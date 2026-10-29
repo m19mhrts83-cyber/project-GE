@@ -36,6 +36,23 @@
         table.rows th, table.rows td { border-bottom: 1px solid var(--line); padding: 5px 6px; text-align: left; vertical-align: top; }
         .warn { color: var(--accent); }
 
+        /* ===== 初級モード（初期表示）: 中級の機能を隠し、文字とボタンを大きく ===== */
+        .modebar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; font-size: 14px; }
+        .modebar button { font-size: 14px; }
+        .beginner-guide { display: none; }
+        body.beginner .adv { display: none !important; }
+        body.beginner .beginner-guide { display: block; font-size: 16px; line-height: 1.8; margin: 0 0 12px; }
+        body.beginner h1 { font-size: 24px; }
+        body.beginner label { font-size: 17px; margin-top: 14px; }
+        body.beginner input[type=text], body.beginner select { font-size: 18px; padding: 12px; }
+        body.beginner textarea { font-size: 15px; }
+        body.beginner .actions button { font-size: 19px; padding: 14px 22px; border-radius: 10px; }
+        body.beginner #status { font-size: 17px; line-height: 1.7; }
+        body.beginner table.rows { font-size: 15px; }
+        table.rows button { padding: 5px 10px; font-size: 13px; white-space: nowrap; }
+        body.beginner table.rows button { font-size: 16px; padding: 8px 14px; }
+        body.beginner .panel strong { font-size: 18px; }
+
         /* ===== A4 叩き台 ===== */
         .sheet { width: 210mm; min-height: 297mm; margin: 0 auto; background: var(--paper); padding: 12mm 12mm 10mm; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
         .sheet h2 { font-size: 26px; margin: 0; letter-spacing: .04em; }
@@ -80,10 +97,19 @@
         }
     </style>
 </head>
-<body>
+<body class="beginner">
 <div class="wrap noprint">
     <h1>周辺MAP 叩き台（OpenStreetMap版・試作）</h1>
-    <p class="sub">チャットAIが出した施設表を貼る → 地図に番号ピン・一覧・徒歩分 → A4の叩き台。地図はAIに描かせず、OpenStreetMapの実地図を使います。</p>
+    <div class="modebar">
+        <span id="modeLabel">いまは「初級」の画面です。</span>
+        <button id="btnMode" class="secondary" type="button">中級の機能を表示</button>
+    </div>
+    <ol class="beginner-guide">
+        <li>物件名と住所を入れる</li>
+        <li>AIが出した表をコピーして、下の欄に貼る</li>
+        <li>「地図にピンを立てる」→「A4にする」→「印刷・PDF保存」</li>
+    </ol>
+    <p class="sub adv">チャットAIが出した施設表を貼る → 地図に番号ピン・一覧・徒歩分 → A4の叩き台。地図はAIに描かせず、OpenStreetMapの実地図を使います。</p>
 
     <div class="panel">
         <div class="grid2">
@@ -96,21 +122,21 @@
                 <input type="text" id="propAddr" placeholder="例: 愛知県名古屋市北区長田町4丁目69番地5">
             </div>
         </div>
-        <label for="areaCopy">エリアの一言（任意）</label>
-        <input type="text" id="areaCopy" placeholder="例: 名城線と瀬戸線に挟まれた生活至便な立地です。">
+        <label for="areaCopy" class="adv">エリアの一言（任意）</label>
+        <input type="text" id="areaCopy" class="adv" placeholder="例: 名城線と瀬戸線に挟まれた生活至便な立地です。">
         <label for="tableIn">施設表（チャットAIの出力をそのまま貼る）</label>
         <textarea id="tableIn" rows="12" spellcheck="false" placeholder="| 掲載 | 区分 | 施設名 | 種類 | 住所・目印 | 吹き出し | 確認 |&#10;| ○ | 徒歩 | 志賀本通駅 | 駅 | 名古屋市北区 | 栄まで地下鉄で直通です | 確認済み |"></textarea>
-        <small>列は「掲載（○／×）・区分（徒歩／車／吹き出し）・施設名・種類・住所・目印・吹き出し・確認」。掲載が×の行は載せません。表の前後に説明文が混ざっていても表の部分だけ読みます。「吹き出し」区分の行は紙面下の吹き出しになります。</small>
+        <small class="adv">列は「掲載（○／×）・区分（徒歩／車／吹き出し）・施設名・種類・住所・目印・吹き出し・確認」。掲載が×の行は載せません。表の前後に説明文が混ざっていても表の部分だけ読みます。「吹き出し」区分の行は紙面下の吹き出しになります。</small>
         <div class="actions">
             <button id="btnRun">地図にピンを立てる</button>
-            <button id="btnSample" class="secondary">見本データを入れる</button>
+            <button id="btnSample" class="secondary adv">見本データを入れる</button>
         </div>
         <div id="status"></div>
     </div>
 
     <div class="panel" id="editPanel" hidden>
         <strong>⑤ ピン位置の確認</strong>
-        <small>　ずれているピンはドラッグで直せます（徒歩分も計算し直します）。地図の表示範囲が、そのまま叩き台の地図範囲になります。</small>
+        <small class="adv">　ずれているピンはドラッグで直せます（徒歩分も計算し直します）。地図の表示範囲が、そのまま叩き台の地図範囲になります。</small>
         <div id="editMap" style="margin-top:8px"></div>
         <table class="rows" id="rowTable"></table>
         <label for="mapStyle">紙面の地図</label>
@@ -119,13 +145,13 @@
             <option value="white">白地図（道路と線路だけ・文字なし）</option>
         </select>
         <div class="actions">
-            <button id="btnSheet">A4叩き台を作る</button>
+            <button id="btnSheet">A4にする</button>
             <button id="btnPrint" class="secondary" disabled>印刷・PDF保存</button>
-            <button id="btnHtml" class="secondary" disabled>叩き台HTMLを保存（AI仕上げ用）</button>
+            <button id="btnHtml" class="secondary adv" disabled>叩き台HTMLを保存（AI仕上げ用）</button>
         </div>
     </div>
 
-    <div class="panel" id="finishPanel" hidden>
+    <div class="panel adv" id="finishPanel" hidden>
         <strong>⑥ AIの仕上げHTMLを貼る</strong>
         <small>　保存した叩き台HTMLをチャットAIに渡して見た目を整えてもらい、返ってきたHTMLをそのまま貼ります。地図画像はこのページが差し込みます。</small>
         <textarea id="finishIn" rows="8" spellcheck="false" placeholder="<!DOCTYPE html> から </html> まで（```で囲まれていてもかまいません）"></textarea>
