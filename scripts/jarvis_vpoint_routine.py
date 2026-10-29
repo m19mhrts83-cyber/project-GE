@@ -481,7 +481,7 @@ def main() -> int:
         asks = (report.get("manual") or {}).get("jarvis_asks") or []
         if not isinstance(asks, list):
             asks = []
-        note_bits = ["窓C定例"]
+        note_bits = ["月末の定例チェック（25日〜末日）"]
         if report.get("auto", {}).get("grant_summary", {}).get("status"):
             note_bits.append(f"付与={report['auto']['grant_summary']['status']}")
         slack_cmd = [
