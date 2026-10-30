@@ -187,6 +187,21 @@ def normalize_report_item_spacing(body: str) -> str:
     return text
 
 
+_WEATHER_SEP_RE = re.compile(r"[ \t]*[·･][ \t]*")
+
+
+def split_weather_item_parts(body: str) -> str:
+    """天気の1項目を「 · 」区切りで改行（iPhone で1行が長すぎる FB 2026-10-29）。"""
+    out: list[str] = []
+    for line in (body or "").splitlines():
+        if re.match(r"[ \t]*[•・\-\*][ \t]*\S", line) and _WEATHER_SEP_RE.search(line):
+            parts = [p.strip() for p in _WEATHER_SEP_RE.split(line) if p.strip()]
+            out.extend(parts)
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
 def ensure_consult_handoff_footer(body: str) -> str:
     """#consult 用。末尾に「次:」が無いとき橋渡し3行を補完（忘却防止）。"""
     text = (body or "").rstrip()
@@ -208,8 +223,11 @@ def build_text(meta: dict[str, str], body: str, name: str) -> str:
     body_clean = body.strip()
     if channel == "consult":
         body_clean = ensure_consult_handoff_footer(body_clean)
+    is_weather = "天気" in (meta.get("bot") or "") + title
+    if is_weather:
+        body_clean = split_weather_item_parts(body_clean)
     # 天気・定型の箇条書きは項目間空行（見やすさ）
-    if channel in {"report", "consult"} or "天気" in (meta.get("bot") or "") + title:
+    if channel in {"report", "consult"} or is_weather:
         body_clean = normalize_report_item_spacing(body_clean)
     if len(body_clean) > BODY_LIMIT:
         body_clean = body_clean[: BODY_LIMIT - 1] + "…"
@@ -233,6 +251,9 @@ def build_text(meta: dict[str, str], body: str, name: str) -> str:
         filtered.append(line)
     body_clean = "\n".join(filtered).strip() or "（本文なし）"
     body_clean = markdown_to_slack(body_clean)
+    if is_weather:
+        # 種別／ch の行は天気では読まないので題だけ（Slack FB 2026-10-29）
+        return f"【Grok定型報告】{bot}\n*{title}*\n\n{body_clean}"
     return (
         f"【Grok定型報告】{bot}\n"
         f"・種別: {kind}\n"
