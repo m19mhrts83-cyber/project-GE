@@ -669,9 +669,9 @@ def main() -> int:
             n = upsert_batches(sb, "line_openchat_logs", to_upsert)
             print(f"✅ kamiooya-qa line_openchat_logs UPSERT (staging・差分): {n}")
 
-    if args.export_grok or do_apply:
+    if args.export_grok:
         # Google Drive(CloudStorage) は同期中の EDEADLK 等で書けないことがある。
-        # DB(正本)反映は済んでいるため、二次投影の失敗で全体を落とさない。
+        # 明示実行だけに限定し、DB(正本)反映と日次運用を分離する。
         try:
             export_for_grok(all_entries, GROK_SHARED / "神大家オプチャ_修繕業者・相談知見リスト.md")
             export_catalog(all_entries, GROK_SHARED / "神大家オプチャ_データソースカタログ.md")

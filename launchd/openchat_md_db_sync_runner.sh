@@ -72,10 +72,10 @@ fi
     echo "# active threads sync rc=${th_rc}"
   fi
 
-  # MD → kamiooya-qa.line_openchat_logs（staging）＋ Grok共有
-  # 二次投影の失敗で本線（取込・監視）を止めない
+  # OneDrive MD → kamiooya-qa.line_openchat_logs（staging）。
+  # Google Drive の Grok共有は二次出力なので、日次本線から分離する。
   db_rc=0
-  "$PY" "${REPO_DIR}/scripts/jarvis_kurashift_openchat_sync.py" --apply --export-grok || db_rc=$?
+  "$PY" "${REPO_DIR}/scripts/jarvis_kurashift_openchat_sync.py" --apply || db_rc=$?
 
   # staging → ready / excluded（ノイズのみ除外・検索公開）
   "$PY" "${REPO_DIR}/scripts/jarvis_openchat_publish.py" --apply || true
