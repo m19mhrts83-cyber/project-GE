@@ -35,7 +35,7 @@ class OpenchatHealthTest(unittest.TestCase):
         self.assertEqual(result["level"], "info")
         self.assertEqual(result["symptom"], "main_only_no_thread_evidence")
 
-    def test_active_notification_without_success_is_attention(self) -> None:
+    def test_unregistered_active_notification_is_attention(self) -> None:
         history = {
             f"2026-10-{day:02d}": {
                 "routes": {"sample": {"appended_threads": 0, "appended_main": 1}}
@@ -44,7 +44,7 @@ class OpenchatHealthTest(unittest.TestCase):
         }
         result = evaluate_route(
             route(registered=2),
-            {"appended_main": 1, "appended_threads": 0, "ok": 0},
+            {"appended_main": 1, "appended_threads": 0, "ok": 2},
             history,
             {"main": 1, "thread": 0, "reply": 0},
             {"main": 1, "thread": 0, "reply": 0},

@@ -226,15 +226,17 @@ def count_md_headings(md: Path, *, days: int = 14) -> dict[str, int]:
     return result
 
 
-def load_active_thread_counts(path: Path | None = None) -> dict[str, int]:
-    """直近のメインイベントで通知されたスレッド数を route 別に返す。"""
+def load_active_thread_mids(path: Path | None = None) -> dict[str, set[str]]:
+    """直近のメインイベントで通知されたスレッドMIDを route 別に返す。"""
     path = path or ACTIVE_THREADS
     raw = load_json(path)
     routes = raw.get("routes") if isinstance(raw.get("routes"), dict) else {}
-    out: dict[str, int] = {}
+    out: dict[str, set[str]] = {}
     for rid, mids in routes.items():
-        if isinstance(mids, (dict, list)):
-            out[str(rid)] = len(mids)
+        if isinstance(mids, dict):
+            out[str(rid)] = {str(mid) for mid in mids}
+        elif isinstance(mids, list):
+            out[str(rid)] = {str(mid) for mid in mids}
     return out
 
 
@@ -373,7 +375,7 @@ def evaluate_route(
     history: dict[str, Any],
     md_counts: dict[str, int],
     md_active_counts: dict[str, int] | None = None,
-    active_thread_count: int = 0,
+    unregistered_active_thread_count: int = 0,
 ) -> dict[str, Any]:
     rid = route["id"]
     registered = len(route["thread_mids"])
@@ -395,7 +397,7 @@ def evaluate_route(
     action = ""
     symptom = ""
 
-    if include and registered == 0 and (replies_14 > 0 or active_thread_count > 0):
+    if include and registered == 0 and (replies_14 > 0 or unregistered_active_thread_count > 0):
         level = "attention"
         symptom = "silent_fail_empty_mids"
         if replies_14 > 0:
@@ -405,14 +407,14 @@ def evaluate_route(
             )
         else:
             reasons.append(
-                f"thread_mids 未登録なのに新着スレッド通知{active_thread_count}件"
+                f"thread_mids 未登録なのに新着スレッド通知{unregistered_active_thread_count}件"
                 "（取得対象未登録。--init discover 要）"
             )
         action = BOOTSTRAP_HINT.format(route_id=rid)
 
     # メイン投稿だけでは「スレッドが存在する」証拠にならない。
-    # 30日失効後の無活動ルートを誤検知しないため、新着スレッド通知があるのに
-    # 取得成功0の場合だけ attention にする。
+    # 30日失効後の無活動ルートを誤検知しないため、取得対象に未登録の
+    # 新着スレッド通知がある場合だけ attention にする。
     if include and registered > 0 and level == "ok":
         days_zero = 0
         main_recent = 0
@@ -422,11 +424,11 @@ def evaluate_route(
             if int(ent.get("appended_threads") or 0) == 0:
                 days_zero += 1
             main_recent += int(ent.get("appended_main") or 0)
-        if active_thread_count > 0 and ok_n == 0:
+        if unregistered_active_thread_count > 0:
             level = "attention"
             symptom = "zero_append_with_main"
             reasons.append(
-                f"新着スレッド通知{active_thread_count}件に対し取得成功0"
+                f"取得対象に未登録の新着スレッド通知{unregistered_active_thread_count}件"
                 f"（登録{registered}件、直近{THREAD_ACTIVE_DAYS}日活動{thread_activity_active}件）"
             )
             action = action or BOOTSTRAP_HINT.format(route_id=rid)
@@ -468,7 +470,7 @@ def evaluate_route(
         "md_main_14d": main_14,
         "md_threads_active": threads_active,
         "md_replies_active": replies_active,
-        "active_thread_notifications": active_thread_count,
+        "unregistered_active_thread_notifications": unregistered_active_thread_count,
         "md_window_days": THREAD_ACTIVE_DAYS,
         "appended_threads": int((latest_entry or {}).get("appended_threads") or 0),
         "appended_main": int((latest_entry or {}).get("appended_main") or 0),
@@ -732,7 +734,7 @@ def build_report(
     history = health.get("history") if isinstance(health.get("history"), dict) else {}
     latest = health.get("latest") if isinstance(health.get("latest"), dict) else {}
     latest_routes = latest.get("routes") if isinstance(latest.get("routes"), dict) else {}
-    active_thread_counts = load_active_thread_counts()
+    active_thread_mids = load_active_thread_mids()
 
     route_evals: list[dict[str, Any]] = []
     for route in routes:
@@ -749,7 +751,10 @@ def build_report(
                 history,
                 md_counts,
                 md_active_counts,
-                active_thread_counts.get(route["id"], 0),
+                len(
+                    active_thread_mids.get(route["id"], set())
+                    - {str(mid) for mid in route["thread_mids"]}
+                ),
             )
         )
 
