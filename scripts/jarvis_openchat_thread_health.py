@@ -2,7 +2,7 @@
 """
 815 オプチャ・スレッド取得健全性 → sync_meta + watch_status
 
-静かな失敗（登録0件で正常終了・追記0が続く等）と、
+静かな失敗（スレッド活動の証拠があるのに取得できない等）と、
 メイン鮮度（全ルートで直近N日【メイン】0＋常時監視は稼働）を検知し、
 ダッシュボード /openchat 用の JSON を push する。
 
@@ -34,6 +34,7 @@ ROUTES_YAML = REPO / "line_unofficial_poc" / "open_chat_routes.yaml"
 WATCH_STATUS = (
     REPO / "line_unofficial_poc" / ".line_auth" / ".chrline_open_chat_watch_status.json"
 )
+ACTIVE_THREADS = REPO / "line_unofficial_poc" / ".line_auth" / "active_thread_mids.json"
 # 同期runnerが「pause したまま resume に失敗した」ことを示すマーカー
 WATCH_RESUME_FAILED = (
     REPO / "line_unofficial_poc" / ".line_auth" / "WATCH_RESUME_FAILED.txt"
@@ -225,6 +226,18 @@ def count_md_headings(md: Path, *, days: int = 14) -> dict[str, int]:
     return result
 
 
+def load_active_thread_counts(path: Path | None = None) -> dict[str, int]:
+    """直近のメインイベントで通知されたスレッド数を route 別に返す。"""
+    path = path or ACTIVE_THREADS
+    raw = load_json(path)
+    routes = raw.get("routes") if isinstance(raw.get("routes"), dict) else {}
+    out: dict[str, int] = {}
+    for rid, mids in routes.items():
+        if isinstance(mids, (dict, list)):
+            out[str(rid)] = len(mids)
+    return out
+
+
 def daily_thread_series(routes: list[dict[str, Any]], *, days: int = 30) -> list[dict[str, Any]]:
     """日付ごとの【スレッド】追記件数（route内訳付き）。"""
     start = today() - timedelta(days=days - 1)
@@ -360,6 +373,7 @@ def evaluate_route(
     history: dict[str, Any],
     md_counts: dict[str, int],
     md_active_counts: dict[str, int] | None = None,
+    active_thread_count: int = 0,
 ) -> dict[str, Any]:
     rid = route["id"]
     registered = len(route["thread_mids"])
@@ -368,14 +382,20 @@ def evaluate_route(
     threads_14 = int(md_counts.get("thread") or 0)
     main_14 = int(md_counts.get("main") or 0)
     # 判定用は広めの窓（既定30日）。表示用の 14日 はそのまま残す。
-    threads_active = int((md_active_counts or md_counts).get("thread") or 0)
+    active_counts = md_active_counts or md_counts
+    threads_active = int(active_counts.get("thread") or 0)
+    replies_active = int(active_counts.get("reply") or 0)
+    thread_activity_active = threads_active + replies_active
+    deleted = int((latest_entry or {}).get("deleted") or 0)
+    closed = int((latest_entry or {}).get("closed") or 0)
+    ok_n = int((latest_entry or {}).get("ok") or 0)
 
     level = "ok"
     reasons: list[str] = []
     action = ""
     symptom = ""
 
-    if include and registered == 0 and (replies_14 > 0 or main_14 > 0):
+    if include and registered == 0 and (replies_14 > 0 or active_thread_count > 0):
         level = "attention"
         symptom = "silent_fail_empty_mids"
         if replies_14 > 0:
@@ -384,15 +404,15 @@ def evaluate_route(
                 "（専用スレ取得できていない静かな失敗）"
             )
         else:
-            # メインだけ取れていて relatedMessageId が MD に無い典型。
-            # 差分 discover では候補0になりやすい → --init で履歴スキャンが必要。
             reasons.append(
-                f"thread_mids 未登録なのに直近14日【メイン】{main_14}件"
-                "（スレは立っていても差分discoverでは拾えない。--init 要）"
+                f"thread_mids 未登録なのに新着スレッド通知{active_thread_count}件"
+                "（取得対象未登録。--init discover 要）"
             )
         action = BOOTSTRAP_HINT.format(route_id=rid)
 
-    # 登録あり・7日連続 appended_threads=0、かつ main 追記あり
+    # メイン投稿だけでは「スレッドが存在する」証拠にならない。
+    # 30日失効後の無活動ルートを誤検知しないため、新着スレッド通知があるのに
+    # 取得成功0の場合だけ attention にする。
     if include and registered > 0 and level == "ok":
         days_zero = 0
         main_recent = 0
@@ -402,19 +422,22 @@ def evaluate_route(
             if int(ent.get("appended_threads") or 0) == 0:
                 days_zero += 1
             main_recent += int(ent.get("appended_main") or 0)
-        # MD 側の main も参考
-        if days_zero >= 7 and (main_recent > 0 or main_14 > 0) and threads_active == 0:
+        if active_thread_count > 0 and ok_n == 0:
             level = "attention"
             symptom = "zero_append_with_main"
             reasons.append(
-                f"登録{registered}件なのに7日連続スレ追記0"
-                f"（メインは動いている／直近{THREAD_ACTIVE_DAYS}日【スレッド】0）"
+                f"新着スレッド通知{active_thread_count}件に対し取得成功0"
+                f"（登録{registered}件、直近{THREAD_ACTIVE_DAYS}日活動{thread_activity_active}件）"
             )
             action = action or BOOTSTRAP_HINT.format(route_id=rid)
+        elif days_zero >= 7 and (main_recent > 0 or main_14 > 0) and thread_activity_active == 0:
+            level = "info"
+            symptom = "threads_dormant"
+            reasons.append(
+                f"登録{registered}件・直近{THREAD_ACTIVE_DAYS}日スレッド活動0"
+                "（メイン投稿のみ。30日失効またはスレッド無活動の可能性）"
+            )
 
-    deleted = int((latest_entry or {}).get("deleted") or 0)
-    closed = int((latest_entry or {}).get("closed") or 0)
-    ok_n = int((latest_entry or {}).get("ok") or 0)
     if registered > 0 and (deleted + closed) >= max(registered * 0.8, 1) and ok_n == 0:
         if level == "ok":
             level = "info"
@@ -428,6 +451,12 @@ def evaluate_route(
         if level == "ok":
             level = "info"
             reasons.append("thread_mids 0件・直近スレ／メイン活動なし（問題なしの可能性）")
+    elif include and registered == 0 and level == "ok" and main_14 > 0:
+        level = "info"
+        symptom = "main_only_no_thread_evidence"
+        reasons.append(
+            f"thread_mids 0件・直近メイン{main_14}件だが、スレッド活動の証拠なし"
+        )
 
     return {
         "route_id": rid,
@@ -438,6 +467,8 @@ def evaluate_route(
         "md_replies_14d": replies_14,
         "md_main_14d": main_14,
         "md_threads_active": threads_active,
+        "md_replies_active": replies_active,
+        "active_thread_notifications": active_thread_count,
         "md_window_days": THREAD_ACTIVE_DAYS,
         "appended_threads": int((latest_entry or {}).get("appended_threads") or 0),
         "appended_main": int((latest_entry or {}).get("appended_main") or 0),
@@ -701,6 +732,7 @@ def build_report(
     history = health.get("history") if isinstance(health.get("history"), dict) else {}
     latest = health.get("latest") if isinstance(health.get("latest"), dict) else {}
     latest_routes = latest.get("routes") if isinstance(latest.get("routes"), dict) else {}
+    active_thread_counts = load_active_thread_counts()
 
     route_evals: list[dict[str, Any]] = []
     for route in routes:
@@ -717,6 +749,7 @@ def build_report(
                 history,
                 md_counts,
                 md_active_counts,
+                active_thread_counts.get(route["id"], 0),
             )
         )
 

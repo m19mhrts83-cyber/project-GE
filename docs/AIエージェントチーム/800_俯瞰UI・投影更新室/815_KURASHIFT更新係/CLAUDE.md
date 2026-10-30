@@ -64,6 +64,13 @@
 3. **要フォロー時だけ** Slack #ops へ短文。OKは logs のみ
 4. 要判断は #consult
 
+### LINEオプチャの正本と監視
+
+- 正本MDはOneDrive `P815_神大家オプチャ/*/5.やり取り.md`。ここからSupabase `line_openchat_logs`へ差分取込する
+- Google Drive `【with Grok bot】` は任意の二次出力。日次本線からは外し、必要時だけ `--export-grok` で明示実行する
+- スレッドは30日経過でアクセス不能になるため、削除済み404は想定内。stateでdeleted化し日常取得をスキップする
+- 健全性attentionは、返信または新着スレッド通知など「スレッド活動の証拠」があるのに取得できない場合に限る。メイン投稿だけでは取りこぼし扱いにしない
+
 ### 一括（Phase L）
 
 ```bash
@@ -81,3 +88,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-09 | スタブ作成（俯瞰UI更新担当） |
 | 2026-10-11 | Phase L: ui_cycle 報告経路。朝refresh＋12:30相乗り |
 | 2026-10-16 | `#ops` は要フォロー時のみ（OKは投稿スキップ） |
+| 2026-10-30 | 30日失効404を想定内化。Grok二次出力を日次本線から分離し、スレッド活動証拠ベースの監視へ修正 |

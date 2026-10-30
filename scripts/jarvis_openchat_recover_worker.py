@@ -18,7 +18,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -29,10 +29,29 @@ PAUSE = POC / "launchd" / "open_chat_watch_pause.sh"
 RESUME = POC / "launchd" / "open_chat_watch_resume.sh"
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 RECIPE_ID = "openchat_init_bootstrap"
+RUNNING_STALE_HOURS = 2
 
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+def running_is_stale(recipe: dict[str, Any], *, now: datetime | None = None) -> bool:
+    if str(recipe.get("status") or "") != "running":
+        return False
+    raw = str(recipe.get("started_at") or "").strip()
+    if not raw:
+        return True
+    try:
+        started = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return True
+    current = now or datetime.now(timezone.utc)
+    return current.astimezone(timezone.utc) - started.astimezone(timezone.utc) > timedelta(
+        hours=RUNNING_STALE_HOURS
+    )
 
 
 def sb_client():
@@ -211,6 +230,22 @@ def main(argv: list[str] | None = None) -> int:
     payload, rem, recipe = load_recipe(sb)
     if str(recipe.get("id") or "") != RECIPE_ID:
         print("# no openchat_init_bootstrap recipe")
+        return 0
+    if str(recipe.get("status") or "") == "running" and running_is_stale(recipe):
+        stale = dict(recipe)
+        stale["status"] = "error"
+        stale["finished_at"] = now_iso()
+        stale["error"] = (
+            f"stale runningを回収（started_at={recipe.get('started_at') or 'unknown'}、"
+            f"{RUNNING_STALE_HOURS}時間超）"
+        )
+        stale["result"] = None
+        if args.dry_run:
+            print(json.dumps({"stale_running": True, "recipe": stale}, ensure_ascii=False))
+            return 0
+        save_recipe(sb, payload, rem, stale)
+        push_health_after_recipe()
+        print(json.dumps({"ok": False, "status": "error", "result": stale["error"]}, ensure_ascii=False))
         return 0
     if str(recipe.get("status") or "") != "queued":
         print(f"# skip status={recipe.get('status')}")
