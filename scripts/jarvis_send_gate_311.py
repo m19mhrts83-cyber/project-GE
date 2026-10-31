@@ -27,6 +27,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from jarvis_cloud_file import read_text_cloud  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[1]
 AGENT_DIR = (
     REPO
@@ -222,10 +225,17 @@ def _parse_inbox_md(path: Path) -> tuple[Path, str]:
     return Path(draft).expanduser(), source
 
 
+class DraftNotReady(OSError):
+    """Drive の未ダウンロード（EDEADLK）などで今は読めない。次の poll で読み直す。"""
+
+
 def _read_draft(path: Path) -> str:
     if not path.is_file():
         raise FileNotFoundError(f"下書きがありません: {path}")
-    return path.read_text(encoding="utf-8", errors="replace")
+    text = read_text_cloud(path)
+    if text is None:
+        raise DraftNotReady(f"下書きを今は読めません（Drive 未同期の可能性）: {path.name}")
+    return text
 
 
 def _emails_in(text: str) -> list[str]:
@@ -796,15 +806,21 @@ def main() -> int:
                     md.rename(bad)
                     print(f"inbox_error={bad}")
                 continue
-            code = _process_one(
-                draft,
-                source,
-                dry_run=args.dry_run,
-                post=args.post,
-                cfg=cfg,
-                resolved_to=resolved_to or None,
-                resolved_cc=resolved_cc or None,
-            )
+            try:
+                code = _process_one(
+                    draft,
+                    source,
+                    dry_run=args.dry_run,
+                    post=args.post,
+                    cfg=cfg,
+                    resolved_to=resolved_to or None,
+                    resolved_cc=resolved_cc or None,
+                )
+            except DraftNotReady as e:
+                # 1 件読めないだけで poll 全体を落とさない。MD は inbox に残し次回読み直す
+                print(f"⏳ {e}（inbox に残して次回）", file=sys.stderr)
+                worst = max(worst, 1)
+                continue
             worst = max(worst, code)
             if not args.keep_inbox:
                 dest = processed_dir / md.name

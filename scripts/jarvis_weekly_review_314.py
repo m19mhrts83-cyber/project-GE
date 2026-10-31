@@ -44,6 +44,8 @@ ZERO_COUNT_RE = re.compile(r"\b(fail|failed|errors?)\s*[=:]?\s*(0|なし)(?!\d)"
 AI_CALL_RE = re.compile(
     r"openai|anthropic|chat\.completions|find_cursor_agent|launch_cloud_agent"
     r"|api\.x\.ai|generativelanguage|claude -p|cursor-agent"
+    # Gemini（聞くエンジン・議事録整形など）。2026-10-31 追加: 今週の追加が素通りしていた
+    r"|geminiReply|gemini\.generate|jarvis_gemini_research|GEMINI_API_KEY"
 )
 
 
@@ -118,8 +120,8 @@ def collect_commits(since: datetime) -> dict[str, Any]:
         [
             "git", "log", "origin/main", f"--since={since.isoformat()}", "-p",
             "--pretty=COMMIT %h", "--", "*.py", "*.ts", "*.yml", "*.sh",
-            # 検出パターンを書いている自分自身は除く
-            ":!scripts/jarvis_weekly_review_314.py",
+            # 検出パターンを書いている自分自身と、モックで呼ぶだけのテストは除く
+            ":!scripts/jarvis_weekly_review_314.py", ":!scripts/tests/**",
         ],
         timeout=180,
     )
@@ -246,6 +248,8 @@ def collect_workflow_deps() -> list[str]:
     missing = []
     for wf in sorted((REPO / ".github" / "workflows").glob("*.yml")):
         s = wf.read_text(encoding="utf-8")
+        # コメント行の説明（「Mac の scripts/x.py が…」）は実行しないので数えない
+        s = "\n".join(ln for ln in s.splitlines() if not ln.lstrip().startswith("#"))
         scripts = set(re.findall(r"scripts/(\w+\.py)", s))
         if not scripts:
             continue
