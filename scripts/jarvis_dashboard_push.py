@@ -88,6 +88,22 @@ def _clean_nul(val: Any) -> Any:
     return val
 
 
+# Mac push で消すと #consult メール要対応が毎回「未投稿」に戻り連投になる（317 FB 10/28・10/30）
+KEEP_PAYLOAD_PREFIXES = ("slack_ma_", "gmail_read_")
+
+
+def keep_remote_payload_meta(
+    payload: dict[str, Any], remote_payload: dict[str, Any], keep: tuple[str, ...]
+) -> dict[str, Any]:
+    """Web／Slack 投稿側で付けた payload メタを Mac の上書きから守る。"""
+    for k, v in remote_payload.items():
+        if v is None:
+            continue
+        if k in keep or k.startswith(KEEP_PAYLOAD_PREFIXES):
+            payload[k] = v
+    return payload
+
+
 def push_triage(sb) -> int:
     if not QUEUE_PATH.is_file():
         print("# triage: queue.json なし", file=sys.stderr)
@@ -142,9 +158,7 @@ def push_triage(sb) -> int:
             if it.get(k) is not None
         }
         remote_payload = remote.get("payload") if isinstance(remote.get("payload"), dict) else {}
-        for k in KEEP_PAYLOAD:
-            if remote_payload.get(k) is not None:
-                payload[k] = remote_payload[k]
+        keep_remote_payload_meta(payload, remote_payload, KEEP_PAYLOAD)
         draft_text = it.get("draft_text") or None
         if remote_payload.get("web_draft_saved_at") and remote.get("draft_text"):
             draft_text = remote.get("draft_text")
