@@ -647,6 +647,12 @@ def print_block(state: dict[str, Any]) -> None:
         print(f"- state: {WEEKLY_SUMMARY_STATE_PATH}")
 
 
+def _err_line(tail: str | None, width: int = 160) -> str:
+    """stderr の末尾から最後の非空行（例外の型と理由）を返す。先頭 120 字だと途中の ^^^ しか残らない。"""
+    lines = [ln.strip() for ln in (tail or "").splitlines() if ln.strip()]
+    return lines[-1][:width] if lines else ""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Poll 部長ボックス → state / dashboard")
     ap.add_argument("--push", action="store_true", help="situation_watch + dashboard push")
@@ -712,7 +718,7 @@ def main() -> int:
                 else:
                     print(
                         f"📎 Todoist inbox apply: FAIL rc={apply_result.get('returncode')} "
-                        f"{(apply_result.get('stderr_tail') or '')[:120]}",
+                        f"{_err_line(apply_result.get('stderr_tail'))}",
                         file=sys.stderr,
                     )
             if not args.skip_slack_report_apply:
@@ -727,7 +733,7 @@ def main() -> int:
                 else:
                     print(
                         f"📎 Slack report apply: FAIL rc={slack_apply_result.get('returncode')} "
-                        f"{(slack_apply_result.get('stderr_tail') or '')[:120]}",
+                        f"{_err_line(slack_apply_result.get('stderr_tail'))}",
                         file=sys.stderr,
                     )
             if not args.skip_send_gate_311_apply:
@@ -742,7 +748,7 @@ def main() -> int:
                 else:
                     print(
                         f"📎 311 send_gate apply: FAIL rc={send_gate_311_result.get('returncode')} "
-                        f"{(send_gate_311_result.get('stderr_tail') or '')[:120]}",
+                        f"{_err_line(send_gate_311_result.get('stderr_tail'))}",
                         file=sys.stderr,
                     )
             if not args.skip_app_dev_cards_apply:
@@ -758,7 +764,7 @@ def main() -> int:
                 else:
                     print(
                         f"📎 app_dev_cards apply: FAIL rc={app_dev_cards_result.get('returncode')} "
-                        f"{(app_dev_cards_result.get('stderr_tail') or '')[:120]}",
+                        f"{_err_line(app_dev_cards_result.get('stderr_tail'))}",
                         file=sys.stderr,
                     )
             s9 = apply_s9_candidates()
@@ -768,7 +774,7 @@ def main() -> int:
                 )
             elif not s9.get("ok") and not s9.get("skipped"):
                 print(
-                    f"📎 s9_candidates apply: FAIL rc={s9.get('returncode')} {(s9.get('stderr_tail') or s9.get('error') or '')[:120]}",
+                    f"📎 s9_candidates apply: FAIL rc={s9.get('returncode')} {_err_line(s9.get('stderr_tail') or s9.get('error'))}",
                     file=sys.stderr,
                 )
             state = poll()

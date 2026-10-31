@@ -180,6 +180,12 @@ def archive_processed(svc, msg: dict[str, Any], label_id: str | None) -> bool:
     return True
 
 
+def is_scope_error(exc: Exception) -> bool:
+    """Gmail API の 403 insufficient scopes（再認可しないと直らない）か。"""
+    text = str(exc)
+    return "insufficient authentication scopes" in text or "insufficientPermissions" in text
+
+
 def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, Any]:
     sys.path.insert(0, str(REPO / "scripts"))
     from jarvis_kurashift_vendor_list import (
@@ -210,14 +216,25 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
         except Exception as e:
             print(f"# grok_bucho label soft-fail: {e}", file=sys.stderr)
 
+    scope_missing = False
+
     def _archive(msg: dict[str, Any]) -> None:
-        nonlocal archived
-        if dry_run or _keep_inbox():
+        nonlocal archived, scope_missing
+        if dry_run or _keep_inbox() or scope_missing:
             return
         try:
             if archive_processed(svc, msg, label_id):
                 archived += 1
         except Exception as e:
+            if is_scope_error(e):
+                # 権限不足は全件同じ結果になる。1 回だけ書いて、この回の片付けは止める
+                scope_missing = True
+                print(
+                    "# grok_bucho archive skip: トークンに gmail.modify が無い"
+                    "（estate の Gmail トークンを再認可すれば片付けが動く）",
+                    file=sys.stderr,
+                )
+                return
             print(f"# grok_bucho archive soft-fail id={msg.get('id')}: {e}", file=sys.stderr)
 
     for msg in messages:
