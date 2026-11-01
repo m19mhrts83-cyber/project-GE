@@ -45,6 +45,13 @@ def inject_runtime_placeholders(api_yaml: str) -> str:
     """Replace runtime placeholders in API YAML with values from env."""
     out = api_yaml
 
+    if "__COMMUNITY_ATTACHMENTS_PROXY_SECRET__" in out:
+        secret = (os.environ.get("COMMUNITY_ATTACHMENTS_PROXY_SECRET") or "").strip()
+        if len(secret) < 32:
+            raise SystemExit("COMMUNITY_ATTACHMENTS_PROXY_SECRET が未設定です。")
+        out = out.replace("__COMMUNITY_ATTACHMENTS_PROXY_SECRET__", secret)
+        out = out.replace("__COMMUNITY_ATTACHMENTS_URL__", "https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/community-attachments")
+
     if "__NOTIFY_WEBHOOK_URL__" in out or "__NOTIFY_SHARED_SECRET__" in out:
         url = (os.environ.get("NOTIFY_WEBHOOK_URL") or "").strip()
         secret = (os.environ.get("NOTIFY_SHARED_SECRET") or "").strip()
