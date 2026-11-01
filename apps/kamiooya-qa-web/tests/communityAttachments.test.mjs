@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHandler, issueSession, sessionUser } from '../supabase/functions/community-attachments/index.ts';
 
 const cfg = { projectUrl: 'https://example.supabase.co', serviceKey: 'server-only-key',
+  memberReadsEnabled: true,
   proxySecret: 'proxy-secret-'.repeat(4), sessionSecret: 'session-secret-'.repeat(4),
   raimoOrigin: 'https://app.example', statusUrl: 'https://app.example/status' };
 const now = 1800000000000;
@@ -12,6 +13,16 @@ const response = (obj, status = 200) => new Response(JSON.stringify(obj), { stat
 const request = (body, token = '', origin = cfg.raimoOrigin) => new Request('https://edge.example', {
   method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) },
   body: JSON.stringify(body),
+});
+
+test('security hold blocks new and previously issued sessions without upstream reads', async () => {
+  const handler = createHandler({ ...cfg, memberReadsEnabled: false }, async () => assert.fail('must not fetch'), () => now);
+  const token = await issueSession('12', cfg.sessionSecret, now);
+  for (const operation of ['session', 'index', 'list', 'open']) {
+    const res = await handler(request({ operation, user_id: '12', attachment_id: id }, operation === 'session' ? cfg.proxySecret : token));
+    assert.equal(res.status, 503);
+    assert.equal((await res.json()).error, 'attachments_temporarily_unavailable');
+  }
 });
 
 test('session rejects forgery, expiry and altered user id', async () => {
