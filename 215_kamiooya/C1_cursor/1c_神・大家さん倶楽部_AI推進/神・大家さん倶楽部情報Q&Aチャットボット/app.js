@@ -3729,6 +3729,10 @@ const App = {
       return hitKeyword && hitCategory && hitDate;
     });
 
+    const pageSize = 100;
+    const requestedOffset = Number.isInteger(opts.offset) && opts.offset >= 0 ? opts.offset : 0;
+    const offset = Math.min(requestedOffset, Math.max(0, Math.floor((filtered.length - 1) / pageSize) * pageSize));
+    const visibleRows = filtered.slice(offset, offset + pageSize);
     const totalCount = communityRows.length;
     const missingDateCount = communityRows.reduce(function (n, row) {
       return n + (App.hasPostedAtValue(row) ? 0 : 1);
@@ -3736,12 +3740,25 @@ const App = {
     if (App.elements.commentListMeta) {
       App.elements.commentListMeta.textContent =
         '表示 ' +
-        filtered.length +
-        ' / 全 ' +
+        (filtered.length ? (offset + 1) + '〜' + (offset + visibleRows.length) : '0') +
+        ' / 検索結果 ' + filtered.length + ' / 全 ' +
         totalCount +
         ' 件（日時なし ' +
         missingDateCount +
         ' 件）';
+      if (filtered.length > pageSize) {
+        const controls = document.createElement('span');
+        controls.className = 'inline-flex gap-3 ml-3';
+        [['前の100件', offset - pageSize], ['次の100件', offset + pageSize]].forEach(function (page) {
+          const button = document.createElement('button');
+          button.type = 'button'; button.textContent = page[0];
+          button.className = 'text-blue-700 underline disabled:text-slate-400';
+          button.disabled = page[1] < 0 || page[1] >= filtered.length;
+          button.addEventListener('click', function () { App.renderCommentTable({ offset: page[1] }); });
+          controls.appendChild(button);
+        });
+        App.elements.commentListMeta.appendChild(controls);
+      }
     }
 
     if (filtered.length === 0) {
@@ -3749,7 +3766,7 @@ const App = {
       return;
     }
 
-    filtered.forEach(function (r) {
+    visibleRows.forEach(function (r) {
       const tr = document.createElement('tr');
       tr.className = 'border-t';
       const postedAt = String(App.commentField(r, 'posted_at') || '').trim();
