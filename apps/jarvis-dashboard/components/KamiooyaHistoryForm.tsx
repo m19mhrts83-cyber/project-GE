@@ -8,7 +8,7 @@ export default function KamiooyaHistoryForm({ projectId, itemId, initialId, work
   projectId: string; itemId: string; initialId: string; workDate: string; previous?: WorkEvent; questionId?: string;
 }) {
   const [state, action, pending] = useActionState(saveKamiooyaHistory, { ok: false, message: "" });
-  const [eventId, setEventId] = useState(initialId);
+  const eventId = initialId;
   const [fields, setFields] = useState({
     workDate: previous?.work_date ?? workDate, summary: previous?.summary ?? "",
     minutes: previous?.minutes == null ? "" : String(previous.minutes),
@@ -18,10 +18,11 @@ export default function KamiooyaHistoryForm({ projectId, itemId, initialId, work
   const change = (key: keyof typeof fields, value: string) => setFields(current => ({ ...current, [key]: value }));
   useEffect(() => {
     if (state.savedId) {
-      setEventId(crypto.randomUUID());
-      if (!previous && !questionId) setFields({workDate,summary:"",minutes:"",timeKind:"owner_confirmed",correctionReason:"",status:"",evidence:""});
+      // 保存結果を受け取ってからGETし直す。Server Actionの再描画待ちで
+      // 「保存中」のまま残らないよう、保存と表示の取得を分ける。
+      window.location.reload();
     }
-  }, [state.savedId, previous, questionId, workDate]);
+  }, [state.savedId]);
   const label = previous ? "時間・記録を見直す" : questionId ? "この質問に回答する" : "作業記録を追加する";
   return <details style={{ margin: "12px 0", borderTop: "1px solid var(--border, #ddd)", paddingTop: 10 }}>
     <summary style={{ cursor: "pointer" }}>{label}</summary>
