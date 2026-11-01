@@ -63,6 +63,8 @@
 
 手順: `docs/神大家運営_作業項目と実行履歴_20261101.md`。記録: `scripts/jarvis_kamiooya_work_history.py`、投影: Jarvis用Supabase `sync_meta.kamiooya_work_history`、閲覧: `/kamiooya/history`。セッション終了時に記録・同期する。
 
+画面からの作業追記・時間訂正・質問回答も可能。訂正は旧記録を残して追記し、訂正後だけ集計する。CLIの `--push` は画面入力を読み戻してIDでマージする双方向同期。古いJSONの直接upsertで画面入力を消さない。競合する時間訂正は本人に確認する。
+
 ## 6. 作業手順（チェックリスト）
 
 1. 対象ページ／投影ジョブを確認

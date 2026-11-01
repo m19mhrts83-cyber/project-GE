@@ -4,6 +4,7 @@ import io
 import json
 import tempfile
 import unittest
+from unittest.mock import patch, Mock
 from pathlib import Path
 
 SPEC = importlib.util.spec_from_file_location("work_history", Path(__file__).parents[1] / "jarvis_kamiooya_work_history.py")
@@ -12,6 +13,31 @@ SPEC.loader.exec_module(work)
 
 
 class WorkHistoryTest(unittest.TestCase):
+    def sample(self, event_id="original"):
+        return {"version":1,"updated_at":"2026-11-01T12:00:00+09:00","projects":[{"id":"p","title":"案件","items":[{"id":"a","title":"項目","status":"planned"}],"events":[{"id":event_id,"item_id":"a","at":"2026-11-01T12:00:00+09:00","kind":"log","summary":"記録","actor":"Chappy","minutes":None,"time_kind":"unrecorded","evidence":[]}]}]}
+
+    def test_merge_keeps_dashboard_entry_and_rejects_conflicting_corrections(self):
+        local = self.sample()
+        remote = self.sample("web")
+        combined = work.merge(local,remote)
+        self.assertEqual({e["id"] for e in combined["projects"][0]["events"]},{"original","web"})
+        remote["projects"][0]["events"][0]["supersedes"]="original"
+        local["projects"][0]["events"].append({**local["projects"][0]["events"][0],"id":"local-edit","supersedes":"original"})
+        with self.assertRaisesRegex(ValueError,"訂正が競合"):
+            work.merge(local,remote)
+
+    def test_push_retries_compare_and_swap_and_merges_new_remote_entry(self):
+        local = self.sample()
+        first = {"value":json.dumps(self.sample()),"updated_at":"2026-11-01T03:00:00Z"}
+        second = {"value":json.dumps(self.sample("web")),"updated_at":"2026-11-01T03:01:00Z"}
+        empty = Mock(ok=True,status_code=200); empty.json.return_value=[]
+        success = Mock(ok=True,status_code=200); success.json.return_value=[{"key":"kamiooya_work_history"}]
+        with patch.object(work,"remote_config",return_value=("https://example.com/rest/v1/sync_meta",{})), patch.object(work,"remote_read",side_effect=[first,second]), patch("requests.patch",side_effect=[empty,success]) as save:
+            combined=work.push(local)
+        self.assertEqual(save.call_count,2)
+        self.assertEqual(save.call_args.kwargs["params"]["updated_at"],"eq."+second["updated_at"])
+        self.assertEqual({e["id"] for e in combined["projects"][0]["events"]},{"original","web"})
+
     def test_records_questions_answers_without_duplicate_retry(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "history.json"

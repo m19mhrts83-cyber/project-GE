@@ -7,13 +7,14 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import fcntl
 import json
 import os
 import re
 import tempfile
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -23,7 +24,7 @@ STATUSES = ("planned", "running", "waiting", "done")
 
 
 def now() -> str:
-    return datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(timespec="seconds")
+    return datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(timespec="milliseconds")
 
 
 def atomic_write(path: Path, text: str) -> None:
@@ -66,27 +67,96 @@ def render(data: dict) -> str:
                         lines += [f"  質問ID: {e['question_id']}"]
                     if e.get("supersedes"):
                         lines += [f"  訂正対象: {e['supersedes']}"]
+                    if e.get("work_date"):
+                        lines += [f"  作業日: {e['work_date']}"]
                     lines += [f"  根拠: {url}" for url in e["evidence"]]
             lines.append("")
     return "\n".join(lines) + "\n"
 
 
-def push(data: dict) -> None:
+def merge(local: dict, remote: dict) -> dict:
+    """追記IDでマージ。画面の訂正を古いローカル記録で消さない。"""
+    out = copy.deepcopy(remote)
+    for lp in local["projects"]:
+        rp = next((p for p in out["projects"] if p["id"] == lp["id"]), None)
+        if rp is None:
+            out["projects"].append(copy.deepcopy(lp))
+            continue
+        for li in lp["items"]:
+            ri = next((i for i in rp["items"] if i["id"] == li["id"]), None)
+            if ri is None:
+                rp["items"].append(copy.deepcopy(li))
+            elif ri["title"] != li["title"]:
+                raise ValueError("同じ項目IDの名称が競合しています。元の記録を確認してください")
+        by_id = {e["id"]: e for e in rp["events"]}
+        for event in lp["events"]:
+            if event["id"] in by_id and event != by_id[event["id"]]:
+                raise ValueError("同じ記録IDの内容が競合しています。正本を確認してください")
+            by_id[event["id"]] = copy.deepcopy(event)
+        rp["events"] = list(by_id.values())
+    for p in out["projects"]:
+        corrected = {}
+        answered = {}
+        for event in sorted(p["events"], key=lambda e: (datetime.fromisoformat(e["at"].replace("Z", "+00:00")), e["id"])):
+            if event.get("supersedes"):
+                target = event["supersedes"]
+                if target in corrected:
+                    raise ValueError("同じ実績への訂正が競合しています。時間を二重計上せず確認してください")
+                corrected[target] = event["id"]
+            if event.get("question_id"):
+                target = event["question_id"]
+                if target in answered:
+                    raise ValueError("同じ質問への回答が競合しています。本人の回答を確認してください")
+                answered[target] = event["id"]
+            if event.get("status") in STATUSES:
+                next(i for i in p["items"] if i["id"] == event["item_id"])["status"] = event["status"]
+    dates = [d for d in (local.get("updated_at"), remote.get("updated_at")) if d]
+    out["updated_at"] = max(dates, key=lambda d: datetime.fromisoformat(d.replace("Z", "+00:00"))) if dates else None
+    return out
+
+
+def remote_config() -> tuple[str, dict]:
     import requests
     url = os.environ.get("JARVIS_SUPABASE_URL", "").rstrip("/")
     key = os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY", "")
     if not url or not key:
         raise ValueError("JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY が必要です")
-    # 全公開はしない。既存sync_metaのauthenticated RLSを利用する。
-    response = requests.post(
-        url + "/rest/v1/sync_meta?on_conflict=key",
-        headers={"apikey": key, "Authorization": "Bearer " + key, "Prefer": "resolution=merge-duplicates,return=minimal"},
-        json={"key": "kamiooya_work_history", "value": json.dumps(data, ensure_ascii=False), "updated_at": now()},
-        timeout=30,
-    )
+    return url + "/rest/v1/sync_meta", {"apikey": key, "Authorization": "Bearer " + key}
+
+
+def remote_read(endpoint: str, headers: dict) -> dict | None:
+    import requests
+    response = requests.get(endpoint, headers=headers, params={"key": "eq.kamiooya_work_history", "select": "value,updated_at"}, timeout=30)
     if not response.ok:
-        raise RuntimeError(f"Dashboard同期失敗 HTTP {response.status_code}（ローカル履歴は保存済み）")
-    print("Dashboard同期完了")
+        raise RuntimeError(f"Dashboard読取失敗 HTTP {response.status_code}（ローカル履歴は保持）")
+    rows = response.json()
+    return rows[0] if rows else None
+
+
+def push(data: dict) -> dict:
+    import requests
+    endpoint, headers = remote_config()
+    for _ in range(4):
+        row = remote_read(endpoint, headers)
+        combined = merge(data, json.loads(row["value"])) if row else data
+        revision = datetime.fromisoformat(now())
+        if row:
+            old = datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
+            revision = max(revision, old + timedelta(milliseconds=1))
+        body = {"key": "kamiooya_work_history", "value": json.dumps(combined, ensure_ascii=False), "updated_at": revision.isoformat()}
+        opts = {"headers": {**headers, "Prefer": "return=representation"}, "json": body, "timeout": 30}
+        if row:
+            response = requests.patch(endpoint, params={"key": "eq.kamiooya_work_history", "updated_at": "eq." + row["updated_at"]}, **opts)
+        else:
+            response = requests.post(endpoint, **opts)
+        if response.status_code == 409:
+            continue
+        if not response.ok:
+            raise RuntimeError(f"Dashboard同期失敗 HTTP {response.status_code}（ローカル履歴は保存済み）")
+        if response.json():
+            print("Dashboardとの双方向同期完了")
+            return combined
+    raise RuntimeError("同時更新が続いています。ローカル履歴を保持しているので再同期してください")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -111,6 +181,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--minutes", type=int)
         p.add_argument("--time-kind", choices=TIME_KINDS, default="unrecorded")
         p.add_argument("--status", choices=STATUSES)
+        p.add_argument("--work-date", help="実際の作業日 YYYY-MM-DD（省略時は記録日のみ）")
         if cmd == "answer":
             p.add_argument("--question-id", required=True)
     subs.add_parser("show")
@@ -121,6 +192,11 @@ def main(argv: list[str] | None = None) -> int:
     with path.with_suffix(".lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         data = load(path)
+        if args.push:
+            endpoint, headers = remote_config()
+            row = remote_read(endpoint, headers)
+            if row:
+                data = merge(data, json.loads(row["value"]))
         changed = False
         if args.command == "plan":
             if any(p["id"] == args.project for p in data["projects"]):
@@ -146,6 +222,9 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 if args.minutes is not None and args.minutes < 0:
                     raise ValueError("所要分は0以上です")
+                if args.work_date:
+                    if datetime.strptime(args.work_date, "%Y-%m-%d").strftime("%Y-%m-%d") != args.work_date:
+                        raise ValueError("作業日はYYYY-MM-DDで指定してください")
                 if (args.minutes is None) != (args.time_kind == "unrecorded"):
                     raise ValueError("時間未記録はminutesを省略し、時間を入れる場合はtime-kindを明示してください")
                 for url in args.evidence:
@@ -175,6 +254,8 @@ def main(argv: list[str] | None = None) -> int:
                     event["status"] = args.status
                 if args.supersedes:
                     event["supersedes"] = args.supersedes
+                if args.work_date:
+                    event["work_date"] = args.work_date
                 p["events"].append(event)
                 changed = True
                 print(f"記録ID: {eid}")
@@ -183,7 +264,9 @@ def main(argv: list[str] | None = None) -> int:
             atomic_write(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
             atomic_write(path.with_suffix(".md"), render(data))
         if args.push:
-            push(data)
+            data = push(data)
+            atomic_write(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+            atomic_write(path.with_suffix(".md"), render(data))
         if args.command == "show":
             print(render(data))
     return 0
