@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { randomUUID } from "node:crypto";
 import Shell from "@/components/Shell";
+import KamiooyaHistoryForm from "@/components/KamiooyaHistoryForm";
 import { createClient } from "@/lib/supabase/server";
 import { parseWorkHistory, workTotals, type WorkHistory } from "@/lib/kamiooyaWorkHistory";
 
@@ -23,14 +25,15 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
   let failure = error ? "作業履歴を取得できませんでした。再読み込みしてください。" : "";
   try { history = parseWorkHistory(data?.value); } catch { failure = "保存された作業履歴の形式を確認してください。"; }
   const projects = (history?.projects ?? []).filter(p => !projectId || p.id === projectId);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" }).format(new Date());
   return (
     <Shell active="/kamiooya">
       <Link href="/kamiooya">← 神大家運営</Link>
       <h1>作業項目と履歴</h1>
-      <p className="sub">事前に相談した項目ごとに、実行結果と質問・回答を振り返れます。時間未記録・推計・本人確認済みを区別しています。</p>
+      <p className="sub">項目を開くと、作業記録の追加と時間の見直しができます。訂正前の履歴も残し、本人確認済み・推計・エージェント処理を分けて集計します。</p>
       <p className="meta">記録の最終更新: {date(history?.updated_at ?? null)}</p>
       <form method="get" style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "16px 0" }}>
-        <label>案件 <select name="project" defaultValue={projectId}><option value="">すべて</option>{(history?.projects ?? []).map(p => <option key={p.id} value={p.id}>{p.title}</option>)}</select></label>
+        <label>案件 <select name="project" aria-label="案件" defaultValue={projectId}><option value="">すべて</option>{(history?.projects ?? []).map(p => <option key={p.id} value={p.id}>{p.title}</option>)}</select></label>
         <label>検索 <input name="q" defaultValue={q} placeholder="作業項目・記録の内容" /></label>
         <button className="btn" type="submit">絞り込む</button>
       </form>
@@ -46,7 +49,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
           <p className="meta">時間の合算を請求額とは扱いません。見積は作業時間の実績ではありません。</p>
           {!items.length ? <p>一致する作業項目がありません。</p> : null}
           {items.map(i => {
-            const events = p.events.filter(e => e.item_id === i.id).sort((a, b) => b.at.localeCompare(a.at));
+            const events = p.events.filter(e => e.item_id === i.id).sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
             const open = pending.some(e => e.item_id === i.id) || i.status === "running";
             return <details className="card" key={i.id} open={open || undefined} style={{ marginBottom: 12, padding: 14 }}>
               <summary style={{ cursor: "pointer", fontWeight: 600 }}>{statusLabels[i.status] ?? i.status} · {i.title} <span className="meta">（履歴 {events.length}件）</span></summary>
@@ -54,13 +57,17 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
               <ol style={{ paddingLeft: 22 }}>
                 {events.map(e => <li key={e.id} style={{ margin: "16px 0", overflowWrap: "anywhere" }}>
                   <div className="meta">記録: {date(e.at)} · {e.actor} · {kindLabels[e.kind] ?? e.kind}{e.kind === "ask" ? pending.some(x => x.id === e.id) ? " · 回答待ち" : " · 回答記録済み" : ""}</div>
+                  {e.work_date ? <div className="meta">作業日: {e.work_date}</div> : null}
                   <p style={{ whiteSpace: "pre-wrap", margin: "6px 0" }}>{e.summary}</p>
                   <span className="meta">{timeLabels[e.time_kind] ?? "時間の種別未確認"}{e.minutes == null ? "" : ` ${e.minutes}分`}</span>
                   {events.some(x => x.supersedes === e.id) ? <div className="meta">訂正後の記録があります（時間の集計対象外）</div> : null}
                   {e.question_id ? <div className="meta">対応する質問: {e.question_id}</div> : null}
                   {e.evidence.filter(url => typeof url === "string" && url.startsWith("https://")).map((url, n) => <div key={n}><a href={url} target="_blank" rel="noreferrer">根拠・成果物 {n + 1} ↗</a></div>)}
+                  {!["log", "answer"].includes(e.kind) || events.some(x => x.supersedes === e.id) ? null : <KamiooyaHistoryForm projectId={p.id} itemId={i.id} initialId={randomUUID()} workDate={today} previous={e} />}
+                  {e.kind === "ask" && pending.some(x => x.id === e.id) ? <KamiooyaHistoryForm projectId={p.id} itemId={i.id} initialId={randomUUID()} workDate={today} questionId={e.id} /> : null}
                 </li>)}
               </ol>
+              <KamiooyaHistoryForm projectId={p.id} itemId={i.id} initialId={randomUUID()} workDate={today} />
             </details>;
           })}
         </section>;
