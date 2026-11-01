@@ -2,7 +2,7 @@
 // Each metadata/read request rechecks the current Raimo membership status.
 declare const Deno: { env: { get(key: string): string | undefined }; serve(handler: (req: Request) => Promise<Response>): void };
 
-type Config = { projectUrl: string; serviceKey: string; proxySecret: string; sessionSecret: string; raimoOrigin: string; statusUrl: string };
+type Config = { projectUrl: string; serviceKey: string; proxySecret: string; sessionSecret: string; raimoOrigin: string; statusUrl: string; memberReadsEnabled: boolean };
 const BUCKET = "community-attachments";
 const AUDIENCE = "kamiooya-attachments";
 const encoder = new TextEncoder();
@@ -50,6 +50,9 @@ export function createHandler(cfg: Config, transport: typeof fetch = fetch, now:
       let body;
       try { body = JSON.parse(text); } catch { return json({ error: "invalid_request" }, 400); }
       const op = body?.operation;
+      // Fail closed until the legacy Raimo authentication endpoints are audited.
+      // This also blocks already-issued sessions; stored originals remain private.
+      if (!cfg.memberReadsEnabled && ["session", "index", "list", "open"].includes(op)) return json({ error: "attachments_temporarily_unavailable" }, 503);
       const authorization = req.headers.get("authorization") || "";
       if (op === "session") {
         if (!await sameSecret(authorization, "Bearer " + cfg.proxySecret)) return json({ error: "unauthorized" }, 401);
@@ -106,5 +109,6 @@ if (typeof Deno !== "undefined") Deno.serve(createHandler({
   projectUrl: Deno.env.get("SUPABASE_URL") || "", serviceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
   proxySecret: Deno.env.get("COMMUNITY_ATTACHMENTS_PROXY_SECRET") || "", sessionSecret: Deno.env.get("COMMUNITY_ATTACHMENTS_SESSION_SECRET") || "",
   raimoOrigin: "https://ma-54t2keqdelz3.raimo-app.buzz",
+  memberReadsEnabled: false,
   statusUrl: "https://ma-54t2keqdelz3.raimo-app.buzz/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0/internal/attachment-user-status",
 }));
