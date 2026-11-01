@@ -8,6 +8,8 @@ on:
     paths:
       - "apps/jarvis-dashboard/**"
       - "apps/trade-desk/**"
+      - "apps/kamiooya-qa-web/**"
+      - "215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/**"
       - "scripts/**"
       - ".github/workflows/pr-checks.yml"
   workflow_dispatch:
@@ -17,6 +19,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  attachment-access-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --experimental-strip-types --test apps/kamiooya-qa-web/tests/*.test.mjs
+      - run: node --check apps/kamiooya-qa-web/public/raimo/app.js
+
   app-build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
