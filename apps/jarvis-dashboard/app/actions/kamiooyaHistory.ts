@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { appendWorkEntry, parseWorkHistory, type WorkEntryInput } from "@/lib/kamiooyaWorkHistory";
 
@@ -26,7 +25,6 @@ export async function saveKamiooyaHistory(_previous: HistorySaveResult, form: Fo
         .eq("key", "kamiooya_work_history").eq("updated_at", data.updated_at).select("key");
       if (saveError) throw new Error("保存できませんでした。入力を確認して再試行してください。");
       if (saved?.length) {
-        revalidatePath("/kamiooya/history");
         return { ok: true, message: "保存しました。履歴と集計を更新しました。", savedId: input.eventId };
       }
     }
