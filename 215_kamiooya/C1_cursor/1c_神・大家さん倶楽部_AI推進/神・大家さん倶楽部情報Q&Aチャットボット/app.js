@@ -1,10 +1,13 @@
 const App = {
+  // Offline repair candidate: stay on the existing backend until an approved cutover.
+  authGatewayBase: '',
   // 公開 Edge URL（シークレットは /semantic-search-config から取得）
   semanticEdgeUrl: 'https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/semantic-search',
   _semanticSecret: null,
 
   state: {
     currentUser: null,
+    authToken: '',
     attachmentToken: '',
     attachmentIndex: {},
     attachmentGeneration: 0,
@@ -60,11 +63,12 @@ const App = {
   elements: {},
 
   apiClient: async (method, endpoint, body = null, fetchOptions = null) => {
-    const url = '/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0' + endpoint;
+    const url = (App.authGatewayBase || '/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0') + endpoint;
     const options = {
       method: method,
       headers: { 'Content-Type': 'application/json' },
     };
+    if (App.authGatewayBase && App.state.authToken) options.headers.Authorization = 'Bearer ' + App.state.authToken;
     if (body) options.body = JSON.stringify(body);
     if (fetchOptions && fetchOptions.signal) options.signal = fetchOptions.signal;
     try {
@@ -1176,6 +1180,7 @@ const App = {
         email: email,
         password_hash: password
       });
+      App.state.authToken = App.authGatewayBase ? String(res.auth_token || '') : '';
       App.state.currentUser = res.user;
       App.state.attachmentGeneration += 1;
       App.state.attachmentToken = '';
@@ -1247,6 +1252,8 @@ const App = {
   },
 
   logout: () => {
+    if (App.authGatewayBase && App.state.authToken) void App.apiClient('POST', '/auth/logout', {}).catch(() => {});
+    App.state.authToken = '';
     App.state.attachmentGeneration += 1;
     App.state.attachmentToken = '';
     App.state.attachmentIndex = {};

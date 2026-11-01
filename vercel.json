@@ -1,0 +1,7 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "codex/kamiooya-auth-offline-review": false
+    }
+  }
+}
