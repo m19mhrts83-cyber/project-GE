@@ -103,7 +103,7 @@ export function appendWorkEntry(history: WorkHistory, input: WorkEntryInput, now
   if (input.status && !["planned", "running", "waiting", "done"].includes(input.status)) throw new Error("項目の状態が不正です。");
   project.events.push({
     id: input.eventId, at: now, work_date: input.workDate, item_id: item.id,
-    kind: input.questionId ? "answer" : "log", actor: "松野（Dashboard）", summary,
+    kind: input.questionId ? "answer" : "log", actor: "Dashboard入力", summary,
     minutes, time_kind: minutes == null ? "unrecorded" : input.timeKind as WorkEvent["time_kind"], evidence,
     ...(input.supersedes ? { supersedes: input.supersedes } : {}),
     ...(input.questionId ? { question_id: input.questionId } : {}),
