@@ -73,5 +73,38 @@ class BatchTests(unittest.TestCase):
             with p.open('wb') as f:f.truncate(attachments.MAX_BYTES+1)
             with self.assertRaisesRegex(ValueError,'file_size_limit'):attachments.inspect_file(p,root)
 
+    def test_prefetched_metadata_still_verifies_uploaded_body_before_linking(self):
+        import hashlib
+        data=b'file';store=object.__new__(attachments.Store)
+        meta={'id':'a','sha256':hashlib.sha256(data).hexdigest(),'storage_path':'comments/1/a.pdf','content_type':'application/pdf'}
+        store.existing=Mock(side_effect=AssertionError('already fetched'))
+        store.request=Mock(side_effect=[Mock(),Mock(content=data),Mock()])
+        self.assertEqual(store.save(meta,data,old_record=None),'saved')
+        self.assertEqual([c.args[0] for c in store.request.call_args_list],['POST','GET','POST'])
+
+    def test_batch_upload_does_not_expose_metadata_before_batch_commit(self):
+        import hashlib
+        data=b'file';store=object.__new__(attachments.Store)
+        meta={'id':'a','sha256':hashlib.sha256(data).hexdigest(),'storage_path':'comments/1/a.pdf','content_type':'application/pdf'}
+        store.request=Mock(side_effect=[Mock(),Mock(content=data)])
+        self.assertEqual(store.save(meta,data,old_record=None,publish=False),'saved')
+        self.assertEqual(len(store.request.call_args_list),2)
+
+    def test_legacy_http_is_only_a_stable_source_identifier(self):
+        self.assertEqual(attachments.canonical_url('http://example.com/a.pdf?token=x'), 'http://example.com/a.pdf')
+        with self.assertRaises(ValueError):attachments.canonical_url('file:///tmp/a.pdf')
+
+    def test_failed_metadata_commit_never_records_upload_as_success(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);file=root/'a.pdf';file.write_bytes(b'%PDF-file')
+            meta={'id':'a','comment_id':'1','sha256':hashlib.sha256(file.read_bytes()).hexdigest(),'storage_path':'comments/1/a.pdf'}
+            plan={'records':[{'meta':meta,'archive_path':'a.pdf'}]};store=Mock();store.save.return_value='saved';store.request.side_effect=RuntimeError('supabase_http_503')
+            state=root/'state.jsonl'
+            with patch.object(batch,'ARCHIVE',root),patch.object(batch,'Store',return_value=store),patch.object(batch,'rows_for_ids',side_effect=[{'1':{}},{},{}]),patch.object(batch.time,'sleep'):
+                result=batch.apply_plan(plan,state)
+            self.assertEqual(result['counts'],{'failed':1})
+            self.assertEqual(json.loads(state.read_text())['result'],'failed')
+
 
 if __name__=='__main__':unittest.main()
