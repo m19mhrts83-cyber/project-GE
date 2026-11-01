@@ -5,13 +5,15 @@ import vm from 'node:vm';
 
 class Element {
   children = []; listeners = {}; className = ''; textContent = '';
+  set innerHTML(value) { this.children = []; }
+  get innerHTML() { return ''; }
   appendChild(child) { this.children.push(child); child.parent = this; }
-  querySelector() { return this.children.find(x => x.className.includes('community-attachment-links')) || null; }
+  querySelector() { return this.children.find(x => (x.className || '').includes('community-attachment-links')) || null; }
   remove() { this.parent.children = this.parent.children.filter(x => x !== this); }
   addEventListener(name, fn) { this.listeners[name] = fn; }
 }
 function load(path) {
-  const document = { addEventListener() {}, createElement: () => new Element() };
+  const document = { addEventListener() {}, createElement: () => new Element(), createTextNode: text => ({ textContent: text }) };
   return vm.runInNewContext(readFileSync(path, 'utf8') + '\nApp;', { document, window: {}, console, URL, fetch: () => { throw new Error('unexpected fetch'); } });
 }
 const sources = [new URL('../public/raimo/app.js', import.meta.url), new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js', import.meta.url)];
@@ -35,4 +37,18 @@ for (const source of sources) {
     assert.equal(host.children[0].children[1].href, '#attachment-a');
     const empty = new Element(); app.appendAttachmentLinks(empty, 'none'); assert.equal(empty.children.length, 0);
   });
+  test(source.pathname + ': large comment lists remain paged and exact search reaches old attachments', () => {
+    const app = load(source);
+    app.state.comments = Array.from({length: 250}, (_,i) => ({comment_id: String(20000+i), content: 'body', author_name: 'author'}));
+    app.elements.commentTableBody = new Element(); app.elements.commentListMeta = new Element();
+    app.elements.commentSearchInput = {value: ''};
+    app.isLessonCommentRow = () => false; app.commentField = (row,k) => row[k] || '';
+    app.hasPostedAtValue = () => true; app.parseWeStudyAuthorName = () => ({raw:'author'});
+    app.renderCommentTable(); assert.equal(app.elements.commentTableBody.children.length,100);
+    app.renderCommentTable({offset:200}); assert.equal(app.elements.commentTableBody.children.length,50);
+    app.elements.commentSearchInput.value='20249'; app.renderCommentTable();
+    assert.equal(app.elements.commentTableBody.children.length,1);
+    assert.match(app.elements.commentListMeta.textContent, /検索結果 1 /);
+  });
+
 }
