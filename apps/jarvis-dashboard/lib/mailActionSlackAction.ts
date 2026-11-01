@@ -671,7 +671,9 @@ export async function applyMailActionSlack(
   }
 
   if (action === "done") {
-    // チャット（LINE／Chatwork 等）はアプリで返信し、ここでは記録だけ
+    // チャット（LINE／Chatwork 等）はアプリで返信し、ここでは記録だけ。
+    // メールでは「回答不要・回答済み」。見送りと違い送信者は除外せず、次回も判断に出す
+    await resetMailSkipStreak(String(row.from_email || ""));
     payload.slack_ma_action = { action: "done", at: now, source };
     payload.manual_reply = { at: now, channel: String(row.lane || "") };
     if (payload.todoist_task_id && !payload.todoist_closed_at) {
@@ -690,7 +692,7 @@ export async function applyMailActionSlack(
     revalidateMailActionPaths();
     return {
       ok: true,
-      message: `返信済みにしました（${row.partner || id}）`,
+      message: `回答不要・回答済みにしました（${row.partner || id}）· 次回も判断に出します`,
       status: "sent",
       ...digestSync,
     };
