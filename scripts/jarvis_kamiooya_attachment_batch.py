@@ -14,6 +14,7 @@ import signal
 import threading
 import time
 import zipfile
+from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from pathlib import Path
 
@@ -164,13 +165,14 @@ def apply_plan(plan, state, workers=3, max_files=100):
             try:
                 if not hasattr(local, 'store'):
                     local.store = Store()
-                path = (ARCHIVE / row['archive_path']).resolve()
-                if not path.is_relative_to(ARCHIVE.resolve()):
+                source_root = state.parent / 'recovered' if row.get('recovery_file') else ARCHIVE
+                path = (source_root / (row.get('recovery_file') or row['archive_path'])).resolve()
+                if not path.is_relative_to(source_root.resolve()):
                     raise ValueError('file_outside_archive')
                 data = path.read_bytes()
                 if hashlib.sha256(data).hexdigest() != meta['sha256']:
                     raise ValueError('source_changed_rebuild_inventory')
-                status = local.store.save(meta, data)
+                status = local.store.save(meta, data, old_record=old.get(meta['id']), publish=False)
                 return {'id': meta['id'], 'sha256': meta['sha256'], 'result': status}
             except (ValueError, RuntimeError, requests.RequestException, OSError) as exc:
                 if attempt < 2 and isinstance(exc, (requests.RequestException, RuntimeError)):
@@ -180,15 +182,37 @@ def apply_plan(plan, state, workers=3, max_files=100):
                 return {'id': meta['id'], 'sha256': meta['sha256'], 'result': 'failed', 'error_type': type(exc).__name__}
     counts = collections.Counter()
     failures = []
+    by_id = {r['meta']['id']: r['meta'] for r in selected}
     # append-only/fsync。次の実行は成功済みhashと本番メタの双方で再開判定する。
     with state.open('a', encoding='utf-8') as out, concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        ready = []
+        def flush():
+            successful = [r for r in ready if r['result'] != 'failed']
+            if successful:
+                for attempt in range(3):
+                    try:
+                        store.request('POST', '/rest/v1/community_attachments', params={'on_conflict': 'id'}, json=[{**by_id[r['id']], 'updated_at': datetime.now(timezone.utc).isoformat()} for r in successful], headers={'Prefer': 'resolution=merge-duplicates,return=minimal'})
+                        break
+                    except (RuntimeError, requests.RequestException):
+                        if attempt == 2:
+                            for r in successful:
+                                r.update(result='failed', error_type='metadata_publish_failed')
+                        else:
+                            time.sleep(attempt + 1)
+            # メタの一括commitが成功してから成功checkpointを残す。
+            for result in ready:
+                counts[result['result']] += 1
+                if result['result'] == 'failed':
+                    failures.append(result)
+                out.write(json.dumps(result) + '\n')
+            out.flush(); os.fsync(out.fileno()); ready.clear()
+            print(json.dumps({'processed': sum(counts.values()), 'selected': len(selected), **counts}), flush=True)
         for result in pool.map(worker, selected):
-            counts[result['result']] += 1
-            if result['result'] == 'failed':
-                failures.append(result)
-            out.write(json.dumps(result) + '\n'); out.flush(); os.fsync(out.fileno())
-            if sum(counts.values()) % 25 == 0:
-                print(json.dumps({'processed': sum(counts.values()), 'selected': len(selected), **counts}), flush=True)
+            ready.append(result)
+            if len(ready) == 25:
+                flush()
+        if ready:
+            flush()
     current = rows_for_ids(store, 'community_attachments', ids, 'id,sha256,storage_path')
     matching = sum(current.get(r['meta']['id'], {}).get('sha256') == r['meta']['sha256'] and current[r['meta']['id']]['storage_path'] == r['meta']['storage_path'] for r in records)
     return {'eligible': len(records), 'resumed': resumed, 'selected': len(selected), 'remaining': max(0, len(pending)-len(selected)), 'missing_comment': len(missing), 'metadata_matching': matching, 'counts': dict(counts), 'issues': missing + failures}
@@ -221,7 +245,9 @@ def main():
         if args.apply:
             args.state.parent.mkdir(parents=True, exist_ok=True)
             args.state.touch(mode=0o600, exist_ok=True)
-            report['execution'] = apply_plan(plan, args.state, args.workers, args.max_files)
+            with args.state.with_suffix('.lock').open('w') as state_lock:
+                fcntl.flock(state_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                report['execution'] = apply_plan(plan, args.state, args.workers, args.max_files)
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2)); args.report.chmod(0o600)
         print(json.dumps({k: v for k, v in report.items() if k != 'inventory'} | {'inventory_counts': plan['counts']}), flush=True)

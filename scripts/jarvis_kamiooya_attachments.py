@@ -23,6 +23,7 @@ PROJECT_URL = "https://mwubzgefkkjjbingrmqu.supabase.co"
 BUCKET = "community-attachments"
 MAX_BYTES = 50 * 1024 * 1024
 ARCHIVE = Path.home() / "Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/215_神大家_WeStudyスクレイプ/runs"
+_UNSET = object()
 
 
 def normalize_comment_id(raw: str) -> str:
@@ -34,10 +35,11 @@ def normalize_comment_id(raw: str) -> str:
 
 def canonical_url(raw: str) -> str:
     u = urlsplit(raw)
-    if u.scheme != "https" or u.username or u.password or not u.hostname:
+    if u.scheme not in ("http", "https") or u.username or u.password or not u.hostname:
         raise ValueError("invalid_source_url")
     # 一時トークン・追跡情報は保存しない。取得済みファイルの識別にのみ使用。
-    return urlunsplit(("https", u.netloc.lower(), u.path, "", ""))
+    # 旧HTTPの資料URLも識別子として保持する。ここからネット取得は行わない。
+    return urlunsplit((u.scheme, u.netloc.lower(), u.path, "", ""))
 
 
 def inspect_file(path: Path, root: Path) -> tuple[bytes, str, str]:
@@ -138,15 +140,15 @@ class Store:
         }).json()
         return rows[0] if rows else None
 
-    def save(self, meta: dict, data: bytes) -> str:
-        old = self.existing(meta["id"])
+    def save(self, meta: dict, data: bytes, old_record=_UNSET, publish=True) -> str:
+        old = self.existing(meta["id"]) if old_record is _UNSET else old_record
         path = f"/storage/v1/object/{BUCKET}/{meta['storage_path']}"
         if old and old["sha256"] == meta["sha256"] and old["storage_path"] == meta["storage_path"]:
             # DBだけ成功とせず、実体の欠落・破損も検出する。
             body = self.request("GET", path).content
             if hashlib.sha256(body).hexdigest() != meta["sha256"]:
                 raise ValueError("stored_hash_mismatch")
-            if meta.get("original_name") and old.get("original_name") != meta["original_name"]:
+            if publish and meta.get("original_name") and old.get("original_name") != meta["original_name"]:
                 self.request("PATCH", "/rest/v1/community_attachments", params={"id": "eq." + meta["id"]}, json={"original_name": meta["original_name"], "updated_at": datetime.now(timezone.utc).isoformat()})
             return "unchanged"
         # 内容ハッシュをキーにするため異なる内容を上書きしない。
@@ -154,9 +156,10 @@ class Store:
         body = self.request("GET", path).content
         if hashlib.sha256(body).hexdigest() != meta["sha256"]:
             raise ValueError("stored_hash_mismatch")
-        self.request("POST", "/rest/v1/community_attachments", params={"on_conflict": "id"},
-                     json={**meta, "updated_at": datetime.now(timezone.utc).isoformat()},
-                     headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+        if publish:
+            self.request("POST", "/rest/v1/community_attachments", params={"on_conflict": "id"},
+                         json={**meta, "updated_at": datetime.now(timezone.utc).isoformat()},
+                         headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
         return "saved"
 
 
