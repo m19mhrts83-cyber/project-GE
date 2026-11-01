@@ -4,16 +4,16 @@
 
 | 項目 | 値 |
 |---|---|
-| task_id | （Todoist id または run_id） |
+| task_id | kamiooya-work-history-20261101 |
 | agent_id | 814 |
-| executor | cursor / claude_code / gencode / launchd / gha / … |
-| status | queued |
+| executor | codex |
+| status | running |
 | started_at | |
 | finished_at | |
 
 ## 依頼
 
-（何をするか。入力は `input/` または外部パス）
+神大家運営の作業項目を事前に相談・設定し、項目別の実行履歴、本人への質問と回答、時間の根拠を記録。本人用Dashboardから案件・項目別に振り返れるようにする。
 
 ## 完了条件
 
