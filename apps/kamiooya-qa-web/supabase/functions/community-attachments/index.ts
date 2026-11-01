@@ -87,7 +87,7 @@ export function createHandler(cfg: Config, transport: typeof fetch = fetch, now:
       if (op !== "open") return json({ attachments: rows, next_offset: op === "index" && rows.length === 500 ? (body.offset ?? 0) + 500 : null });
       const row = rows[0];
       if (!row) return json({ error: "not_found" }, 404);
-      if (row.bucket !== BUCKET || !/^comments\/[0-9]+\/[0-9a-f]{64}\.(jpg|png|pdf|xlsx)$/.test(row.storage_path)) return json({ error: "invalid_storage_record" }, 500);
+      if (row.bucket !== BUCKET || !/^comments\/[0-9]+\/[0-9a-f]{64}\.(jpg|png|pdf|xlsx|docx|pptx|zip|webp|heic|doc|csv)$/.test(row.storage_path)) return json({ error: "invalid_storage_record" }, 500);
       const signResponse = await transport(cfg.projectUrl + "/storage/v1/object/sign/" + BUCKET + "/" + row.storage_path, {
         method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn: 60 }), signal: AbortSignal.timeout(15000) });
       if (!signResponse.ok) return json({ error: "file_unavailable" }, 503);
