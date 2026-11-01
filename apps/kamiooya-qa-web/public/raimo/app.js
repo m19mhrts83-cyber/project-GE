@@ -5,6 +5,10 @@ const App = {
 
   state: {
     currentUser: null,
+    attachmentToken: '',
+    attachmentIndex: {},
+    attachmentGeneration: 0,
+    attachmentDetailCommentId: '',
     currentSessionId: null,
     chatSessions: [],
     chatMessages: [],
@@ -1135,7 +1139,11 @@ const App = {
         password_hash: password
       });
       App.state.currentUser = res.user;
+      App.state.attachmentGeneration += 1;
+      App.state.attachmentToken = '';
+      App.state.attachmentIndex = {};
       App.afterLogin();
+      void App.initializeAttachments(email, password, App.state.attachmentGeneration);
       App.showToast('ログインしました', 'success');
     } catch (error) {
       App.showToast(error.message || 'ログインに失敗しました', 'error');
@@ -1201,6 +1209,10 @@ const App = {
   },
 
   logout: () => {
+    App.state.attachmentGeneration += 1;
+    App.state.attachmentToken = '';
+    App.state.attachmentIndex = {};
+    App.state.attachmentDetailCommentId = '';
     App.state.currentUser = null;
     App.state.currentSessionId = null;
     App.state.chatSessions = [];
@@ -2244,7 +2256,8 @@ const App = {
         '">DBで見る</button>' +
         '<div class="text-slate-600">' +
         App.escapeHtml(c.snippet || '') +
-        '</div></li>'
+        '</div><span class="citation-attachments" data-comment-id="' +
+        App.escapeHtml(c.commentId || '') + '"></span></li>'
       );
     };
 
@@ -3168,6 +3181,9 @@ const App = {
     });
 
     area.scrollTop = area.scrollHeight;
+    area.querySelectorAll('.citation-attachments').forEach(function (container) {
+      App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：');
+    });
   },
 
   renderSuggestedQuestions: () => {
@@ -3375,6 +3391,98 @@ const App = {
     });
   },
 
+  initializeAttachments: async (email, password, generation) => {
+    const userId = String((App.state.currentUser || {}).id || '');
+    const current = () => App.state.attachmentGeneration === generation &&
+      String((App.state.currentUser || {}).id || '') === userId;
+    try {
+      const session = await App.apiClient('POST', '/auth/attachment-session', {
+        email: email, password_hash: password
+      });
+      if (!current()) return;
+      const token = String(session.token || '');
+      if (!token) throw new Error('添付セッションを取得できません');
+      App.state.attachmentToken = token;
+      const index = {};
+      let offset = 0;
+      for (let page = 0; page < 201; page++) {
+        if (!current()) return;
+        const data = await App.attachmentRequest({ operation: 'index', offset: offset }, token);
+        if (!current()) return;
+        (data.attachments || []).forEach(function (item) {
+          const cid = String(item.comment_id || '');
+          if (!index[cid]) index[cid] = [];
+          index[cid].push(item);
+        });
+        if (data.next_offset == null) {
+          App.state.attachmentIndex = index;
+          App.renderCommentTable();
+          App.renderChatMessages();
+          if (App.elements.commentDetailDialog && App.elements.commentDetailDialog.open &&
+              App.elements.commentDetailBody && App.state.attachmentDetailCommentId) {
+            App.appendAttachmentLinks(App.elements.commentDetailBody, App.state.attachmentDetailCommentId);
+          }
+          return;
+        }
+        offset = data.next_offset;
+      }
+      throw new Error('添付一覧の取得上限を超えました');
+    } catch (error) {
+      if (current()) App.showToast('添付情報を取得できませんでした。本文の閲覧は続けられます。', 'error');
+    }
+  },
+
+  attachmentRequest: async (body, token) => {
+    const response = await fetch('https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/community-attachments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (token || App.state.attachmentToken || '') },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      throw new Error(response.status === 401 || response.status === 403
+        ? '添付を開くには承認済みのアカウントでログインし直してください。'
+        : '添付ファイルを取得できませんでした。時間を置いて再試行してください。');
+    }
+    return response.json();
+  },
+
+  appendAttachmentLinks: (container, commentId, label) => {
+    const previous = container.querySelector('.community-attachment-links');
+    if (previous) previous.remove();
+    const items = (App.state.attachmentIndex || {})[String(commentId || '')] || [];
+    if (!items.length) return;
+    const wrapper = document.createElement('span');
+    wrapper.className = 'community-attachment-links block mt-2 text-sm';
+    const title = document.createElement('span');
+    title.textContent = label || '添付資料：';
+    wrapper.appendChild(title);
+    items.forEach(function (item) {
+      const link = document.createElement('a');
+      link.href = '#attachment-' + String(item.id);
+      link.className = 'block text-blue-700 hover:underline break-all';
+      link.textContent = String(item.original_name || '添付ファイル');
+      link.addEventListener('click', async function (event) {
+        event.preventDefault();
+        const generation = App.state.attachmentGeneration;
+        const target = window.open('about:blank', '_blank');
+        if (target) target.opener = null;
+        try {
+          const result = await App.attachmentRequest({ operation: 'open', attachment_id: item.id });
+          if (generation !== App.state.attachmentGeneration) throw new Error('ログイン状態が変わりました。開き直してください。');
+          const url = new URL(result.url);
+          if (url.origin !== 'https://mwubzgefkkjjbingrmqu.supabase.co' ||
+              !url.pathname.startsWith('/storage/v1/object/sign/community-attachments/')) throw new Error('添付リンクを確認できませんでした。');
+          if (!target) throw new Error('ポップアップを許可して、もう一度リンクを押してください。');
+          target.location.replace(url.href);
+        } catch (error) {
+          if (target) target.close();
+          App.showToast(error.message || '添付ファイルを開けませんでした。', 'error');
+        }
+      });
+      wrapper.appendChild(link);
+    });
+    container.appendChild(wrapper);
+  },
   renderCommentTable: (opts) => {
     opts = opts || {};
     const body = App.elements.commentTableBody;
@@ -3476,6 +3584,7 @@ const App = {
         App.openCommentDetailDialog(r);
       });
       contentTd.appendChild(openBtn);
+      App.appendAttachmentLinks(contentTd, App.commentField(r, 'comment_id'));
 
       tr.innerHTML =
         '<td class="p-2 whitespace-nowrap">' +
@@ -3525,6 +3634,8 @@ const App = {
     }
     if (App.elements.commentDetailBody) {
       App.elements.commentDetailBody.textContent = content;
+      App.state.attachmentDetailCommentId = cid;
+      App.appendAttachmentLinks(App.elements.commentDetailBody, cid);
     }
     if (typeof App.elements.commentDetailDialog.showModal === 'function') {
       App.elements.commentDetailDialog.showModal();
