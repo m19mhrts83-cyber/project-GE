@@ -57,6 +57,12 @@
 - このフォルダ内: `logs/`
 - 外部正本: Jarvisダッシュボード / KURASHIFT（Vercel）・Supabase投影
 
+### 神大家運営の作業履歴（2026-11-01）
+
+事前に松野さんと案件・作業項目を決め、項目別で実行結果と根拠を残す。エージェントで確認できない内容は本人への質問と回答を紐づける。時間不明を0扱いせず、本人確認済み・推計・エージェント処理を区別する。
+
+手順: `docs/神大家運営_作業項目と実行履歴_20261101.md`。記録: `scripts/jarvis_kamiooya_work_history.py`、投影: Jarvis用Supabase `sync_meta.kamiooya_work_history`、閲覧: `/kamiooya/history`。セッション終了時に記録・同期する。
+
 ## 6. 作業手順（チェックリスト）
 
 1. 対象ページ／投影ジョブを確認
