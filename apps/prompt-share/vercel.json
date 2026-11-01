@@ -1,4 +1,11 @@
 {
   "framework": "nextjs",
-  "regions": ["hnd1"]
+  "regions": [
+    "hnd1"
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "codex/kamiooya-auth-offline-review": false
+    }
+  }
 }

@@ -4,5 +4,10 @@
   "regions": [
     "hnd1"
   ],
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ."
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
+  "git": {
+    "deploymentEnabled": {
+      "codex/kamiooya-auth-offline-review": false
+    }
+  }
 }
