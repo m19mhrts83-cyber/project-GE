@@ -21,7 +21,7 @@ import requests
 
 PROJECT_URL = "https://mwubzgefkkjjbingrmqu.supabase.co"
 BUCKET = "community-attachments"
-MAX_BYTES = 20 * 1024 * 1024
+MAX_BYTES = 50 * 1024 * 1024
 ARCHIVE = Path.home() / "Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/215_神大家_WeStudyスクレイプ/runs"
 
 
@@ -56,11 +56,28 @@ def inspect_file(path: Path, root: Path) -> tuple[bytes, str, str]:
         return data, "image/png", ".png"
     if ext == ".pdf" and data.startswith(b"%PDF-"):
         return data, "application/pdf", ".pdf"
-    if ext == ".xlsx" and data.startswith(b"PK"):
+    if ext in (".xlsx", ".docx", ".pptx", ".zip") and data.startswith(b"PK"):
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             names = set(z.namelist())
-            if "[Content_Types].xml" in names and "xl/workbook.xml" in names:
-                return data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"
+            office = {".xlsx": ("xl/workbook.xml", "spreadsheetml.sheet"), ".docx": ("word/document.xml", "wordprocessingml.document"), ".pptx": ("ppt/presentation.xml", "presentationml.presentation")}
+            if ext in office and "[Content_Types].xml" in names and office[ext][0] in names:
+                return data, "application/vnd.openxmlformats-officedocument." + office[ext][1], ext
+            if ext == ".zip":
+                return data, "application/zip", ext
+    if ext == ".webp" and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return data, "image/webp", ext
+    if ext == ".heic" and data[4:8] == b"ftyp" and data[8:12] in (b"heic", b"heix", b"mif1"):
+        return data, "image/heic", ext
+    if ext == ".doc" and data.startswith(bytes.fromhex("d0cf11e0a1b11ae1")):
+        return data, "application/msword", ext
+    if ext == ".csv":
+        for encoding in ("utf-8-sig", "cp932"):
+            try:
+                text = data.decode(encoding)
+                if "\x00" not in text and not re.search(r"<\s*(?:!doctype|html|script)\b", text, re.I) and ("," in text or "\t" in text):
+                    return data, "text/csv", ext
+            except UnicodeDecodeError:
+                pass
     raise ValueError("unsupported_or_invalid_file")
 
 
@@ -74,7 +91,7 @@ def build_attachment(row: dict, root: Path = ARCHIVE) -> tuple[dict, bytes]:
     return {
         "id": identity, "comment_id": cid, "bucket": BUCKET,
         "storage_path": f"comments/{cid}/{digest}{ext}",
-        "source_url": url, "original_name": path.name[:255],
+        "source_url": url, "original_name": Path(str(row.get("name") or path.name)).name[:255],
         "content_type": mime, "byte_size": len(data), "sha256": digest,
     }, data
 
@@ -102,6 +119,8 @@ class Store:
         if existing:
             if existing.get("public"):
                 raise ValueError("bucket_must_be_private")
+            if existing.get("file_size_limit") is not None and existing["file_size_limit"] < MAX_BYTES:
+                self.request("PUT", "/storage/v1/bucket/" + BUCKET, json={"public": False, "file_size_limit": MAX_BYTES})
             return
         self.request("POST", "/storage/v1/bucket", json={
             "id": BUCKET, "name": BUCKET, "public": False, "file_size_limit": MAX_BYTES,
@@ -115,7 +134,7 @@ class Store:
 
     def existing(self, ident: str):
         rows = self.request("GET", "/rest/v1/community_attachments", params={
-            "select": "id,sha256,storage_path", "id": f"eq.{ident}", "limit": 1,
+            "select": "id,sha256,storage_path,original_name", "id": f"eq.{ident}", "limit": 1,
         }).json()
         return rows[0] if rows else None
 
@@ -127,6 +146,8 @@ class Store:
             body = self.request("GET", path).content
             if hashlib.sha256(body).hexdigest() != meta["sha256"]:
                 raise ValueError("stored_hash_mismatch")
+            if meta.get("original_name") and old.get("original_name") != meta["original_name"]:
+                self.request("PATCH", "/rest/v1/community_attachments", params={"id": "eq." + meta["id"]}, json={"original_name": meta["original_name"], "updated_at": datetime.now(timezone.utc).isoformat()})
             return "unchanged"
         # 内容ハッシュをキーにするため異なる内容を上書きしない。
         self.request("POST", path, data=data, headers={"Content-Type": meta["content_type"], "x-upsert": "true"})
