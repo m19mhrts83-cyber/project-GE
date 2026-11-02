@@ -138,6 +138,10 @@ class AttachmentsTest(unittest.TestCase):
         with self.assertRaises(ValueError):Queue(Path(self.temp.name)/'OneDrive'/'spool')
         with self.assertRaises(ValueError):self.add('../escape')
         self.assertEqual(self.q.path.stat().st_mode&0o777,0o600)
+        with self.assertRaises(ValueError):Queue(Path.home())
+        with tempfile.TemporaryDirectory() as root:
+            (Path(root)/'unrelated.txt').write_text('keep')
+            with self.assertRaises(ValueError):Queue(root)
 
 class Response:
     def __init__(self,status=200,data=None,headers=None,body=b''):
