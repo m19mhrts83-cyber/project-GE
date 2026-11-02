@@ -13,6 +13,24 @@ import os
 from pathlib import Path
 import subprocess
 import time
+import signal
+
+def run_bounded(command, *, env, cwd=None, timeout=900):
+    """Terminate the entire stage process group, so an orphan cannot retain LINE's lock."""
+    process=subprocess.Popen(command,env=env,cwd=cwd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+      text=True,start_new_session=True)
+    try:
+        out,err=process.communicate(timeout=timeout)
+        return subprocess.CompletedProcess(command,process.returncode,out,err)
+    except subprocess.TimeoutExpired:
+        try:os.killpg(process.pid,signal.SIGTERM)
+        except ProcessLookupError:pass
+        try:out,err=process.communicate(timeout=20)
+        except subprocess.TimeoutExpired:
+            try:os.killpg(process.pid,signal.SIGKILL)
+            except ProcessLookupError:pass
+            out,err=process.communicate()
+        return subprocess.CompletedProcess(command,124,out,err)
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -36,14 +54,15 @@ def main():
         except BlockingIOError:return 75
         if subprocess.run(['pgrep','-f',r'application\.jp\.naver\.line\.mac|/Applications/LINE\.app'],capture_output=True).returncode==0:
             print(json.dumps({'state':'blocked','reason':'mac_line_running'}));return 75
-        if not a.attachments_only:
-            text_rc=subprocess.run([str(repo/'launchd/openchat_md_db_sync_runner.sh')],env=env,capture_output=True).returncode
         try:
+            if not a.attachments_only:
+                paused=True # the existing runner can pause the watcher before it fails
+                text_rc=run_bounded([str(repo/'launchd/openchat_md_db_sync_runner.sh')],env=env).returncode
             subprocess.run([str(poc/'launchd/open_chat_watch_pause.sh')],check=True,capture_output=True);paused=True
             command=[str(poc/'.venv-patch/bin/python'),str(code/'scripts/jarvis_openchat_attachments.py'),'--apply','--scan',
               '--routes-yaml',str(poc/'open_chat_routes.yaml'),'--active-threads',str(poc/'.line_auth/active_thread_mids.json'),
               '--limit',str(a.limit),'--max-file-mib','50','--scan-pages',str(a.scan_pages),'--scan-threads','5']
-            result=subprocess.run(command,env=env,capture_output=True,text=True,cwd=repo)
+            result=run_bounded(command,env=env,cwd=repo)
             for line in result.stdout.splitlines():
                 try:
                     value=json.loads(line)
@@ -74,12 +93,19 @@ def main():
               'value':json.dumps(summary,ensure_ascii=False),'updated_at':summary.get('at')},timeout=30)
             summary['dashboard_health_synced']=response.ok
         stamp=datetime.now().astimezone().strftime('%Y%m%d-%H%M')
+        states=summary.get('states',{});scan=summary.get('scan',{})
+        readable=(f"オプチャ添付: 保存{states.get('saved',0)}件・{summary.get('saved_unique_bytes',0)/1e6:.1f}MB、"
+          f"取得不可{states.get('expired',0)}件、待機{states.get('pending',0)}件、保留{states.get('held',0)}件。"
+          f"Supabase保存合計{summary.get('project_storage_bytes',0)/1e9:.3f}GB。"
+          f"本文RC={text_rc}、添付RC={summary.get('attachment_rc')}、監視復帰={summary.get('watch_running')}。"
+          f"過去履歴の続き{scan.get('pages_remaining',0)}ストリーム・順番待ちスレッド{scan.get('threads_deferred',0)}件。"
+          "取得不可や履歴の残りがある場合、完全回収とは扱わない。")
         cli=[str(Path.home()/'selenium_env/venv/bin/python'),str(repo/'scripts/jarvis_kamiooya_work_history.py'),'--push','note',
           '--project','supabase-attachments-20261101','--item','openchat-attachments','--actor','OpenChat backup worker',
-          '--event-id','openchat-daily-'+stamp,'--summary',json.dumps(summary,ensure_ascii=False)]
+          '--event-id','openchat-daily-'+stamp,'--work-date',datetime.now().astimezone().strftime('%Y-%m-%d'),'--summary',readable]
         history=subprocess.run(cli,env=env,capture_output=True)
         summary['dashboard_history_synced']=history.returncode==0
         print(json.dumps(summary,ensure_ascii=False))
-        return 0 if summary.get('attachment_rc')==0 and summary.get('watch_running') else 1
+        return 0 if text_rc in (None,0) and summary.get('attachment_rc')==0 and summary.get('watch_running') else 1
 
 if __name__=='__main__':raise SystemExit(main())

@@ -259,6 +259,15 @@ class TransportTest(unittest.TestCase):
             with self.assertRaises(w.Failure):s.usage()
 
 class DailyRuntimeTest(unittest.TestCase):
+    def test_bounded_stage_terminates_instead_of_leaving_a_lock_holder(self):
+        import subprocess
+        sp=importlib.util.spec_from_file_location('daily_bounded',ROOT/'scripts/jarvis_openchat_daily_runtime.py')
+        daily=importlib.util.module_from_spec(sp);sp.loader.exec_module(daily)
+        started=time.monotonic()
+        result=daily.run_bounded([sys.executable,'-c','import time; time.sleep(120)'],env=os.environ.copy(),timeout=.05)
+        self.assertEqual(result.returncode,124)
+        self.assertLess(time.monotonic()-started,3)
+
     def test_wrapper_restores_watcher_and_filters_unexpected_child_output(self):
         from types import SimpleNamespace
         import io
@@ -269,7 +278,7 @@ class DailyRuntimeTest(unittest.TestCase):
             calls.append(args)
             if args[:2]==['pgrep','-f']:return SimpleNamespace(returncode=0 if args[2]=='chrline_open_chat_realtime_watch.py' else 1)
             return SimpleNamespace(returncode=0,stdout='{"states":{"saved":2},"authToken":"must-not-persist"}\n',stderr='')
-        with tempfile.TemporaryDirectory() as root,patch.object(daily.Path,'home',return_value=Path(root)),patch.object(daily.subprocess,'run',side_effect=run),patch.dict(os.environ,{},clear=True),patch.object(sys,'argv',['daily','--repo-root',root,'--code-root',root,'--attachments-only']),patch('sys.stdout',io.StringIO()):
+        with tempfile.TemporaryDirectory() as root,patch.object(daily.Path,'home',return_value=Path(root)),patch.object(daily.subprocess,'run',side_effect=run),patch.object(daily,'run_bounded',side_effect=run),patch.dict(os.environ,{},clear=True),patch.object(sys,'argv',['daily','--repo-root',root,'--code-root',root,'--attachments-only']),patch('sys.stdout',io.StringIO()):
             self.assertEqual(daily.main(),0)
             result=json.loads((Path(root)/'.local/share/jarvis/openchat-ops/daily_health.json').read_text())
             self.assertEqual(result['states'],{'saved':2});self.assertTrue(result['watch_running'])
