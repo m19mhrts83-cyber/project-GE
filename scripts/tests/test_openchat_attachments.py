@@ -143,6 +143,60 @@ class AttachmentsTest(unittest.TestCase):
             (Path(root)/'unrelated.txt').write_text('keep')
             with self.assertRaises(ValueError):Queue(root)
 
+    def test_recent_poll_does_not_wait_for_historical_catchup(self):
+        from types import SimpleNamespace
+        route=SimpleNamespace(rid='route',square_chat_mid='room')
+        helper=SimpleNamespace(_parse_routes=lambda p:[route],_get=lambda c,m,k,f:m.get(k),
+          _best_message_from_event=lambda c,e:e,_extract_events=lambda c,r:r['events'],
+          _extract_tokens=lambda c,r,s,t:(r.get('sync',s),r.get('cont','')),
+          _extract_thread_mids_from_event=lambda *a:[],_is_thread_deleted_error=lambda e:False)
+        calls=[];recent_count=[0]
+        def fetch(c,room,thread,sync='',cont=''):
+            calls.append((sync,cont))
+            if not sync and not cont:
+                recent_count[0]+=1
+                return {'events':[{'id':'new'+str(recent_count[0]),'contentType':1}], 'sync':'recent','cont':'history'}
+            return {'events':[{'id':'old','contentType':14}],'sync':'history-sync','cont':'next'}
+        with patch.dict(sys.modules,{'chrline_open_chat_to_md':helper}),patch.object(w,'fetch_recent',fetch):
+            w.scan(None,self.q,Path('unused'),pages=1)
+            w.scan(None,self.q,Path('unused'),pages=0)
+        self.assertEqual(calls,[('',''),('recent','history'),('','')])
+        rows={r['message_id']:r['cohort'] for r in self.q.db.execute('select * from jobs')}
+        self.assertEqual(rows,{'new1':'backfill','old':'backfill','new2':'daily'})
+
+    def test_history_empty_page_completes_without_endless_refetch(self):
+        from types import SimpleNamespace
+        route=SimpleNamespace(rid='r',square_chat_mid='room')
+        helper=SimpleNamespace(_parse_routes=lambda p:[route],_get=lambda c,m,k,f:m.get(k),
+          _best_message_from_event=lambda c,e:e,_extract_events=lambda c,r:[],
+          _extract_tokens=lambda c,r,s,t:('sync','stale-continuation'),
+          _extract_thread_mids_from_event=lambda *a:[],_is_thread_deleted_error=lambda e:False)
+        with patch.dict(sys.modules,{'chrline_open_chat_to_md':helper}),patch.object(w,'fetch_recent',return_value={}) as fetch:
+            result=w.scan(None,self.q,Path('unused'),pages=10)
+        self.assertEqual(fetch.call_count,1);self.assertEqual(result['pages_remaining'],0)
+
+    def test_daily_forward_gap_is_resumed_independently_of_changing_text_anchor(self):
+        from types import SimpleNamespace
+        route=SimpleNamespace(rid='r',square_chat_mid='room');calls=[]
+        def forward(c,**kw):
+            calls.append((kw['sync_token'],kw['cont_token']))
+            return {'events':[{'id':'daily'+str(len(calls)),'contentType':1}],
+              'sync':'advanced','cont':'pending' if len(calls)==1 else ''}
+        helper=SimpleNamespace(_parse_routes=lambda p:[route],_get=lambda c,m,k,f:m.get(k),
+          _best_message_from_event=lambda c,e:e,_extract_events=lambda c,r:r['events'],
+          _extract_tokens=lambda c,r,s,t:(r.get('sync',s),r.get('cont','')),
+          _extract_thread_mids_from_event=lambda *a:[],_is_thread_deleted_error=lambda e:False,
+          _fetch_square_chat_events=forward)
+        with tempfile.TemporaryDirectory() as root:
+            anchor=Path(root)/'text-state.json';anchor.write_text(json.dumps({'streams':{'room::main':{'sync_token':'anchor1'}}}))
+            with patch.dict(sys.modules,{'chrline_open_chat_to_md':helper}),patch.object(w,'fetch_recent',return_value={'events':[],'sync':'history','cont':''}):
+                w.scan(None,self.q,Path('unused'),pages=1,text_state=anchor)
+                anchor.write_text(json.dumps({'streams':{'room::main':{'sync_token':'anchor2'}}}))
+                w.scan(None,self.q,Path('unused'),pages=1,text_state=anchor)
+                w.scan(None,self.q,Path('unused'),pages=1,text_state=anchor)
+        self.assertEqual(calls,[('anchor1',''),('advanced','pending')])
+        self.assertEqual(len(self.q.due()),2)
+
 class Response:
     def __init__(self,status=200,data=None,headers=None,body=b''):
         self.status_code=status;self.ok=200<=status<300;self.data=data;self.headers=headers or {};self.body=body
@@ -155,14 +209,18 @@ class TransportTest(unittest.TestCase):
     def test_bounded_source_download_uses_existing_auth_and_never_follows_redirect(self):
         with tempfile.TemporaryDirectory() as root:
             path=Path(root)/'part'
-            class Client:Hraders4Obs={'X-Line-Access':'fixture-secret'}
+            class Client:
+                Hraders4Obs={'X-Line-Access':'encrypted-fixture'}
+                authToken='fixture-secret'
             class HTTP:
-                def post(self,url,**kw):
+                def get(self,url,**kw):
+                    self.url=url
                     self.kw=kw;return Response(body=b'x'*11)
             http=HTTP()
             with self.assertRaises(w.Failure):w.download(Client(),{'message_id':'123'},path,10,session=http)
             self.assertFalse(path.exists());self.assertIs(http.kw['allow_redirects'],False)
             self.assertEqual(http.kw['headers']['X-Line-Access'],'fixture-secret')
+            self.assertEqual(http.url,'https://obs.line-apps.com/r/g2/m/123')
 
     def test_tus_resume_large_video_and_integrity(self):
         with tempfile.TemporaryDirectory() as root,patch.dict(os.environ,{'SUPABASE_URL':w.PROJECT,'SUPABASE_SERVICE_ROLE_KEY':'fixture'}):
@@ -199,5 +257,23 @@ class TransportTest(unittest.TestCase):
             with self.assertRaises(w.Failure):s.check_private()
             s.request=lambda *a,**k:Response(data=None)
             with self.assertRaises(w.Failure):s.usage()
+
+class DailyRuntimeTest(unittest.TestCase):
+    def test_wrapper_restores_watcher_and_filters_unexpected_child_output(self):
+        from types import SimpleNamespace
+        import io
+        sp=importlib.util.spec_from_file_location('daily_runtime',ROOT/'scripts/jarvis_openchat_daily_runtime.py')
+        daily=importlib.util.module_from_spec(sp);sp.loader.exec_module(daily)
+        calls=[]
+        def run(args,**kw):
+            calls.append(args)
+            if args[:2]==['pgrep','-f']:return SimpleNamespace(returncode=0 if args[2]=='chrline_open_chat_realtime_watch.py' else 1)
+            return SimpleNamespace(returncode=0,stdout='{"states":{"saved":2},"authToken":"must-not-persist"}\n',stderr='')
+        with tempfile.TemporaryDirectory() as root,patch.object(daily.Path,'home',return_value=Path(root)),patch.object(daily.subprocess,'run',side_effect=run),patch.dict(os.environ,{},clear=True),patch.object(sys,'argv',['daily','--repo-root',root,'--code-root',root,'--attachments-only']),patch('sys.stdout',io.StringIO()):
+            self.assertEqual(daily.main(),0)
+            result=json.loads((Path(root)/'.local/share/jarvis/openchat-ops/daily_health.json').read_text())
+            self.assertEqual(result['states'],{'saved':2});self.assertTrue(result['watch_running'])
+            self.assertNotIn('authToken',result)
+        self.assertTrue(any('open_chat_watch_resume.sh' in str(args) for args in calls))
 
 if __name__=='__main__':unittest.main()

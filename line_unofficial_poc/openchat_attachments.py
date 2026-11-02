@@ -70,7 +70,7 @@ class Queue:
         return ident
 
     def update(self, ident, **values):
-        if set(values)-{'state','attempts','next_at','error','sha256','bytes','mime','storage_path','upload_url','saved_at'}:
+        if set(values)-{'state','attempts','next_at','error','sha256','bytes','mime','storage_path','upload_url','saved_at','source_bytes'}:
             raise ValueError('invalid_queue_update')
         with self.db:
             self.db.execute('UPDATE jobs SET '+','.join(f'{k}=?' for k in values)+' WHERE id=?', [*values.values(),ident])
@@ -87,7 +87,8 @@ class Queue:
         days=min(30,max(0,(time.time()-first)/86400)) if first else 0
         daily_bytes=sum(r['bytes'] for r in unique if not r['backfill'] and r['first_saved']>=time.time()-30*86400)
         oldest=self.db.execute("SELECT min(created_at) FROM jobs WHERE state IN ('pending','retry','held')").fetchone()[0]
-        return {'states':dict(self.db.execute('SELECT state,count(*) FROM jobs GROUP BY state').fetchall()),
+        states=dict(self.db.execute('SELECT state,count(*) FROM jobs GROUP BY state').fetchall())
+        return {'states':states,'archive_complete':not any(count for state,count in states.items() if state!='saved'),
                 'by_kind':[dict(r) for r in self.db.execute('SELECT kind,state,count(*) AS count FROM jobs GROUP BY kind,state')],
                 'oldest_waiting_seconds':round(time.time()-oldest) if oldest else None,
                 'saved_unique_bytes':sum(r['bytes'] for r in unique),
