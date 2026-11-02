@@ -39,6 +39,7 @@ def main():
     p.add_argument('--attachments-only',action='store_true')
     p.add_argument('--limit',type=int,default=100)
     p.add_argument('--scan-pages',type=int,default=2)
+    p.add_argument('--scan-threads',type=int,default=5)
     a=p.parse_args();repo=a.repo_root.resolve();code=a.code_root.resolve()
     from dotenv import dotenv_values
     env=os.environ.copy()
@@ -61,7 +62,7 @@ def main():
             subprocess.run([str(poc/'launchd/open_chat_watch_pause.sh')],check=True,capture_output=True);paused=True
             command=[str(poc/'.venv-patch/bin/python'),str(code/'scripts/jarvis_openchat_attachments.py'),'--apply','--scan',
               '--routes-yaml',str(poc/'open_chat_routes.yaml'),'--active-threads',str(poc/'.line_auth/active_thread_mids.json'),
-              '--limit',str(a.limit),'--max-file-mib','50','--scan-pages',str(a.scan_pages),'--scan-threads','5']
+              '--limit',str(a.limit),'--max-file-mib','50','--scan-pages',str(a.scan_pages),'--scan-threads',str(a.scan_threads)]
             result=run_bounded(command,env=env,cwd=repo)
             for line in result.stdout.splitlines():
                 try:
