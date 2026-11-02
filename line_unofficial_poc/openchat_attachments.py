@@ -16,6 +16,12 @@ def private_root(path=None):
                 Path.home()/'.local/share/jarvis/openchat-attachments').expanduser().resolve()
     if any(x in str(root).lower() for x in ['onedrive', 'googledrive', 'google drive', 'dropbox', 'mobile documents', 'icloud']):
         raise ValueError('spool_must_not_sync_to_cloud')
+    if root in (Path('/'),Path.home(),Path.home().parent,Path('/tmp'),Path('/var/tmp')):
+        raise ValueError('dedicated_spool_directory_required')
+    if root.exists():
+        known = re.compile(r'(queue\.sqlite3(?:-journal|-wal|-shm)?|worker\.lock|[0-9a-f]{64}\.(media|part))')
+        if any(p.is_symlink() or not known.fullmatch(p.name) for p in root.iterdir()):
+            raise ValueError('dedicated_spool_directory_required')
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     root.chmod(0o700)
     return root
