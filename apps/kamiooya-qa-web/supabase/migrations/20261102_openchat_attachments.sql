@@ -1,6 +1,6 @@
 -- Private backup only: member viewing is a separate release.
 insert into storage.buckets (id,name,public,file_size_limit)
-values ('openchat-attachments','openchat-attachments',false,524288000)
+values ('openchat-attachments','openchat-attachments',false,52428800)
 on conflict (id) do nothing;
 
 -- Existing permissive policies for other buckets must not expose this archive.

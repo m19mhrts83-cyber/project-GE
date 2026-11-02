@@ -32,3 +32,10 @@ Use the already configured Mac runtime and project-specific server credentials. 
 5. Status is available from the worker without `--apply`. Backfill bytes are separate from daily-growth bytes. Distinct hashes are counted once. A monthly growth estimate appears only after at least two observed days; it is a rough trend, not a cost promise. Use project/organization usage and current rates before operator discussions. Missing collection days lower confidence and require review. `--retry-held --apply` resumes capacity-held jobs after resolving the cause; it does not retry expired/unsupported cases automatically.
 
 No new schedule is installed. Current daily scheduling remains managed by the existing runner. A Draft PR is a review boundary, not permission to merge, migrate, publish or change live accounts. This branch's Vercel Git deployments are disabled in the root and four app configurations.
+
+
+## Operational overlay without merging the authentication branch
+
+`jarvis_openchat_daily_runtime.py` runs the existing text runner first, then pauses the watcher, acquires the same LINE lock, scans with independent attachment cursors, saves pending files and resumes the watcher with a process check. It publishes only counters and status to the private Dashboard/work history. A pinned snapshot under a local nonsync runtime directory can be used by the existing daily LaunchAgent without editing the main checkout or merging either PR. Preserve the existing calendar intervals and save the original plist for rollback.
+
+Real integration requires direct authenticated OBS GET for originals; the SDK's OA proxy may return empty bodies for files/video. Recent scans use BACKWARD=2 with the text collector's sync token as a read-only anchor, plus a separate history cursor. The scanner never writes text cursor state. Recent messages are checked every run while historical pagination continues. Previously expired files stay explicitly failed rather than counted as saved. Current operational worker/bucket limits are 50MiB when the spend cap restricts the global limit; do not disable the spend cap automatically.
