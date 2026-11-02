@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from CHRLINE.hooks import HooksTracer
+from openchat_attachments import capture as capture_attachment
 
 from chrline_client_utils import (
     build_logged_in_client,
@@ -585,6 +586,8 @@ def main() -> int:
             message_id = str(_get(msg, "id", 4) or "").strip()
             if not message_id:
                 return
+            capture_attachment(msg, getter=lambda m,k,f: _get(m,k,f),
+                room_id=route.chat_mid, thread_id=thread_mid or '')
             text = _msg_text(msg)
             if text == "[本文なし]":
                 return

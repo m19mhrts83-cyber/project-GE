@@ -11,6 +11,8 @@ on:
       - "apps/kamiooya-qa-web/**"
       - "215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/**"
       - "scripts/**"
+      - "line_unofficial_poc/**"
+      - "launchd/openchat_md_db_sync_runner.sh"
       - ".github/workflows/pr-checks.yml"
   workflow_dispatch:
 
