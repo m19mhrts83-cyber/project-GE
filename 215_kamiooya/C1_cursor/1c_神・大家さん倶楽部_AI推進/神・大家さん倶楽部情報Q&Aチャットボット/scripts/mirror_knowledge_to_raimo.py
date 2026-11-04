@@ -13,6 +13,8 @@ import urllib.request
 from pathlib import Path
 
 CHATBOT = Path(__file__).resolve().parents[1]
+from raimo_service_client import service_payload
+
 API_PREFIX = "/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0"
 
 
@@ -33,7 +35,7 @@ def load_env() -> None:
 
 def post_json(base: str, endpoint: str, payload: dict) -> tuple[int, str]:
     url = base.rstrip("/") + API_PREFIX + endpoint
-    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    data = json.dumps(service_payload(url, payload), ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=data,
@@ -49,7 +51,10 @@ def post_json(base: str, endpoint: str, payload: dict) -> tuple[int, str]:
 
 def get_json(base: str, endpoint: str) -> dict:
     url = base.rstrip("/") + API_PREFIX + endpoint
-    with urllib.request.urlopen(url, timeout=60) as r:
+    data = json.dumps(service_payload(url)).encode("utf-8")
+    url = url.replace(API_PREFIX + "/", API_PREFIX + "/internal/read/", 1)
+    request = urllib.request.Request(url, data=data, headers={"Content-Type":"application/json"}, method="POST")
+    with urllib.request.urlopen(request, timeout=60) as r:
         return json.loads(r.read().decode("utf-8"))
 
 

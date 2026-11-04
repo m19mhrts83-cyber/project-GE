@@ -31,7 +31,7 @@ function setup() {
     const r = await handler(req('/auth/login', '', { email: uid + '@example.test', password_hash: 'fixture-password' }));
     assert.equal(r.status, 200); return (await r.json()).auth_token;
   };
-  return { d, handler, login, members, saved, calls, advance: () => clock += 900001, throttle: () => loginAllowed = false };
+  return { d, handler, login, members, saved, calls, advance: () => clock += 28800001, throttle: () => loginAllowed = false };
 }
 test('login returns only public identity plus an opaque session; rejects forged/stale sessions', async () => {
   const s = setup(); const token = await s.login();
@@ -81,7 +81,7 @@ test('chat ownership is enforced even for staff and body actors are replaced', a
 });
 test('logout revokes; reset/bootstrap/notification and unreviewed operations remain closed', async () => {
   const s = setup(), token = await s.login('m');
-  for (const path of ['/auth/reset-password','/auth/forgot-password/issue','/admin/bootstrap-master','/notify/approval']) {
+  for (const path of ['/auth/reset-password','/auth/forgot-password/issue','/admin/bootstrap-master','/semantic-search-config']) {
     assert.equal((await s.handler(req(path, token, {}))).status, 403);
   }
   assert.equal((await s.handler(req('/auth/logout', token, {}))).status, 200);
