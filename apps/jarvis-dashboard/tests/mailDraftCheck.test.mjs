@@ -68,3 +68,18 @@ test('下書き作成は元のメールが空なら呼ばない', async () => {
   assert.equal(r.ok, false);
   assert.equal(called, false);
 });
+
+test('本文が空のときの下書き作成は指示をプロンプトに入れる', async () => {
+  let prompt = '';
+  const m = load(async (p) => { prompt = p; return { ok: true, text: '承知しました。\n松野' }; });
+  const r = await m.composeDraft({ who: '山田様', subject: '件名', inbound: 'ご確認ください', instruction: 'お礼だけ短く' });
+  assert.equal(r.ok, true);
+  assert.match(prompt, /松野さんの指示/);
+  assert.match(prompt, /お礼だけ短く/);
+});
+
+test('指示なしなら指示ブロックを入れない', () => {
+  const m = load(async () => ({ ok: false, error: 'x' }));
+  const p = m.composePrompt({ who: 'A', subject: 'B', inbound: 'C' });
+  assert.doesNotMatch(p, /松野さんの指示/);
+});
