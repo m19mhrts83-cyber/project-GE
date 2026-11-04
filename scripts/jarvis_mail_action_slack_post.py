@@ -120,6 +120,8 @@ MA_ACTION_IDS = {
     "todoist": "mail_action_todoist",
     "done": "mail_action_done",
 }
+# メール: 返信不要・別経路で返信済み。見送りと違い送信者は学習で除外しない（次回も判断に出す）
+DONE_LABEL = "回答不要・回答済み"
 CHAT_KINDS = {"chat"}
 CHAT_APP_URLS = {"Chatwork": "https://www.chatwork.com/"}
 
@@ -264,7 +266,11 @@ def _button_elements(
                 "text": {"type": "plain_text", "text": todoist_label, "emoji": True},
                 "url": ma_url(tid, "todoist"),
             },
-        ]
+        ] + ([] if chat else [{
+            "type": "button",
+            "text": {"type": "plain_text", "text": DONE_LABEL, "emoji": True},
+            "url": ma_url(tid, "done"),
+        }])
     return [
         {
             "type": "button",
@@ -286,7 +292,12 @@ def _button_elements(
             "action_id": MA_ACTION_IDS["todoist"],
             "value": f"ma:todoist:{tid}",
         },
-    ]
+    ] + ([] if chat else [{
+        "type": "button",
+        "text": {"type": "plain_text", "text": DONE_LABEL, "emoji": True},
+        "action_id": MA_ACTION_IDS["done"],
+        "value": f"ma:done:{tid}",
+    }])
 
 
 def _clean_body_lines(body: str) -> list[str]:
