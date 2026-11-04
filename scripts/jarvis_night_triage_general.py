@@ -96,16 +96,16 @@ def is_kurashift_property_mail(subject: str, body: str = "") -> bool:
 
 
 def classify_general_kind(subject: str, body: str = "", from_email: str = "") -> str:
-    """general 取込の kind: mail（要確認）| skim（要約用）。"""
-    blob = f"{subject or ''}\n{(body or '')[:2000]}\n{from_email or ''}"
-    if SKIM_HINT_RE.search(blob) and not NEEDS_ACTION_RE.search(blob):
+    """general 取込の kind: mail（要確認）| skim（要約用）。
+
+    依頼語（ご確認・お願い）は自動送信にも必ず入るため、人が書いたメールだけを mail にする
+    （jarvis_mail_human.looks_human_mail。2026-11-04: 依頼語判定ではカード・銀行・販促が要対応に並んでいた）。
+    """
+    if NOISE_FROM_RE.search(from_email or ""):
         return "skim"
-    if NOISE_FROM_RE.search(from_email or "") and not NEEDS_ACTION_RE.search(blob):
-        return "skim"
-    if NEEDS_ACTION_RE.search(blob):
-        return "mail"
-    # 未返信スレッドでも依頼語が無ければ要約側（ホームで確認したよ）
-    return "skim"
+    from jarvis_mail_human import looks_human_mail
+
+    return "mail" if looks_human_mail(from_email, subject, body) else "skim"
 
 
 def resolve_contact_yaml(explicit: Path | None = None) -> Path:
