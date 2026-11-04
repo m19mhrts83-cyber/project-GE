@@ -146,13 +146,41 @@ class ItemTests(unittest.TestCase):
     def test_unparseable_date_skipped(self):
         self.assertIsNone(hub.item_from_md_entry({"received_at": "不明", "channel": ""}))
 
-    def test_candidate_key_matches_md_entry(self):
-        """111 の未返信候補から、同じ台帳行の external_id が引けること。"""
+    def test_candidate_maps_to_same_dedupe_key(self):
+        """111 の未返信候補から、同じ台帳行の dedupe_key が引けること。"""
         entries = parse_yoritoori_text(_md(self.now), "102_ミニテック", "ミニテック")
         cands = find_unreplied(entries, 14)
         self.assertEqual(len(cands), 1)
-        ext = hub.md_external_id(pt._candidate_md_key(cands[0]))
-        self.assertEqual(ext, self.by_subject["Re: 201号室 エアコン不具合"]["external_id"])
+        c = cands[0]
+        crow = hub.item_from_md_entry({**c, "channel": c.get("channel_raw") or c.get("channel")})
+        target = self.by_subject["Re: 201号室 エアコン不具合"]
+        self.assertEqual(hub.dedupe_key(crow), hub.dedupe_key(target))
+
+    def test_double_entry_collapsed(self):
+        """同日時・同本文で「自分から送信」と誤ラベルの「相手から返信」が並ぶ分は1行。"""
+        body = "ミニテック 林 様\nお世話になっております。松野です。\n共用部アンペア変更の立ち会い完了のご連絡です。\n"
+        md = (
+            "### 2026/10/11 07:58｜ミニテック｜自分から送信｜アンペア変更\n\n**件名**: アンペア変更\n" + body + "\n---\n\n"
+            "### 2026/10/11 07:58｜ミニテック｜相手から返信｜アンペア変更\n\n**件名**: アンペア変更\n" + body + "\n---\n"
+        )
+        rows = hub.items_from_md_text(md, "102_ミニテック", "ミニテック")
+        self.assertEqual(len(rows), 1)
+
+    def test_dedupe_key_ignores_timezone_format(self):
+        a = {"party_id": "p", "channel": "gmail", "direction": "inbound",
+             "occurred_at": "2026-10-11T07:58:00+09:00", "body_text": "本 文"}
+        b = {**a, "occurred_at": "2026-10-10T22:58:00+00:00", "body_text": "本文"}
+        self.assertEqual(hub.dedupe_key(a), hub.dedupe_key(b))
+
+    def test_find_duplicate_ids_keeps_oldest(self):
+        base = {"party_id": "p", "channel": "gmail", "direction": "outbound",
+                "occurred_at": "2026-10-11T07:58:00+09:00", "body_text": "x"}
+        rows = [
+            {**base, "id": "b", "created_at": "2026-11-04T10:00:02+00:00"},
+            {**base, "id": "a", "created_at": "2026-11-04T10:00:01+00:00"},
+            {**base, "id": "c", "created_at": "2026-11-04T10:00:03+00:00", "body_text": "y"},
+        ]
+        self.assertEqual(hub.find_duplicate_ids(rows), ["b"])
 
 
 class _Result:
@@ -180,6 +208,21 @@ class _Query:
         self.filters.append(("in", col, list(vals)))
         return self
 
+    def gte(self, col, val):
+        self.filters.append(("gte", col, val))
+        return self
+
+    def order(self, *_a, **_k):
+        return self
+
+    def range(self, start, end):
+        self.rng = (start, end)
+        return self
+
+    def delete(self):
+        self.op = "delete"
+        return self
+
     def eq(self, col, val):
         self.filters.append(("eq", col, val))
         return self
@@ -189,6 +232,8 @@ class _Query:
             if kind == "in" and row.get(col) not in val:
                 return False
             if kind == "eq" and row.get(col) != val:
+                return False
+            if kind == "gte" and str(row.get(col)) < str(val):
                 return False
         return True
 
@@ -208,7 +253,14 @@ class _Query:
             for r in hit:
                 r.update(self.payload)
             return _Result(hit)
-        return _Result([r for r in rows if self._match(r)])
+        if self.op == "delete":
+            hit = [r for r in rows if self._match(r)]
+            rows[:] = [r for r in rows if r not in hit]
+            return _Result(hit)
+        out = [r for r in rows if self._match(r)]
+        if getattr(self, "rng", None):
+            out = out[self.rng[0] : self.rng[1] + 1]
+        return _Result(out)
 
 
 class _FakeSB:
@@ -255,6 +307,26 @@ class Phase1SyncTests(unittest.TestCase):
         self.assertEqual(len(sb.db["comm_items"]), 2)  # 重複しない
         target = next(r for r in sb.db["comm_items"] if r["id"] == row2["comm_item_id"])
         self.assertEqual(target["work_status"], "done")
+
+
+class DedupeSyncTests(unittest.TestCase):
+    def test_existing_variant_with_other_external_id_not_reinserted(self):
+        now = datetime.now(JST)
+        entries = parse_yoritoori_text(_md(now), "102_ミニテック", "ミニテック")
+        cands = find_unreplied(entries, 14)
+        row = pt.row_from_candidate(cands[0], pt.heuristic_judge(cands[0]))
+        sb = _FakeSB()
+        with mock.patch.object(hub, "client", return_value=sb):
+            pt.comm_hub_sync(entries, [(cands[0], row)], lookback_days=14)
+            before = len(sb.db["comm_items"])
+            # DB 側の外部IDだけ別表記（二重記載の別見出し）にしても、新しい行は増えない
+            for r in sb.db["comm_items"]:
+                r["external_id"] = "md:other-" + r["external_id"]
+                r["source_ref"] = {"source": "yoritoori_md"}
+            row2 = pt.row_from_candidate(cands[0], pt.heuristic_judge(cands[0]))
+            pt.comm_hub_sync(entries, [(cands[0], row2)], lookback_days=14)
+        self.assertEqual(len(sb.db["comm_items"]), before)
+        self.assertTrue(row2["comm_item_id"].startswith("uuid-"))
 
 
 class MainSoftFailTests(unittest.TestCase):

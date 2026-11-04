@@ -267,17 +267,6 @@ def row_from_candidate(c: dict[str, Any], judge: dict[str, Any]) -> dict[str, An
     }
 
 
-def _candidate_md_key(c: dict[str, Any]) -> dict[str, Any]:
-    """候補 → 元の md 見出し（台帳の external_id 計算用）。"""
-    return {
-        "folder": c.get("folder"),
-        "received_at": c.get("received_at"),
-        "channel": c.get("channel_raw") or c.get("channel"),
-        "subject": c.get("subject"),
-        "summary": c.get("summary"),
-    }
-
-
 def comm_hub_sync(
     entries: list[dict[str, Any]],
     pairs: list[tuple[dict[str, Any], dict[str, Any]]],
@@ -296,25 +285,36 @@ def comm_hub_sync(
     now = datetime.now(JST)
     window = now - timedelta(days=window_days)
     recent = now - timedelta(days=lookback_days)
+    sb = hub.client()
+    # 窓内の既存行（二重記載の別表記を含む）を同一視するため、先に鍵を引いておく
+    existing = hub.existing_by_dedupe_key(sb, window.isoformat())
     items: dict[str, dict[str, Any]] = {}
+    seen: set[tuple[str, str, str, str, str]] = set()
     for e in entries:
         row = hub.item_from_md_entry(e, recent_cutoff=recent)
         if row is None or row["occurred_at"] < window.isoformat():
             continue
-        items.setdefault(row["external_id"], row)
-    cand_ext = {
-        id(row): hub.md_external_id(_candidate_md_key(c)) for c, row in pairs
-    }
-    sb = hub.client()
+        dk = hub.dedupe_key(row)
+        if row["external_id"] in items or dk in seen or dk in existing:
+            continue
+        seen.add(dk)
+        items[row["external_id"]] = row
     ids = hub.insert_items(sb, list(items.values()))
-    missing = [x for x in cand_ext.values() if x not in ids]
-    if missing:
-        ids.update(hub.lookup_ids(sb, missing))
+    ids_by_dk = {hub.dedupe_key(r): ids[x] for x, r in items.items() if x in ids}
+    ids_by_dk.update(existing)
+
+    cand_dk: dict[int, tuple[str, str, str, str, str] | None] = {}
+    for c, row in pairs:
+        crow = hub.item_from_md_entry(
+            {**c, "channel": c.get("channel_raw") or c.get("channel")}
+        )
+        cand_dk[id(row)] = hub.dedupe_key(crow) if crow else None
 
     needs: list[str] = []
     links: list[dict[str, Any]] = []
     for _c, row in pairs:
-        iid = ids.get(cand_ext[id(row)])
+        dk = cand_dk.get(id(row))
+        iid = ids_by_dk.get(dk) if dk else None
         if not iid:
             continue
         row["comm_item_id"] = iid
@@ -324,11 +324,11 @@ def comm_hub_sync(
     hub.mark_needs_reply(sb, needs)
     hub.link_items(sb, links)
     print(
-        f"# comm hub: items={len(items)} in_db={len(ids)} "
+        f"# comm hub: new={len(items)} known={len(existing)} "
         f"linked={len(links)} needs_reply={len(needs)}",
         file=sys.stderr,
     )
-    return len(ids)
+    return len(ids_by_dk)
 
 
 def push_rows(rows: list[dict[str, Any]]) -> int:
