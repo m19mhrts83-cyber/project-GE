@@ -24,6 +24,8 @@ CHATBOT = SCRIPTS.parent
 sys.path.insert(0, str(SCRIPTS))
 from forum_category_map import enrich_comment_meta  # noqa: E402
 
+from raimo_service_client import service_post, service_get
+
 API_PREFIX = "/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0"
 
 
@@ -153,7 +155,7 @@ def main() -> int:
                 "topic_title": meta.get("topic_title") or "",
             }
             try:
-                resp = page.request.post(
+                resp = service_post(page,
                     app_url + API_PREFIX + "/admin/comments/update-category",
                     data=json.dumps(payload),
                     headers={"Content-Type": "application/json"},

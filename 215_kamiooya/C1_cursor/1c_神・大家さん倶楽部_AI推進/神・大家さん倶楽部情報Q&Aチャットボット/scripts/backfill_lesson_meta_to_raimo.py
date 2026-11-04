@@ -21,6 +21,8 @@ from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent
 CHATBOT = SCRIPTS.parent
+from raimo_service_client import service_post, service_get
+
 API_PREFIX = "/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0"
 ALFRED = Path.home() / "git-repos" / "ProgramCode" / "alfred_python"
 
@@ -154,7 +156,7 @@ def main() -> int:
             page.click("#loginSubmitBtn")
             page.wait_for_timeout(4000)
 
-        resp = page.request.get(app_url + API_PREFIX + "/comments", timeout=120000)
+        resp = service_get(page, app_url + API_PREFIX + "/comments", timeout=120000)
         if resp.status >= 400:
             print(f"comments fetch failed: {resp.status} {resp.text()[:200]}", file=sys.stderr)
             browser.close()
@@ -221,7 +223,7 @@ def main() -> int:
                 skip += 1
                 continue
             try:
-                r = page.request.post(
+                r = service_post(page,
                     app_url + API_PREFIX + "/admin/comments/update-content",
                     data=json.dumps(payload),
                     headers={"Content-Type": "application/json"},

@@ -1,10 +1,13 @@
 const App = {
+  // Offline repair candidate: stay on the existing backend until an approved cutover.
+  authGatewayBase: '', // Release publisher sets the verified gateway URL.
   // 公開 Edge URL（シークレットは /semantic-search-config から取得）
   semanticEdgeUrl: 'https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/semantic-search',
   _semanticSecret: null,
 
   state: {
     currentUser: null,
+    authToken: '',
     attachmentToken: '',
     attachmentIndex: {},
     attachmentGeneration: 0,
@@ -60,16 +63,20 @@ const App = {
   elements: {},
 
   apiClient: async (method, endpoint, body = null, fetchOptions = null) => {
-    const url = '/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0' + endpoint;
+    const url = (App.authGatewayBase || '/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0') + endpoint;
     const options = {
       method: method,
       headers: { 'Content-Type': 'application/json' },
     };
+    if (App.authGatewayBase && App.state.authToken) options.headers.Authorization = 'Bearer ' + App.state.authToken;
     if (body) options.body = JSON.stringify(body);
     if (fetchOptions && fetchOptions.signal) options.signal = fetchOptions.signal;
     try {
       const response = await fetch(url, options);
       if (!response.ok) {
+        if (response.status === 401 && App.authGatewayBase && App.state.authToken) {
+          App.state.authToken = ''; App.state.attachmentToken = ''; App.state.currentUser = null; App.showAuthView();
+        }
         const text = await response.text();
         let errorData = {};
         if (text) {
@@ -1176,7 +1183,9 @@ const App = {
         email: email,
         password_hash: password
       });
+      App.state.authToken = App.authGatewayBase ? String(res.auth_token || '') : '';
       App.state.currentUser = res.user;
+      document.getElementById('loginPassword').value = '';
       App.state.attachmentGeneration += 1;
       App.state.attachmentToken = '';
       App.state.attachmentIndex = {};
@@ -1247,6 +1256,8 @@ const App = {
   },
 
   logout: () => {
+    if (App.authGatewayBase && App.state.authToken) void App.apiClient('POST', '/auth/logout', {}).catch(() => {});
+    App.state.authToken = '';
     App.state.attachmentGeneration += 1;
     App.state.attachmentToken = '';
     App.state.attachmentIndex = {};
@@ -3593,7 +3604,7 @@ const App = {
       String((App.state.currentUser || {}).id || '') === userId;
     try {
       const session = await App.apiClient('POST', '/auth/attachment-session', {
-        email: email, password_hash: password
+        ...(App.authGatewayBase ? {} : { email: email, password_hash: password })
       });
       if (!current()) return;
       const token = String(session.token || '');
