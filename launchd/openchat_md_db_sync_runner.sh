@@ -77,6 +77,14 @@ fi
   db_rc=0
   "$PY" "${REPO_DIR}/scripts/jarvis_kurashift_openchat_sync.py" --apply || db_rc=$?
 
+  # Optional private attachment worker, while realtime remains paused. Its own
+  # session lock prevents a competing LINE login. Never gate body ingestion on it.
+  attachment_rc=0
+  if [[ "${LINE_OPENCHAT_ATTACHMENTS_QUEUE:-0}" == "1" && "${LINE_OPENCHAT_ATTACHMENTS_APPLY:-0}" == "1" ]]; then
+    ( cd "$POC" && ./run_patch.sh "${REPO_DIR}/scripts/jarvis_openchat_attachments.py" --apply --limit 10 ) || attachment_rc=$?
+    echo "# openchat attachment worker rc=${attachment_rc}"
+  fi
+
   # staging → ready / excluded（ノイズのみ除外・検索公開）
   "$PY" "${REPO_DIR}/scripts/jarvis_openchat_publish.py" --apply || true
 
@@ -86,6 +94,6 @@ fi
 
   resume_watch
 
-  echo "# end md_rc=${md_rc} db_rc=${db_rc} $(date '+%Y-%m-%d %H:%M:%S %z')"
+  echo "# end md_rc=${md_rc} db_rc=${db_rc} attachment_rc=${attachment_rc} $(date '+%Y-%m-%d %H:%M:%S %z')"
   exit "${md_rc}"
 } >>"$LOG" 2>&1

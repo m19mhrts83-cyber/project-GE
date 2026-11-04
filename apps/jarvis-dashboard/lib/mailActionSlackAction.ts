@@ -116,6 +116,7 @@ type TriageRow = {
   lane: string | null;
   kind: string | null;
   summary: string | null;
+  folder?: string | null;
   gmail_thread_id: string | null;
   gmail_message_id: string | null;
   payload: Record<string, unknown> | null;
@@ -154,6 +155,21 @@ export function guessMailTodoistLane(
   return "ai_raimo";
 }
 
+/** Slack で作った下書きを保存（開き直しても作り直さない） */
+export async function saveMailActionDraft(id: string, text: string, source: string): Promise<void> {
+  const sb = createServiceClient();
+  if (!sb || !text.trim()) return;
+  const row = await fetchMailActionTriage(id);
+  if (!row || String(row.draft_text || "").trim()) return;
+  const payload = asPayload(row.payload);
+  payload.draft_source = source;
+  payload.draft_created_at = new Date().toISOString();
+  await sb
+    .from("triage_items")
+    .update({ draft_text: text, payload, updated_at: new Date().toISOString() })
+    .eq("id", id);
+}
+
 export async function fetchMailActionTriage(
   id: string,
 ): Promise<TriageRow | null> {
@@ -162,7 +178,7 @@ export async function fetchMailActionTriage(
   const { data, error } = await sb
     .from("triage_items")
     .select(
-      "id,status,subject,draft_text,original_body,from_email,partner,account,lane,kind,summary,gmail_thread_id,gmail_message_id,payload",
+      "id,status,subject,draft_text,original_body,from_email,partner,account,lane,kind,summary,folder,gmail_thread_id,gmail_message_id,payload",
     )
     .eq("id", id)
     .maybeSingle();

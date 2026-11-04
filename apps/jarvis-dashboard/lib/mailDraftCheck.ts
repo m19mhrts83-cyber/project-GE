@@ -83,3 +83,51 @@ export async function reviseDraft(
   if (!instruction.trim()) return { ok: false, error: "見直し指示を入力してください" };
   return run(revisePrompt(draft, instruction), draft);
 }
+
+/** 返信下書きを作る（「返信する」で本文が空のとき・1通1回） */
+export function composePrompt(opts: {
+  who: string;
+  subject: string;
+  inbound: string;
+  history?: string;
+  materials?: string[];
+}): string {
+  const lines = [
+    "あなたは株式会社リビングサポート松の代表・松野真治です。届いたメールへの返信下書きを書いてください。",
+    "",
+    "ルール:",
+    "- 日本語。丁寧だが冗長にしない。",
+    "- 冒頭は相手の呼び方に合わせる（〇〇様）。不明なら「ご担当者様」。",
+    "- 末尾署名は「松野」のみ。",
+    "- 約束・金額・日付を作らない。分からないことは確認の一文にする。",
+    "- 件名・引用・「Re:」は書かない。本文のみ。",
+  ];
+  if (opts.materials?.length) {
+    lines.push("- 資料を求められているので、添付して送る前提で一言添える（例: 下記の資料をお送りします）。");
+  }
+  lines.push(
+    "",
+    `相手: ${opts.who}`,
+    `件名: ${opts.subject}`,
+  );
+  if (opts.history?.trim()) {
+    lines.push("", "【これまでのやり取り（新しいものが末尾）】", opts.history.trim());
+  }
+  lines.push("", "【届いたメール】", (opts.inbound || "").slice(0, 4000), "", "返信本文のみを出力してください。");
+  return lines.join("\n");
+}
+
+export async function composeDraft(opts: {
+  who: string;
+  subject: string;
+  inbound: string;
+  history?: string;
+  materials?: string[];
+}): Promise<DraftCheckResult> {
+  if (!opts.inbound.trim()) return { ok: false, error: "元のメール本文がありません" };
+  const r = await geminiReply(composePrompt(opts), { timeoutMs: TIMEOUT_MS, maxAttempts: 3 });
+  if (!r.ok) return { ok: false, error: r.error };
+  const text = stripFence(r.text);
+  if (!text) return { ok: false, error: "下書きが空でした" };
+  return { ok: true, text, changes: [] };
+}

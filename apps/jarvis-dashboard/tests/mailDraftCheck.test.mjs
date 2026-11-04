@@ -43,3 +43,28 @@ test('Gemini 失敗時は本文を変えずにエラー', async () => {
   assert.equal(r.ok, false);
   assert.match(r.error, /429/);
 });
+
+test('下書き作成はやり取り履歴と資料依頼をプロンプトに入れる', async () => {
+  let prompt = '';
+  const m = load(async (p) => { prompt = p; return { ok: true, text: '山村様\n\nご連絡ありがとうございます。\n\n松野' }; });
+  const r = await m.composeDraft({
+    who: '山村不動産',
+    subject: '物件の件',
+    inbound: '松野様\n資料をお送りください。',
+    history: '【OneDrive やり取り末尾】前回の打合せ',
+    materials: ['登記簿謄本'],
+  });
+  assert.equal(r.ok, true);
+  assert.match(r.text, /^山村様/);
+  assert.match(prompt, /これまでのやり取り/);
+  assert.match(prompt, /前回の打合せ/);
+  assert.match(prompt, /添付して送る前提/);
+});
+
+test('下書き作成は元のメールが空なら呼ばない', async () => {
+  let called = false;
+  const m = load(async () => { called = true; return { ok: true, text: 'x' }; });
+  const r = await m.composeDraft({ who: 'a', subject: 'b', inbound: '  ' });
+  assert.equal(r.ok, false);
+  assert.equal(called, false);
+});

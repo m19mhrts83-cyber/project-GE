@@ -726,7 +726,7 @@ def build_compact_payload(
         app_link = f"<{app_url}|{channel}を開く>" if app_url else f"{channel}アプリ"
         draft_note = f"📱 {app_link}で返信 → 「返信済みにする」"
     else:
-        draft_note = "下書きあり → 返信で編集" if draft else "下書きなし → 返信で作成"
+        draft_note = "下書きあり → 返信で編集" if draft else "「返信する」で下書きを自動作成"
     materials = material_items(row)
     material_line = ""
     if materials:
@@ -1063,6 +1063,7 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         .execute()
     )
     from jarvis_kurashift_re_inquiry_channel import is_mail_action_excluded
+    from jarvis_mail_human import looks_human_mail
 
     pool_rows: list[dict[str, Any]] = []
     muted_n = 0
@@ -1108,6 +1109,18 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
             skipped_skim += 1
             continue
         if kind == "skim" and pri != "high" and not (row.get("draft_text") or "").strip():
+            skipped_skim += 1
+            continue
+        # 一般メールは人が書いたものだけ（カード・銀行・販促の自動送信は要約側）
+        if (
+            lane == "general"
+            and not (row.get("draft_text") or "").strip()
+            and not looks_human_mail(
+                str(row.get("from_email") or ""),
+                subj,
+                str(row.get("original_body") or ""),
+            )
+        ):
             skipped_skim += 1
             continue
         if lane == "openchat":
