@@ -5,6 +5,11 @@ Gmail／Chatwork 未返信判定 → triage_items。
 
 LINE／iMessage は対象外（Mac 夜間トリアージ残）。
 
+2026-11-04: コミュニケーション台帳（comm_items）へ並走書き込み（Phase 1）。
+読んだ 5.やり取り.md の直近分を台帳に足し、未返信候補は needs_reply、
+triage_items.comm_item_id で台帳とつなぐ。台帳側の失敗では本線を止めない。
+無効化: JARVIS_COMM_HUB=0 または --no-comm-hub
+
   python scripts/jarvis_gha_partner_triage.py --dry-run --limit 10
   python scripts/jarvis_gha_partner_triage.py --push --limit 30
 """
@@ -155,7 +160,12 @@ def _has_chatwork_route(p: dict[str, Any]) -> bool:
     return isinstance(rooms, dict) and bool(rooms)
 
 
-def candidates_from_partners(*, lookback_days: int, max_partners: int) -> list[dict[str, Any]]:
+def candidates_from_partners(
+    *,
+    lookback_days: int,
+    max_partners: int,
+    collect: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     import yaml
     from jarvis_night_triage import (
         find_unreplied,
@@ -197,6 +207,8 @@ def candidates_from_partners(*, lookback_days: int, max_partners: int) -> list[d
             if not text:
                 continue
             entries = parse_yoritoori_text(text, folder, name)
+            if collect is not None:
+                collect.extend(entries)
             if want_mail:
                 mail_entries.extend(entries)
             if want_cw:
@@ -253,6 +265,70 @@ def row_from_candidate(c: dict[str, Any], judge: dict[str, Any]) -> dict[str, An
         },
         "updated_at": now_iso(),
     }
+
+
+def _candidate_md_key(c: dict[str, Any]) -> dict[str, Any]:
+    """候補 → 元の md 見出し（台帳の external_id 計算用）。"""
+    return {
+        "folder": c.get("folder"),
+        "received_at": c.get("received_at"),
+        "channel": c.get("channel_raw") or c.get("channel"),
+        "subject": c.get("subject"),
+        "summary": c.get("summary"),
+    }
+
+
+def comm_hub_sync(
+    entries: list[dict[str, Any]],
+    pairs: list[tuple[dict[str, Any], dict[str, Any]]],
+    *,
+    lookback_days: int,
+    window_days: int = 30,
+) -> int:
+    """Phase 1 並走書き込み。pairs = (候補, triage 行)。triage 行に comm_item_id を足す。
+
+    例外は呼び出し側で握りつぶす（本線を止めない）。戻り値は台帳に存在する件数。
+    """
+    from datetime import timedelta
+
+    import jarvis_comm_hub as hub
+
+    now = datetime.now(JST)
+    window = now - timedelta(days=window_days)
+    recent = now - timedelta(days=lookback_days)
+    items: dict[str, dict[str, Any]] = {}
+    for e in entries:
+        row = hub.item_from_md_entry(e, recent_cutoff=recent)
+        if row is None or row["occurred_at"] < window.isoformat():
+            continue
+        items.setdefault(row["external_id"], row)
+    cand_ext = {
+        id(row): hub.md_external_id(_candidate_md_key(c)) for c, row in pairs
+    }
+    sb = hub.client()
+    ids = hub.insert_items(sb, list(items.values()))
+    missing = [x for x in cand_ext.values() if x not in ids]
+    if missing:
+        ids.update(hub.lookup_ids(sb, missing))
+
+    needs: list[str] = []
+    links: list[dict[str, Any]] = []
+    for _c, row in pairs:
+        iid = ids.get(cand_ext[id(row)])
+        if not iid:
+            continue
+        row["comm_item_id"] = iid
+        links.append({"item_id": iid, "target_type": "triage_item", "target_id": row["id"]})
+        if row.get("status") == "pending":
+            needs.append(iid)
+    hub.mark_needs_reply(sb, needs)
+    hub.link_items(sb, links)
+    print(
+        f"# comm hub: items={len(items)} in_db={len(ids)} "
+        f"linked={len(links)} needs_reply={len(needs)}",
+        file=sys.stderr,
+    )
+    return len(ids)
 
 
 def push_rows(rows: list[dict[str, Any]]) -> int:
@@ -313,15 +389,27 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="明示オプトイン時のみ Gemini 判定（非推奨）",
     )
+    ap.add_argument(
+        "--no-comm-hub",
+        action="store_true",
+        help="コミュニケーション台帳への並走書き込みをしない",
+    )
     args = ap.parse_args(argv)
+    use_comm_hub = not args.no_comm_hub and (
+        (os.environ.get("JARVIS_COMM_HUB") or "1").strip().lower()
+        not in ("0", "false", "no", "off")
+    )
     # 既定オフ。JARVIS_TRIAGE_NO_GEMINI=0 かつ --allow-gemini のときのみオン。
     allow_gemini = bool(args.allow_gemini) and (
         (os.environ.get("JARVIS_TRIAGE_NO_GEMINI") or "1").strip().lower()
         not in ("1", "true", "yes", "on")
     )
 
+    md_entries: list[dict[str, Any]] = []
     cands = candidates_from_partners(
-        lookback_days=args.lookback_days, max_partners=args.max_partners
+        lookback_days=args.lookback_days,
+        max_partners=args.max_partners,
+        collect=md_entries,
     )
     n_mail = sum(1 for c in cands if (c.get("channel") or "Gmail") == "Gmail")
     n_cw = sum(1 for c in cands if (c.get("channel") or "") == "Chatwork")
@@ -331,6 +419,7 @@ def main(argv: list[str] | None = None) -> int:
         file=sys.stderr,
     )
     rows: list[dict[str, Any]] = []
+    pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
     skipped_self = 0
     for c in cands[: args.limit]:
         judge = maybe_gemini_judge(c, allow_gemini=allow_gemini)
@@ -348,6 +437,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             continue
         rows.append(row)
+        pairs.append((c, row))
         if allow_gemini and os.environ.get("GEMINI_API_KEY"):
             time.sleep(1.2)
     if skipped_self:
@@ -358,6 +448,14 @@ def main(argv: list[str] | None = None) -> int:
         if rows:
             print(json.dumps(rows[0], ensure_ascii=False, indent=2)[:800])
         return 0
+
+    if use_comm_hub:
+        try:
+            comm_hub_sync(md_entries, pairs, lookback_days=args.lookback_days)
+        except Exception as e:  # noqa: BLE001 — 台帳は書き足すだけ。本線は続行
+            for row in rows:
+                row.pop("comm_item_id", None)
+            print(f"# comm hub soft-fail: {type(e).__name__}: {e}", file=sys.stderr)
 
     n = push_rows(rows)
     print(f"📎 partner triage pushed={n}")
