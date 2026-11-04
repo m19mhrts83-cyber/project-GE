@@ -43,7 +43,7 @@ export function createHandler(cfg: Config, transport: typeof fetch = fetch, now:
     if (origin && origin !== cfg.raimoOrigin) return json({ error: "forbidden_origin" }, 403);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
     if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-    if (!cfg.serviceKey || cfg.proxySecret.length < 32 || cfg.sessionSecret.length < 32 || !cfg.statusUrl.startsWith(cfg.raimoOrigin + "/")) return json({ error: "service_not_configured" }, 503);
+    if (!cfg.serviceKey || cfg.proxySecret.length < 32 || cfg.sessionSecret.length < 32 || !(cfg.statusUrl.startsWith(cfg.raimoOrigin + "/") || cfg.statusUrl === cfg.projectUrl + "/functions/v1/raimo-auth/internal/attachment-user-status")) return json({ error: "service_not_configured" }, 503);
     try {
       const text = await req.text();
       if (text.length > 16384) return json({ error: "request_too_large" }, 413);
@@ -114,7 +114,7 @@ if (typeof Deno !== "undefined") Deno.serve(createHandler({
   projectUrl: Deno.env.get("SUPABASE_URL") || "", serviceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
   proxySecret: Deno.env.get("COMMUNITY_ATTACHMENTS_PROXY_SECRET") || "", sessionSecret: Deno.env.get("COMMUNITY_ATTACHMENTS_SESSION_SECRET") || "",
   raimoOrigin: "https://ma-54t2keqdelz3.raimo-app.buzz",
-  memberReadsEnabled: false,
+  memberReadsEnabled: Deno.env.get("COMMUNITY_ATTACHMENTS_MEMBER_READS_ENABLED") === "1",
   requireParentSession: true,
-  statusUrl: "https://ma-54t2keqdelz3.raimo-app.buzz/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0/internal/attachment-user-status",
+  statusUrl: (Deno.env.get("SUPABASE_URL") || "") + "/functions/v1/raimo-auth/internal/attachment-user-status",
 }));

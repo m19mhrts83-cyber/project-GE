@@ -1,6 +1,6 @@
 const App = {
   // Offline repair candidate: stay on the existing backend until an approved cutover.
-  authGatewayBase: '',
+  authGatewayBase: '', // Release publisher sets the verified gateway URL.
   // 公開 Edge URL（シークレットは /semantic-search-config から取得）
   semanticEdgeUrl: 'https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/semantic-search',
   _semanticSecret: null,
@@ -74,6 +74,9 @@ const App = {
     try {
       const response = await fetch(url, options);
       if (!response.ok) {
+        if (response.status === 401 && App.authGatewayBase && App.state.authToken) {
+          App.state.authToken = ''; App.state.attachmentToken = ''; App.state.currentUser = null; App.showAuthView();
+        }
         const text = await response.text();
         let errorData = {};
         if (text) {
@@ -1182,6 +1185,7 @@ const App = {
       });
       App.state.authToken = App.authGatewayBase ? String(res.auth_token || '') : '';
       App.state.currentUser = res.user;
+      document.getElementById('loginPassword').value = '';
       App.state.attachmentGeneration += 1;
       App.state.attachmentToken = '';
       App.state.attachmentIndex = {};
@@ -3600,7 +3604,7 @@ const App = {
       String((App.state.currentUser || {}).id || '') === userId;
     try {
       const session = await App.apiClient('POST', '/auth/attachment-session', {
-        email: email, password_hash: password
+        ...(App.authGatewayBase ? {} : { email: email, password_hash: password })
       });
       if (!current()) return;
       const token = String(session.token || '');

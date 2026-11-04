@@ -1,6 +1,5 @@
-// Offline repair candidate. No deployed route imports this module.
-// Production requires persistent sessions, throttling and a guarded Raimo adapter.
-type Member = { id: string; email: string; role: string; status: string; authVersion: string };
+// Shared gateway: the production adapter supplies persistent sessions and live membership checks.
+type Member = { id: string; email: string; role: string; status: string; authVersion: string; name?: string; member_no?: string; prefecture?: string };
 type Session = { uid: string; authVersion: string; expires: number };
 export type GatewayDependencies = {
   origin: string;
@@ -11,16 +10,26 @@ export type GatewayDependencies = {
   chatOwner(id: string): Promise<string | null>;
   forward(method: string, path: string, input: Record<string, unknown>): Promise<unknown>;
   attachmentSession(uid: string, parentSession: string): Promise<unknown>;
+  publicAction?(path: string, input: Record<string, unknown>): Promise<unknown>;
   now?: () => number;
 };
 const approved = (u: Member | null): u is Member => !!u && u.status === 'approved' && ['user', 'admin', 'master_admin'].includes(u.role) && !!u.authVersion;
-const publicUser = (u: Member) => ({ id: u.id, email: u.email, role: u.role, status: u.status });
+const publicUser = (u: Member) => ({ id: u.id, email: u.email, role: u.role, status: u.status, ...(u.name !== undefined ? {name:u.name}:{}), ...(u.member_no !== undefined ? {member_no:u.member_no}:{}), ...(u.prefecture !== undefined ? {prefecture:u.prefecture}:{}) });
 // Only explicitly reviewed operations may pass; all other legacy routes stay closed.
 function permission(method: string, path: string): 'member' | 'staff' | 'master' | 'chat' | 'own-list' | null {
   if (method === 'GET' && ['/comments', '/knowledge-chunks', '/knowledge-sources', '/suggested-questions'].includes(path)) return 'member';
   if (method === 'GET' && ['/admin/users', '/admin/users/pending'].includes(path)) return 'staff';
   if (method === 'PUT' && /^\/admin\/users\/[a-zA-Z0-9_-]+\/(approve|reject)$/.test(path)) return 'master';
   if (method === 'POST' && path === '/chat-sessions') return 'member';
+  if ((method === 'POST' && path === '/suggested-questions') || (method === 'PUT' && /^\/suggested-questions\/[a-zA-Z0-9_-]+\/increment$/.test(path))) return 'member';
+  if ((method === 'GET' && ['/admin/members','/admin/role-requests/pending'].includes(path)) ||
+      (method === 'POST' && /^\/admin\/(members(?:\/update)?|comments(?:\/update-(category|content|posted-at)|\/[a-zA-Z0-9_-]+\/delete)?|knowledge-sources(?:\/update)?|knowledge-chunks(?:\/delete-by-source)?|users\/[a-zA-Z0-9_-]+\/role-requests)$/.test(path))) return 'staff';
+  if(method==='GET' && path==='/admin/master-transfer/pending')return 'master';
+  if ((method === 'POST' && /^\/admin\/users\/[a-zA-Z0-9_-]+\/set-role$/.test(path)) ||
+      (method === 'PUT' && /^\/admin\/(users\/[a-zA-Z0-9_-]+\/withdraw|role-requests\/[a-zA-Z0-9_-]+\/(approve|reject))$/.test(path)) ||
+      (method === 'POST' && ['/admin/master-transfer/start','/admin/master-transfer/cancel'].includes(path))) return 'master';
+  if (method === 'POST' && ['/admin/master-transfer/validate','/admin/master-transfer/accept'].includes(path)) return 'staff';
+  if (method === 'POST' && ['/notify/approval','/notify/rejection','/notify/master-transfer'].includes(path)) return 'master';
   if (method === 'GET' && /^\/users\/[a-zA-Z0-9_-]+\/chat-sessions$/.test(path)) return 'own-list';
   if ((method === 'GET' && /^\/chat-sessions\/[a-zA-Z0-9_-]+$/.test(path)) ||
       (method === 'PUT' && /^\/chat-sessions\/[a-zA-Z0-9_-]+\/touch$/.test(path)) ||
@@ -29,10 +38,15 @@ function permission(method: string, path: string): 'member' | 'staff' | 'master'
 }
 // Deny-by-default user projection rather than recursive deletion of a few field names.
 function safeUsers(result: unknown): unknown {
-  const safe = (u: any) => ({ id: u.id, email: u.email, role: u.role, status: u.status });
+  const safe = (u: any) => publicUser(u);
   const r = result as any;
   if (!r || !Array.isArray(r.users)) throw new Error('invalid_users_response');
   return { users: r.users.map(safe) };
+}
+function stripPrivate(value: unknown): unknown {
+  if(Array.isArray(value))return value.map(stripPrivate);
+  if(value && typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([k])=>!['password','password_hash','reset_token','reset_expires_at','authVersion','auth_version','secret','__gateway_secret'].includes(k)).map(([k,v])=>[k,stripPrivate(v)]));
+  return value;
 }
 export function createRaimoAuthGateway(d: GatewayDependencies) {
   const now = d.now || Date.now;
@@ -54,6 +68,8 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         try { input = JSON.parse(text); } catch { return json({ error: 'invalid_request' }, 400); }
         if (!input || typeof input !== 'object' || Array.isArray(input)) return json({ error: 'invalid_request' }, 400);
       }
+      const publicPaths=['/auth/register','/auth/reregister','/auth/register-roster','/auth/reregister-roster','/auth/reset-password/check','/auth/forgot-password/issue','/auth/forgot-password/validate','/auth/reset-password','/notify/registration','/notify/password-reset'];
+      if(req.method==='POST' && publicPaths.includes(path) && d.publicAction) return json(await d.publicAction(path,input));
       if (req.method === 'POST' && path === '/auth/login') {
         const email = String(input.email || '').trim().toLowerCase();
         const password = String(input.password_hash || '');
@@ -62,8 +78,8 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         const user = await d.authenticate(email, password);
         if (!approved(user)) return json({ error: 'invalid_credentials' }, 401);
         const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
-        await d.sessions.put(token, { uid: user.id, authVersion: user.authVersion, expires: now() + 900000 });
-        return json({ user: publicUser(user), auth_token: token, expires_in: 900 });
+        await d.sessions.put(token, { uid: user.id, authVersion: user.authVersion, expires: now() + 28800000 });
+        return json({ user: publicUser(user), auth_token: token, expires_in: 28800 });
       }
       const authorization = req.headers.get('authorization') || '';
       const token = /^Bearer ([0-9a-f]{64})$/.exec(authorization)?.[1];
@@ -87,13 +103,20 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       if (level === 'own-list' && path.split('/')[2] !== user.id) return json({ error: 'forbidden' }, 403);
       if (level === 'chat' && await d.chatOwner(path.split('/')[2]) !== user.id) return json({ error: 'forbidden' }, 403);
       // Never forward browser-supplied credentials, internal secrets or actor identity.
+      if (path.endsWith('/set-role') && !['user','admin'].includes(String(input.role))) return json({error:'invalid_role'},400);
+      if (/^\/admin\/role-requests\/[^/]+\/approve$/.test(path) && !['user','admin'].includes(String(input.new_role))) return json({error:'invalid_role'},400);
       const forwarded = { ...input };
       for (const key of ['actor_user_id', 'user_id', 'role', 'status', 'secret', '__gateway_secret', 'password_hash', 'auth_token']) delete forwarded[key];
+      if(path.endsWith('/set-role'))forwarded.role=input.role;
       forwarded.actor_user_id = user.id;
+      if(path.startsWith('/admin/'))forwarded.actor_email = user.email;
+      if(path==='/admin/master-transfer/start')forwarded.from_email=user.email;
       if (path === '/chat-sessions') forwarded.user_id = user.id;
       const result = await d.forward(req.method, path, forwarded);
-      return json(level === 'staff' ? safeUsers(result) : result);
-    } catch {
+      return json(req.method === 'GET' && ['/admin/users','/admin/users/pending'].includes(path) ? safeUsers(result) : stripPrivate(result));
+    } catch (err) {
+      const e=err as {code?:string;status?:number};
+      if(e && ['email_taken','not_on_roster','already_registered','invalid_token','not_approved','user_not_found','forbidden','member_not_found','invalid_password','try_later','route_not_reviewed','operation_failed'].includes(e.code||'')) return json({error:e.code,errorCode:e.code},[400,403,429,503].includes(e.status||0)?e.status:400);
       // Neither upstream response bodies nor credential/session values are exposed.
       return json({ error: 'service_unavailable' }, 503);
     }

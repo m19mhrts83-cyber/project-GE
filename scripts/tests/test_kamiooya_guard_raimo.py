@@ -29,3 +29,19 @@ class GuardRaimoTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class ReleaseDefinitionTest(unittest.TestCase):
+    def test_read_aliases_and_private_lookups_are_guarded(self):
+        import sys
+        sys.path.insert(0,str(ROOT/'scripts'))
+        from jarvis_kamiooya_release_definition import release_definition
+        source=next(ROOT.glob('215_kamiooya/**/WeStudy_API_secret_admin_upgrade.yaml'))
+        result=release_definition(yaml.safe_load(source.read_text()))
+        for route in result['api']:
+            self.assertIn('__RAIMO_AUTH_GATEWAY_SECRET__',route['steps'][0]['check']['condition'])
+        endpoints=[r['endpoint'] for r in result['api']]
+        self.assertIn('POST /internal/read/comments',endpoints)
+        self.assertIn('POST /internal/auth-user/user_id',endpoints)
+        for route in result['api']:
+            if route['name'] in ('listApprovedUsers','listPendingUsers'):
+                self.assertFalse(any(s.get('check',{}).get('errorCode')=='security_maintenance' for s in route['steps']))

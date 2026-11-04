@@ -1,3 +1,7 @@
+# Authentication candidate history
+
+This document described the original offline-only draft. The production adapter, shared session/throttling schema, guarded read aliases, credential/reset handling and automation transport were subsequently added. See [the release runbook](kamiooya_auth_release.md) for the current implementation and cutover requirements. Neither the existence of this code nor passing unit tests means that a production release has completed.
+
 # Offline authentication candidate
 
 Status: draft, not deployed, not ready for merge. No historical access-log investigation is part of this change.
