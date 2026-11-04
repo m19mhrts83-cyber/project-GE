@@ -435,6 +435,8 @@ type ModalCtx = {
   materials: string[];
   candidates: MaterialCandidate[];
   state: MaModalState;
+  /** 本文が空のときに下書きを作るための元メール情報 */
+  row: NonNullable<Awaited<ReturnType<typeof fetchMailActionTriage>>>;
 };
 
 async function loadModalCtx(
@@ -460,6 +462,7 @@ async function loadModalCtx(
     materials: extractMaterialRequests(inbound),
     candidates: metaCandidates(metaRaw),
     state: extractMaModalState(payload),
+    row,
   };
 }
 
@@ -532,6 +535,49 @@ export async function handleMaModalAction(opts: {
   }
 
   const mode = opts.actionId === MA_MODAL_ACTION_IDS.proofread ? "proofread" : "revise";
+
+  // 本文が空なら、指示の有無にかかわらず、やり取り履歴と届いたメール（＋指示）から下書きを作る
+  if (mode === "revise" && !state.body.trim()) {
+    const busyVersion = version + 1;
+    await update(
+      viewFrom(ctx, {
+        version: busyVersion,
+        busy: true,
+        notice: "⏳ これまでのやり取りを踏まえて下書きを作成中…（10秒ほど）",
+      }),
+    );
+    return {
+      run: async () => {
+        const row = ctx.row;
+        const history = await retrieveYoritooriForAsk({
+          lane: row.lane,
+          title: row.subject,
+          summary: row.summary,
+          payload: { ...(row.payload || {}), partner: row.partner, folder: row.folder },
+        }).catch(() => null);
+        const result = await composeDraft({
+          who: ctx.who,
+          subject: String(row.subject || ""),
+          inbound: ctx.inbound,
+          history: history?.ok ? history.promptBlock : "",
+          materials: ctx.materials,
+          instruction: state.instruction,
+        });
+        let next = state;
+        let notice: string;
+        if (result.ok) {
+          next = { ...state, body: result.text, instruction: "" };
+          await saveMailActionDraft(ctx.meta.id, result.text, "slack_revise_empty").catch(() => {});
+          notice = state.instruction
+            ? "✍️ 指示とこれまでのやり取りを踏まえた下書きです。確認・修正してから「送信」"
+            : "✍️ これまでのやり取りを踏まえた下書きです。確認・修正してから「送信」";
+        } else {
+          notice = `❌ 下書きを作れませんでした（${result.error}）。本文を入力して送信できます`;
+        }
+        await update(viewFrom(ctx, { version: busyVersion + 1, state: next, notice }));
+      },
+    };
+  }
 
   if (mode === "revise" && !state.instruction) {
     await update(
