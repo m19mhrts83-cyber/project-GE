@@ -15,7 +15,8 @@ migration: apps/jarvis-dashboard/supabase/migrations/20261104_comm_hub.sql
   python scripts/jarvis_comm_hub.py backfill-md --apply
 
   # 確認（分類で絞る＋日本語キーワード）
-  python scripts/jarvis_comm_hub.py search --party partner:102_ミニテック --query エアコン
+  python scripts/jarvis_comm_hub.py dedupe --dry-run   # 二重記載の整理（--apply で削除）
+  python scripts/jarvis_comm_hub.py search --party partner:P102_ミニテック --query エアコン
 """
 from __future__ import annotations
 
@@ -281,6 +282,23 @@ def read_partner_md(folder: str) -> str | None:
     return None
 
 
+def dedupe_key(row: dict[str, Any]) -> tuple[str, str, str, str, str]:
+    """同じ送受信が md に2回書かれた分（「自分から送信」と誤ラベルの「相手から返信」等）を同一視する鍵。"""
+    body = re.sub(r"\s+", "", str(row.get("body_text") or ""))[:300]
+    occurred = str(row.get("occurred_at") or "")
+    try:  # DB は UTC、取込側は +09:00。同じ瞬間なら同じ文字列にそろえる
+        occurred = datetime.fromisoformat(occurred).astimezone(ZoneInfo("UTC")).isoformat()
+    except ValueError:
+        pass
+    return (
+        str(row.get("party_id") or ""),
+        str(row.get("channel") or ""),
+        occurred,
+        str(row.get("direction") or ""),
+        body or str(row.get("subject") or ""),
+    )
+
+
 def items_from_md_text(
     text: str,
     folder: str,
@@ -291,11 +309,20 @@ def items_from_md_text(
     from jarvis_night_triage import parse_yoritoori_text
 
     out: dict[str, dict[str, Any]] = {}
+    seen: set[tuple[str, str, str, str, str]] = set()
     for e in parse_yoritoori_text(text, folder, name):
         row = item_from_md_entry(e, recent_cutoff=recent_cutoff)
-        if row is not None:
-            # 同一キーは先勝ち（md は新しい順なので最新の見出しを採用）
-            out.setdefault(row["external_id"], row)
+        if row is None:
+            continue
+        # 同一キーは先勝ち（md は新しい順なので最新の見出しを採用）
+        if row["external_id"] in out:
+            continue
+        # 同じ日時・向き・本文の二重記載は1行にまとめる
+        dk = dedupe_key(row)
+        if dk in seen:
+            continue
+        seen.add(dk)
+        out[row["external_id"]] = row
     return list(out.values())
 
 
@@ -364,6 +391,30 @@ def insert_items(sb, rows: list[dict[str, Any]]) -> dict[str, str]:
             ignore_duplicates=True,
         ).execute()
     return lookup_ids(sb, [r["external_id"] for r in rows])
+
+
+def existing_by_dedupe_key(sb, since_iso: str) -> dict[tuple[str, str, str, str, str], str]:
+    """since 以降の md 由来の既存行 → {dedupe_key: id}（同一キーは古い行を採用）。"""
+    out: dict[tuple[str, str, str, str, str], str] = {}
+    start = 0
+    while True:
+        r = (
+            sb.table("comm_items")
+            .select("id,party_id,channel,occurred_at,direction,body_text,subject,created_at,source_ref")
+            .gte("occurred_at", since_iso)
+            .order("id")
+            .range(start, start + 999)
+            .execute()
+        )
+        batch = r.data or []
+        for x in sorted(batch, key=lambda y: (str(y.get("created_at") or ""), str(y["id"]))):
+            if (x.get("source_ref") or {}).get("source") != "yoritoori_md":
+                continue
+            out.setdefault(dedupe_key(x), str(x["id"]))
+        if len(batch) < 1000:
+            break
+        start += 1000
+    return out
 
 
 def lookup_ids(sb, external_ids: list[str]) -> dict[str, str]:
@@ -461,6 +512,53 @@ def cmd_backfill_md(args: argparse.Namespace) -> int:
     return 0
 
 
+def find_duplicate_ids(rows: list[dict[str, Any]]) -> list[str]:
+    """dedupe_key が同じ行のうち、最初の1行（created_at, id 順）を残して他の id を返す。"""
+    keep: dict[tuple[str, str, str, str, str], str] = {}
+    drop: list[str] = []
+    for r in sorted(rows, key=lambda x: (str(x.get("created_at") or ""), str(x.get("id") or ""))):
+        k = dedupe_key(r)
+        if k in keep:
+            drop.append(str(r["id"]))
+        else:
+            keep[k] = str(r["id"])
+    return drop
+
+
+def cmd_dedupe(args: argparse.Namespace) -> int:
+    sb = client()
+    rows: list[dict[str, Any]] = []
+    start = 0
+    while True:
+        r = (
+            sb.table("comm_items")
+            .select("id,party_id,channel,occurred_at,direction,body_text,subject,created_at,source_ref")
+            .eq("category", "partner")
+            .eq("account", "")
+            .order("id")
+            .range(start, start + 999)
+            .execute()
+        )
+        batch = r.data or []
+        rows.extend(batch)
+        if len(batch) < 1000:
+            break
+        start += 1000
+    # md 由来だけを対象にする（他経路の行は触らない）
+    rows = [x for x in rows if (x.get("source_ref") or {}).get("source") == "yoritoori_md"]
+    drop = find_duplicate_ids(rows)
+    print(f"# md 由来 {len(rows)} 件 / 重複 {len(drop)} 件", file=sys.stderr)
+    if not args.apply:
+        print("📒 comm dedupe dry-run")
+        return 0
+    n = 0
+    for i in range(0, len(drop), 100):
+        sb.table("comm_items").delete().in_("id", drop[i : i + 100]).execute()
+        n += len(drop[i : i + 100])
+    print(f"📒 comm dedupe deleted={n}")
+    return 0
+
+
 def cmd_search(args: argparse.Namespace) -> int:
     params: dict[str, Any] = {"p_limit": args.limit}
     if args.party:
@@ -501,6 +599,12 @@ def main(argv: list[str] | None = None) -> int:
     g2.add_argument("--dry-run", action="store_true")
     g2.add_argument("--apply", action="store_true")
     s2.set_defaults(func=cmd_backfill_md)
+
+    s4 = sub.add_parser("dedupe", help="md 由来の二重記載（同日時・同向き・同本文）を1行にまとめる")
+    g4 = s4.add_mutually_exclusive_group()
+    g4.add_argument("--dry-run", action="store_true")
+    g4.add_argument("--apply", action="store_true")
+    s4.set_defaults(func=cmd_dedupe)
 
     s3 = sub.add_parser("search")
     s3.add_argument("--party", action="append")
