@@ -25,14 +25,14 @@ function confirmActionHtml(
   sig: string,
 ): string {
   const title =
-    action === "skip" ? "見送りの確認" : action === "done" ? "返信済みの確認" : "Todoist追加の確認";
+    action === "skip" ? "見送りの確認" : action === "done" ? "回答不要・回答済みの確認" : "Todoist追加の確認";
   const label =
-    action === "skip" ? "見送りにする" : action === "done" ? "返信済みにする" : "Todoist に追加する";
+    action === "skip" ? "見送りにする" : action === "done" ? "回答不要・回答済みにする" : "Todoist に追加する";
   const note =
     action === "skip"
       ? "見送りにすると Slack カードは削除されます。"
       : action === "done"
-        ? "LINE／Chatwork などアプリで返信した記録だけ残します（送信はしません）。"
+        ? "回答不要、またはアプリ・別経路で返信済みとして記録します（送信はしません）。送信者は次回も判断に出します。"
         : "電話・ポータル等の手配用に Todoist へ起票します。";
   const esc = (s: string) =>
     String(s || "")
