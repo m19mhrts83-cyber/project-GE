@@ -20,6 +20,8 @@ from typing import Any
 
 SCRIPTS = Path(__file__).resolve().parent
 CHATBOT = SCRIPTS.parent
+from raimo_service_client import service_post, service_get
+
 API_PREFIX = "/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0"
 JUNK_PREFIXES = ("trigger-", "edit-", "reply-", "test-")
 
@@ -125,7 +127,7 @@ def login_app(page, app_url: str) -> None:
 
 
 def fetch_existing(page, app_url: str) -> dict[str, dict[str, Any]]:
-    resp = page.request.get(app_url + API_PREFIX + "/comments", timeout=180000)
+    resp = service_get(page, app_url + API_PREFIX + "/comments", timeout=180000)
     if resp.status >= 400:
         raise RuntimeError(f"GET /comments HTTP {resp.status}: {resp.text()[:200]}")
     data = resp.json()
@@ -189,7 +191,7 @@ def main() -> int:
                 if args.dry_run:
                     deleted += 1
                     continue
-                resp = page.request.post(
+                resp = service_post(page,
                     app_url + API_PREFIX + f"/admin/comments/{rid}/delete",
                     data=json.dumps({}),
                     headers={"Content-Type": "application/json"},
@@ -245,7 +247,7 @@ def main() -> int:
                 "posted_at": rec.get("posted_at"),
             }
             payload = {k: v for k, v in payload.items() if v is not None and v != ""}
-            resp = page.request.post(
+            resp = service_post(page,
                 app_url + API_PREFIX + "/admin/comments/update-posted-at",
                 data=json.dumps(payload),
                 headers={"Content-Type": "application/json"},
@@ -287,7 +289,7 @@ def main() -> int:
             }
             # Raimo DSL は null で落ちることがあるため空は送らない
             payload = {k: v for k, v in payload.items() if v is not None and v != ""}
-            resp = page.request.post(
+            resp = service_post(page,
                 app_url + API_PREFIX + "/admin/comments/update-content",
                 data=json.dumps(payload),
                 headers={"Content-Type": "application/json"},
@@ -299,7 +301,7 @@ def main() -> int:
 
         def do_insert(rec: dict[str, Any]) -> tuple[str, bool, str]:
             payload = {k: v for k, v in rec.items() if v is not None and v != ""}
-            resp = page.request.post(
+            resp = service_post(page,
                 app_url + API_PREFIX + "/admin/comments",
                 data=json.dumps(payload),
                 headers={"Content-Type": "application/json"},

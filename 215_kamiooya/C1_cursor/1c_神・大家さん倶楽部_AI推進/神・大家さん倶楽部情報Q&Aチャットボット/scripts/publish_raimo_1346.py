@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import re
 import time
 import urllib.request
@@ -43,7 +44,15 @@ def load_env() -> None:
 
 def inject_runtime_placeholders(api_yaml: str) -> str:
     """Replace runtime placeholders in API YAML with values from env."""
-    out = api_yaml
+    # Every future publication must retain the server proof boundary.
+    import yaml
+    project_root = next(p for p in CHATBOT.parents if (p / "scripts/jarvis_kamiooya_release_definition.py").exists())
+    sys.path.insert(0, str(project_root / "scripts"))
+    from jarvis_kamiooya_release_definition import release_definition
+    if len(os.environ.get("RAIMO_AUTH_GATEWAY_SECRET", "")) < 32:
+        raise SystemExit("RAIMO_AUTH_GATEWAY_SECRET is required; refusing an unguarded publication")
+    out = yaml.safe_dump(release_definition(yaml.safe_load(api_yaml)), allow_unicode=True, sort_keys=False)
+    out = out.replace("__RAIMO_AUTH_GATEWAY_SECRET__", os.environ["RAIMO_AUTH_GATEWAY_SECRET"])
 
     if "__COMMUNITY_ATTACHMENTS_PROXY_SECRET__" in out:
         secret = (os.environ.get("COMMUNITY_ATTACHMENTS_PROXY_SECRET") or "").strip()
@@ -86,7 +95,7 @@ def inject_js_placeholders(js: str) -> str:
             "app.js に SEMANTIC_SEARCH プレースホルダが残っています。"
             "ブラウザ直呼びは廃止済みです。プレースホルダを削除してください。"
         )
-    return js
+    return js.replace("authGatewayBase: '',", "authGatewayBase: 'https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/raimo-auth',", 1)
 
 
 def prepare_html_for_raimo(html: str) -> str:

@@ -2,7 +2,7 @@
 // Each metadata/read request rechecks the current Raimo membership status.
 declare const Deno: { env: { get(key: string): string | undefined }; serve(handler: (req: Request) => Promise<Response>): void };
 
-type Config = { projectUrl: string; serviceKey: string; proxySecret: string; sessionSecret: string; raimoOrigin: string; statusUrl: string; memberReadsEnabled: boolean };
+type Config = { projectUrl: string; serviceKey: string; proxySecret: string; sessionSecret: string; raimoOrigin: string; statusUrl: string; memberReadsEnabled: boolean; requireParentSession?: boolean };
 const BUCKET = "community-attachments";
 const AUDIENCE = "kamiooya-attachments";
 const encoder = new TextEncoder();
@@ -17,9 +17,9 @@ async function sameSecret(a: string, b: string): Promise<boolean> {
   const [x, y] = await Promise.all([hash(a), hash(b)]);
   return x.reduce((n, v, i) => n | (v ^ y[i]), 0) === 0;
 }
-export async function issueSession(uid: string, secret: string, now: number): Promise<string> {
+export async function issueSession(uid: string, secret: string, now: number, parentSession?: string): Promise<string> {
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(uid)) throw new Error("invalid_user");
-  const payload = b64(encoder.encode(JSON.stringify({ v: 1, aud: AUDIENCE, uid, exp: Math.floor(now / 1000) + 28800 })));
+  const payload = b64(encoder.encode(JSON.stringify({ v: 1, aud: AUDIENCE, uid, ...(parentSession ? { sid: parentSession } : {}), exp: Math.floor(now / 1000) + 28800 })));
   return payload + "." + b64(await hmac(secret, payload));
 }
 export async function sessionUser(token: string, secret: string, now: number): Promise<string | null> {
@@ -43,7 +43,7 @@ export function createHandler(cfg: Config, transport: typeof fetch = fetch, now:
     if (origin && origin !== cfg.raimoOrigin) return json({ error: "forbidden_origin" }, 403);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
     if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-    if (!cfg.serviceKey || cfg.proxySecret.length < 32 || cfg.sessionSecret.length < 32 || !cfg.statusUrl.startsWith(cfg.raimoOrigin + "/")) return json({ error: "service_not_configured" }, 503);
+    if (!cfg.serviceKey || cfg.proxySecret.length < 32 || cfg.sessionSecret.length < 32 || !(cfg.statusUrl.startsWith(cfg.raimoOrigin + "/") || cfg.statusUrl === cfg.projectUrl + "/functions/v1/raimo-auth/internal/attachment-user-status")) return json({ error: "service_not_configured" }, 503);
     try {
       const text = await req.text();
       if (text.length > 16384) return json({ error: "request_too_large" }, 413);
@@ -57,17 +57,22 @@ export function createHandler(cfg: Config, transport: typeof fetch = fetch, now:
       if (op === "session") {
         if (!await sameSecret(authorization, "Bearer " + cfg.proxySecret)) return json({ error: "unauthorized" }, 401);
         const uid = String(body.user_id ?? "");
-        return json({ token: await issueSession(uid, cfg.sessionSecret, now()), expires_in: 28800 });
+        const parent = String(body.parent_session ?? "");
+        if (cfg.requireParentSession && !/^[0-9a-f]{64}$/.test(parent)) return json({ error: "login_required" }, 401);
+        return json({ token: await issueSession(uid, cfg.sessionSecret, now(), cfg.requireParentSession ? parent : undefined), expires_in: 28800 });
       }
       if (!["index", "list", "open"].includes(op)) return json({ error: "invalid_operation" }, 400);
       const uid = await sessionUser(authorization.replace(/^Bearer /, ""), cfg.sessionSecret, now());
       if (!uid) return json({ error: "login_required" }, 401);
+      const claims = JSON.parse(new TextDecoder().decode(unb64(authorization.replace(/^Bearer /, "").split(".")[0])));
+      if (cfg.requireParentSession && !/^[0-9a-f]{64}$/.test(claims.sid || "")) return json({ error: "login_required" }, 401);
       // Do not trust browser user_id/role/status or a stale login result.
       const statusResponse = await transport(cfg.statusUrl, { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: uid, secret: cfg.proxySecret }), signal: AbortSignal.timeout(15000) });
+        body: JSON.stringify({ user_id: uid, secret: cfg.proxySecret, ...(cfg.requireParentSession ? { session_ref: claims.sid } : {}) }), signal: AbortSignal.timeout(15000) });
       if (!statusResponse.ok) return json({ error: "membership_check_unavailable" }, 503);
       const member = await statusResponse.json();
       if (String(member.user_id) !== uid || member.status !== "approved" || !["user", "admin", "master_admin"].includes(member.role)) return json({ error: "membership_required" }, 403);
+      if (cfg.requireParentSession && member.session_active !== true) return json({ error: "login_required" }, 401);
       const auth = { apikey: cfg.serviceKey, Authorization: "Bearer " + cfg.serviceKey };
       const query = new URLSearchParams();
       if (op === "open") {
@@ -109,6 +114,7 @@ if (typeof Deno !== "undefined") Deno.serve(createHandler({
   projectUrl: Deno.env.get("SUPABASE_URL") || "", serviceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
   proxySecret: Deno.env.get("COMMUNITY_ATTACHMENTS_PROXY_SECRET") || "", sessionSecret: Deno.env.get("COMMUNITY_ATTACHMENTS_SESSION_SECRET") || "",
   raimoOrigin: "https://ma-54t2keqdelz3.raimo-app.buzz",
-  memberReadsEnabled: false,
-  statusUrl: "https://ma-54t2keqdelz3.raimo-app.buzz/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0/internal/attachment-user-status",
+  memberReadsEnabled: Deno.env.get("COMMUNITY_ATTACHMENTS_MEMBER_READS_ENABLED") === "1",
+  requireParentSession: true,
+  statusUrl: (Deno.env.get("SUPABASE_URL") || "") + "/functions/v1/raimo-auth/internal/attachment-user-status",
 }));

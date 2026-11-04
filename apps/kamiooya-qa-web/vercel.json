@@ -4,7 +4,8 @@
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
   "git": {
     "deploymentEnabled": {
-      "codex/kamiooya-openchat-attachments": false
+      "codex/kamiooya-openchat-attachments": false,
+      "codex/kamiooya-auth-offline-review": false
     }
   }
 }

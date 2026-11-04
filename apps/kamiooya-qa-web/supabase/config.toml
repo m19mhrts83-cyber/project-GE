@@ -1,0 +1,5 @@
+[functions.raimo-auth]
+verify_jwt = false
+
+[functions.community-attachments]
+verify_jwt = false
