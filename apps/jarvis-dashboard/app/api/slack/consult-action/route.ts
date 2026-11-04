@@ -375,6 +375,7 @@ export async function POST(request: NextRequest) {
         messageTs,
       });
       if (result.kind === "modal_opened") {
+        if (result.run) after(result.run);
         return new NextResponse("", { status: 200 });
       }
       if (result.kind === "ephemeral" || result.kind === "error") {

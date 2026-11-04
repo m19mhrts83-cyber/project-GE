@@ -11,9 +11,11 @@ import {
   maActionUrl,
   normalizeMailAccount,
   parseMaAction,
+  saveMailActionDraft,
   type MailActionSlackAction,
 } from "@/lib/mailActionSlackAction";
-import { proofreadDraft, reviseDraft } from "@/lib/mailDraftCheck";
+import { composeDraft, proofreadDraft, reviseDraft } from "@/lib/mailDraftCheck";
+import { retrieveYoritooriForAsk } from "@/lib/onedrive/retrieveYoritoori";
 import { searchMaterialFiles } from "@/lib/materialFiles";
 import {
   candidateValue,
@@ -323,7 +325,7 @@ async function slackApi(
   token: string,
   method: string,
   body: Record<string, unknown>,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; viewId?: string }> {
   const res = await fetch(`https://slack.com/api/${method}`, {
     method: "POST",
     headers: {
@@ -332,8 +334,10 @@ async function slackApi(
     },
     body: JSON.stringify(body),
   });
-  const j = (await res.json()) as { ok?: boolean; error?: string };
-  return j.ok ? { ok: true } : { ok: false, error: j.error || `${method} failed` };
+  const j = (await res.json()) as { ok?: boolean; error?: string; view?: { id?: string } };
+  return j.ok
+    ? { ok: true, viewId: j.view?.id }
+    : { ok: false, error: j.error || `${method} failed` };
 }
 
 async function openReplyModal(opts: {
@@ -347,7 +351,9 @@ async function openReplyModal(opts: {
   account: string;
   channelId?: string;
   messageTs?: string;
-}): Promise<{ ok: boolean; error?: string }> {
+  /** 本文が空なので、開いた後に下書きを作る */
+  composing?: boolean;
+}): Promise<{ ok: boolean; error?: string; viewId?: string }> {
   const view = buildReplyView({
     meta: { id: opts.triageId, channel: opts.channelId, message_ts: opts.messageTs },
     who: opts.who,
@@ -355,6 +361,8 @@ async function openReplyModal(opts: {
     state: { ...EMPTY_STATE, body: opts.draft, to: opts.to, account: opts.account },
     version: 1,
     materials: extractMaterialRequests(opts.inbound),
+    busy: opts.composing,
+    notice: opts.composing ? "⏳ これまでのやり取りを踏まえて下書きを作成中…（10秒ほど）" : undefined,
   });
   return slackApi(opts.token, "views.open", { trigger_id: opts.triggerId, view });
 }
@@ -701,6 +709,8 @@ export async function handleMaBlockAction(opts: {
   text: string;
   blocks?: ReturnType<typeof maDoneBlocks>;
   slack_deleted?: boolean;
+  /** 応答後に走らせる処理（下書き作成） */
+  run?: () => Promise<void>;
 }> {
   const { action, triageId, triggerId, channelId, messageTs } = opts;
 
@@ -711,20 +721,74 @@ export async function handleMaBlockAction(opts: {
     }
     const bot = (process.env.SLACK_BOT_TOKEN || "").trim();
     if (bot && triggerId) {
+      const who = String(row.partner || row.from_email || "相手");
+      const inbound = String(row.original_body || "");
+      const to = guessMailReplyTo(row);
+      const account = normalizeMailAccount(row.account) || "estate";
+      const composing = !String(row.draft_text || "").trim() && Boolean(inbound.trim());
       const opened = await openReplyModal({
         token: bot,
         triggerId,
         triageId,
-        who: String(row.partner || row.from_email || "相手"),
+        who,
         draft: String(row.draft_text || ""),
-        inbound: String(row.original_body || ""),
-        to: guessMailReplyTo(row),
-        account: normalizeMailAccount(row.account) || "estate",
+        inbound,
+        to,
+        account,
         channelId,
         messageTs,
+        composing,
       });
       if (opened.ok) {
-        return { kind: "modal_opened", text: "返信モーダルを開きました" };
+        const viewId = opened.viewId;
+        if (!composing || !viewId) {
+          return { kind: "modal_opened", text: "返信モーダルを開きました" };
+        }
+        const meta = { id: triageId, channel: channelId, message_ts: messageTs };
+        const materials = extractMaterialRequests(inbound);
+        return {
+          kind: "modal_opened",
+          text: "返信モーダルを開きました（下書き作成中）",
+          run: async () => {
+            const history = await retrieveYoritooriForAsk({
+              lane: row.lane,
+              title: row.subject,
+              summary: row.summary,
+              payload: { ...(row.payload || {}), partner: row.partner, folder: row.folder },
+            }).catch(() => null);
+            const result = await composeDraft({
+              who,
+              subject: String(row.subject || ""),
+              inbound,
+              history: history?.ok ? history.promptBlock : "",
+              materials,
+            });
+            let body = "";
+            let notice: string;
+            if (result.ok) {
+              body = result.text;
+              await saveMailActionDraft(triageId, body, "slack_compose").catch(() => {});
+              notice = history?.ok && history.chars
+                ? "✍️ これまでのやり取りを踏まえた下書きです。確認・修正してから「送信」"
+                : "✍️ 届いたメールから作った下書きです（やり取り履歴なし）。確認・修正してから「送信」";
+            } else {
+              notice = `❌ 下書きを作れませんでした（${result.error}）。本文を入力して送信できます`;
+            }
+            // 作成中に入力していたら上書きしない: 版を上げずに本文だけ差し込むと Slack が入力を保つので、版を上げる
+            await slackApi(bot, "views.update", {
+              view_id: viewId,
+              view: buildReplyView({
+                meta,
+                who,
+                inbound,
+                state: { ...EMPTY_STATE, body, to, account },
+                version: 2,
+                materials,
+                notice,
+              }),
+            });
+          },
+        };
       }
       return {
         kind: "ephemeral",

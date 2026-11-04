@@ -726,7 +726,7 @@ def build_compact_payload(
         app_link = f"<{app_url}|{channel}を開く>" if app_url else f"{channel}アプリ"
         draft_note = f"📱 {app_link}で返信 → 「返信済みにする」"
     else:
-        draft_note = "下書きあり → 返信で編集" if draft else "下書きなし → 返信で作成"
+        draft_note = "下書きあり → 返信で編集" if draft else "「返信する」で下書きを自動作成"
     materials = material_items(row)
     material_line = ""
     if materials:
