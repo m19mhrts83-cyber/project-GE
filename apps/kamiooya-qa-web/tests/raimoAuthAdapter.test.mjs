@@ -11,7 +11,7 @@ function fixture(){
   const u=new URL(url),body=opts.body?JSON.parse(opts.body):{};calls.push({url,opts,body});
   if(u.pathname.endsWith('/rpc/raimo_auth_take_limit'))return Response.json(limit);
   if(u.pathname.endsWith('/raimo_auth_sessions')){
-   if(opts.method==='POST'){assert.match(body.token_hash,/^[0-9a-f]{64}$/);store.set(body.token_hash,body);return new Response(null,{status:204});}
+   if(opts.method==='POST'){assert.match(body.token_hash,/^[0-9a-f]{64}$/);store.set(body.token_hash,body);return new Response(null,{status:201});}
    const key=u.searchParams.get('token_hash')?.slice(3);
    if(opts.method==='DELETE'){store.delete(key);return new Response(null,{status:204});}
    return Response.json(store.has(key)?[store.get(key)]:[]);

@@ -13,7 +13,8 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
   const rest = async (path: string, options: RequestInit={}) => {
     const r=await transport(c.projectUrl+'/rest/v1/'+path,{...options,headers:{...auth,...options.headers},signal:AbortSignal.timeout(20000)});
     if(!r.ok) throw new Error('persistence_unavailable');
-    return r.status===204?null:r.json();
+    const text=await r.text();
+    return text?JSON.parse(text):null;
   };
   const backend = async (method: string, path: string, input: Record<string,unknown>={}) => {
     // Read aliases keep the server proof in a POST body, never in URLs or access logs.
