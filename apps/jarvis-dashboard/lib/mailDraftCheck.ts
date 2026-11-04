@@ -91,6 +91,8 @@ export function composePrompt(opts: {
   inbound: string;
   history?: string;
   materials?: string[];
+  /** 松野さんの見直し指示（本文が空のまま「指示で見直し」を押したとき） */
+  instruction?: string;
 }): string {
   const lines = [
     "あなたは株式会社リビングサポート松の代表・松野真治です。届いたメールへの返信下書きを書いてください。",
@@ -113,7 +115,11 @@ export function composePrompt(opts: {
   if (opts.history?.trim()) {
     lines.push("", "【これまでのやり取り（新しいものが末尾）】", opts.history.trim());
   }
-  lines.push("", "【届いたメール】", (opts.inbound || "").slice(0, 4000), "", "返信本文のみを出力してください。");
+  lines.push("", "【届いたメール】", (opts.inbound || "").slice(0, 4000));
+  if (opts.instruction?.trim()) {
+    lines.push("", "【松野さんの指示（最優先で従う）】", opts.instruction.trim());
+  }
+  lines.push("", "返信本文のみを出力してください。");
   return lines.join("\n");
 }
 
@@ -123,6 +129,7 @@ export async function composeDraft(opts: {
   inbound: string;
   history?: string;
   materials?: string[];
+  instruction?: string;
 }): Promise<DraftCheckResult> {
   if (!opts.inbound.trim()) return { ok: false, error: "元のメール本文がありません" };
   const r = await geminiReply(composePrompt(opts), { timeoutMs: TIMEOUT_MS, maxAttempts: 3 });
