@@ -5,6 +5,7 @@
   ],
   "git": {
     "deploymentEnabled": {
+      "codex/kamiooya-openchat-attachments": false,
       "codex/kamiooya-auth-offline-review": false
     }
   }

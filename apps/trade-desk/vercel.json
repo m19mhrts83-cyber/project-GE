@@ -7,6 +7,7 @@
   "ignoreCommand": "echo 'Skip Vercel Git deploy; production is GHA trade-desk-deploy.yml only' && exit 0",
   "git": {
     "deploymentEnabled": {
+      "codex/kamiooya-openchat-attachments": false,
       "codex/kamiooya-auth-offline-review": false
     }
   }
