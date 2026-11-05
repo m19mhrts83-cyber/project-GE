@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Recover original WeStudy images without re-encoding or deleting thumbnails. Dry run by default."""
 from __future__ import annotations
-import argparse,hashlib,io,json,re,os,threading
+import argparse,hashlib,io,json,re,os,threading,math
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from urllib.parse import urlsplit,urlunsplit
+from urllib.parse import urlsplit,urlunsplit,unquote
 from datetime import datetime,timezone
 import requests
 from PIL import Image
@@ -41,11 +41,21 @@ def download(url,transport=requests):
         return b''.join(parts)
 
 
-def recover(store,row,apply=False):
+class StorageBudget:
+    def __init__(self,used):
+        if type(used) not in (int,float) or not math.isfinite(used):raise ValueError('unknown_storage_usage')
+        self.used=used;self.lock=threading.Lock()
+    def reserve(self,size):
+        with self.lock:
+            if self.used+size>80_000_000_000:return False
+            self.used+=size;return True
+
+
+def recover(store,row,apply=False,budget=None,source_transport=None):
     url=original_url(row['source_url'])
     if not url:return {'result':'not_thumbnail'}
     if row.get('original_source_url'):return {'result':'already_original'}
-    data=download(url)
+    data=download(url,source_transport or requests)
     if data is None:return {'result':'source_missing'}
     (w,h),(mime,ext)=image_info(data)
     thumb=re.search(r'-(\d+)x(\d+)(?=\.[a-z]+$)',row['source_url'],re.I)
@@ -53,12 +63,16 @@ def recover(store,row,apply=False):
     if w<tw or h<th or (w==tw and h==th):return {'result':'not_larger'}
     digest=hashlib.sha256(data).hexdigest()
     meta={k:row[k] for k in ['id','comment_id','bucket','source_url']}
-    meta.update(original_name=Path(urlsplit(url).path).name[:255],content_type=mime,byte_size=len(data),sha256=digest,
+    meta.update(original_name=Path(unquote(urlsplit(url).path)).name[:255],content_type=mime,byte_size=len(data),sha256=digest,
                 storage_path=f"comments/{row['comment_id']}/{digest}{ext}",original_source_url=url,image_width=w,image_height=h)
     if apply:
-        usage=store.request('POST','/rest/v1/rpc/openchat_backup_storage_bytes',json={}).json()
-        if not isinstance(usage,(int,float)) or usage+len(data)>80_000_000_000:return {'result':'budget_held'}
-        store.save(meta,data)
+        if budget is not None:
+            allowed=budget.reserve(len(data))
+        else:
+            usage=store.request('POST','/rest/v1/rpc/openchat_backup_storage_bytes',json={}).json()
+            allowed=isinstance(usage,(int,float)) and usage+len(data)<=80_000_000_000
+        if not allowed:return {'result':'budget_held'}
+        store.save(meta,data,old_record=row)
     return {'result':'saved' if apply else 'available','bytes':len(data),'previous_bytes':row['byte_size'],'width':w,'height':h}
 
 
@@ -75,11 +89,13 @@ def main(argv=None):
         if len(batch)<1000:break
     counts={};records=[]
     selected=[r for r in rows if original_url(r['source_url']) and not r.get('original_source_url')][:a.limit]
+    budget=StorageBudget(store.request('POST','/rest/v1/rpc/openchat_backup_storage_bytes',json={}).json()) if a.apply else None
     local=threading.local()
     def work(row):
         try:
-            if not hasattr(local,'store'):local.store=Store()
-            result=recover(local.store,row,a.apply)
+            if not hasattr(local,'store'):
+                local.store=Store();local.source=requests.Session()
+            result=recover(local.store,row,a.apply,budget,local.source)
         except Exception as e:result={'result':'failed','error_type':type(e).__name__}
         return {'id':row['id'],**result}
     with ThreadPoolExecutor(max_workers=a.workers) as pool:

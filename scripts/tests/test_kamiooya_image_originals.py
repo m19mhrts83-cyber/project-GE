@@ -43,3 +43,10 @@ class OriginalImagesTest(unittest.TestCase):
         with patch.object(mod.Image,'open',return_value=image):
             size,kind=mod.image_info(b'jpeg-camera-original')
         self.assertEqual(size,(400,300));self.assertEqual(kind,('image/jpeg','.jpg'))
+    def test_parallel_budget_reservations_are_bounded(self):
+        from concurrent.futures import ThreadPoolExecutor
+        budget=mod.StorageBudget(80_000_000_000-10)
+        with ThreadPoolExecutor(max_workers=4) as pool:results=list(pool.map(budget.reserve,[6]*10))
+        self.assertEqual(sum(results),1)
+        for value in [None,True,float('nan')]:
+            with self.assertRaises(ValueError):mod.StorageBudget(value)
