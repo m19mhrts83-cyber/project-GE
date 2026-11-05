@@ -22,6 +22,8 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
+from jarvis_supabase_errors import abort_on_quota
+
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 MAP_PATH = REPO / "config" / "finance_entity_map.yaml"
@@ -277,7 +279,12 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if args.push:
-        n = push_supabase(result)
+        try:
+            n = push_supabase(result)
+        except Exception as exc:
+            # Free 枠 exceed_egress_quota はリトライ不可。明確な exit 6 で止める
+            abort_on_quota(exc)
+            raise
         print(f"# pushed {n}", file=sys.stderr)
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
