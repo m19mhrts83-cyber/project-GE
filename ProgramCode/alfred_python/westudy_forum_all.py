@@ -1622,6 +1622,16 @@ def selenium_cookie_session() -> requests.Session:
     return sess
 
 
+def original_upload_url(url: str) -> str | None:
+    """Prefer WordPress original images, without changing the catalog identity."""
+    from urllib.parse import urlsplit, urlunsplit
+    u=urlsplit(url)
+    if u.scheme!="https" or u.hostname not in ("westudy.co.jp","www.westudy.co.jp") or u.port or u.username or u.password or u.query or u.fragment or not u.path.startswith("/wp-content/uploads/"):
+        return None
+    path,n=re.subn(r"-\d+x\d+(?=\.(?:jpg|jpeg|png|webp)$)","",u.path,flags=re.I)
+    return urlunsplit((u.scheme,u.netloc,path,"","")) if n else None
+
+
 def save_comment_attachments(
     rows: list[dict],
     topic_dir: Path,
@@ -1648,6 +1658,35 @@ def save_comment_attachments(
                 url = (att.get("url") or "").strip()
                 if not url:
                     continue
+                preferred = original_upload_url(url) if att.get("kind") == "image" else None
+                if preferred:
+                    original_name = Path(urlparse(preferred).path).name
+                    safe_original = re.sub(r"[^\w.\-]+", "_", original_name)[:80] or f"image{i}"
+                    original_dest = attach_root / f"{cid}_{i:02d}_original_{safe_original}"
+                    try:
+                        if original_dest.exists() and original_dest.stat().st_size > 0:
+                            original_data = original_dest.read_bytes()
+                        else:
+                            response = sess.get(preferred, timeout=40, stream=True, allow_redirects=False)
+                            try:
+                                if response.status_code != 200:
+                                    original_data = b""
+                                else:
+                                    parts=[];size=0
+                                    for part in response.iter_content(65536):
+                                        size+=len(part)
+                                        if size>50*1024*1024:raise ValueError("original_image_size_limit")
+                                        parts.append(part)
+                                    original_data=b"".join(parts)
+                            finally:
+                                response.close()
+                        if original_data.startswith((b"\xff\xd8\xff",b"\x89PNG\r\n\x1a\n")) or (original_data.startswith(b"RIFF") and original_data[8:12]==b"WEBP"):
+                            if not original_dest.exists():original_dest.write_bytes(original_data)
+                            rec={**att,"original_source_url":preferred,"name":original_name,"comment_id":row.get("comment_id"),"author":row.get("author"),"local_path":str(original_dest)}
+                            cat.write(json.dumps(rec,ensure_ascii=False)+"\n");saved+=1
+                            continue
+                    except (requests.RequestException,OSError,ValueError):
+                        pass  # Keep the existing thumbnail fallback; never upscale/re-encode.
                 name = att.get("name") or Path(urlparse(url).path).name or f"file{i}"
                 safe = re.sub(r"[^\w.\-]+", "_", name)[:80] or f"file{i}"
                 dest = attach_root / f"{cid}_{i:02d}_{safe}"
