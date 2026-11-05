@@ -321,6 +321,28 @@ def _slack(channel: str, lines: list[str]) -> int:
     return subprocess.call(cmd, cwd=str(REPO))
 
 
+def _attach_ledger_refs(items: list[dict]) -> None:
+    """台帳（comm hub）から同じ相手の過去のやり取りを引き、it["ledger_refs"] に入れる。
+
+    下書き本文は変えない（Slack 報告の参考表示のみ）。台帳側の失敗では止めない。
+    """
+    if (os.environ.get("JARVIS_COMM_HUB") or "").strip() == "0":
+        return
+    try:
+        import jarvis_comm_hub as ch  # type: ignore
+
+        sb = ch.client()
+    except Exception as e:  # noqa: BLE001
+        print(f"# ledger refs skip: {e}", file=sys.stderr)
+        return
+    for it in items:
+        refs = ch.recent_context(
+            str(it.get("folder") or ""), str(it.get("subject") or ""), sb=sb
+        )
+        if refs:
+            it["ledger_refs"] = refs
+
+
 def _id_of(it: dict) -> str:
     return str(it.get("seq") or it.get("id") or "")
 
@@ -371,6 +393,7 @@ def main() -> int:
     q = _load_queue()
     items = q.get("items") or []
     applyable, b_waiting, skipped_old = _pm_candidates(items, args.lookback_days)
+    _attach_ledger_refs(applyable)
     # テンプレで埋めた draft_text を queue に戻す（apply が再読込するため）
     if applyable and not args.dry_run:
         qpath = REPO / ".jarvis_state" / "night_triage" / "queue.json"
@@ -437,6 +460,7 @@ def main() -> int:
             return 0
         today = datetime.now(JST).strftime("%Y-%m-%d")
         partners = [Path(p).parent.name for _, p in written if p != "(dry-run)"]
+        refs_by_id = {_id_of(it): it for it in applyable if it.get("ledger_refs")}
         lines = [
             "【報告】211 返信案内下書き・朝便",
             f"・日付: {today}",
@@ -447,6 +471,11 @@ def main() -> int:
             "・次: 人が確認。送信はこの報告ではしない",
             "・失敗: なし",
         ]
+        for tid, _ in written:
+            it = refs_by_id.get(str(tid))
+            if it:
+                lines.append(f"・参考（台帳の過去分 / {it.get('folder')}）")
+                lines.extend(f"　- {r}" for r in it["ledger_refs"])
         return _slack("report", lines)
 
     return 0

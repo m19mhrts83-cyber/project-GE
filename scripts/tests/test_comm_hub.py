@@ -361,5 +361,53 @@ class MainSoftFailTests(unittest.TestCase):
         sync.assert_not_called()
 
 
+class _FakeRpc:
+    def __init__(self, calls, data):
+        self.calls, self.data = calls, data
+
+    def execute(self):
+        class R:
+            pass
+
+        r = R()
+        r.data = self.data
+        return r
+
+
+class _FakeCtxSB:
+    def __init__(self):
+        self.calls = []
+
+    def rpc(self, name, params):
+        self.calls.append((name, params))
+        if params.get("p_query"):
+            return _FakeRpc(self.calls, [
+                {"id": "a", "occurred_at": "2026-10-20T01:00:00+00:00",
+                 "direction": "outbound", "subject": "ゴミ出しの件"},
+            ])
+        return _FakeRpc(self.calls, [
+            {"id": "a", "occurred_at": "2026-10-20T01:00:00+00:00",
+             "direction": "outbound", "subject": "ゴミ出しの件"},
+            {"id": "b", "occurred_at": "2026-10-10T01:00:00+00:00",
+             "direction": "inbound", "subject": "アンペア変更"},
+        ])
+
+
+class RecentContextTest(unittest.TestCase):
+  def test_keyword_then_recent(self):
+    sb = _FakeCtxSB()
+    out = hub.recent_context("P102_ミニテック", "Re: ゴミ出し", limit=2, sb=sb)
+    self.assertEqual(out, ["2026-10-20 自分 ゴミ出しの件", "2026-10-10 相手 アンペア変更"])
+    self.assertEqual(sb.calls[0][1]["p_party_ids"], ["partner:P102_ミニテック"])
+
+
+  def test_soft_fail(self):
+    class Boom:
+        def rpc(self, *a, **k):
+            raise RuntimeError("402")
+
+    self.assertEqual(hub.recent_context("P102_ミニテック", "x", sb=Boom()), [])
+
+
 if __name__ == "__main__":
     unittest.main()
