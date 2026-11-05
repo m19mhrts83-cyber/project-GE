@@ -10,6 +10,7 @@ export type GatewayDependencies = {
   chatOwner(id: string): Promise<string | null>;
   forward(method: string, path: string, input: Record<string, unknown>): Promise<unknown>;
   attachmentSession(uid: string, parentSession: string): Promise<unknown>;
+  semanticConfig?(): Promise<{url: string; secret: string}>;
   publicAction?(path: string, input: Record<string, unknown>): Promise<unknown>;
   now?: () => number;
 };
@@ -90,6 +91,8 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       }
       const user = await d.member(session.uid);
       if (!approved(user) || user.id !== session.uid || user.authVersion !== session.authVersion) return json({ error: 'membership_required' }, 403);
+      // This legacy browser search credential is separate from every privileged server secret.
+      if(path==='/semantic-search-config' && req.method==='POST' && d.semanticConfig)return json(await d.semanticConfig());
       if (path === '/auth/attachment-session' && req.method === 'POST') {
         // Identity comes solely from the verified session; input password/user/role ignored.
         const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token!)));
