@@ -627,7 +627,13 @@
                         <option value="14" selected>14日</option>
                         <option value="30">30日</option>
                         <option value="60">60日</option>
+                        <option value="90">90日</option>
+                        <option value="180">180日</option>
                       </select>
+                    </label>
+                    <label class="text-xs text-slate-500" title="指定するとこの日から今日まで（期間の選択より優先）">
+                      開始日（実測期間）
+                      <input id="analyticsSinceInput" type="date" class="ml-1 border rounded-md px-2 py-1 text-sm" />
                     </label>
                     <button id="reloadAnalyticsBtn" type="button" class="px-4 py-2 rounded bg-blue-900 text-white text-sm">再取得</button>
                   </div>
@@ -641,6 +647,12 @@
                 <h4 class="font-semibold mb-1 text-sm">Gemini 利用・想定課金（試算）</h4>
                 <p class="text-xs text-slate-500 mb-3">期間内の成功質問数 × 単価目安。Google請求額そのものではありません。</p>
                 <div id="analyticsGeminiEstimate" class="space-y-2 text-sm"></div>
+              </div>
+
+              <div class="bg-white rounded border p-4 overflow-auto">
+                <h4 class="font-semibold mb-1 text-sm">費用の実測（週次）</h4>
+                <p class="text-xs text-slate-500 mb-3">週は月曜始まり（日本時間）。意味検索は Gemini の実トークン数から計算、通常検索は件数×単価目安。AI Studio の請求額と見比べてください。</p>
+                <div id="analyticsMetering" class="space-y-3 text-sm"></div>
               </div>
 
               <div class="bg-white rounded border p-4">

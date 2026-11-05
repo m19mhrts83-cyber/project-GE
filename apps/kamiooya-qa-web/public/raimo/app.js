@@ -3880,6 +3880,8 @@ const App = {
     const statusEl = document.getElementById('analyticsStatus');
     const daysSelect = document.getElementById('analyticsDaysSelect');
     const days = daysSelect ? Number(daysSelect.value) || 14 : 14;
+    const sinceInput = document.getElementById('analyticsSinceInput');
+    const since = sinceInput && /^\d{4}-\d{2}-\d{2}$/.test(sinceInput.value) ? sinceInput.value : '';
     if (statusEl) statusEl.textContent = '読み込み中…';
     try {
       const cfg = await App.resolveSemanticConfig();
@@ -3893,7 +3895,7 @@ const App = {
           'Content-Type': 'application/json',
           'X-Semantic-Shared-Secret': cfg.secret
         },
-        body: JSON.stringify({ days: days })
+        body: JSON.stringify(since ? { days: days, since: since } : { days: days })
       });
       const text = await response.text();
       let data = {};
@@ -4098,6 +4100,8 @@ const App = {
             })
             .join('');
 
+    App.renderAnalyticsMetering(data);
+
     const recent = data.recent_events || [];
     recentBody.innerHTML =
       recent.length === 0
@@ -4145,6 +4149,92 @@ const App = {
               );
             })
             .join('');
+  },
+
+  // 費用の実測（週次）: qa-analytics の metering を表示
+  renderAnalyticsMetering: (data) => {
+    const el = document.getElementById('analyticsMetering');
+    if (!el) return;
+    const m = data && data.metering;
+    if (!m) {
+      el.innerHTML =
+        '<p class="text-slate-500">' +
+        App.escapeHtml(
+          data && data.metering_error
+            ? '週次集計が未設定です（migration 20261105_qa_usage_metering.sql を適用してください）'
+            : 'データがありません'
+        ) +
+        '</p>';
+      return;
+    }
+    const yen = function (n) {
+      return Number(n || 0).toLocaleString('ja-JP') + '円';
+    };
+    const num = function (n) {
+      return Number(n || 0).toLocaleString('ja-JP');
+    };
+    const card = function (label, value, sub) {
+      return (
+        '<div class="rounded border p-3 bg-slate-50"><div class="text-xs text-slate-500">' +
+        App.escapeHtml(label) +
+        '</div><div class="text-lg font-semibold mt-1">' +
+        App.escapeHtml(value) +
+        '</div>' +
+        (sub ? '<div class="text-xs text-slate-500 mt-1">' + App.escapeHtml(sub) + '</div>' : '') +
+        '</div>'
+      );
+    };
+    const perQ =
+      m.jpy_per_question_low == null
+        ? '—'
+        : m.jpy_per_question_low + '〜' + m.jpy_per_question_high + '円';
+    const semPerQ =
+      m.semantic_usd_per_question == null
+        ? '未計測'
+        : '$' + Number(m.semantic_usd_per_question).toFixed(4) +
+          '（約' + (Number(m.semantic_usd_per_question) * Number(m.usd_jpy || 150)).toFixed(2) + '円）';
+    const weekly = m.weekly || [];
+    el.innerHTML =
+      '<div class="grid grid-cols-2 md:grid-cols-4 gap-3">' +
+      card('成功質問数', num(m.questions), '利用者 ' + (m.period_users == null ? '—' : num(m.period_users)) + ' 人') +
+      card('Gemini 費用（期間）', yen(m.total_jpy_low) + '〜' + yen(m.total_jpy_high), '通常検索の幅で上下') +
+      card('1問あたり', perQ, '試算は1.5〜6円') +
+      card('意味検索 1問の実費', semPerQ, '実測 ' + num(m.semantic_metered) + ' 問') +
+      '</div>' +
+      '<table class="w-full text-xs mt-2"><thead class="bg-slate-50 text-slate-600"><tr>' +
+      '<th class="p-2 text-left">週</th><th class="p-2 text-right">質問</th><th class="p-2 text-right">通常</th>' +
+      '<th class="p-2 text-right">意味</th><th class="p-2 text-right">利用者</th>' +
+      '<th class="p-2 text-right">入力トークン</th><th class="p-2 text-right">出力トークン</th>' +
+      '<th class="p-2 text-right">費用（円）</th></tr></thead><tbody>' +
+      (weekly.length === 0
+        ? '<tr><td class="p-2 text-slate-500" colspan="8">なし</td></tr>'
+        : weekly
+            .map(function (w) {
+              return (
+                '<tr class="border-t"><td class="p-2 whitespace-nowrap">' +
+                App.escapeHtml(String(w.week_start_jst || '')) +
+                '〜</td><td class="p-2 text-right">' + num(w.questions) +
+                '</td><td class="p-2 text-right">' + num(w.normal_ok) +
+                '</td><td class="p-2 text-right">' + num(w.semantic_ok) +
+                '</td><td class="p-2 text-right">' + num(w.users) +
+                '</td><td class="p-2 text-right">' + num(w.prompt_tokens) +
+                '</td><td class="p-2 text-right">' + num(w.output_tokens) +
+                '</td><td class="p-2 text-right whitespace-nowrap">' +
+                App.escapeHtml(num(w.total_jpy_low) + '〜' + num(w.total_jpy_high)) +
+                '</td></tr>'
+              );
+            })
+            .join('')) +
+      '</tbody></table>' +
+      '<p class="text-xs text-slate-500">' +
+      App.escapeHtml(
+        (m.note || '') +
+          ' 単価: 入力 $' + (m.price_usd_per_m ? m.price_usd_per_m.input : 0.5) +
+          '／出力 $' + (m.price_usd_per_m ? m.price_usd_per_m.output : 3) +
+          '（100万トークンあたり）、1USD≒' + (m.usd_jpy || 150) +
+          '円。週の利用者数は通常・意味の多い方。'
+      ) +
+      '</p>';
   },
 
   callSemanticSearch: async (query, fetchOptions) => {
