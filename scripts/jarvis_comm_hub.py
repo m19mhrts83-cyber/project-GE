@@ -579,6 +579,48 @@ def cmd_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def recent_context(
+    folder: str,
+    subject: str = "",
+    *,
+    limit: int = 3,
+    since_days: int = 365,
+    sb=None,
+) -> list[str]:
+    """返信下書きの参考用に、同じ相手の過去のやり取りを台帳から引く（211 用・soft-fail）。
+
+    件名に近い過去分（キーワード一致）を先に、足りなければ直近を足す。失敗時は空リスト。
+    """
+    if (os.environ.get("JARVIS_COMM_HUB") or "").strip() == "0":
+        return []
+    try:
+        sb = sb or client()
+        since = (datetime.now(JST) - timedelta(days=since_days)).isoformat()
+        base = {
+            "p_party_ids": [party_id_for_folder(folder)],
+            "p_since": since,
+            "p_limit": limit,
+        }
+        rows: list[dict[str, Any]] = []
+        q = re.sub(r"^(re|fw|fwd)\s*:\s*", "", (subject or "").strip(), flags=re.I)
+        q = re.sub(r"[【】\[\]()（）「」]", " ", q).strip()
+        if len(q) >= 2:
+            rows = sb.rpc("comm_search", {**base, "p_query": q[:60]}).execute().data or []
+        if len(rows) < limit:
+            seen = {r["id"] for r in rows}
+            recent = sb.rpc("comm_search", {**base, "p_limit": limit}).execute().data or []
+            rows += [r for r in recent if r["id"] not in seen][: limit - len(rows)]
+        out = []
+        for r in rows[:limit]:
+            who = "自分" if r.get("direction") == "outbound" else "相手"
+            text = (r.get("subject") or r.get("summary") or "").strip().replace("\n", " ")
+            out.append(f"{str(r['occurred_at'])[:10]} {who} {text[:50]}")
+        return out
+    except Exception as e:  # noqa: BLE001
+        print(f"# comm hub context soft-fail: {e}", file=sys.stderr)
+        return []
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
