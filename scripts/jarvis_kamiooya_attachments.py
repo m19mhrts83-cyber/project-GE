@@ -90,12 +90,21 @@ def build_attachment(row: dict, root: Path = ARCHIVE) -> tuple[dict, bytes]:
     data, mime, ext = inspect_file(path, root)
     digest = hashlib.sha256(data).hexdigest()
     identity = hashlib.sha256(f"{cid}\0{url}".encode()).hexdigest()
-    return {
+    meta = {
         "id": identity, "comment_id": cid, "bucket": BUCKET,
         "storage_path": f"comments/{cid}/{digest}{ext}",
         "source_url": url, "original_name": Path(str(row.get("name") or path.name)).name[:255],
         "content_type": mime, "byte_size": len(data), "sha256": digest,
-    }, data
+    }
+    if row.get("original_source_url"):
+        original=canonical_url(row["original_source_url"])
+        expected=re.sub(r"-\d+x\d+(?=\.(?:jpg|jpeg|png|webp)$)","",url,flags=re.I)
+        if original!=expected or not urlsplit(original).hostname in ("westudy.co.jp","www.westudy.co.jp") or original==url:
+            raise ValueError("invalid_original_provenance")
+        from PIL import Image
+        with Image.open(io.BytesIO(data)) as im:
+            meta.update(original_source_url=original,image_width=im.width,image_height=im.height)
+    return meta, data
 
 
 class Store:
@@ -136,12 +145,17 @@ class Store:
 
     def existing(self, ident: str):
         rows = self.request("GET", "/rest/v1/community_attachments", params={
-            "select": "id,sha256,storage_path,original_name", "id": f"eq.{ident}", "limit": 1,
+            "select": "id,sha256,storage_path,original_name,original_source_url", "id": f"eq.{ident}", "limit": 1,
         }).json()
         return rows[0] if rows else None
 
     def save(self, meta: dict, data: bytes, old_record=_UNSET, publish=True) -> str:
         old = self.existing(meta["id"]) if old_record is _UNSET else old_record
+        if old and old.get("original_source_url") and not meta.get("original_source_url"):
+            body = self.request("GET", f"/storage/v1/object/{BUCKET}/{old['storage_path']}").content
+            if hashlib.sha256(body).hexdigest() != old["sha256"]:
+                raise ValueError("stored_hash_mismatch")
+            return "original_retained"
         path = f"/storage/v1/object/{BUCKET}/{meta['storage_path']}"
         if old and old["sha256"] == meta["sha256"] and old["storage_path"] == meta["storage_path"]:
             # DBだけ成功とせず、実体の欠落・破損も検出する。
@@ -176,7 +190,7 @@ def main(argv=None) -> int:
         p.error("limit must be 1..100")
     wanted = {normalize_comment_id(x) for x in args.comment_id}
     store = Store()
-    counts = {"saved": 0, "unchanged": 0, "dry_run": 0, "invalid": 0, "missing_comment": 0, "failed": 0}
+    counts = {"saved": 0, "unchanged": 0, "original_retained": 0, "dry_run": 0, "invalid": 0, "missing_comment": 0, "failed": 0}
     records = []
     seen = set()
     for catalog in args.catalog:
