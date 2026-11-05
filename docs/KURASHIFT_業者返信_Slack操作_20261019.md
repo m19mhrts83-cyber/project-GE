@@ -88,6 +88,11 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 返信なし | `vendor_reply_skip` |
 | URL 予備 | `GET /api/g/vr/{send\|edit\|skip}/{id}?s=` |
 
+## 重複投稿の防止（2026-11-05）
+
+- 投稿済み印は `triage_items.payload.slack_vr_posted_at`。`jarvis_kurashift_vendor_reply_triage.py --push` の再取込（upsert）で payload を作り直しても、既存の `slack_*` 印は `merge_posted_marks` で引き継ぐ。
+- 以前は再取込のたびに印が消え、同じカードが何度も出ていた（11/04 山村不動産が3回）。テスト: `scripts/tests/test_vendor_reply_triage_posted_mark.py`
+
 ## 関連
 
 - Dashboard 下書き: `docs/Jarvis_Dashboard_業者返信下書き.md`

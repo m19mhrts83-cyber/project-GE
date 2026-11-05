@@ -234,6 +234,20 @@ def find_vendor_replies(
     return out
 
 
+def merge_posted_marks(row: dict[str, Any], remote_payload: dict[str, Any] | None) -> None:
+    """再取込の upsert で Slack 投稿済み印（slack_*）を消さない。
+
+    消えると jarvis_vendor_reply_slack_post.py --from-triage が同じ件を何度も
+    #consult に出す（2026-11-04 山村不動産が 05:04／05:06／05:08 に3回）。
+    """
+    if not isinstance(remote_payload, dict):
+        return
+    pl = row.setdefault("payload", {})
+    for k, v in remote_payload.items():
+        if k.startswith("slack_") and k not in pl:
+            pl[k] = v
+
+
 def push_rows(rows: list[dict[str, Any]]) -> int:
     from supabase import create_client
 
@@ -244,18 +258,22 @@ def push_rows(rows: list[dict[str, Any]]) -> int:
     sb = create_client(url, key)
     protected = {"sent", "skipped", "snoozed", "done"}
     remote: dict[str, str] = {}
+    remote_payload: dict[str, dict[str, Any]] = {}
     ids = [r["id"] for r in rows]
     for i in range(0, len(ids), 80):
         chunk = ids[i : i + 80]
         r = sb.table("triage_items").select("id,status,draft_text,payload").in_("id", chunk).execute()
         for x in r.data or []:
             remote[str(x["id"])] = str(x.get("status") or "")
+            if isinstance(x.get("payload"), dict):
+                remote_payload[str(x["id"])] = x["payload"]
     n = 0
     for row in rows:
         rid = row["id"]
         if rid in remote and remote[rid] in protected:
             row["status"] = remote[rid]
             continue
+        merge_posted_marks(row, remote_payload.get(rid))
         sb.table("triage_items").upsert(row, on_conflict="id").execute()
         n += 1
     return n
