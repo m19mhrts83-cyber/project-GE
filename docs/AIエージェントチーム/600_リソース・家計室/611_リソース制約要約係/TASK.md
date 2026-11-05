@@ -4,7 +4,7 @@
 |---|---|
 | task_id | 611-impl-1 |
 | agent_id | 611 |
-| executor | Codex（コーディング）。フロー案はチャッピー（ChatGPT）で磨き済みの扱い |
+| executor | ミスレモン（Claude Code）で進めてよい（2026-11-05 松野さん）。Codex でも可。ローカルログの確認は Mac 上で動かす必要がある |
 | status | queued |
 | 依頼者 | 松野さん（2026-11-05 に「611の実装を渡す」を選択） |
 
