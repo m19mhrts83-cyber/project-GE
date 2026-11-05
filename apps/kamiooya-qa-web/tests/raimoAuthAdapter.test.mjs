@@ -26,6 +26,7 @@ function fixture(){
     if(!['user','assistant'].includes(body.role))return Response.json({errorCode:'message_role_required'},{status:400});
     return Response.json({ok:true});
    }
+   if(path==='/semantic-search-config')return Response.json({url:config.projectUrl+'/functions/v1/semantic-search',secret:'s'.repeat(43),internal:'private-reset'});
    if(path==='/internal/read/admin/users')return Response.json({users});
    if(path==='/internal/read/comments')return Response.json({comments:[]});
    if(path.startsWith('/auth/'))return Response.json({success:true,id:'3'});
@@ -101,4 +102,24 @@ test('semantic message appends preserve message roles without accepting membersh
  await f.request('/chat-sessions',{role:'master_admin',user_id:'2',initial_message:'x'},token);
  const sent=f.calls.filter(c=>c.url.endsWith('/chat-sessions')).at(-1).body;
  assert.equal('role' in sent,false);assert.equal(sent.user_id,'1');
+});
+
+test('only approved sessions receive the legacy semantic configuration and no server credentials',async()=>{
+ const f=fixture();
+ assert.equal((await f.request('/semantic-search-config',{})).status,401);
+ const token=await f.login();
+ const r=await f.request('/semantic-search-config',{url:'https://evil.example',secret:f.config.gatewaySecret,user_id:'2'},token);
+ assert.equal(r.status,200);
+ const body=await r.json();assert.deepEqual(Object.keys(body).sort(),['secret','url']);
+ assert.equal(body.url,f.config.projectUrl+'/functions/v1/semantic-search');assert.equal(body.secret,'s'.repeat(43));
+ const sent=f.calls.find(c=>c.url.endsWith('/semantic-search-config')).body;
+ assert.deepEqual(Object.keys(sent),['__gateway_secret']);
+ f.users[0].status='pending';assert.equal((await f.request('/semantic-search-config',{},token)).status,403);
+});
+test('semantic configuration rejects redirect destinations and reused privileged credentials',async()=>{
+ const f=fixture();
+ for(const bad of [{url:'https://evil.example',secret:'s'.repeat(43)},{url:f.config.projectUrl+'/functions/v1/semantic-search',secret:f.config.gatewaySecret}]){
+  const adapter=createProductionAdapter(f.config,async()=>true,async()=>'',async()=>Response.json(bad));
+  await assert.rejects(()=>adapter.deps.semanticConfig());
+ }
 });
