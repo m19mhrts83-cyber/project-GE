@@ -6,6 +6,10 @@ import {labelAnswerSources,attachReferenceLabels,mentionedSourceLabels} from '..
 const load=()=>vm.runInNewContext(readFileSync(new URL('../public/raimo/app.js',import.meta.url),'utf8')+'\nApp;',{
  document:{addEventListener(){},getElementById:()=>null},window:{setTimeout},console,URL,fetch,Intl,Date
 });
+test('published HTML does not suppress Raimo automatic app.js injection with a commented script tag',()=>{
+ const html=readFileSync(new URL('../public/raimo/index.html',import.meta.url),'utf8');
+ assert.equal(/<!--[\s\S]*?<script\s+src=["']app\.js["'][\s\S]*?-->/.test(html),false);
+});
 test('abbreviated answer markers retain their explicit context identities',()=>{
  assert.deepEqual([...mentionedSourceLabels('LINEオプチャ1、4、7、8、10。コミュニティ2,5。セミナー3')],['LINEオプチャ1','LINEオプチャ4','LINEオプチャ7','LINEオプチャ8','LINEオプチャ10','コミュニティ2','コミュニティ5','セミナー3']);
  const app=load();const refs=app.buildCitationsFromRelated([],[],[],null,[{id:'four',citation_label:'LINEオプチャ4'}]);
