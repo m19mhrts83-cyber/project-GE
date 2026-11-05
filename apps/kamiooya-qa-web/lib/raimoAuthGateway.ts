@@ -105,9 +105,12 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       // Never forward browser-supplied credentials, internal secrets or actor identity.
       if (path.endsWith('/set-role') && !['user','admin'].includes(String(input.role))) return json({error:'invalid_role'},400);
       if (/^\/admin\/role-requests\/[^/]+\/approve$/.test(path) && !['user','admin'].includes(String(input.new_role))) return json({error:'invalid_role'},400);
+      // A chat message's speaker is not the user's membership/administrative role.
+      const appendMessage=req.method==='POST' && /^\/chat-sessions\/[a-zA-Z0-9_-]+\/messages-append$/.test(path);
+      if(appendMessage && !['user','assistant'].includes(input.role as string))return json({error:'invalid_message_role'},400);
       const forwarded = { ...input };
       for (const key of ['actor_user_id', 'user_id', 'role', 'status', 'secret', '__gateway_secret', 'password_hash', 'auth_token']) delete forwarded[key];
-      if(path.endsWith('/set-role'))forwarded.role=input.role;
+      if(path.endsWith('/set-role') || appendMessage)forwarded.role=input.role;
       forwarded.actor_user_id = user.id;
       if(path.startsWith('/admin/'))forwarded.actor_email = user.email;
       if(path==='/admin/master-transfer/start')forwarded.from_email=user.email;
