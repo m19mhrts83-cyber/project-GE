@@ -17,6 +17,18 @@ test('a mentioned video title and position links directly to that position',()=>
  const app=load();const linked=app.linkReferenceLabels('動画A 01:01頃を参照。',[{kind:'video_chunk',videoTitle:'動画A',videoUrl:'https://vimeo.com/123?h=fixture',startSec:61}],'m');
  assert.equal(linked,'[動画A 01:01頃](https://vimeo.com/123?h=fixture#t=61s)を参照。');
 });
+test('legacy reference recovery uses exact query and unique event time, including missing video metadata',async()=>{
+ const app=load();app.authGatewayBase='https://gateway.example';app.state.currentUser={id:'one'};app.state.currentSessionId='mine';app.state.messageLoadGeneration=1;
+ app.state.chatMessages=[{id:'u',role:'user',content:'question',created_at:'2026-11-05T12:00:00Z'},{id:'a',role:'assistant',content:'LINEオプチャ1',created_at:'2026-11-05T12:01:00Z'}];
+ app.state.citationsByMessageId={a:[{kind:'openchat',openchatId:'line'}]};app.renderChatMessages=()=>{};
+ app.saveCitationsForMessage=(sid,id,refs)=>{app.state.citationsByMessageId[id]=refs;};
+ const event={created_at:'2026-11-05T12:00:59Z',query_text:'question',used_sources:{comment_ids:[],chunk_keys:['video'],openchat_ids:['line']}};
+ app.apiClient=async()=>({events:[event],chunks:[{chunk_key:'video',source_id:7,start_sec:61,content:'video passage'}],sources:[{id:7,source_key:'s',title:'動画A',video_url:'https://vimeo.com/123'}]});
+ await app.hydrateHistoricalReferences('mine',1);
+ assert.equal(app.state.citationsByMessageId.a[0].citationLabel,'LINEオプチャ1');assert.equal(app.state.citationsByMessageId.a[1].citationLabel,'セミナー1');assert.match(app.state.citationsByMessageId.a[1].videoUrl,/#t=61s$/);
+ app.state.citationsByMessageId={a:[{kind:'openchat',openchatId:'line'}]};app.apiClient=async()=>({events:[event,event],sources:[]});await app.hydrateHistoricalReferences('mine',1);
+ assert.equal(app.state.citationsByMessageId.a[0].citationLabel,undefined);
+});
 test('answer context source labels survive client recency reordering',()=>{
  const labels=labelAnswerSources([{comment_id:'old'},{comment_id:'new'}], [{chunk_key:'video'}],[{id:'line-old'},{id:'line-new'}]);
  const reordered=attachReferenceLabels([{id:'line-new'},{id:'line-old'}],'id',labels.openchats);

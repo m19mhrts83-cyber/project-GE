@@ -75,7 +75,9 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     },
     referenceEvents:async(userId,chatId)=>{
       // The inspected legacy deployment used context order for these recent semantic events.
-      const q=new URLSearchParams({select:'created_at,query_text,used_sources',user_id:'eq.'+userId,session_id:'eq.'+chatId,search_mode:'eq.semantic',result_status:'eq.ok',created_at:'gte.2026-11-04T00:00:00+09:00',order:'created_at.desc',limit:'100'});
+      // Bound recovery to the archived pre-stable-label deployment. New filtered IDs
+      // are not positional labels; those answers recover their persisted job DTO instead.
+      const q=new URLSearchParams({select:'created_at,query_text,used_sources',user_id:'eq.'+userId,session_id:'eq.'+chatId,search_mode:'eq.semantic',result_status:'eq.ok',and:'(created_at.gte.2026-11-04T00:00:00+09:00,created_at.lt.2026-11-06T06:53:00+09:00)',order:'created_at.desc',limit:'100'});
       const events=await rest('app_qa_search_events?'+q),keys=new Set<string>();
       for(const event of events){try{const ids=typeof event.used_sources==='string'?JSON.parse(event.used_sources):event.used_sources;for(const key of ids?.chunk_keys||[])if(typeof key==='string'&&/^[a-zA-Z0-9:_|.\/-]{1,250}$/.test(key))keys.add(key);}catch{}}
       const chunks:any[]=[];const selected=[...keys].slice(0,500);
