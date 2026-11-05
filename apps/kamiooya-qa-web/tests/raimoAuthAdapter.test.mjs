@@ -22,6 +22,11 @@ function fixture(){
    if(path.startsWith('/internal/auth-user/')){const field=path.split('/').at(-1);return Response.json({user:users.find(x=>String(x[field==='user_id'?'id':field])===String(body[field]))||null});}
    if(path==='/internal/read/chat-sessions/mine')return Response.json({session:{user_id:'1'}});
    if(path==='/internal/read/chat-sessions/theirs')return Response.json({session:{user_id:'2'}});
+   if(path==='/chat-sessions/mine/messages-append'){
+    if(!['user','assistant'].includes(body.role))return Response.json({errorCode:'message_role_required'},{status:400});
+    return Response.json({ok:true});
+   }
+   if(path==='/semantic-search-config')return Response.json({url:config.projectUrl+'/functions/v1/semantic-search',secret:'s'.repeat(43),internal:'private-reset'});
    if(path==='/internal/read/admin/users')return Response.json({users});
    if(path==='/internal/read/comments')return Response.json({comments:[]});
    if(path.startsWith('/auth/'))return Response.json({success:true,id:'3'});
@@ -80,4 +85,41 @@ test('proof is never accepted for an internal browser route and failures hide up
  const failing=createProductionAdapter(f.config,async()=>true,async()=>'',async()=>{throw new Error('private-source-body');});
  const gateway=createRaimoAuthGateway(failing.deps);const r=await gateway(new Request('https://gateway.example/auth/login',{method:'POST',body:JSON.stringify({email:'a@example.test',password_hash:'x'})}));
  assert.equal(r.status,503);assert.equal((await r.text()).includes('private-source-body'),false);
+});
+
+test('semantic message appends preserve message roles without accepting membership roles',async()=>{
+ const f=fixture(),token=await f.login();
+ for(const role of ['user','assistant']){
+  const r=await f.request('/chat-sessions/mine/messages-append',{role,content:'semantic message',user_id:'2',actor_user_id:'2'},token);
+  assert.equal(r.status,200);
+  const sent=f.calls.filter(c=>c.url.endsWith('/chat-sessions/mine/messages-append')).at(-1).body;
+  assert.equal(sent.role,role);assert.equal(sent.actor_user_id,'1');assert.equal('user_id' in sent,false);
+ }
+ for(const role of ['admin','master_admin','system',null,['user']]){
+  assert.equal((await f.request('/chat-sessions/mine/messages-append',{role,content:'x'},token)).status,400);
+ }
+ assert.equal((await f.request('/chat-sessions/theirs/messages-append',{role:'assistant',content:'x'},token)).status,403);
+ await f.request('/chat-sessions',{role:'master_admin',user_id:'2',initial_message:'x'},token);
+ const sent=f.calls.filter(c=>c.url.endsWith('/chat-sessions')).at(-1).body;
+ assert.equal('role' in sent,false);assert.equal(sent.user_id,'1');
+});
+
+test('only approved sessions receive the legacy semantic configuration and no server credentials',async()=>{
+ const f=fixture();
+ assert.equal((await f.request('/semantic-search-config',{})).status,401);
+ const token=await f.login();
+ const r=await f.request('/semantic-search-config',{url:'https://evil.example',secret:f.config.gatewaySecret,user_id:'2'},token);
+ assert.equal(r.status,200);
+ const body=await r.json();assert.deepEqual(Object.keys(body).sort(),['secret','url']);
+ assert.equal(body.url,f.config.projectUrl+'/functions/v1/semantic-search');assert.equal(body.secret,'s'.repeat(43));
+ const sent=f.calls.find(c=>c.url.endsWith('/semantic-search-config')).body;
+ assert.deepEqual(Object.keys(sent),['__gateway_secret']);
+ f.users[0].status='pending';assert.equal((await f.request('/semantic-search-config',{},token)).status,403);
+});
+test('semantic configuration rejects redirect destinations and reused privileged credentials',async()=>{
+ const f=fixture();
+ for(const bad of [{url:'https://evil.example',secret:'s'.repeat(43)},{url:f.config.projectUrl+'/functions/v1/semantic-search',secret:f.config.gatewaySecret}]){
+  const adapter=createProductionAdapter(f.config,async()=>true,async()=>'',async()=>Response.json(bad));
+  await assert.rejects(()=>adapter.deps.semanticConfig());
+ }
 });

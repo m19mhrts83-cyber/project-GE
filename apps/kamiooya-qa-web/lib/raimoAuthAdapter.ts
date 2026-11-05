@@ -72,6 +72,13 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       const r=await transport(c.projectUrl+'/functions/v1/community-attachments',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+c.proxySecret},body:JSON.stringify({operation:'session',user_id:uid,parent_session:parent}),signal:AbortSignal.timeout(20000)});
       if(!r.ok)throw new Error('attachments_unavailable');return r.json();
     },
+    semanticConfig:async()=>{
+      const r=await backend('POST','/semantic-search-config',{});
+      if(r?.url!==c.projectUrl+'/functions/v1/semantic-search' || typeof r.secret!=='string' ||
+        r.secret.length<32 || r.secret.length>256 || [c.gatewaySecret,c.proxySecret,c.serviceKey].includes(r.secret))throw new Error('invalid_semantic_configuration');
+      // Explicit projection: only the existing client-side search credential, never backend extras.
+      return {url:r.url,secret:r.secret};
+    },
     publicAction:async(path,input)=>{
       const email=String(input.email||'').trim().toLowerCase();
       if(!await allow('public:'+path+':'+(email||String(input.token||'')),5))throw new UpstreamError('try_later',429);
