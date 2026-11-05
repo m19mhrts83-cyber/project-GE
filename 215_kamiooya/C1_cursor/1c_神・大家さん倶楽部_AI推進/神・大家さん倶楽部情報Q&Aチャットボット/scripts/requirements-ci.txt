@@ -3,3 +3,4 @@ selenium
 playwright
 supabase
 requests
+pillow

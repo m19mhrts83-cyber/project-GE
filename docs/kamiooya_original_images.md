@@ -18,3 +18,9 @@ python scripts/jarvis_kamiooya_image_originals.py --apply --limit 5000 --workers
 ```
 
 Successful records are skipped on subsequent runs. Failed/missing candidates retain their thumbnails and remain visible in the report for an explicit retry.
+
+## Daily community attachment delta
+
+`jarvis_kamiooya_community_daily.py` consumes full harvest CSVs after the existing daily comment import in `westudy-raimo-weekly.yml`. It also runs when the text delta is zero. Known attachment identities are skipped without binary downloads; new attachment URLs are checked independently. Missing parent comments and capacity/deferred/error counts make the job fail visibly for retry. Missing sources and untrusted external links are counted separately.
+
+Only HTTPS WeStudy `/wp-content/uploads/` files are fetched, without redirects or authentication cookies. Other hosts and query-bearing URLs are held out rather than followed. Files are bounded at 50 MiB and validated using the existing importer. The worker prefers a larger original for new image attachments and preserves unchanged bytes, then verifies the stored hash. Local temporary binaries are removed after the run and never uploaded to CI artifacts or Git. The 80 GB project ceiling and a per-run file bound prevent unbounded backfills. This daily path does not attempt to detect replaced content behind an already known unchanged URL, or claim external links are backed up.
