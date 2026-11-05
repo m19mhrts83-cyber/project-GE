@@ -719,7 +719,8 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
     const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext, geminiUsage, req.signal);
 
     const referenceLabels=labelAnswerSources(commentsForAnswer,chunksForAnswer,openchatsForAnswer);
-    const mentioned=mentionedSourceLabels(answer);
+    const knownLabels=new Set([...Object.values(referenceLabels.comments),...Object.values(referenceLabels.chunks),...Object.values(referenceLabels.openchats)]);
+    const mentioned=mentionedSourceLabels(answer,knownLabels);
     chunksForAnswer.forEach(row=>{
       const title=displaySourceTitle(asString(sourceById.get(Number(row.source_id))?.title));
       if(title && answer.includes(title) && answer.includes(formatMmSs(row.start_sec)))mentioned.add(referenceLabels.chunks[row.chunk_key]);

@@ -10,10 +10,10 @@ export function attachReferenceLabels(rows: Row[], key: string, labels: Record<s
   return rows.map(row=>({...row,...(labels[String(row[key])] ? {citation_label:labels[String(row[key])]} : {})}));
 }
 
-export function mentionedSourceLabels(answer:string):Set<string>{
+export function mentionedSourceLabels(answer:string,known?:Set<string>):Set<string>{
  const found=new Set<string>();
  for(const match of answer.matchAll(/(LINEオプチャ|コミュニティ|セミナー)(\d+(?:\s*[、,]\s*\d+)*)/g)){
-  for(const index of match[2].split(/[、,]/))found.add(match[1]+Number(index.trim()));
+  for(const index of match[2].split(/[、,]/)){const label=match[1]+Number(index.trim());if(!known||known.has(label))found.add(label);}
  }
  return found;
 }
