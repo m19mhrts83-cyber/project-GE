@@ -28,3 +28,7 @@ npx deno check apps/kamiooya-qa-web/supabase/functions/raimo-auth/index.ts
 ```
 
 Unit tests use synthetic users, transport and persistent-store responses. These tests do not replace live integration and browser verification. The private operational result and handoff identify the actual release state. Historical third-party access investigation is outside this change.
+
+## Semantic message-role regression (2026-11-05)
+
+Semantic search first appends the user message, then calls its search function and appends the assistant answer. The gateway stripped every input `role` as an untrusted membership role, including this route's required message-speaker field. As a result, `messages-append` failed with HTTP400/`operation_failed` before semantic generation. The fix preserves only `user` or `assistant` on POST `/chat-sessions/{id}/messages-append`, after the existing authenticated ownership check. Administrative roles, cross-user chat access and identity overrides remain rejected. This repair does not change normal-search timeouts or implement asynchronous long jobs.
