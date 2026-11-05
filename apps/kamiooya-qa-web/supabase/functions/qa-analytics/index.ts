@@ -5,8 +5,39 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 type Body = {
   days?: number;
+  /** 実測期間の開始日（JST, YYYY-MM-DD）。指定時は days より優先 */
+  since?: string;
+  /** 実測期間の終了日（JST, YYYY-MM-DD, この日を含む） */
+  until?: string;
   secret?: string;
 };
+
+type WeeklyRow = {
+  week_start_jst: string;
+  search_mode: string;
+  ok_count: number;
+  failed_count: number;
+  unique_users: number;
+  unique_sessions: number;
+  metered_count: number;
+  prompt_tokens: number;
+  output_tokens: number;
+  thought_tokens: number;
+};
+
+/** JST の日付文字列 → その日 0:00 JST の ISO。不正なら null */
+function jstDateToIso(value: unknown, addDays = 0): string | null {
+  const s = typeof value === "string" ? value.trim() : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const t = Date.parse(`${s}T00:00:00+09:00`);
+  if (!Number.isFinite(t)) return null;
+  return new Date(t + addDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function envNumber(name: string, fallback: number): number {
+  const v = Number((Deno.env.get(name) || "").trim());
+  return Number.isFinite(v) && v > 0 ? v : fallback;
+}
 
 function corsHeaders(): HeadersInit {
   return {
@@ -57,8 +88,11 @@ Deno.serve(async (req) => {
     return json({ errorMessage: "forbidden" }, 403);
   }
 
-  const daysRaw = body?.days ?? Number(new URL(req.url).searchParams.get("days") || 14);
-  const days = Math.max(1, Math.min(90, Number.isFinite(daysRaw) ? daysRaw : 14));
+  const params = new URL(req.url).searchParams;
+  const daysRaw = Number(body?.days ?? params.get("days") ?? 14);
+  const days = Math.max(1, Math.min(365, Number.isFinite(daysRaw) ? daysRaw : 14));
+  const sinceParam = body?.since ?? params.get("since");
+  const untilParam = body?.until ?? params.get("until");
 
   const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").trim();
   const serviceKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").trim();
@@ -70,7 +104,13 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const since =
+    jstDateToIso(sinceParam) || new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const until = jstDateToIso(untilParam, 1);
+  const rangeDays = Math.max(
+    1,
+    Math.round(((until ? Date.parse(until) : Date.now()) - Date.parse(since)) / 86400000)
+  );
 
   const { data: events, error } = await sb
     .from("app_qa_search_events")
@@ -78,12 +118,18 @@ Deno.serve(async (req) => {
       "id,created_at,search_mode,query_text,session_id,user_id,comment_hit_count,chunk_hit_count,answer_comment_count,answer_chunk_count,result_status,error_message"
     )
     .gte("created_at", since)
+    .lt("created_at", until || "9999-12-31T00:00:00Z")
     .order("created_at", { ascending: false })
     .limit(2000);
 
   if (error) {
     return json({ errorMessage: error.message }, 500);
   }
+
+  // 実測用の週次集計（件数上限なし）。migration 未適用なら null で返し、画面側で案内する
+  const weeklyRes = await sb.rpc("qa_usage_weekly", { p_since: since, p_until: until });
+  const usersRes = await sb.rpc("qa_usage_period_users", { p_since: since, p_until: until });
+  const weeklyRows: WeeklyRow[] | null = weeklyRes.error ? null : (weeklyRes.data as WeeklyRow[]) || [];
 
   const rows = events || [];
   let normal = 0;
@@ -118,6 +164,26 @@ Deno.serve(async (req) => {
       queryCounts[q].count += 1;
       if (mode === "semantic") queryCounts[q].semantic += 1;
       else queryCounts[q].normal += 1;
+    }
+  }
+
+  if (weeklyRows) {
+    // 2,000件の取得上限を超えても正しい件数になるよう、件数は週次集計から出す
+    normal = 0;
+    semantic = 0;
+    failed = 0;
+    billableNormal = 0;
+    billableSemantic = 0;
+    for (const w of weeklyRows) {
+      const all = Number(w.ok_count) + Number(w.failed_count);
+      failed += Number(w.failed_count);
+      if (w.search_mode === "semantic") {
+        semantic += all;
+        billableSemantic += Number(w.ok_count);
+      } else if (w.search_mode === "normal") {
+        normal += all;
+        billableNormal += Number(w.ok_count);
+      }
     }
   }
 
@@ -176,10 +242,99 @@ Deno.serve(async (req) => {
     note: "想定レンジ。Google請求額そのものではありません。",
   };
 
+  // 実測（意味検索の要約は実トークン × 公開単価、通常検索は Raimo 側のため件数 × 単価目安）
+  const PRICE_IN = envNumber("GEMINI_PRICE_INPUT_USD_PER_M", 0.5);
+  const PRICE_OUT = envNumber("GEMINI_PRICE_OUTPUT_USD_PER_M", 3.0);
+  const JPY = envNumber("USD_JPY_RATE", USD_PER_JPY);
+  const tokenUsd = (p: number, o: number, t: number) => (p * PRICE_IN + (o + t) * PRICE_OUT) / 1e6;
+  let metering: Record<string, unknown> | null = null;
+  if (weeklyRows) {
+    const weeks: Record<string, Record<string, number | string>> = {};
+    let pTok = 0, oTok = 0, tTok = 0, meteredSemantic = 0;
+    for (const w of weeklyRows) {
+      const key = String(w.week_start_jst);
+      if (!weeks[key]) {
+        weeks[key] = {
+          week_start_jst: key, normal_ok: 0, semantic_ok: 0, failed: 0,
+          users_max_mode: 0, semantic_metered: 0, prompt_tokens: 0, output_tokens: 0, thought_tokens: 0,
+        };
+      }
+      const r = weeks[key] as Record<string, number>;
+      if (w.search_mode === "normal") r.normal_ok += Number(w.ok_count);
+      if (w.search_mode === "semantic") r.semantic_ok += Number(w.ok_count);
+      r.failed += Number(w.failed_count);
+      r.users_max_mode = Math.max(r.users_max_mode, Number(w.unique_users));
+      if (w.search_mode === "semantic") {
+        r.semantic_metered += Number(w.metered_count);
+        r.prompt_tokens += Number(w.prompt_tokens);
+        r.output_tokens += Number(w.output_tokens);
+        r.thought_tokens += Number(w.thought_tokens);
+        meteredSemantic += Number(w.metered_count);
+        pTok += Number(w.prompt_tokens);
+        oTok += Number(w.output_tokens);
+        tTok += Number(w.thought_tokens);
+      }
+    }
+    const perSemanticUsd = meteredSemantic > 0 ? tokenUsd(pTok, oTok, tTok) / meteredSemantic : null;
+    const round4 = (n: number) => Math.round(n * 10000) / 10000;
+    const weekly = Object.values(weeks)
+      .sort((a, b) => String(a.week_start_jst).localeCompare(String(b.week_start_jst)))
+      .map((r) => {
+        const x = r as Record<string, number>;
+        const semMeasured = tokenUsd(x.prompt_tokens, x.output_tokens, x.thought_tokens);
+        // トークン未記録の意味検索（改修前の分など）は、記録済み分の平均単価で補う
+        const semUnmetered = Math.max(0, x.semantic_ok - x.semantic_metered);
+        const semUsd = semMeasured + (perSemanticUsd ?? UNIT_SEMANTIC_HIGH) * semUnmetered;
+        const normLow = x.normal_ok * UNIT_NORMAL_LOW;
+        const normHigh = x.normal_ok * UNIT_NORMAL_HIGH;
+        return {
+          week_start_jst: r.week_start_jst,
+          questions: x.normal_ok + x.semantic_ok,
+          normal_ok: x.normal_ok,
+          semantic_ok: x.semantic_ok,
+          failed: x.failed,
+          users: x.users_max_mode,
+          semantic_metered: x.semantic_metered,
+          prompt_tokens: x.prompt_tokens,
+          output_tokens: x.output_tokens + x.thought_tokens,
+          semantic_usd: round4(semUsd),
+          normal_usd_low: round4(normLow),
+          normal_usd_high: round4(normHigh),
+          total_jpy_low: Math.round((semUsd + normLow) * JPY),
+          total_jpy_high: Math.round((semUsd + normHigh) * JPY),
+        };
+      });
+    const semUsdAll = weekly.reduce((a, w) => a + w.semantic_usd, 0);
+    const normLowAll = billableNormal * UNIT_NORMAL_LOW;
+    const normHighAll = billableNormal * UNIT_NORMAL_HIGH;
+    const questionsAll = billableNormal + billableSemantic;
+    metering = {
+      period_users: usersRes.error ? null : Number(usersRes.data) || 0,
+      questions: questionsAll,
+      semantic_metered: meteredSemantic,
+      prompt_tokens: pTok,
+      output_tokens: oTok + tTok,
+      semantic_usd_per_question: perSemanticUsd == null ? null : round4(perSemanticUsd),
+      semantic_usd: round4(semUsdAll),
+      normal_usd_low: round4(normLowAll),
+      normal_usd_high: round4(normHighAll),
+      total_jpy_low: Math.round((semUsdAll + normLowAll) * JPY),
+      total_jpy_high: Math.round((semUsdAll + normHighAll) * JPY),
+      jpy_per_question_low: questionsAll > 0 ? Math.round(((semUsdAll + normLowAll) * JPY / questionsAll) * 100) / 100 : null,
+      jpy_per_question_high: questionsAll > 0 ? Math.round(((semUsdAll + normHighAll) * JPY / questionsAll) * 100) / 100 : null,
+      price_usd_per_m: { input: PRICE_IN, output: PRICE_OUT },
+      usd_jpy: JPY,
+      weekly,
+      note:
+        "意味検索は実トークン×公開単価、通常検索はRaimo側でGeminiを呼ぶため件数×単価目安。Google請求額（AI Studio）と突き合わせて確認してください。",
+    };
+  }
+
   return json({
     ok: true,
-    range_days: days,
+    range_days: sinceParam ? rangeDays : days,
     since,
+    until,
     totals: {
       total,
       normal,
@@ -190,6 +345,8 @@ Deno.serve(async (req) => {
       normal_ratio: total > 0 ? Number((normal / total).toFixed(4)) : 0,
     },
     gemini_estimate: geminiEstimate,
+    metering,
+    metering_error: weeklyRes.error ? weeklyRes.error.message : null,
     daily,
     top_queries: topQueries,
     recent_events: recent,
