@@ -339,10 +339,6 @@ const App = {
     if (reloadMembersBtn) reloadMembersBtn.addEventListener('click', App.loadMembers);
     const importSrtBtn = document.getElementById('importSrtBtn');
     if (importSrtBtn) importSrtBtn.addEventListener('click', App.importSrtTranscript);
-    const meteringCsvBtn = document.getElementById('analyticsMeteringCsvBtn');
-    if (meteringCsvBtn) {
-      meteringCsvBtn.addEventListener('click', App.downloadAnalyticsMeteringCsv);
-    }
     const reloadAnalyticsBtn = document.getElementById('reloadAnalyticsBtn');
     if (reloadAnalyticsBtn) {
       reloadAnalyticsBtn.addEventListener('click', function () {
@@ -4228,45 +4224,6 @@ const App = {
           '円。週の利用者数は通常・意味の多い方。'
       ) +
       '</p>';
-  },
-
-  downloadAnalyticsMeteringCsv: () => {
-    const data = App.state.analyticsOverview;
-    const m = data && data.metering;
-    if (!m || !Array.isArray(m.weekly) || m.weekly.length === 0) {
-      App.showToast('実測データがありません。先に再取得してください', 'error');
-      return;
-    }
-    const header = [
-      '週（月曜）', '成功質問数', '通常検索', '意味検索', '失敗', '利用者',
-      '意味検索_実測件数', '入力トークン', '出力トークン',
-      '意味検索_USD', '通常検索_USD_下限', '通常検索_USD_上限', '合計_円_下限', '合計_円_上限'
-    ];
-    const rows = m.weekly.map(function (w) {
-      return [
-        w.week_start_jst, w.questions, w.normal_ok, w.semantic_ok, w.failed, w.users,
-        w.semantic_metered, w.prompt_tokens, w.output_tokens,
-        w.semantic_usd, w.normal_usd_low, w.normal_usd_high, w.total_jpy_low, w.total_jpy_high
-      ];
-    });
-    const csv = [header].concat(rows)
-      .map(function (r) {
-        return r.map(function (v) {
-          const s = v == null ? '' : String(v);
-          return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-        }).join(',');
-      })
-      .join('\r\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'QAチャットボット_費用実測_' + new Date().toISOString().slice(0, 10) + '.csv';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function () {
-      URL.revokeObjectURL(a.href);
-      a.remove();
-    }, 0);
   },
 
   callSemanticSearch: async (query, fetchOptions) => {
