@@ -190,6 +190,16 @@ jobs:
             "${cmd[@]}"
           )
 
+      # Full harvest contains attachment-only additions even when text delta is zero.
+      # Binary files stay in a temporary directory and are never Git artifacts.
+      - name: Back up new community attachments
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/jarvis_kamiooya_community_daily.py \
+            --root "$CHATBOT_OUTPUT_ROOT/exports/raw" \
+            --report "${RUNNER_TEMP}/community-attachments-summary.json" --apply
+
       # 取込のあと、embedding が null の comments／公開済み openchat に emb を付ける。
       # 失敗しても state のコミットは続ける（emb は次回の週次で取り返せる）。
       - name: Embed new rows (comments + openchat)
