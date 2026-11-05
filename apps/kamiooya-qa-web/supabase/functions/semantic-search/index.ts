@@ -298,7 +298,34 @@ function buildAnswerPrompt(query: string, answerContext: string): string {
   ].join("\n");
 }
 
-async function summarizeAnswer(query: string, answerContext: string): Promise<string> {
+/** 実測用: Gemini 応答の usageMetadata を記録する入れ物（app_qa_search_events に保存） */
+type GeminiUsage = {
+  model: string;
+  prompt_tokens: number;
+  output_tokens: number;
+  thought_tokens: number;
+  calls: number;
+};
+
+function newGeminiUsage(): GeminiUsage {
+  return { model: GEMINI_ANSWER_MODEL, prompt_tokens: 0, output_tokens: 0, thought_tokens: 0, calls: 0 };
+}
+
+function addUsageMetadata(usage: GeminiUsage | undefined, meta: unknown): void {
+  if (!usage || !meta || typeof meta !== "object") return;
+  const m = meta as Record<string, unknown>;
+  const n = (v: unknown) => (Number.isFinite(Number(v)) ? Math.max(0, Math.floor(Number(v))) : 0);
+  usage.prompt_tokens += n(m.promptTokenCount);
+  usage.output_tokens += n(m.candidatesTokenCount);
+  usage.thought_tokens += n(m.thoughtsTokenCount);
+  usage.calls += 1;
+}
+
+async function summarizeAnswer(
+  query: string,
+  answerContext: string,
+  usage?: GeminiUsage
+): Promise<string> {
   const trimmed = answerContext.trim();
   if (!trimmed) return REFUSAL;
 
@@ -321,6 +348,7 @@ async function summarizeAnswer(query: string, answerContext: string): Promise<st
     throw new Error(`Gemini generate failed: HTTP ${response.status} ${text.slice(0, 240)}`);
   }
   const payload = await response.json();
+  addUsageMetadata(usage, payload?.usageMetadata);
   const text = asString(payload?.candidates?.[0]?.content?.parts?.[0]?.text).trim();
   if (!text) throw new Error("Gemini generate response is empty");
 
@@ -396,6 +424,18 @@ async function fetchOpenchatHits(
   return Array.from(byId.values())
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, openchatLimit);
+}
+
+/** 実トークンを列に展開。要約を呼んでいなければ null（未計測と区別する） */
+function usageColumns(usage: GeminiUsage): Record<string, unknown> {
+  if (usage.calls === 0) return {};
+  return {
+    gemini_model: usage.model,
+    gemini_prompt_tokens: usage.prompt_tokens,
+    gemini_output_tokens: usage.output_tokens,
+    gemini_thought_tokens: usage.thought_tokens,
+    gemini_calls: usage.calls,
+  };
 }
 
 async function logSearchEvent(
@@ -476,6 +516,7 @@ Deno.serve(async (req) => {
     );
   }
 
+  const geminiUsage = newGeminiUsage();
   try {
     const openchatLimit = Math.max(
       1,
@@ -669,7 +710,7 @@ Deno.serve(async (req) => {
       sourceById,
       openchatsForAnswer
     );
-    const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext);
+    const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext, geminiUsage);
 
     const usedSources = JSON.stringify({
       comment_ids: commentsForAnswer.map((row) => asString(row.comment_id)).filter(Boolean),
@@ -700,6 +741,7 @@ Deno.serve(async (req) => {
       match_threshold: matchThreshold,
       used_sources: usedSources,
       result_status: "ok",
+      ...usageColumns(geminiUsage),
     });
 
     return json({
@@ -726,6 +768,7 @@ Deno.serve(async (req) => {
       ...baseEvent,
       result_status: "error",
       error_message: String(message).slice(0, 500),
+      ...usageColumns(geminiUsage),
     });
     return json({ errorMessage: message }, 500);
   }
