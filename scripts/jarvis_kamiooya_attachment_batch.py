@@ -135,7 +135,7 @@ def apply_plan(plan, state, workers=3, max_files=100):
     records = plan['records']
     ids = [r['meta']['id'] for r in records]
     comments = rows_for_ids(store, 'comments', sorted({r['meta']['comment_id'] for r in records}), 'comment_id', 'comment_id')
-    old = rows_for_ids(store, 'community_attachments', ids, 'id,sha256,storage_path')
+    old = rows_for_ids(store, 'community_attachments', ids, 'id,sha256,storage_path,original_source_url')
     done = {}
     if state.exists():
         for line in state.read_text().splitlines():
@@ -147,10 +147,13 @@ def apply_plan(plan, state, workers=3, max_files=100):
                 pass  # 強制終了で末尾行が欠けても既存成功分を維持する。
     pending, missing = [], []
     resumed = 0
+    original_retained = 0
     for row in records:
         meta = row['meta']
         if meta['comment_id'] not in comments:
             missing.append({'id': meta['id'], 'comment_id': meta['comment_id'], 'result': 'missing_comment'})
+        elif old.get(meta['id'], {}).get('original_source_url') and not meta.get('original_source_url'):
+            original_retained += 1
         elif done.get(meta['id']) == meta['sha256'] and old.get(meta['id'], {}).get('sha256') == meta['sha256'] and old[meta['id']]['storage_path'] == meta['storage_path']:
             resumed += 1
         else:
@@ -213,9 +216,9 @@ def apply_plan(plan, state, workers=3, max_files=100):
                 flush()
         if ready:
             flush()
-    current = rows_for_ids(store, 'community_attachments', ids, 'id,sha256,storage_path')
+    current = rows_for_ids(store, 'community_attachments', ids, 'id,sha256,storage_path,original_source_url')
     matching = sum(current.get(r['meta']['id'], {}).get('sha256') == r['meta']['sha256'] and current[r['meta']['id']]['storage_path'] == r['meta']['storage_path'] for r in records)
-    return {'eligible': len(records), 'resumed': resumed, 'selected': len(selected), 'remaining': max(0, len(pending)-len(selected)), 'missing_comment': len(missing), 'metadata_matching': matching, 'counts': dict(counts), 'issues': missing + failures}
+    return {'eligible': len(records), 'original_retained': original_retained, 'resumed': resumed, 'selected': len(selected), 'remaining': max(0, len(pending)-len(selected)), 'missing_comment': len(missing), 'metadata_matching': matching, 'counts': dict(counts), 'issues': missing + failures}
 
 
 def main():
