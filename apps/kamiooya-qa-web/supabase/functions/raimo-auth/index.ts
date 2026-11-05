@@ -1,3 +1,5 @@
+declare const EdgeRuntime:{waitUntil(task:Promise<unknown>):void};
+import {handleSemanticSearch} from '../semantic-search/handler.ts';
 import bcrypt from 'npm:bcryptjs@3.0.3';
 import { createRaimoAuthGateway } from '../../../lib/raimoAuthGateway.ts';
 import { createProductionAdapter, digest } from '../../../lib/raimoAuthAdapter.ts';
@@ -11,7 +13,7 @@ const verify=async(raw:string,stored:string)=>{
 };
 Deno.serve(async(req:Request)=>{
  try{
-  const adapter=createProductionAdapter(config,verify,raw=>bcrypt.hash(raw,12));
+  const adapter=createProductionAdapter(config,verify,raw=>bcrypt.hash(raw,12),fetch,{schedule:task=>EdgeRuntime.waitUntil(task),semantic:handleSemanticSearch});
   const path=new URL(req.url).pathname.replace(/^\/raimo-auth|^\/functions\/v1\/raimo-auth/,'')||'/';
   if(path==='/internal/attachment-user-status'){
    if(req.method!=='POST'||Number(req.headers.get('content-length')||0)>16384)return Response.json({error:'unauthorized'},{status:401});

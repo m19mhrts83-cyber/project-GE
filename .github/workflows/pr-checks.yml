@@ -32,6 +32,16 @@ jobs:
       - run: node --experimental-strip-types --test apps/kamiooya-qa-web/tests/*.test.mjs
       - run: node --check apps/kamiooya-qa-web/public/raimo/app.js
 
+  search-edge-typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.5.6
+      - run: deno check apps/kamiooya-qa-web/supabase/functions/raimo-auth/index.ts apps/kamiooya-qa-web/supabase/functions/semantic-search/index.ts
+
   app-build:
     runs-on: ubuntu-latest
     timeout-minutes: 20

@@ -1,3 +1,4 @@
+import {createAnswerJobs,createRestAnswerStore,compactAnswerResult} from './qaAnswerJobs.ts';
 // Runtime-neutral production adapters. Secrets are injected only by the Edge entrypoint.
 import type { GatewayDependencies } from './raimoAuthGateway.ts';
 export type RuntimeConfig = { origin: string; raimoBase: string; gatewaySecret: string; projectUrl: string; serviceKey: string; proxySecret: string };
@@ -6,7 +7,7 @@ export class UpstreamError extends Error {
   code: string; status: number;
   constructor(code: string, status: number) { super(code); this.code=code; this.status=status; }
 }
-export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, stored: string) => Promise<boolean>, hash: (raw: string) => Promise<string>, transport: typeof fetch = fetch) {
+export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, stored: string) => Promise<boolean>, hash: (raw: string) => Promise<string>, transport: typeof fetch = fetch, jobsRuntime?:{schedule(task:Promise<void>):void;semantic(req:Request):Promise<Response>}) {
   if (!/^https:\/\//.test(c.raimoBase) || !c.raimoBase.startsWith(c.origin+'/miniAppApi/') ||
       !/^https:\/\/[a-z]+\.supabase\.co$/.test(c.projectUrl) || [c.gatewaySecret,c.proxySecret].some(v=>v.length<32) || !c.serviceKey) throw new Error('invalid_configuration');
   const auth = { apikey:c.serviceKey, Authorization:'Bearer '+c.serviceKey, 'Content-Type':'application/json' };
@@ -16,12 +17,12 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     const text=await r.text();
     return text?JSON.parse(text):null;
   };
-  const backend = async (method: string, path: string, input: Record<string,unknown>={}) => {
+  const backend = async (method: string, path: string, input: Record<string,unknown>={}, signal?:AbortSignal) => {
     // Read aliases keep the server proof in a POST body, never in URLs or access logs.
     // The server proof is never supplied by the browser.
     let url=c.raimoBase+(method==='GET'?'/internal/read':'')+path;
     const data={...input,__gateway_secret:c.gatewaySecret};
-    const options:RequestInit={method:method==='GET'?'POST':method,headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(60000),redirect:'error'};
+    const options:RequestInit={method:method==='GET'?'POST':method,headers:{'Content-Type':'application/json'},signal:signal||AbortSignal.timeout(60000),redirect:'error'};
     options.body=JSON.stringify(data);
     const r=await transport(url,options);
     let result;try{result=await r.json();}catch{throw new Error('backend_unavailable');}
@@ -72,6 +73,22 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       const r=await transport(c.projectUrl+'/functions/v1/community-attachments',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+c.proxySecret},body:JSON.stringify({operation:'session',user_id:uid,parent_session:parent}),signal:AbortSignal.timeout(20000)});
       if(!r.ok)throw new Error('attachments_unavailable');return r.json();
     },
+    referenceEvents:async(userId,chatId)=>{
+      // The inspected legacy deployment used context order for these recent semantic events.
+      const q=new URLSearchParams({select:'created_at,query_text,used_sources',user_id:'eq.'+userId,session_id:'eq.'+chatId,search_mode:'eq.semantic',result_status:'eq.ok',created_at:'gte.2026-11-04T00:00:00+09:00',order:'created_at.desc',limit:'100'});
+      const events=await rest('app_qa_search_events?'+q),keys=new Set<string>();
+      for(const event of events){try{const ids=typeof event.used_sources==='string'?JSON.parse(event.used_sources):event.used_sources;for(const key of ids?.chunk_keys||[])if(typeof key==='string'&&/^[a-zA-Z0-9:_|.\/-]{1,250}$/.test(key))keys.add(key);}catch{}}
+      const chunks:any[]=[];const selected=[...keys].slice(0,500);
+      for(let offset=0;offset<selected.length;offset+=20){
+        const query=new URLSearchParams({select:'chunk_key,source_id,source_key,start_sec,end_sec,content',chunk_key:'in.('+selected.slice(offset,offset+20).join(',')+')',limit:'20'});
+        const rows=await rest('knowledge_chunks?'+query);chunks.push(...rows.map((r:any)=>({...r,content:String(r.content||'').slice(0,800)})));
+      }
+      const sources=await rest('knowledge_sources?select=id,source_key,title,video_url&limit=1000');
+      const jq=new URLSearchParams({select:'finished_at,query,result',user_id:'eq.'+userId,chat_id:'eq.'+chatId,status:'eq.done',order:'finished_at.desc',limit:'20'});
+      const jobs=await rest('qa_answer_jobs?'+jq);
+      return {events,chunks,sources,jobs};
+    },
+    referenceMetadata:async()=>rest('rpc/qa_reference_metadata',{method:'POST',body:'{}'}),
     semanticConfig:async()=>{
       const r=await backend('POST','/semantic-search-config',{});
       if(r?.url!==c.projectUrl+'/functions/v1/semantic-search' || typeof r.secret!=='string' ||
@@ -112,5 +129,26 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       throw new UpstreamError('route_not_reviewed',403);
     }
   };
+  if(jobsRuntime)deps.jobs=createAnswerJobs({
+    store:createRestAnswerStore(rest),schedule:jobsRuntime.schedule,
+    authorize:async job=>{
+      const u=await deps.member(job.user_id),s=await status(job.user_id,job.parent_session_ref);
+      return !!(u&&u.status==='approved'&&u.authVersion===job.auth_version&&s.session_active&&await deps.chatOwner(job.chat_id)===job.user_id);
+    },
+    execute:async(job,signal)=>{
+      if(job.mode!=='semantic'){
+        const result=compactAnswerResult(await backend('POST','/chat-sessions/'+job.chat_id+(job.mode==='fast'?'/messages-fast':'/messages'),{content:job.query,actor_user_id:job.user_id},signal));
+        if(!result.answer.trim())throw new Error('empty_answer');return result;
+      }
+      const cfg=await deps.semanticConfig!();
+      await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'user',content:job.query},signal);
+      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22}),signal}));
+      const result=await response.json();
+      if(!response.ok){if(signal.aborted)throw signal.reason;throw new UpstreamError(result?.code==='semantic_disabled'?'semantic_disabled':'operation_failed',503);}
+      const answer=String(result.answer||'').trim();if(!answer)throw new Error('empty_answer');
+      await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'assistant',content:answer},signal);
+      return compactAnswerResult(result);
+    }
+  });
   return {deps, status, allow, backend};
 }
