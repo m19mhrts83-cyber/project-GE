@@ -44,6 +44,8 @@ ALLOWED_FUNCTIONS = {
 CHATBOT = REPO / "215_kamiooya" / "C1_cursor" / "1c_神・大家さん倶楽部_AI推進" / "神・大家さん倶楽部情報Q&Aチャットボット"
 ENV_FILE = Path.home() / "git-repos" / ".env.jarvis_private"
 UA = "kamiooya-qa-release/1"
+# Q&A プロジェクトは jarvis-dashboard と別アカウント。専用トークンを使う
+TOKEN_KEY = "SUPABASE_ACCESS_TOKEN_KAMIOOYA"
 
 
 def load_env() -> None:
@@ -69,7 +71,7 @@ def mgmt_query(sql: str):
         f"https://api.supabase.com/v1/projects/{PROJECT_REF}/database/query",
         data=json.dumps({"query": sql}).encode(),
         headers={
-            "Authorization": "Bearer " + need("SUPABASE_ACCESS_TOKEN"),
+            "Authorization": "Bearer " + need(TOKEN_KEY),
             "Content-Type": "application/json",
             "User-Agent": UA,
         },
@@ -102,7 +104,7 @@ def step_functions(names: list[str], dry: bool) -> None:
         print(f"[2] deploy: {fn}")
         if dry:
             continue
-        env = dict(os.environ, SUPABASE_ACCESS_TOKEN=need("SUPABASE_ACCESS_TOKEN"))
+        env = dict(os.environ, SUPABASE_ACCESS_TOKEN=need(TOKEN_KEY))
         r = subprocess.run(cmd, cwd=QA_WEB, env=env, capture_output=True, text=True)
         tail = (r.stdout + r.stderr).strip().splitlines()[-5:]
         for line in tail:
