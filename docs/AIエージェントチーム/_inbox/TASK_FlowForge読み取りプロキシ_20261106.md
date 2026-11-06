@@ -8,9 +8,10 @@
 | task_id | flowforge-read-proxy-20261106 |
 | agent_id | （横断・ハブ） |
 | executor | codex（実装）／cursor（レビュー可） |
-| status | queued |
-| started_at | |
-| finished_at | |
+| status | done（実装・ローカル検証済／**Production未デプロイ**） |
+| started_at | 2026-11-07T00:34+09:00 |
+| finished_at | 2026-11-07T00:40+09:00 |
+| executor | cursor（Jarvis・TASKどおり実装） |
 
 ## Goal
 
@@ -57,12 +58,12 @@ ChatGPT（Custom GPT Actions）が、FlowForge の **share URL** または share
 
 ## Acceptance Criteria
 
-- [ ] ローカルまたは Preview で、正しいキー付き GET が 312 の share JSON を返す
-- [ ] キー無しが拒否される
-- [ ] ChatGPT Actions 用 OpenAPI（パス・ヘッダ・例）が docs にある
-- [ ] `docs/運用コマンド一覧.md` にプロキシ節がある（または 54 からリンク）
-- [ ] `tests/` または同等のチェックが通る
-- [ ] Production デプロイは未実施、または松野承認済みと明記
+- [x] ローカルまたは Preview で、正しいキー付き GET が 312 の share JSON を返す
+- [x] キー無しが拒否される
+- [x] ChatGPT Actions 用 OpenAPI（パス・ヘッダ・例）が docs にある（`54b_`）
+- [x] `docs/運用コマンド一覧.md` にプロキシ節がある
+- [x] `tests/flowforgeShareProxy.test.mjs` が通る
+- [x] Production デプロイは未実施（要松野承認）
 
 ## References
 
