@@ -73,3 +73,26 @@ Deno.test('independent retrieval starts early and video metadata does not wait f
   assert.deepEqual(result.referenceLabels,{comments:{'42':'コミュニティ1'},chunks:{k:'セミナー1'},openchats:{line:'LINEオプチャ1'}});
  }finally{clearTimeout(timer);release();globalThis.fetch=originalFetch;keys.forEach((k,i)=>saved[i]===undefined?Deno.env.delete(k):Deno.env.set(k,saved[i]!));}
 });
+
+Deno.test('failed LINE retrieval is explicit and cannot generate a silently incomplete answer',async()=>{
+ const keys=['GEMINI_API_KEY','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SEMANTIC_SEARCH_SHARED_SECRET','SEMANTIC_SEARCH_DISABLED'];
+ const saved=keys.map(k=>Deno.env.get(k)),originalFetch=globalThis.fetch;
+ ['fixture-provider','https://fixture.supabase.co','fixture-service','fixture-semantic','0'].forEach((v,i)=>Deno.env.set(keys[i],v));
+ let failure='',generationCalls=0;const events:any[]=[];
+ globalThis.fetch=async(input,init)=>{
+  const url=new URL(input instanceof Request?input.url:String(input));
+  if(url.pathname.endsWith(':embedContent'))return Response.json({embedding:{values:Array.from({length:768},(_,i)=>(i+1)/1000)}});
+  if(url.pathname.endsWith(':generateContent')){generationCalls++;throw new Error('generation must not run');}
+  if(url.pathname.endsWith('/'+failure))return Response.json({message:'fixture source unavailable',code:'fixture'}, {status:503});
+  if(url.pathname.includes('/rpc/'))return Response.json([]);
+  if(url.pathname.endsWith('/app_qa_search_events')){events.push(JSON.parse(String(init?.body)));return Response.json([], {status:201});}
+  throw new Error('unexpected fixture request');
+ };
+ try{
+  for(failure of ['match_openchat_semantic','search_openchat_keyword']){
+   const response=await handleSemanticSearch(new Request('https://fixture.supabase.co/functions/v1/semantic-search',{method:'POST',headers:{'x-semantic-shared-secret':'fixture-semantic'},body:JSON.stringify({query:'failure-fixture-'+crypto.randomUUID()})}));
+   assert.equal(response.status,500);assert.equal((await response.json()).code,'semantic_search_failed');
+  }
+  assert.equal(generationCalls,0);assert.equal(events.length,2);assert.ok(events.every(event=>event.result_status==='error'));
+ }finally{globalThis.fetch=originalFetch;keys.forEach((k,i)=>saved[i]===undefined?Deno.env.delete(k):Deno.env.set(k,saved[i]!));}
+});

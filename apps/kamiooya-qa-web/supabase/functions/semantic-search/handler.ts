@@ -412,6 +412,11 @@ async function fetchOpenchatHits(
     keywordResult,
   ]);
 
+  // A failed source is not an empty source. Do not spend a generation call on
+  // silently incomplete evidence or present it as a complete search result.
+  if(semRpc.error)throw new Error('match_openchat_semantic failed');
+  if(kwRpc.error)throw new Error('search_openchat_keyword failed');
+
   const byId = new Map<string, OpenchatRow>();
   for (const row of (semRpc.data || []) as Record<string, unknown>[]) {
     const mapped = mapOpenchatRow(row);
