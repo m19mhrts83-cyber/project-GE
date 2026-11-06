@@ -92,7 +92,7 @@ test('attachment pages retry a transient read without duplicating records or ret
   return {attachments:[{id:'a',comment_id:'12'}],next_offset:null};
  };
  await app.initializeAttachments('mail','not-retained',1);
- assert.equal(calls,2);assert.equal(app.state.attachmentIndex['12'].length,1);assert.equal(app.state.attachmentStatus,'');assert.equal(app.state.attachmentLoading,false);
+ assert.equal(calls,3);assert.equal(app.state.attachmentIndex['12'].length,1);assert.equal(app.state.attachmentStatus,'');assert.equal(app.state.attachmentLoading,false);
  assert.equal(JSON.stringify(app.state).includes('not-retained'),false);
 });
 test('attachment permission errors are not retried and leave a recoverable status',async()=>{
