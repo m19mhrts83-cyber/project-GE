@@ -1,6 +1,6 @@
 # 神大家 Q&A の本番反映（Supabase migration と Edge Function）を GitHub 上で実行する。
 # 松野さんの手元操作なしで Miss Lemon が反映できるようにするための入口（2026-11-06）。
-# - 鍵は既存の secrets.SUPABASE_ACCESS_TOKEN（kamiooya-qa-heartbeat と同じ）を使う
+# - 鍵は secrets.SUPABASE_ACCESS_TOKEN_KAMIOOYA（Q&A プロジェクトを持つアカウントのトークン）。無ければ SUPABASE_ACCESS_TOKEN
 # - migration → Edge Function → 確認 の順。失敗した所で止まる
 # - Raimo のフロント／API YAML はここでは更新しない
 name: kamiooya-qa release
@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 15
     env:
       PROJECT_REF: mwubzgefkkjjbingrmqu
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_KAMIOOYA || secrets.SUPABASE_ACCESS_TOKEN }}
       MIGRATIONS: ${{ github.event.inputs.migrations }}
       FUNCTIONS: ${{ github.event.inputs.functions }}
     defaults:
