@@ -398,7 +398,7 @@ function mapOpenchatRow(row: Record<string, unknown>): OpenchatRow {
 async function fetchOpenchatHits(
   // deno-lint-ignore no-explicit-any
   sb: any,
-  query: string,
+  keywordResult: PromiseLike<{data: unknown;error: unknown}>,
   embedding: number[],
   matchThreshold: number,
   openchatLimit: number
@@ -409,10 +409,7 @@ async function fetchOpenchatHits(
       match_threshold: matchThreshold,
       match_count: openchatLimit,
     }),
-    sb.rpc("search_openchat_keyword", {
-      query_text: query.slice(0, 80),
-      match_count: openchatLimit,
-    }),
+    keywordResult,
   ]);
 
   const byId = new Map<string, OpenchatRow>();
@@ -525,6 +522,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
   }
 
   const geminiUsage = newGeminiUsage();
+  let embeddingProviderCalls=0;
   try {
     const openchatLimit = Math.max(
       1,
@@ -616,33 +614,71 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       : DEFAULT_MATCH_THRESHOLD;
     const skipAnswer = body?.skip_answer === true;
 
+    // Keyword retrieval does not depend on the vector. Start it immediately,
+    // while retaining its rejection for the eventual join (including embed failure).
+    const retrievalStarted=performance.now();
+    const keywordResult=Promise.resolve(sb.rpc("search_openchat_keyword", {
+      query_text: query.slice(0, 80), match_count: openchatLimit,
+    }));
+    void keywordResult.catch(()=>{});
     const embeddingStarted=performance.now();
     const cached=await queryEmbeddingCache.get(await embeddingKey(GEMINI_EMBED_MODEL,'RETRIEVAL_QUERY',GEMINI_EMBED_DIM,query),
-      signal=>embedQuery(query,signal),req.signal);
+      signal=>{embeddingProviderCalls++;return embedQuery(query,signal);},req.signal);
     const embedding=cached.values;
     const embeddingMs=Math.round(performance.now()-embeddingStarted);
 
-    const [commentsRpc, chunksRpc, openchatRows] = await Promise.all([
+    // Only the chunk result is needed to resolve video titles/URLs. Do not
+    // serialize that read behind unrelated comment or LINE queries.
+    const chunkPipeline=(async()=>{
+      const chunksRpc=await sb.rpc("match_chunks_semantic", {
+        query_embedding: embedding, match_threshold: matchThreshold, match_count: chunkLimit,
+      });
+      if(chunksRpc.error)throw new Error(`match_chunks_semantic failed: ${chunksRpc.error.message}`);
+      const chunkRowsRaw: ChunkRow[] = (chunksRpc.data || []).map((row: Record<string, unknown>) => ({
+        chunk_key: asString(row.chunk_key),
+        source_id: asNullableNumber(row.source_id),
+        start_sec: asNullableNumber(row.start_sec),
+        end_sec: asNullableNumber(row.end_sec),
+        speaker: asString(row.speaker) || null,
+        content: buildSnippet(row.content),
+        similarity: Number(row.similarity || 0),
+      }));
+
+      const sourceIds = Array.from(
+        new Set(
+          chunkRowsRaw
+            .map((row) => row.source_id)
+            .filter((value): value is number => typeof value === "number")
+        )
+      );
+
+      let relatedSources: Array<Record<string, unknown>> = [];
+      if (sourceIds.length > 0) {
+        const { data: sources, error } = await sb
+          .from("knowledge_sources")
+          .select("id,source_key,title,video_url,origin_path,content_channel")
+          .in("id", sourceIds);
+        if (error) throw new Error(`knowledge_sources fetch failed: ${error.message}`);
+        relatedSources = (sources || []).map((row: Record<string, unknown>) => ({
+          id: Number(row.id),
+          source_key: asString(row.source_key),
+          title: asString(row.title),
+          video_url: asString(row.video_url) || null,
+          origin_path: asString(row.origin_path) || null,
+          content_channel: asString(row.content_channel) || null,
+        }));
+      }
+
+      return {chunkRowsRaw,relatedSources};
+    })();
+    const [commentsRpc, chunkData, openchatRows] = await Promise.all([
       sb.rpc("match_comments_semantic", {
-        query_embedding: embedding,
-        match_threshold: matchThreshold,
-        match_count: commentLimit,
+        query_embedding: embedding, match_threshold: matchThreshold, match_count: commentLimit,
       }),
-      sb.rpc("match_chunks_semantic", {
-        query_embedding: embedding,
-        match_threshold: matchThreshold,
-        match_count: chunkLimit,
-      }),
-      fetchOpenchatHits(sb, query, embedding, matchThreshold, openchatLimit),
+      chunkPipeline,
+      fetchOpenchatHits(sb, keywordResult, embedding, matchThreshold, openchatLimit),
     ]);
-
-    if (commentsRpc.error) {
-      throw new Error(`match_comments_semantic failed: ${commentsRpc.error.message}`);
-    }
-    if (chunksRpc.error) {
-      throw new Error(`match_chunks_semantic failed: ${chunksRpc.error.message}`);
-    }
-
+    if(commentsRpc.error)throw new Error(`match_comments_semantic failed: ${commentsRpc.error.message}`);
     const commentRows: CommentRow[] = (commentsRpc.data || []).map((row: Record<string, unknown>) => ({
       source_type: asString(row.source_type) || null,
       comment_id: asString(row.comment_id) || null,
@@ -651,41 +687,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       content: buildSnippet(row.content),
       similarity: Number(row.similarity || 0),
     }));
-
-    const chunkRowsRaw: ChunkRow[] = (chunksRpc.data || []).map((row: Record<string, unknown>) => ({
-      chunk_key: asString(row.chunk_key),
-      source_id: asNullableNumber(row.source_id),
-      start_sec: asNullableNumber(row.start_sec),
-      end_sec: asNullableNumber(row.end_sec),
-      speaker: asString(row.speaker) || null,
-      content: buildSnippet(row.content),
-      similarity: Number(row.similarity || 0),
-    }));
-
-    const sourceIds = Array.from(
-      new Set(
-        chunkRowsRaw
-          .map((row) => row.source_id)
-          .filter((value): value is number => typeof value === "number")
-      )
-    );
-
-    let relatedSources: Array<Record<string, unknown>> = [];
-    if (sourceIds.length > 0) {
-      const { data: sources, error } = await sb
-        .from("knowledge_sources")
-        .select("id,source_key,title,video_url,origin_path,content_channel")
-        .in("id", sourceIds);
-      if (error) throw new Error(`knowledge_sources fetch failed: ${error.message}`);
-      relatedSources = (sources || []).map((row: Record<string, unknown>) => ({
-        id: Number(row.id),
-        source_key: asString(row.source_key),
-        title: asString(row.title),
-        video_url: asString(row.video_url) || null,
-        origin_path: asString(row.origin_path) || null,
-        content_channel: asString(row.content_channel) || null,
-      }));
-    }
+    const {chunkRowsRaw,relatedSources}=chunkData;
 
     const sourceById = new Map<number, Record<string, unknown>>();
     for (const source of relatedSources) {
@@ -722,6 +724,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       sourceById,
       openchatsForAnswer
     );
+    const retrievalMs=Math.round(performance.now()-retrievalStarted);
     const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext, geminiUsage, req.signal);
 
     const referenceLabels=labelAnswerSources(commentsForAnswer,chunksForAnswer,openchatsForAnswer);
@@ -762,7 +765,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       used_sources: usedSources,
       result_status: "ok",
       ...usageColumns(geminiUsage),
-      meta:{embedding_cache_hit:cached.cacheHit,embedding_ms:embeddingMs},
+      meta:{embedding_cache_hit:cached.cacheHit,embedding_ms:embeddingMs,embedding_provider_calls:embeddingProviderCalls,retrieval_ms:retrievalMs},
     });
 
     return json({
@@ -776,6 +779,8 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       referenceSelection:hasMentioned?"mentioned":"provided-context",
       hitCount: commentRows.length + relatedChunks.length + openchatRows.length,
       meta: {
+        embeddingProviderCalls,
+        retrievalMs,
         embeddingCacheHit:cached.cacheHit,
         embeddingMs,
         commentHitCount: commentRows.length,

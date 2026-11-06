@@ -75,3 +75,12 @@ History source reads overlap independent event/source/job reads and use at most 
 Tests cover immutable identical vectors, expiry/model/task/query boundaries, invalid/failing vectors, shared-consumer cancellation, bounded active requests, exact 100-key ordered retrieval, current authorization checks, and zero redundant reads for fully labelled histories. Performance or billing percentages must not be claimed from these fixture tests; measure production cache-hit frequency separately.
 
 Search-mode UI copy describes matching methods and variable response time rather than ranking speed. Observed normal (40/77s) and semantic (24s) requests were not a controlled same-question benchmark. The UI removes the old normal 10–30s versus semantic slower comparison, keeps normal as the default, and explains that either mode may take minutes depending on query, evidence volume and load.
+
+
+## 2026-11-06 仕上げの待ち合わせ点検
+
+意味検索のLINEキーワード検索を埋込生成と並行開始し、動画タイトル/URL取得を動画chunk取得の直後に開始する。独立したコミュニティ/LINE応答を待ってから動画情報を取得していた直列区間を除去。RPC回数・検索条件・選択根拠数・回答モデル/プロンプトは維持する。`handler.test.ts` は外部通信禁止で、依存関係のゲートを使って前倒し実行と根拠/番号の維持を検証する（fixtureのmsを本番高速化率とは扱わない）。
+
+既存イベントmetaへ `embedding_provider_calls` と `retrieval_ms` を追加し、埋込の実呼出と検索待機を区別する。回答生成の `gemini_calls` と埋込を混同しない。キャッシュ共有者は埋込呼出0で、回答は毎回最新の検索結果から生成する。
+
+追加候補は、実測後に判断する。回答の再利用にはデータ更新版・会員権限・検索条件を含む一致確認が必要で、鮮度を保証しない回答キャッシュは導入しない。根拠削減・安価モデルへの一律変更・自動的な意味検索ONは品質に影響し得るため実施しない。通常検索の複数LLM工程の削減は同一質問/同一データで回答と引用の比較評価を先に行う。
