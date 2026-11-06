@@ -10,7 +10,7 @@ def add_page_route(source):
     if any(r['endpoint']=='POST /internal/read/comments-page' for r in result['api']):
         raise ValueError('page_route_already_exists')
     checks=[copy.deepcopy(s) for s in old['steps'] if 'check' in s]
-    if not checks:raise ValueError('guard_required')
+    if not any('input.__gateway_secret' in str(s['check'].get('condition','')) for s in checks):raise ValueError('guard_required')
     route={'name':'internalReadCommentsPage','endpoint':'POST /internal/read/comments-page','steps':checks+[{'tableFetchMany':{'table':'comments','orderBy':'id ASC','limit':500,'whereRaw':{'sql':"id > ? AND COALESCE(source_type,'') NOT IN ('__admin_meta__','__master_xfer__') AND comment_id NOT LIKE 'admin_%'",'params':['input.after_id']}},'as':'comments'}],'output':{'comments':'fetched.comments'}}
     result['api'].append(route)
     return result

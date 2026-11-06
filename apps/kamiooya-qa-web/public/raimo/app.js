@@ -2336,6 +2336,7 @@ const App = {
         const u=App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl,c.startSec||0));const title=esc(c.videoTitle||'動画タイトル未登録')+' ・ '+esc(App.formatMmSs(c.startSec||0));
         return '<li class="mb-1">'+anchor+' ・ '+(u?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+title+' から再生</a>':title)+'</li>';
       }
+      if(c.kind==='lesson')return '<li class="mb-1">'+anchor+' ・ '+esc(c.lessonTitle||c.topicTitle||'講座ページ')+db('lesson',c.commentId)+'</li>';
       return '<li class="mb-1">'+anchor+' ・ '+esc(App.citationDateLabel(c))+db(c.kind,c.commentId||c.openchatId)+'</li>';
     }).join('')+'</ul>');
     if(videos.length){
@@ -3635,15 +3636,16 @@ const App = {
     const missingDateCount = communityRows.reduce(function (n, row) {
       return n + (App.hasPostedAtValue(row) ? 0 : 1);
     }, 0);
+    const unknownYearCount=communityRows.reduce((n,row)=>n+(!App.hasPostedAtValue(row)&&!Number(((App.state.referenceComments||{})[String(App.commentField(row,'comment_id'))]||{}).inferred_year)?1:0),0);
     if (App.elements.commentListMeta) {
       App.elements.commentListMeta.textContent =
         '表示 ' +
         (filtered.length ? (offset + 1) + '〜' + (offset + visibleRows.length) : '0') +
         ' / 検索結果 ' + filtered.length + ' / 全 ' +
         totalCount +
-        ' 件（日時なし ' +
+        ' 件（月日不明 ' +
         missingDateCount +
-        ' 件）';
+        ' 件・年も不明 ' + unknownYearCount + ' 件）';
       if (filtered.length > pageSize) {
         const controls = document.createElement('span');
         controls.className = 'inline-flex gap-3 ml-3';
