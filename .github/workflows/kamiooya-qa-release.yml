@@ -1,0 +1,104 @@
+# 神大家 Q&A の本番反映（Supabase migration と Edge Function）を GitHub 上で実行する。
+# 松野さんの手元操作なしで Miss Lemon が反映できるようにするための入口（2026-11-06）。
+# - 鍵は既存の secrets.SUPABASE_ACCESS_TOKEN（kamiooya-qa-heartbeat と同じ）を使う
+# - migration → Edge Function → 確認 の順。失敗した所で止まる
+# - Raimo のフロント／API YAML はここでは更新しない
+name: kamiooya-qa release
+
+on:
+  workflow_dispatch:
+    inputs:
+      migrations:
+        description: "適用する migration ファイル名（apps/kamiooya-qa-web/supabase/migrations/ 配下、カンマ区切り。空なら適用しない）"
+        required: false
+        default: ""
+      functions:
+        description: "デプロイする Edge Function 名（カンマ区切り。空ならデプロイしない）"
+        required: false
+        default: ""
+
+concurrency:
+  group: kamiooya-qa-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROJECT_REF: mwubzgefkkjjbingrmqu
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      MIGRATIONS: ${{ github.event.inputs.migrations }}
+      FUNCTIONS: ${{ github.event.inputs.functions }}
+    defaults:
+      run:
+        working-directory: apps/kamiooya-qa-web
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check token
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
+            echo "::error::secrets.SUPABASE_ACCESS_TOKEN がありません"; exit 1
+          fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}")
+          echo "project access: HTTP ${code}"
+          [[ "$code" == "200" ]] || { echo "::error::このトークンでは Q&A プロジェクトを操作できません"; exit 1; }
+
+      - name: Apply migrations
+        if: ${{ github.event.inputs.migrations != '' }}
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra files <<< "$MIGRATIONS"
+          for f in "${files[@]}"; do
+            f="$(echo "$f" | xargs)"
+            [[ -z "$f" ]] && continue
+            path="supabase/migrations/${f}"
+            [[ "$f" =~ ^[A-Za-z0-9_.-]+\.sql$ && -f "$path" ]] || { echo "::error::migration が見つかりません: $f"; exit 1; }
+            echo "applying $f"
+            body=$(jq -Rs '{query: .}' < "$path")
+            code=$(curl -sS -o resp.json -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data "$body" \
+              "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query")
+            echo "HTTP ${code}"
+            if [[ "$code" != 2* ]]; then head -c 500 resp.json; echo; exit 1; fi
+          done
+
+      - name: Deploy Edge Functions
+        if: ${{ github.event.inputs.functions != '' }}
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra fns <<< "$FUNCTIONS"
+          for fn in "${fns[@]}"; do
+            fn="$(echo "$fn" | xargs)"
+            [[ -z "$fn" ]] && continue
+            [[ "$fn" =~ ^[a-z0-9-]+$ && -d "supabase/functions/${fn}" ]] || { echo "::error::function が見つかりません: $fn"; exit 1; }
+            echo "deploying $fn"
+            npx --yes supabase@2 functions deploy "$fn" \
+              --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
+          done
+
+      - name: Verify
+        run: |
+          set -euo pipefail
+          q="select (select count(*) from information_schema.columns where table_schema='public' and table_name='app_qa_search_events' and column_name like 'gemini_%') as gemini_cols, (select count(*) from pg_proc where proname in ('qa_usage_weekly','qa_usage_period_users')) as metering_funcs"
+          body=$(jq -n --arg q "$q" '{query: $q}')
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$body" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query"
+          echo
+          curl -sS -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            "https://api.supabase.com/v1/projects/${PROJECT_REF}/functions" \
+            | jq -r '.[] | select(.slug=="qa-analytics" or .slug=="semantic-search") | "\(.slug) v\(.version) updated_at=\(.updated_at)"'
