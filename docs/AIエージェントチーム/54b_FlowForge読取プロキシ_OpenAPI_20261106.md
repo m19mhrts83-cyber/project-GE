@@ -2,7 +2,7 @@
 
 - 実装: `apps/jarvis-dashboard/app/api/flowforge/`
 - 調査: [`54_FlowForge読み取りAPI調査_20261106.md`](./54_FlowForge読み取りAPI調査_20261106.md)
-- **Production デプロイは松野承認後**。未承認のあいだはローカル／Preview のみ
+- **Production**: 2026-11-06 デプロイ済（`jarvis-dashboard` / `FLOWFORGE_READ_PROXY_KEY`）
 
 ## 認証
 
@@ -41,7 +41,7 @@ info:
   description: Read-only FlowForge (AI Automation) flow JSON via share API.
 servers:
   - url: https://jarvis-dashboard-amber.vercel.app
-    description: Production (after deploy approval)
+    description: Production
 paths:
   /api/flowforge/resolve:
     get:
