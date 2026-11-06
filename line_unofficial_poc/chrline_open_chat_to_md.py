@@ -1940,6 +1940,8 @@ def _run_body(args: argparse.Namespace, *, client=None) -> int:
                     continue
                 capture_attachment(msg, getter=lambda m,k,f: _get(cl,m,k,f),
                     room_id=st.route.square_chat_mid, thread_id=st.thread_mid or '',
+                    route_id=st.route.rid, chat_title=st.route.org_label,
+                    thread_title=st.route.thread_titles.get(st.thread_mid or '', ''),
                     dry_run=skip_md_state)
                 body = _message_text(cl, msg)
                 if body == "[本文なし]" and not args.include_empty:

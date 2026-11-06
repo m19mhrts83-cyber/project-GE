@@ -39,6 +39,7 @@ type SemanticSearchRequest = {
   match_threshold?: number;
   skip_answer?: boolean;
   list_openchat?: boolean;
+  only_attachments?: boolean;
   /** 「DBで見る」用: line_openchat_logs.id を正確に取得（query の KW 検索ではヒットしない） */
   openchat_id?: string;
   chat_title?: string;
@@ -293,6 +294,7 @@ function buildAnswerPrompt(query: string, answerContext: string): string {
     "6. 回答本文の末尾に出典一覧やコミュニティ／セミナーの列挙は書かない（画面UIが表示する）。",
     "7. セミナー動画（[セミナーN]）の内容を使った文には、その文末に（動画タイトル 12:34頃）の形で、該当する time の開始時刻を添える。どの動画の何分何秒あたりで何を話しているかが分かるようにすること。",
     "9. 根拠の番号は参考情報の[コミュニティN]、[セミナーN]、[LINEオプチャN]をそのまま使い、番号を振り直さない。「LINEオプチャ1、LINEオプチャ4」のように接頭辞を省略しない。動画を使った文は（セミナーN：動画タイトル 分:秒頃）の形で示す。",
+    "10. 【LINE添付・内容未解析】はファイル名と投稿文だけの情報です。ファイル内部を読んだと扱わず、内容や数値を推測しないこと。関連資料として紹介する場合も元の[LINEオプチャN]を示すこと。",
     "8. セミナー動画の本文は自動文字起こしのため誤変換や句読点の欠落がある（例: 神王さんクラブ→神・大家さん倶楽部）。文脈から明らかな語は正しい表記に直して要約し、聞き取れない数値や固有名詞は断定しない。",
     "",
     "参考情報テキスト:",
@@ -578,13 +580,15 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
         .order("posted_at", { ascending: false, nullsFirst: false })
         .limit(Math.min(200, openchatLimit * 5));
       const titleFilter = asString(body?.chat_title).trim();
+      if (body?.only_attachments === true) q = q.eq("source_system", "line_openchat_attachment");
       if (titleFilter) {
         q = q.ilike("chat_title", `%${titleFilter}%`);
       }
       if (query) {
+        const literal=query.replace(/\\/g,"\\\\").replace(/"/g,'\\"');
         // id.eq も併用（oc_ 以外の旧 id や手貼り対策）
         q = q.or(
-          `id.eq.${query},content.ilike.%${query}%,chat_title.ilike.%${query}%,sender_name.ilike.%${query}%,thread_title.ilike.%${query}%`
+          `id.eq."${literal}",content.ilike."%${literal}%",chat_title.ilike."%${literal}%",sender_name.ilike."%${literal}%",thread_title.ilike."%${literal}%"`
         );
       }
       const { data, error } = await q;
