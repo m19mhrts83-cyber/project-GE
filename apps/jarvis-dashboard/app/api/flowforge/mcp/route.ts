@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     );
   }
   const secretSet = Boolean((process.env.FLOWFORGE_READ_PROXY_KEY || "").trim());
-  if (!proxyAuthorized(request.headers)) {
+  if (!proxyAuthorized(request.headers, request.nextUrl)) {
     return unauthorized(secretSet);
   }
   return NextResponse.json(
@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
       transport: "streamable-http",
       mcp: "/api/flowforge/mcp",
       tools: ["resolve_flowforge_flow"],
+      auth: "Bearer または ?key=（ChatGPT カスタムMCPは後者）",
     },
     { headers: CORS },
   );
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
     );
   }
   const secretSet = Boolean((process.env.FLOWFORGE_READ_PROXY_KEY || "").trim());
-  if (!proxyAuthorized(request.headers)) {
+  if (!proxyAuthorized(request.headers, request.nextUrl)) {
     return unauthorized(secretSet);
   }
 
