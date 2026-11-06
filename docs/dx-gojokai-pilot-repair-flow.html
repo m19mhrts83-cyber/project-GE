@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>賃貸業務を一つずつ自動化する｜動くスライド試作（修繕依頼→対応一覧）</title>
+<style>
+  :root {
+    --ink: #2b2b2b;
+    --line: #3a3a3a;
+    --paper: #ffffff;
+    --yellow: #ffe27a;
+    --orange: #ffc27a;
+    --blue: #cfe6f5;
+    --green: #d6efd0;
+    --pink: #f9d6d9;
+    --lav: #e3dcf3;
+    --muted: #6b6b6b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink);
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif; }
+  body { overflow: hidden; }
+
+  .stage { position: fixed; inset: 0; display: flex; flex-direction: column; }
+  .slide { position: absolute; inset: 0; padding: 4vh 5vw 9vh; display: none; flex-direction: column; }
+  .slide.active { display: flex; }
+
+  h1, h2 { margin: 0; font-weight: 700; line-height: 1.3; }
+  .marker { display: inline-block; padding: 0.05em 0.5em; background: var(--yellow); border-radius: 6px 10px 8px 12px; transform: rotate(-0.6deg); }
+  .marker.orange { background: var(--orange); }
+  .title { font-size: clamp(22px, 3.6vw, 44px); }
+  .lead { margin: 1.2vh 0 0; font-size: clamp(14px, 1.7vw, 22px); color: var(--muted); }
+
+  /* hand-drawn feel: slightly uneven borders */
+  .card { border: 2.5px solid var(--line); border-radius: 18px 22px 16px 24px / 22px 16px 24px 18px; background: var(--paper); padding: 1.6vh 1.6vw; }
+
+  /* progress chips */
+  .chips { display: flex; gap: 1vw; margin-top: 2.4vh; flex-wrap: wrap; }
+  .chip { display: flex; align-items: center; gap: 0.6em; padding: 0.5em 1em; border: 2px solid var(--line); border-radius: 999px;
+    font-size: clamp(12px, 1.5vw, 19px); background: var(--paper); opacity: 0.45; transition: opacity .4s, background .4s, transform .4s; }
+  .chip b { display: inline-grid; place-items: center; width: 1.7em; height: 1.7em; border-radius: 50%; border: 2px solid var(--line); background: var(--paper); font-size: 0.9em; }
+  .chip.on { opacity: 1; }
+  .chip.now { background: var(--yellow); transform: translateY(-2px) rotate(-0.8deg); }
+
+  .work { flex: 1; display: grid; grid-template-columns: minmax(0, 0.8fr) 4.5vw minmax(0, 1.7fr); align-items: center; gap: 0.6vw; margin-top: 2.4vh; min-height: 0; }
+  .col-title { font-size: clamp(12px, 1.4vw, 18px); color: var(--muted); margin: 0 0 1.8vh 0.4em; }
+
+  /* source card */
+  .source { background: #fffdf2; }
+  .source p { margin: 0; font-size: clamp(14px, 1.9vw, 25px); line-height: 1.9; min-height: 7.6em; }
+  .tag { display: inline-block; margin-top: 1vh; font-size: clamp(11px, 1.2vw, 15px); padding: 0.15em 0.7em; border: 1.5px dashed var(--line); border-radius: 999px; color: var(--muted); }
+  .hl { border-radius: 4px; transition: background .6s; }
+  .s4 .hl[data-k="1"], .s4 td[data-k="1"] { background: var(--blue); }
+  .s4 .hl[data-k="2"], .s4 td[data-k="2"] { background: var(--green); }
+  .s4 .hl[data-k="3"], .s4 td[data-k="3"] { background: var(--pink); }
+  .s4 .hl[data-k="4"], .s4 td[data-k="4"] { background: var(--yellow); }
+  .s4 .hl[data-k="5"], .s4 td[data-k="5"] { background: var(--lav); }
+
+  /* arrow in the middle */
+  .arrow { display: grid; place-items: center; opacity: 0; transition: opacity .4s; }
+  .arrow svg { width: 100%; height: auto; overflow: visible; }
+  .arrow path { stroke: var(--line); stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 90; stroke-dashoffset: 90; }
+  .s2 .arrow, .s2 .arrow { opacity: 1; }
+  .s2 .arrow path { animation: draw .9s ease forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  /* table */
+  .table-wrap { opacity: 0; transform: translateX(14px); transition: opacity .5s, transform .5s; }
+  .s2 .table-wrap { opacity: 1; transform: none; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: clamp(11px, 1.45vw, 19px); }
+  th, td { padding: 0.7em 0.7em; border-bottom: 2px solid var(--line); text-align: left; vertical-align: top; }
+  th { white-space: nowrap; background: var(--orange); font-weight: 700; border-top: 2px solid var(--line); position: relative; }
+  th:first-child { border-left: 2px solid var(--line); border-top-left-radius: 14px; }
+  th:last-child { border-right: 2px solid var(--line); border-top-right-radius: 14px; }
+  td:first-child { border-left: 2px solid var(--line); border-bottom-left-radius: 14px; }
+  td:last-child { border-right: 2px solid var(--line); border-bottom-right-radius: 14px; }
+  td span.v { opacity: 0; display: inline-block; transform: scale(0.9); transition: opacity .45s, transform .45s; }
+  .s3 td span.v { opacity: 1; transform: none; transition-delay: var(--d, 0s); }
+  .unconf { color: #b1402f; font-weight: 700; }
+  th .ok { position: absolute; top: -0.9em; right: 0.2em; font-size: 0.8em; background: var(--green); border: 1.5px solid var(--line); border-radius: 999px; padding: 0 0.45em;
+    opacity: 0; transform: translateY(4px); transition: opacity .4s, transform .4s; }
+  .s3 th .ok { opacity: 1; transform: none; transition-delay: var(--d, 0s); }
+
+  .bubble { margin-top: 1.4vh; display: flex; align-items: center; gap: 0.8vw; min-height: 6vh; font-size: clamp(12px, 1.5vw, 19px); color: var(--ink); }
+  .bubble .who { width: 6vw; min-width: 52px; max-width: 90px; opacity: 0; transition: opacity .4s; }
+  .bubble .say { padding: 0.5em 0.9em; border: 2px solid var(--line); border-radius: 16px 18px 14px 20px; background: var(--paper); opacity: 0; transition: opacity .4s; }
+  .bubble[data-for="2"] .who, .bubble[data-for="2"] .say { }
+  .s2:not(.s3) .bubble.b2 .who, .s2:not(.s3) .bubble.b2 .say { opacity: 1; }
+  .s3:not(.s4) .bubble.b3 .who, .s3:not(.s4) .bubble.b3 .say { opacity: 1; }
+  .s4 .bubble.b4 .who, .s4 .bubble.b4 .say { opacity: 1; }
+  .bubbles { position: relative; min-height: 10vh; }
+  .bubbles .bubble { position: absolute; left: 0; right: 0; top: 0; }
+
+  .foot-note { margin: 2.6vh 0 0; font-size: clamp(10px, 1.15vw, 14px); color: var(--muted); }
+
+  /* slide 2 */
+  .two { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 2.4vw; margin-top: 3vh; align-content: start; }
+  .rule { display: grid; gap: 1.2vh; opacity: 0; transform: translateY(12px); transition: opacity .5s, transform .5s; }
+  .rule.on { opacity: 1; transform: none; }
+  .rule h3 { margin: 0; font-size: clamp(14px, 1.9vw, 24px); }
+  .pair { display: grid; grid-template-columns: 1fr; gap: 1vh; }
+  .ng, .go { display: flex; gap: 0.7em; align-items: baseline; font-size: clamp(13px, 1.7vw, 22px); padding: 0.7em 0.9em; border-radius: 14px 18px 12px 16px; border: 2px solid var(--line); }
+  .ng { background: var(--pink); }
+  .ng .t { text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: #b1402f; }
+  .go { background: var(--green); }
+  .mark { font-weight: 700; flex: none; }
+  .conds { grid-column: 1 / -1; margin-top: 1vh; }
+  .conds h3 { margin: 0 0 1.2vh; font-size: clamp(14px, 1.9vw, 24px); }
+  .conds ol { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4vw; }
+  .conds li { display: flex; gap: 0.7em; align-items: flex-start; font-size: clamp(12px, 1.6vw, 21px); line-height: 1.6; opacity: 0; transform: translateY(12px); transition: opacity .5s, transform .5s; }
+  .conds li.on { opacity: 1; transform: none; }
+  .conds li b { flex: none; display: grid; place-items: center; width: 1.8em; height: 1.8em; border-radius: 50%; background: var(--yellow); border: 2px solid var(--line); }
+
+  /* controls */
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; height: 6vh; min-height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 3vw; font-size: clamp(11px, 1.2vw, 14px); color: var(--muted); border-top: 1.5px dashed #bbb; background: var(--paper); }
+  .bar button { font: inherit; color: var(--ink); background: var(--paper); border: 2px solid var(--line); border-radius: 999px; padding: 0.35em 1.2em; cursor: pointer; }
+  .bar button:hover { background: var(--yellow); }
+  .bar .btns { display: flex; gap: 0.6em; }
+
+  @media (max-width: 760px) {
+    .work { grid-template-columns: 1fr; }
+    .arrow { display: none; }
+    .two { grid-template-columns: 1fr; }
+    .conds ol { grid-template-columns: 1fr; }
+    body { overflow: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    .arrow path { stroke-dashoffset: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+
+  <!-- ===== Slide 1: flow ===== -->
+  <section class="slide active" data-steps="4">
+    <h1 class="title"><span class="marker">修繕の依頼を「対応一覧」にする</span></h1>
+    <p class="lead">受け取る → AIが整理 → プログラムがチェック → 人が見比べる</p>
+
+    <div class="chips">
+      <div class="chip" data-at="1"><b>1</b>依頼文を渡す</div>
+      <div class="chip" data-at="2"><b>2</b>AIが項目を整理</div>
+      <div class="chip" data-at="3"><b>3</b>プログラムがチェック</div>
+      <div class="chip" data-at="4"><b>4</b>人が元の文と見比べる</div>
+    </div>
+
+    <div class="work">
+      <div>
+        <p class="col-title">入力（架空の依頼文）</p>
+        <div class="card source">
+          <p id="srcText" aria-live="polite"></p>
+          <span class="tag">見本の文章（架空）</span>
+        </div>
+      </div>
+
+      <div class="arrow" aria-hidden="true">
+        <svg viewBox="0 0 60 30"><path d="M4 15 H50 M40 5 L52 15 L40 25"/></svg>
+      </div>
+
+      <div class="table-wrap">
+        <p class="col-title">出力（対応一覧）</p>
+        <table>
+          <thead>
+            <tr>
+              <th>物件名<span class="ok" style="--d:.0s">✓</span></th>
+              <th>部屋番号<span class="ok" style="--d:.1s">✓</span></th>
+              <th>依頼内容<span class="ok" style="--d:.2s">✓</span></th>
+              <th>希望日時（原文）<span class="ok" style="--d:.3s">✓</span></th>
+              <th>未確認事項<span class="ok" style="--d:.4s">✓</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-k="1"><span class="v" style="--d:.0s">青葉ハイツ</span></td>
+              <td data-k="2"><span class="v" style="--d:.25s">203</span></td>
+              <td data-k="3"><span class="v" style="--d:.5s">台所水栓の水漏れ</span></td>
+              <td data-k="4"><span class="v" style="--d:.75s">来週火曜の午後</span></td>
+              <td data-k="5"><span class="v unconf" style="--d:1s">連絡先、具体的な訪問日付</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bubbles">
+      <div class="bubble b2">
+        <svg class="who" viewBox="0 0 80 90" aria-hidden="true"><rect x="14" y="30" width="52" height="40" rx="12" fill="#cfe6f5" stroke="#3a3a3a" stroke-width="3"/><rect x="28" y="8" width="24" height="22" rx="6" fill="#fff" stroke="#3a3a3a" stroke-width="3"/><circle cx="35" cy="19" r="2.5" fill="#3a3a3a"/><circle cx="45" cy="19" r="2.5" fill="#3a3a3a"/><path d="M40 8 V2" stroke="#3a3a3a" stroke-width="3"/><circle cx="40" cy="2" r="3" fill="#ffe27a" stroke="#3a3a3a" stroke-width="2"/></svg>
+        <div class="say">AI：分からない項目は、推測せず「未確認」に回します。</div>
+      </div>
+      <div class="bubble b3">
+        <svg class="who" viewBox="0 0 80 90" aria-hidden="true"><rect x="10" y="26" width="60" height="44" rx="8" fill="#d6efd0" stroke="#3a3a3a" stroke-width="3"/><path d="M24 48 L35 59 L56 36" fill="none" stroke="#3a3a3a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="say">プログラム：必須の5項目がそろっているか、形が決めた表どおりかを確かめます。</div>
+      </div>
+      <div class="bubble b4">
+        <svg class="who" viewBox="0 0 80 90" aria-hidden="true"><circle cx="40" cy="26" r="18" fill="#fff" stroke="#3a3a3a" stroke-width="3"/><circle cx="33" cy="25" r="2.5" fill="#3a3a3a"/><circle cx="47" cy="25" r="2.5" fill="#3a3a3a"/><path d="M33 33 Q40 38 47 33" fill="none" stroke="#3a3a3a" stroke-width="2.5" stroke-linecap="round"/><rect x="22" y="46" width="36" height="34" rx="12" fill="#f9d6d9" stroke="#3a3a3a" stroke-width="3"/></svg>
+        <div class="say">人：色をそろえた言葉どうしを見比べます。直したいときは「未確認事項の列を追加して」のようにAIに頼みます。</div>
+      </div>
+    </div>
+
+    <p class="foot-note">※修繕依頼の一覧化はAIが提案した題材です。見本のプログラムは講師が準備中（2026年11月6日時点で未作成）で、この画面は動きの試作です。</p>
+  </section>
+
+  <!-- ===== Slide 2: don't fill ===== -->
+  <section class="slide" data-steps="5">
+    <h1 class="title"><span class="marker orange">AIに「勝手に埋めさせない」</span></h1>
+    <p class="lead">分からないことは、分からないまま残す。</p>
+
+    <div class="two">
+      <div class="rule" data-at="1">
+        <h3>「来週火曜」は、日付にしない</h3>
+        <div class="pair">
+          <div class="ng"><span class="mark">✕</span><span class="t">来週火曜 → ◯月◯日（基準の日が分からないのに決める）</span></div>
+          <div class="go"><span class="mark">○</span><span>「来週火曜の午後」と原文のまま書く</span></div>
+        </div>
+      </div>
+      <div class="rule" data-at="2">
+        <h3>連絡先は、補わない</h3>
+        <div class="pair">
+          <div class="ng"><span class="mark">✕</span><span class="t">それらしい電話番号やメールを入れる</span></div>
+          <div class="go"><span class="mark">○</span><span>「未確認事項」の列に残して、確認する</span></div>
+        </div>
+      </div>
+
+      <div class="conds">
+        <h3>「動いた」と言える条件は3つ</h3>
+        <ol>
+          <li data-at="3"><b>1</b><span>期待どおりの項目が出る</span></li>
+          <li data-at="4"><b>2</b><span>不足しているものが「未確認」と分かる</span></li>
+          <li data-at="5"><b>3</b><span>もう一度動かせて、元に戻せる</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="bar">
+  <span id="pos">1 / 2</span>
+  <span>← → キー・スペース・クリックで進めます</span>
+  <span class="btns"><button id="prev" type="button">◀ 前へ</button><button id="next" type="button">次へ ▶</button></span>
+</div>
+
+<script>
+(function () {
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var pos = document.getElementById('pos');
+  var state = { s: 0, t: 0 };
+  var SRC = '青葉ハイツ203号室の台所水栓から水が漏れています。訪問は来週火曜の午後を希望します。連絡先はまだ確認できていません。';
+  var src = document.getElementById('srcText');
+  var typed = false, typing = null;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function srcHtml() {
+    return SRC
+      .replace('青葉ハイツ', '<span class="hl" data-k="1">青葉ハイツ</span>')
+      .replace('203', '<span class="hl" data-k="2">203</span>')
+      .replace('台所水栓から水が漏れて', '<span class="hl" data-k="3">台所水栓から水が漏れて</span>')
+      .replace('来週火曜の午後', '<span class="hl" data-k="4">来週火曜の午後</span>')
+      .replace('連絡先はまだ確認できていません', '<span class="hl" data-k="5">連絡先はまだ確認できていません</span>');
+  }
+
+  function typeSource() {
+    if (typed) { src.innerHTML = srcHtml(); return; }
+    typed = true;
+    if (reduce) { src.innerHTML = srcHtml(); return; }
+    var i = 0;
+    typing = setInterval(function () {
+      i += 1;
+      src.textContent = SRC.slice(0, i);
+      if (i >= SRC.length) { clearInterval(typing); typing = null; src.innerHTML = srcHtml(); }
+    }, 38);
+  }
+
+  function render() {
+    slides.forEach(function (el, i) {
+      el.classList.toggle('active', i === state.s);
+      if (i !== state.s) return;
+      var t = state.t;
+      for (var n = 1; n <= 5; n++) el.classList.toggle('s' + n, t >= n);
+      Array.prototype.forEach.call(el.querySelectorAll('[data-at]'), function (node) {
+        var at = Number(node.getAttribute('data-at'));
+        node.classList.toggle('on', t >= at);
+        if (node.classList.contains('chip')) node.classList.toggle('now', t === at);
+      });
+    });
+    if (state.s === 0 && state.t >= 1) typeSource();
+    if (state.s === 0 && state.t < 1 && !typing) { src.innerHTML = typed ? srcHtml() : ''; }
+    var total = Number(slides[state.s].getAttribute('data-steps'));
+    pos.textContent = (state.s + 1) + ' / ' + slides.length + '　手順 ' + state.t + ' / ' + total;
+  }
+
+  function next() {
+    var total = Number(slides[state.s].getAttribute('data-steps'));
+    if (state.t < total) { state.t += 1; }
+    else if (state.s < slides.length - 1) { state.s += 1; state.t = 0; }
+    render();
+  }
+  function prev() {
+    if (state.t > 0) { state.t -= 1; }
+    else if (state.s > 0) { state.s -= 1; state.t = Number(slides[state.s].getAttribute('data-steps')); }
+    render();
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+    else if (e.key === 'Home') { state.s = 0; state.t = 0; render(); }
+  });
+  document.getElementById('next').addEventListener('click', next);
+  document.getElementById('prev').addEventListener('click', prev);
+  document.getElementById('stage').addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('button')) return;
+    next();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
