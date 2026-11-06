@@ -49,3 +49,17 @@ PR #238. Missing exact dates repaired: 22,339; dated Supabase rows: 25,652. Year
 The real semantic job completed in 23.52 seconds with one cited video position and 11 LINE sources, preserving the original context labels (including seminar12). Marker links are handled inside the reference container so nested scroll areas reliably reveal their target, without relying on host-browser fragment navigation. The 2026-11-06 daily community workflow 42153985436 succeeded and saved 112 new attachment records (3,528 existing skipped; 2,676 untrusted-source entries excluded).
 
 The cited member video was checked on its canonical WeStudy page after authorized login: matching title and a working Play control were present. Its bare Vimeo page returned not found, so the UI now prioritizes the member page and displays the exact reference time without promising automatic seek. Apply the year-inference migration after the exact-date repair.
+
+## Opt-in real-time normal-search check
+
+The default test suite skips the deliberately slow integration test. Run it explicitly when auditing timeout behavior:
+
+```sh
+QA_WALLCLOCK_TEST=1 node --experimental-strip-types --test apps/kamiooya-qa-web/tests/qaAnswerWallClock.test.mjs
+```
+
+This takes about five minutes. It connects the unchanged production gateway and adapters to a real loopback HTTP server: one normal upstream waits 190 seconds; another never responds and must be cancelled by the real processing deadline (about 285 seconds, reserving the remainder of the 300-second budget for persistence). It drops an admission response and a status response, reauthenticates during processing, verifies a single upstream invocation/job, replays the completed/failed request, and checks cross-user and logged-out access. All identities and results are synthetic. No AI/provider calls, production records, credentials, or external network are used.
+
+This is real wall-clock HTTP evidence for the production code, not a hosted Supabase worker test. Keep it separate from the real production normal-search measurement (76.60 seconds with reload/relogin) and the virtual-clock 90/140/240-second regression tests. The hosted worker and request limits still apply: [Supabase limits](https://supabase.com/docs/guides/functions/limits), [background tasks](https://supabase.com/docs/guides/functions/background-tasks). Do not expose a public delay/testing endpoint just to extend the timing measurement.
+
+2026-11-06 opt-in run passed with real elapsed times: successful upstream 190.260s; stalled upstream stopped with `answer_timeout` at 285.361s. Each case had exactly one upstream call and one job despite lost admission/status responses and reauthentication. Short status requests remained responsive. Cross-owner requests were denied and logged-out retrieval returned 401. No AI calls or production writes were used. The live `raimo-auth` editor source was also compared privately with the released bundle and matched exactly (300s budget plus `EdgeRuntime.waitUntil`). This does not upgrade the existing hosted production evidence beyond the observed 76.60s normal generation.
