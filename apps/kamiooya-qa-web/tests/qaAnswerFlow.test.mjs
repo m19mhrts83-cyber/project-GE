@@ -71,11 +71,11 @@ test('gateway denies unauthenticated and cross-owner jobs before admission',asyn
  const token=await login(f);assert.equal((await f.request('/chat-sessions/theirs/answer-jobs',input('normal'),token)).status,403);assert.equal(f.jobs.size,0);
 });
 
-const normalEnvelope={response:JSON.stringify({answer:'grounded answer',used_sources:{comment_ids:['42'],chunk_keys:['video']}}),relatedComments:[{comment_id:'42',content:'same evidence'}],relatedLessonComments:[],relatedChunks:[{chunk_key:'video',content:'same video'}]};
+const normalEnvelope={response:'grounded answer〔コメントID:42〕〔チャンクID:video〕',relatedComments:[{comment_id:'42',content:'same evidence'}],relatedLessonComments:[],relatedChunks:[{chunk_key:'video',content:'same video'}]};
 test('two-stage normal pipeline saves validated answer and sources once without legacy generation',async()=>{
  const f=fixture({normalPipelineV2:true,envelope:normalEnvelope}),token=await login(f);
  await f.request('/chat-sessions/mine/answer-jobs',input('normal'),token);await Promise.all(f.tasks);
- const job=[...f.jobs.values()][0];assert.equal(job.status,'done');assert.equal(job.result.pipeline,'normal-v2');assert.equal(job.result.answer,'grounded answer');assert.deepEqual(JSON.parse(job.result.usedSources),{comment_ids:['42'],chunk_keys:['video']});
+ const job=[...f.jobs.values()][0];assert.equal(job.status,'done');assert.equal(job.result.pipeline,'normal-v2');assert.equal(job.result.answer,'grounded answer[コミュニティ1][セミナー1]');assert.deepEqual(JSON.parse(job.result.usedSources),{comment_ids:['42'],chunk_keys:['video']});
  assert.equal(f.calls.filter(c=>c.url.endsWith('/internal/normal-answer-v2')).length,1);assert.equal(f.calls.filter(c=>c.url.endsWith('/messages')).length,0);
  assert.deepEqual(f.calls.filter(c=>c.url.endsWith('/messages-append')).map(c=>c.body.role),['user','assistant']);
 });

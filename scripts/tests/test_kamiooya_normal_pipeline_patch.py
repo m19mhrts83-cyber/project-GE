@@ -1,7 +1,7 @@
-import copy,sys,unittest
+import copy,sys,unittest,tempfile
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from kamiooya_normal_pipeline_patch import patch,ENDPOINT
+from kamiooya_normal_pipeline_patch import patch,ENDPOINT,validate_output_path
 class NormalPipelinePatchTests(unittest.TestCase):
  def fixture(self):
   steps=[{'check':{'condition':'input.__gateway_secret == fixture-only'}},{'tableInsert':{'table':'chat_messages'},'as':'userMessage'},{'llm':{'model':'same-model','prompt':'same-keyword-prompt'},'as':'keyword'}]
@@ -11,6 +11,13 @@ class NormalPipelinePatchTests(unittest.TestCase):
  def test_guard_search_and_original_routes_are_unchanged(self):
   before=self.fixture();saved=copy.deepcopy(before);after=patch(before);self.assertEqual(before,saved);self.assertEqual(after['api'][0],saved['api'][0]);route=after['api'][-1];self.assertEqual(route['endpoint'],ENDPOINT)
   self.assertEqual(route['steps'][0],saved['api'][0]['steps'][0]);self.assertEqual([s for s in route['steps'] if 'tableFetchMany' in s],[s for s in saved['api'][0]['steps'] if 'tableFetchMany' in s]);self.assertEqual(sum('llm' in s for s in route['steps']),2);self.assertFalse(any('tableInsert' in s for s in route['steps']));self.assertEqual(patch(after),after)
+  original_prompt=next(s['calculate']['expression'] for s in saved['api'][0]['steps'] if s.get('as')=='promptText');new_prompt=next(s['calculate']['expression'] for s in route['steps'] if s.get('as')=='promptText');self.assertTrue(new_prompt.startswith("'"));self.assertTrue(new_prompt.endswith(original_prompt[1:]));self.assertFalse(any(s.get('as')=='structuredPrompt' for s in route['steps']))
  def test_unexpected_source_layout_is_not_silently_rewritten(self):
   source=self.fixture();source['api'][0]['steps'].pop(0)
   with self.assertRaises(ValueError):patch(source)
+
+ def test_generated_secret_definition_cannot_be_written_into_git_or_cloud_sync(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   folder=Path(temporary);(folder/'.git').mkdir()
+   with self.assertRaises(ValueError):validate_output_path(folder/'api.yaml')
+  with self.assertRaises(ValueError):validate_output_path(Path.home()/'Library/CloudStorage/fixture/api.yaml')
