@@ -41,6 +41,7 @@ jobs:
         with:
           deno-version: v2.5.6
       - run: deno check apps/kamiooya-qa-web/supabase/functions/raimo-auth/index.ts apps/kamiooya-qa-web/supabase/functions/semantic-search/index.ts
+      - run: deno test --allow-env --deny-net apps/kamiooya-qa-web/supabase/functions/semantic-search/handler.test.ts
 
   app-build:
     runs-on: ubuntu-latest

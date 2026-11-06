@@ -41,12 +41,17 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     async delete(token){await rest('raimo_auth_sessions?token_hash=eq.'+await digest(token),{method:'DELETE',headers:{Prefer:'return=minimal'}});}
   };
   const allow = async (key:string,max=10) => await rest('rpc/raimo_auth_take_limit',{method:'POST',body:JSON.stringify({key_hash:await digest(key),max_attempts:max,window_seconds:900})})===true;
-  const status = async (uid:string,ref:string) => {
-    if(!/^[0-9a-f]{64}$/.test(ref)) return {user_id:uid,session_active:false};
-    const rows=await rest('raimo_auth_sessions?token_hash=eq.'+ref+'&select=user_id,auth_version,expires_at&limit=1');
-    const s=rows[0],u=await memberOf(await lookup({user_id:uid}));
-    return {user_id:uid,status:u?.status,role:u?.role,session_active:!!(s&&s.user_id===uid&&Date.parse(s.expires_at)>Date.now()&&s.auth_version===u?.authVersion)};
+  const parentSession=async(ref:string)=>{
+    if(!/^[0-9a-f]{64}$/.test(ref))return null;
+    return (await rest('raimo_auth_sessions?token_hash=eq.'+ref+'&select=user_id,auth_version,expires_at&limit=1'))[0]||null;
   };
+  const sessionActive=(uid:string,s:any,u:any)=>!!(s&&s.user_id===uid&&Date.parse(s.expires_at)>Date.now()&&s.auth_version===u?.authVersion);
+  const status = async (uid:string,ref:string) => {
+    if(!/^[0-9a-f]{64}$/.test(ref))return {user_id:uid,session_active:false};
+    const [s,u]=await Promise.all([parentSession(ref),lookup({user_id:uid}).then(memberOf)]);
+    return {user_id:uid,status:u?.status,role:u?.role,session_active:sessionActive(uid,s,u)};
+  };
+
   const deps:GatewayDependencies={origin:c.origin,sessions,allowLogin:email=>allow('login:'+email),
     authenticate:async(email,password)=>{const u=await lookup({email});if(!u||!await verify(password,String(u.password_hash||'')))return null;return memberOf(u);},
     member:async id=>memberOf(await lookup({user_id:id})),
@@ -86,16 +91,20 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       // Bound recovery to the archived pre-stable-label deployment. New filtered IDs
       // are not positional labels; those answers recover their persisted job DTO instead.
       const q=new URLSearchParams({select:'created_at,query_text,used_sources',user_id:'eq.'+userId,session_id:'eq.'+chatId,search_mode:'eq.semantic',result_status:'eq.ok',and:'(created_at.gte.2026-11-04T00:00:00+09:00,created_at.lt.2026-11-06T06:53:00+09:00)',order:'created_at.desc',limit:'100'});
-      const events=await rest('app_qa_search_events?'+q),keys=new Set<string>();
+      const jq=new URLSearchParams({select:'finished_at,query,result',user_id:'eq.'+userId,chat_id:'eq.'+chatId,status:'eq.done',order:'finished_at.desc',limit:'20'});
+      const [events,sources,jobs]=await Promise.all([rest('app_qa_search_events?'+q),rest('knowledge_sources?select=id,source_key,title,video_url&limit=1000'),rest('qa_answer_jobs?'+jq)]);
+      const keys=new Set<string>();
       for(const event of events){try{const ids=typeof event.used_sources==='string'?JSON.parse(event.used_sources):event.used_sources;for(const key of ids?.chunk_keys||[])if(typeof key==='string'&&/^[a-zA-Z0-9:_|.\/-]{1,250}$/.test(key))keys.add(key);}catch{}}
       const chunks:any[]=[];const selected=[...keys].slice(0,500);
-      for(let offset=0;offset<selected.length;offset+=20){
-        const query=new URLSearchParams({select:'chunk_key,source_id,source_key,start_sec,end_sec,content',chunk_key:'in.('+selected.slice(offset,offset+20).join(',')+')',limit:'20'});
-        const rows=await rest('knowledge_chunks?'+query);chunks.push(...rows.map((r:any)=>({...r,content:String(r.content||'').slice(0,800)})));
+      for(let offset=0;offset<selected.length;offset+=80){
+        const group=[];
+        for(let start=offset;start<Math.min(offset+80,selected.length);start+=20){
+          const query=new URLSearchParams({select:'chunk_key,source_id,source_key,start_sec,end_sec,content',chunk_key:'in.('+selected.slice(start,start+20).join(',')+')',limit:'20'});
+          group.push(rest('knowledge_chunks?'+query));
+        }
+        const pages=await Promise.all(group);
+        chunks.push(...pages.flat().map((r:any)=>({...r,content:String(r.content||'').slice(0,800)})));
       }
-      const sources=await rest('knowledge_sources?select=id,source_key,title,video_url&limit=1000');
-      const jq=new URLSearchParams({select:'finished_at,query,result',user_id:'eq.'+userId,chat_id:'eq.'+chatId,status:'eq.done',order:'finished_at.desc',limit:'20'});
-      const jobs=await rest('qa_answer_jobs?'+jq);
       return {events,chunks,sources,jobs};
     },
     referenceMetadata:async()=>rest('rpc/qa_reference_metadata',{method:'POST',body:'{}'}),
@@ -142,8 +151,8 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
   if(jobsRuntime)deps.jobs=createAnswerJobs({
     store:createRestAnswerStore(rest),schedule:jobsRuntime.schedule,
     authorize:async job=>{
-      const u=await deps.member(job.user_id),s=await status(job.user_id,job.parent_session_ref);
-      return !!(u&&u.status==='approved'&&u.authVersion===job.auth_version&&s.session_active&&await deps.chatOwner(job.chat_id)===job.user_id);
+      const [u,parent,owner]=await Promise.all([deps.member(job.user_id),parentSession(job.parent_session_ref),deps.chatOwner(job.chat_id)]);
+      return !!(u&&u.status==='approved'&&u.authVersion===job.auth_version&&sessionActive(job.user_id,parent,u)&&owner===job.user_id);
     },
     execute:async(job,signal)=>{
       if(job.mode!=='semantic'){
