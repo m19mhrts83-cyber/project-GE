@@ -62,9 +62,10 @@ export async function middleware(request: NextRequest) {
   if (path === "/api/inquiry-send-failover") {
     return NextResponse.next({ request });
   }
-  // FlowForge 読取プロキシ（FLOWFORGE_READ_PROXY_KEY。ChatGPT Actions 用）
+  // FlowForge 読取プロキシ／MCP（FLOWFORGE_READ_PROXY_KEY。ChatGPT Plugin／カスタムMCP）
   if (
     path === "/api/flowforge/resolve" ||
+    path === "/api/flowforge/mcp" ||
     path.startsWith("/api/flowforge/share/")
   ) {
     return NextResponse.next({ request });

@@ -96,12 +96,55 @@ security:
   - bearerAuth: []
 ```
 
-## ChatGPT 登録手順（デプロイ後）
+## ChatGPT 登録手順（2026-11-06 更新）
 
-1. Custom GPT → Actions → Import 上記 OpenAPI
-2. Authentication → API Key → Bearer、キーは Actions 側のみ
-3. ユーザーは share URL（または「312のフロー見て」）を渡す
-4. GPT が `resolve` / `share` を呼び、改善案を返す
+**注意**: Plus アカウントでは **Custom GPT の新規作成は不可**（GPT 自体は 2026-12-11 廃止予定）。旧「Actions に OpenAPI 貼付」は使えない。代替は **Plugins**。
+
+### 済（Jarvis 実施）
+
+1. Plugin Creator（Work）で個人用プラグイン **「FlowForge読取（Jarvis）」** を作成・インストール済み
+2. スキル指示（share URL / agentId / `summary=1`・読み取り専用・キー非再掲）を登録済み
+3. 本番プロキシは稼働中（`FLOWFORGE_READ_PROXY_KEY`）
+
+### 自動取得（カスタム MCP・2026-11-07）
+
+実装: `GET|POST https://jarvis-dashboard-amber.vercel.app/api/flowforge/mcp`  
+Auth: `Authorization: Bearer $FLOWFORGE_READ_PROXY_KEY`（REST プロキシと同じキー）  
+Tool: `resolve_flowforge_flow`（`url` / `shareId` / `flowId` / `agentId`、既定 `summary=true`）
+
+**ChatGPT への登録**
+
+1. [chatgpt.com/plugins](https://chatgpt.com/plugins) → **追加** → **カスタム MCP サーバー**
+2. 名前: `FlowForge Jarvis MCP`（任意）
+3. URL: `https://jarvis-dashboard-amber.vercel.app/api/flowforge/mcp`
+4. Authentication: API Key / Bearer → `.env.jarvis_private` の `FLOWFORGE_READ_PROXY_KEY`
+5. リスク確認 → 作成 → インストール
+6. 既存プラグイン **FlowForge読取（Jarvis）** と併用可（スキル＋MCP）
+
+### チャッピー（ChatGPT）での使い方
+
+| 渡し方 | できる？ | 例 |
+|---|---|---|
+| **FlowForge の share URL を貼る** | **はい**（MCP 接続後） | `https://flowforge-….run.app/share/xxxx` を貼って「設計改善して」 |
+| **編集画面の `/flows/flow_…` URL** | はい（agent 登録の share に解決できるとき） | 312 の編集 URL |
+| **「agentId 312 を見て」** | はい | `@FlowForge読取（Jarvis） agentId 312 を読んで改善案を` |
+| **URL なし・MCP 未接続** | 不可（自動取得できない） | Jarvis に取ってもらい要約を貼る |
+
+推奨プロンプト:
+
+```
+@FlowForge読取（Jarvis）
+このフローを読んで、優先度順に設計改善案を出して。
+https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl
+```
+
+または:
+
+```
+@FlowForge読取（Jarvis） agentId 312 のフローを summary で読んで改善案を。
+```
+
+停止: `FLOWFORGE_READ_PROXY_DISABLE=1`
 
 ## curl 例（値は出さない）
 
