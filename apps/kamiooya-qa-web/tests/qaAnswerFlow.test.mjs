@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createProductionAdapter,digest} from '../lib/raimoAuthAdapter.ts';
 import {createRaimoAuthGateway} from '../lib/raimoAuthGateway.ts';
-function fixture(){
- const sessions=new Map(),jobs=new Map(),tasks=[],calls=[];let modelResolve;
- const c={origin:'https://app.example',raimoBase:'https://app.example/miniAppApi/test',projectUrl:'https://fixture.supabase.co',serviceKey:'service-only',gatewaySecret:'g'.repeat(40),proxySecret:'p'.repeat(40)};
+function fixture(settings={}){
+ const sessions=new Map(),jobs=new Map(),tasks=[],calls=[];let modelResolve;const modelStarted=Promise.withResolvers();
+ const c={origin:'https://app.example',raimoBase:'https://app.example/miniAppApi/test',projectUrl:'https://fixture.supabase.co',serviceKey:'service-only',gatewaySecret:'g'.repeat(40),proxySecret:'p'.repeat(40),normalPipelineV2:settings.normalPipelineV2};
  const user={id:'one',email:'owner@example.test',role:'user',status:'approved',password_hash:'fixture-password'};
  const transport=async(url,options={})=>{
   const u=new URL(url),body=options.body?JSON.parse(options.body):{};calls.push({url,body});
@@ -32,8 +32,9 @@ function fixture(){
    if(path==='/internal/read/chat-sessions/mine')return Response.json({session:{user_id:'one'}});
    if(path==='/internal/read/chat-sessions/theirs')return Response.json({session:{user_id:'two'}});
    if(path==='/semantic-search-config')return Response.json({url:c.projectUrl+'/functions/v1/semantic-search',secret:'s'.repeat(43)});
-   if(path==='/chat-sessions/mine/messages-append'){assert.ok(['user','assistant'].includes(body.role));return Response.json({ok:true});}
-   if(path==='/chat-sessions/mine/messages')return new Promise(resolve=>{modelResolve=()=>resolve(Response.json({answer:'normal answer',usedSources:'{}'}));});
+   if(path==='/internal/normal-answer-v2')return Response.json(settings.envelope||{response:'invalid envelope'});
+   if(path==='/chat-sessions/mine/messages-append'){assert.ok(['user','assistant'].includes(body.role));return settings.failHistory?Response.json({errorCode:'unavailable'},{status:503}):Response.json({ok:true});}
+   if(path==='/chat-sessions/mine/messages')return new Promise(resolve=>{modelResolve=()=>resolve(Response.json({answer:'normal answer',usedSources:'{}'}));modelStarted.resolve();});
   }
   throw new Error('unexpected test transport');
  };
@@ -43,7 +44,7 @@ function fixture(){
  });
  const gateway=createRaimoAuthGateway(adapter.deps);
  const request=(path,body,token='',method='POST')=>gateway(new Request('https://gateway.example'+path,{method,headers:{Origin:c.origin,Authorization:'Bearer '+token},...(body!==undefined?{body:JSON.stringify(body)}:{})}));
- return {request,jobs,sessions,tasks,calls,user,finishModel:()=>modelResolve()};
+ return {request,jobs,sessions,tasks,calls,user,modelReady:modelStarted.promise,finishModel:()=>modelResolve()};
 }
 const input=mode=>({request_id:'11111111-1111-4111-8111-111111111111',mode,query:'question',user_id:'two',auth_version:'forged'});
 async function login(f){const r=await f.request('/auth/login',{email:'owner@example.test',password_hash:'fixture-password'});return (await r.json()).auth_token;}
@@ -68,4 +69,23 @@ test('semantic jobs run the shared handler in background and save one user/assis
 test('gateway denies unauthenticated and cross-owner jobs before admission',async()=>{
  const f=fixture();assert.equal((await f.request('/chat-sessions/mine/answer-jobs',input('normal'))).status,401);
  const token=await login(f);assert.equal((await f.request('/chat-sessions/theirs/answer-jobs',input('normal'),token)).status,403);assert.equal(f.jobs.size,0);
+});
+
+const normalEnvelope={response:JSON.stringify({answer:'grounded answer',used_sources:{comment_ids:['42'],chunk_keys:['video']}}),relatedComments:[{comment_id:'42',content:'same evidence'}],relatedLessonComments:[],relatedChunks:[{chunk_key:'video',content:'same video'}]};
+test('two-stage normal pipeline saves validated answer and sources once without legacy generation',async()=>{
+ const f=fixture({normalPipelineV2:true,envelope:normalEnvelope}),token=await login(f);
+ await f.request('/chat-sessions/mine/answer-jobs',input('normal'),token);await Promise.all(f.tasks);
+ const job=[...f.jobs.values()][0];assert.equal(job.status,'done');assert.equal(job.result.pipeline,'normal-v2');assert.equal(job.result.answer,'grounded answer');assert.deepEqual(JSON.parse(job.result.usedSources),{comment_ids:['42'],chunk_keys:['video']});
+ assert.equal(f.calls.filter(c=>c.url.endsWith('/internal/normal-answer-v2')).length,1);assert.equal(f.calls.filter(c=>c.url.endsWith('/messages')).length,0);
+ assert.deepEqual(f.calls.filter(c=>c.url.endsWith('/messages-append')).map(c=>c.body.role),['user','assistant']);
+});
+test('invalid normal envelope uses legacy once before any history write',async()=>{
+ const f=fixture({normalPipelineV2:true}),token=await login(f);
+ await f.request('/chat-sessions/mine/answer-jobs',input('normal'),token);await f.modelReady;f.finishModel();await Promise.all(f.tasks);
+ assert.equal([...f.jobs.values()][0].result.pipeline,'normal-legacy-fallback');assert.equal([...f.jobs.values()][0].result.answer,'normal answer');assert.equal(f.calls.filter(c=>c.url.endsWith('/messages')).length,1);assert.equal(f.calls.filter(c=>c.url.endsWith('/messages-append')).length,0);
+});
+test('history failure never triggers a second generation or legacy duplicate messages',async()=>{
+ const f=fixture({normalPipelineV2:true,envelope:normalEnvelope,failHistory:true}),token=await login(f);
+ await f.request('/chat-sessions/mine/answer-jobs',input('normal'),token);await Promise.all(f.tasks);
+ assert.equal([...f.jobs.values()][0].status,'failed');assert.equal(f.calls.filter(c=>c.url.endsWith('/internal/normal-answer-v2')).length,1);assert.equal(f.calls.filter(c=>c.url.endsWith('/messages')).length,0);
 });

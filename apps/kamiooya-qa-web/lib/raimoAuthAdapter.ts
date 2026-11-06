@@ -1,7 +1,8 @@
+import {decodeNormalAnswer} from './normalAnswerEnvelope.ts';
 import {createAnswerJobs,createRestAnswerStore,compactAnswerResult} from './qaAnswerJobs.ts';
 // Runtime-neutral production adapters. Secrets are injected only by the Edge entrypoint.
 import type { GatewayDependencies } from './raimoAuthGateway.ts';
-export type RuntimeConfig = { origin: string; raimoBase: string; gatewaySecret: string; projectUrl: string; serviceKey: string; proxySecret: string };
+export type RuntimeConfig = { origin: string; raimoBase: string; gatewaySecret: string; projectUrl: string; serviceKey: string; proxySecret: string; normalPipelineV2?: boolean };
 export const digest = async (s: string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))), b => b.toString(16).padStart(2, '0')).join('');
 export class UpstreamError extends Error {
   code: string; status: number;
@@ -156,8 +157,24 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     },
     execute:async(job,signal)=>{
       if(job.mode!=='semantic'){
+        if(job.mode==='normal'&&c.normalPipelineV2){
+          let decoded;
+          try{
+            decoded=decodeNormalAnswer(await backend('POST','/internal/normal-answer-v2',{content:job.query,actor_user_id:job.user_id},signal));
+          }catch(error){
+            if(signal.aborted)throw signal.reason;
+            // Do not log model text, evidence or credentials. Legacy inference is
+            // only a compatibility fallback; never retry after a history write.
+            console.warn('normal_pipeline_v2_legacy_fallback');
+          }
+          if(decoded){
+            await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'user',content:job.query},signal);
+            await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'assistant',content:decoded.answer},signal);
+            return compactAnswerResult(decoded);
+          }
+        }
         const result=compactAnswerResult(await backend('POST','/chat-sessions/'+job.chat_id+(job.mode==='fast'?'/messages-fast':'/messages'),{content:job.query,actor_user_id:job.user_id},signal));
-        if(!result.answer.trim())throw new Error('empty_answer');return result;
+        if(!result.answer.trim())throw new Error('empty_answer');return {...result,pipeline:job.mode==='fast'?'fast-legacy':c.normalPipelineV2?'normal-legacy-fallback':'normal-legacy'};
       }
       const cfg=await deps.semanticConfig!();
       await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'user',content:job.query},signal);

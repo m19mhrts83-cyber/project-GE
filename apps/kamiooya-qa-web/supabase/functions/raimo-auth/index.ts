@@ -4,7 +4,7 @@ import bcrypt from 'npm:bcryptjs@3.0.3';
 import { createRaimoAuthGateway } from '../../../lib/raimoAuthGateway.ts';
 import { createProductionAdapter, digest } from '../../../lib/raimoAuthAdapter.ts';
 const origin='https://ma-54t2keqdelz3.raimo-app.buzz';
-const config={origin,projectUrl:Deno.env.get('SUPABASE_URL')||'',serviceKey:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'',
+const config={origin,normalPipelineV2:Deno.env.get('RAIMO_NORMAL_PIPELINE_V2')!=='0',projectUrl:Deno.env.get('SUPABASE_URL')||'',serviceKey:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'',
  raimoBase:origin+'/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0',gatewaySecret:Deno.env.get('RAIMO_AUTH_GATEWAY_SECRET')||'',proxySecret:Deno.env.get('COMMUNITY_ATTACHMENTS_PROXY_SECRET')||''};
 const verify=async(raw:string,stored:string)=>{
  if(/^\$2[aby]\$\d{2}\$/.test(stored))return bcrypt.compare(raw,stored);
