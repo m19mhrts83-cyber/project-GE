@@ -108,3 +108,8 @@ test('reference listings load on demand, share one active read, and retry an exp
  app.state.referenceReady={};app.loadComments=async()=>{calls++;throw new Error('temporary');};await app.ensureReferenceData('comments');assert.equal(app.state.referenceReady.comments,undefined);
  app.loadComments=async()=>{calls++;};await app.ensureReferenceData('comments');assert.equal(calls,3);
 });
+
+test('club videos prefer their canonical member page while preserving an honest reference position',()=>{
+ const app=load();const c=app.buildCitationsFromRelated([],[{chunk_key:'k',source_key:'westudy:lesson-20260125_groupconsulting:vimeo:1161686700',start_sec:13432,citation_label:'セミナー12'}],[{source_key:'westudy:lesson-20260125_groupconsulting:vimeo:1161686700',title:'グルコン',video_url:'https://vimeo.com/1161686700'}],null,[]);
+ const html=app.renderCitationsPanel(c,'m','セミナー12');assert.equal(c[0].videoPageUrl,'https://westudy.co.jp/lesson/lesson-20260125_groupconsulting');assert.ok(html.includes('223:52'));assert.ok(html.includes('元動画ページを開く'));assert.ok(html.includes('表示された時刻へ移動してください'));assert.equal(html.includes('href="https://vimeo.com/1161686700'),false);
+});

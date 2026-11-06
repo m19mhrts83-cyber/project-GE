@@ -2173,6 +2173,7 @@ const App = {
         sourceId: ch.source_id,
         videoTitle: App.displaySourceTitle(src.title || sk || '（タイトル不明）'),
         videoUrl: App.withVideoTimeUrl(src.video_url || '', start),
+        videoPageUrl: App.knowledgeVideoPageUrl(src,App.knowledgeSourceMeta(src)),
         startSec: start,
         startLabel: App.formatMmSs(start),
         snippet: String(ch.content || '').replace(/\s+/g, ' ').slice(0, 220)
@@ -2333,19 +2334,19 @@ const App = {
     if(cited.length)parts.push('<div class="font-semibold mb-1">本文で引用した根拠（登場順）</div><ul class="mb-3">'+cited.map(c=>{
       const anchor='<a class="text-blue-700 underline" href="#'+esc(App.citationAnchor(c,messageId))+'">'+esc(c.citationLabel)+'</a>';
       if(c.kind==='video_chunk'){
-        const u=App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl,c.startSec||0));const title=esc(c.videoTitle||'動画タイトル未登録')+' ・ '+esc(App.formatMmSs(c.startSec||0));
-        return '<li class="mb-1">'+anchor+' ・ '+(u?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+title+' から再生</a>':title)+'</li>';
+        const page=App.safeReferenceUrl(c.videoPageUrl),u=page||App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl,c.startSec||0));const title=esc(c.videoTitle||'動画タイトル未登録')+' ・ '+esc(App.formatMmSs(c.startSec||0));
+        return '<li class="mb-1">'+anchor+' ・ '+(u?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+title+(page?' 元動画ページを開く':' から再生')+'</a>':title)+'</li>';
       }
       if(c.kind==='lesson')return '<li class="mb-1">'+anchor+' ・ '+esc(c.lessonTitle||c.topicTitle||'講座ページ')+db('lesson',c.commentId)+'</li>';
       return '<li class="mb-1">'+anchor+' ・ '+esc(App.citationDateLabel(c))+db(c.kind,c.commentId||c.openchatId)+'</li>';
     }).join('')+'</ul>');
     if(videos.length){
       const rows=videos.map(c=>{
-        const url=App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl||'',c.startSec||0));
+        const page=App.safeReferenceUrl(c.videoPageUrl),url=page||App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl||'',c.startSec||0));
         const label=esc(c.videoTitle||'動画タイトル未登録')+' ・ '+esc(App.formatMmSs(c.startSec||0));
-        return '<li'+attrs(c)+'>'+badge(c)+(url?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(url)+'">'+label+' から再生</a>':label+'（動画URL未登録）')+db('video_chunk',c.chunkKey||c.videoTitle)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div></li>';
+        return '<li'+attrs(c)+'>'+badge(c)+(url?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(url)+'">'+label+(page?' 元動画ページを開く':' から再生')+'</a>':label+'（動画URL未登録）')+db('video_chunk',c.chunkKey||c.videoTitle)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div></li>';
       }).join('');
-      parts.push('<div class="font-semibold mb-1">動画の根拠（タイトル・再生位置）</div><ul class="citations-list mb-2">'+rows+'</ul>');
+      parts.push('<div class="font-semibold mb-1">動画の根拠（タイトル・再生位置）</div>'+(videos.some(c=>c.videoPageUrl)?'<p class="text-slate-600 mb-2">元動画ページでは、表示された時刻へ移動してください。</p>':'')+'<ul class="citations-list mb-2">'+rows+'</ul>');
     }
     if(comments.length)parts.push('<div class="font-semibold mb-1">コミュニティの根拠</div>'+dated(comments,c=>{
       const d=App.referenceDateParts(c.postedAt),cat=c.forumCategory&&c.forumCategory!=='未分類'?' ・ '+esc(c.forumCategory):'';
@@ -3241,7 +3242,7 @@ const App = {
         const raw = (App.state.citationsByMessageId || {})[msgId] || [];
         return raw.map(function (c) {
           if(!c)return c;
-          if(c.kind==='video_chunk'){const src=Object.values(App.state.knowledgeSources||{}).find(s=>s.source_key===c.sourceKey||String(s.id)===String(c.sourceId));if(src)return Object.assign({},c,{videoTitle:App.displaySourceTitle(src.title||c.videoTitle),videoUrl:App.withVideoTimeUrl(src.video_url||c.videoUrl||'',c.startSec||0)});}
+          if(c.kind==='video_chunk'){const src=Object.values(App.state.knowledgeSources||{}).find(s=>s.source_key===c.sourceKey||String(s.id)===String(c.sourceId));if(src)return Object.assign({},c,{videoTitle:App.displaySourceTitle(src.title||c.videoTitle),videoUrl:App.withVideoTimeUrl(src.video_url||c.videoUrl||'',c.startSec||0),videoPageUrl:App.knowledgeVideoPageUrl(src,App.knowledgeSourceMeta(src))});}
           if (c.kind !== 'comment' || c.postedAt) return c;
           const pa = App.resolveCommentPostedAt({ comment_id: c.commentId });
           const inferred=Number(((App.state.referenceComments||{})[c.commentId]||{}).inferred_year)||c.inferredYear||null;
@@ -4435,7 +4436,7 @@ const App = {
     const expanded=String(text||'').replace(/(LINEオプチャ|コミュニティ|セミナー)(\d+(?:\s*[、,]\s*\d+)+)/g,(_,prefix,numbers)=>numbers.split(/[、,]/).map(n=>prefix+Number(n.trim())).join('、'));
     let linked=expanded.replace(/(?:LINEオプチャ|コミュニティ|セミナー)\d+/g,label=>labels[label]?'['+label+'](#'+App.citationAnchor(labels[label],messageId)+')':label);
     (citations||[]).filter(c=>c.kind==='video_chunk'&&c.videoTitle&&c.videoUrl).forEach(c=>{
-      const url=App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl,c.startSec||0));if(!url)return;
+      const url=App.safeReferenceUrl(c.videoPageUrl)||App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl,c.startSec||0));if(!url)return;
       const time=App.formatMmSs(c.startSec||0),plain=String(Math.floor(Number(c.startSec||0)/60))+time.slice(-3);
       [time,plain].forEach(t=>{const phrase=App.displaySourceTitle(c.videoTitle)+' '+t+'頃';if(linked.includes(phrase))linked=linked.split(phrase).join('['+phrase.replace(/[\[\]]/g,'')+']('+url.replace(/\(/g,'%28').replace(/\)/g,'%29')+')');});
     });
