@@ -72,6 +72,10 @@ cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
 | **2（推奨）** | **読み取り専用プロキシ**（API キー）。URL or shareId → JSON。ChatGPT Actions から呼ぶ | Codex／Cursor | 不要 |
 | **3（任意）** | ベンダーへ公式 Agent API（API キー・CORS・レート）を依頼 | 人＋ベンダー | 要 |
 
+**Phase 2 実装済（2026-11-07・Jarvis）**: `apps/jarvis-dashboard/app/api/flowforge/`  
+OpenAPI: [`54b_FlowForge読取プロキシ_OpenAPI_20261106.md`](./54b_FlowForge読取プロキシ_OpenAPI_20261106.md)  
+ローカル検証 OK（312 summary・401）。**Production デプロイは未**（承認待ち）。
+
 Phase 2 の利点: project-GE 側だけで完結。編集権限は持たせず、秘密はマスク方針をプロキシ側で実装可能。
 
 ### Phase 2 案（プロキシ）
