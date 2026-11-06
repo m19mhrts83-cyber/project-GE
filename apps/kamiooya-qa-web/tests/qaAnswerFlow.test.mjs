@@ -59,6 +59,7 @@ test('actual gateway and production adapters admit normal jobs before generation
 });
 test('semantic jobs run the shared handler in background and save one user/assistant pair',async()=>{
  const f=fixture(),token=await login(f);const r=await f.request('/chat-sessions/mine/answer-jobs',input('semantic'),token);const accepted=await r.json();await Promise.all(f.tasks);
+ assert.equal(f.calls.filter(c=>c.url.endsWith('/internal/auth-user/user_id')).length,2); // gateway + worker each check once, without caching membership
  const done=await f.request('/chat-sessions/mine/answer-jobs/'+accepted.job_id,undefined,token,'GET');const result=(await done.json()).result;
  assert.equal(result.answer,'semantic answer');assert.equal(result.relatedChunks[0].citation_label,'セミナー1');
  const messages=f.calls.filter(c=>c.url.endsWith('/messages-append'));assert.deepEqual(messages.map(x=>x.body.role),['user','assistant']);

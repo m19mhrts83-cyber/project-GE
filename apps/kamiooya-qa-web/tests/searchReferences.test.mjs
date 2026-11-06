@@ -113,3 +113,8 @@ test('club videos prefer their canonical member page while preserving an honest 
  const app=load();const c=app.buildCitationsFromRelated([],[{chunk_key:'k',source_key:'westudy:lesson-20260125_groupconsulting:vimeo:1161686700',start_sec:13432,citation_label:'セミナー12'}],[{source_key:'westudy:lesson-20260125_groupconsulting:vimeo:1161686700',title:'グルコン',video_url:'https://vimeo.com/1161686700'}],null,[]);
  const html=app.renderCitationsPanel(c,'m','セミナー12');assert.equal(c[0].videoPageUrl,'https://westudy.co.jp/lesson/lesson-20260125_groupconsulting');assert.ok(html.includes('223:52'));assert.ok(html.includes('元動画ページを開く'));assert.ok(html.includes('表示された時刻へ移動してください'));assert.equal(html.includes('href="https://vimeo.com/1161686700'),false);
 });
+
+test('fully labelled cached reference history skips redundant server retrieval without replacing dates or sources',async()=>{
+ const app=load();app.authGatewayBase='https://gateway.example';app.state.currentUser={id:'one'};app.state.currentSessionId='mine';app.state.messageLoadGeneration=1;app.state.chatMessages=[{id:'a',role:'assistant',content:'コミュニティ1'}];app.state.citationsByMessageId={a:[{citationLabel:'コミュニティ1',postedAt:'2026-11-01'}]};let calls=0;app.apiClient=async()=>{calls++;throw new Error('unexpected read');};
+ await app.hydrateHistoricalReferences('mine',1);assert.equal(calls,0);assert.equal(app.state.citationsByMessageId.a[0].postedAt,'2026-11-01');
+});
