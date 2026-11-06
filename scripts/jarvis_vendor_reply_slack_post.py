@@ -130,8 +130,10 @@ def build_payload(row: dict[str, Any], *, url_mode: bool) -> dict[str, Any]:
     text = (
         f"【業者返信】{partner}\n件名: {subject}\n{prop_s}"
         + (f" · {vid}" if vid else "")
-        + f"\n[{mode_note}]\n送信: {send_u}\n編集: {edit_u}\n返信なし: {skip_u}"
+        + f"\n[{mode_note}]"
     )
+    if url_mode:
+        text += f"\n送信確認: {send_u}\n編集: {edit_u}\n返信なし確認: {skip_u}"
     blocks: list[dict[str, Any]] = [
         {"type": "header", "text": {"type": "plain_text", "text": f"業者返信 — {partner[:40]}", "emoji": True}},
         {"type": "section", "text": {"type": "mrkdwn", "text": f"*件名*\n{subject}\n*{prop_s}*" + (f" · `{vid}`" if vid else "")}},
@@ -139,8 +141,8 @@ def build_payload(row: dict[str, Any], *, url_mode: bool) -> dict[str, Any]:
         {"type": "section", "text": {"type": "mrkdwn", "text": f"*返信草案*\n```{draft or '(草案なし)'}```"}},
         {"type": "actions", "block_id": f"vr_actions_{tid[:24]}", "elements": _button_elements(tid, url_mode=url_mode)},
         {"type": "context", "elements": [{"type": "mrkdwn", "text": (
-            f"id=`{tid}` · {mode_note} · Dashboard `/mail/{tid}`\n"
-            f"予備URL: <{send_u}|送信> · <{edit_u}|編集> · <{skip_u}|返信なし>"
+            f"id=`{tid}` · {mode_note} · Dashboard `/mail/{tid}`"
+            + (f"\n確認URL: <{send_u}|送信確認> · <{edit_u}|編集> · <{skip_u}|返信なし確認>" if url_mode else "")
         )}]},
     ]
     return {"text": text, "blocks": blocks, "username": "Jarvis 業者返信"}
