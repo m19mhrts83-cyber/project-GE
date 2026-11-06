@@ -1,0 +1,5 @@
+{
+  "claude_plan": {"pct": null, "updated_at": null, "note": "claude.ai の 設定→使用量 の週次％（目視）"},
+  "gencode": {"pct": null, "updated_at": null, "note": "Genspark の残量（目視）"},
+  "chatgpt_mode": {"pct": null, "updated_at": null, "note": "ChatGPT Plus のチャット残量（目視）"}
+}
