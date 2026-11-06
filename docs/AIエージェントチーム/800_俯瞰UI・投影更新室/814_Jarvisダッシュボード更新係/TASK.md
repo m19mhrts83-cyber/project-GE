@@ -31,6 +31,8 @@ Dashboardの履歴画面から時間の訂正・作業記録の追記を可能�
 
 ## 追加案件 2026-11-06: Q&A効率化の仕上げ点検
 
-- task_id: kamiooya-efficiency-audit-20261106 / executor: codex / status: running
+- task_id: kamiooya-efficiency-audit-20261106 / executor: codex / status: done
 - 依頼: 品質を落とさず待ち時間・AI使用量を減らす追加改善を実装し検証する。
 - 完了条件: 依存関係のない待ち合わせを削減し、根拠選択・モデル入力が変わらない統合テスト、結果と残る提案を文書化。
+
+- 結果: 独立取得を前倒し、LINE取得失敗時の不完全生成を抑止。Node76/Deno3/Edge型チェック成功。旧mainでは新しい回帰試験2件が失敗することも確認。PR #242。
