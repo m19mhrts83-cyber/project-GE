@@ -3281,6 +3281,13 @@ const App = {
       });
     });
 
+    area.querySelectorAll('a[href^="#reference-"]').forEach(function(link){
+      link.addEventListener('click',function(event){
+        const id=String(link.getAttribute('href')||'').slice(1),target=document.getElementById(id);
+        if(!target||!area.contains(target))return;
+        event.preventDefault();target.scrollIntoView({block:'start',behavior:'auto'});
+      });
+    });
     area.scrollTop = area.scrollHeight;
     area.querySelectorAll('.citation-attachments').forEach(function (container) {
       App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：');
