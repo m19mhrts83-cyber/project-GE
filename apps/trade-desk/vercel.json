@@ -13,7 +13,8 @@
       "codex/kamiooya-community-attachment-daily": false,
       "codex/kamiooya-semantic-message-role": false,
       "codex/kamiooya-qa-reliability-20261106": false,
-      "codex/kamiooya-search-efficiency-20261106": false
+      "codex/kamiooya-search-efficiency-20261106": false,
+      "codex/kamiooya-search-mode-copy-20261106": false
     }
   }
 }

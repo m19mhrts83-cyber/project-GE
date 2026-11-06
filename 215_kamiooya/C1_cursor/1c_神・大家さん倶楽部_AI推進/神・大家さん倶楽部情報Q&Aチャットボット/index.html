@@ -251,7 +251,7 @@
               </div>
               <div class="flex items-center justify-between gap-3 mb-3 text-xs">
                 <div class="text-slate-500">
-                  通常検索はキーワード一致（比較的短い）。意味検索は言い換えも含め網羅的に探します（時間がかかることがあります）。
+                  通常検索はキーワード一致を優先し、意味検索は言い換えや関連事例も探します。回答時間は質問・情報量・混雑状況によって変わります。
                 </div>
                 <button
                   id="semanticModeToggle"
@@ -735,9 +735,9 @@
         <button type="button" id="semanticWarningCloseBtn" class="px-2 py-1 rounded border text-sm">閉じる</button>
       </div>
       <div class="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-        <p class="font-semibold mb-1">網羅的に調べるため、時間がかかることがあります</p>
+        <p class="font-semibold mb-1">言い換えや関連事例を含めて探します</p>
         <p>
-          意味検索はベクトル検索と要約を行うため、<span class="font-semibold">1回あたり数十秒〜1分以上</span>かかることがあります（混雑時はそれ以上）。すぐ答えが欲しいときは通常検索（OFF）を使ってください。
+          通常検索と意味検索は探し方が異なります。どちらが速いかは一定ではなく、質問・情報量・混雑状況によって変わります。どちらのモードも数分かかる場合があります。
         </p>
         <p class="mt-2 text-xs">
           デフォルトはOFFです。有効化はこのタブのあいだだけ有効で、ページ再読込や再ログイン後はOFFに戻ります。
@@ -760,11 +760,6 @@
               <td class="p-2 font-medium">探し方</td>
               <td class="p-2">キーワード一致を優先</td>
               <td class="p-2">意味の近さで関連候補を探す</td>
-            </tr>
-            <tr class="border-t">
-              <td class="p-2 font-medium">所要時間</td>
-              <td class="p-2">比較的短い（目安 10〜30秒）</td>
-              <td class="p-2 font-semibold text-amber-900">長い（数十秒〜1分以上のことも）</td>
             </tr>
             <tr class="border-t">
               <td class="p-2 font-medium">向いている質問</td>
