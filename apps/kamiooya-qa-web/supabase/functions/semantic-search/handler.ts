@@ -1,4 +1,5 @@
 import {labelAnswerSources,attachReferenceLabels,mentionedSourceLabels} from '../../../lib/searchReferences.ts';
+import {createQueryEmbeddingCache,embeddingKey} from '../../../lib/queryEmbeddingCache.ts';
 // Supabase Edge Function: semantic search + answer summary.
 // Auth: X-Semantic-Shared-Secret (or body.secret). Deploy with --no-verify-jwt.
 //
@@ -10,6 +11,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 const GEMINI_EMBED_MODEL = "gemini-embedding-001";
 const GEMINI_ANSWER_MODEL = "gemini-3-flash-preview";
 const GEMINI_EMBED_DIM = 768;
+const queryEmbeddingCache=createQueryEmbeddingCache(GEMINI_EMBED_DIM);
 const GEMINI_EMBED_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_EMBED_MODEL}:embedContent`;
 const GEMINI_GENERATE_URL =
@@ -614,7 +616,11 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       : DEFAULT_MATCH_THRESHOLD;
     const skipAnswer = body?.skip_answer === true;
 
-    const embedding = await embedQuery(query, req.signal);
+    const embeddingStarted=performance.now();
+    const cached=await queryEmbeddingCache.get(await embeddingKey(GEMINI_EMBED_MODEL,'RETRIEVAL_QUERY',GEMINI_EMBED_DIM,query),
+      signal=>embedQuery(query,signal),req.signal);
+    const embedding=cached.values;
+    const embeddingMs=Math.round(performance.now()-embeddingStarted);
 
     const [commentsRpc, chunksRpc, openchatRows] = await Promise.all([
       sb.rpc("match_comments_semantic", {
@@ -756,6 +762,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       used_sources: usedSources,
       result_status: "ok",
       ...usageColumns(geminiUsage),
+      meta:{embedding_cache_hit:cached.cacheHit,embedding_ms:embeddingMs},
     });
 
     return json({
@@ -769,6 +776,8 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       referenceSelection:hasMentioned?"mentioned":"provided-context",
       hitCount: commentRows.length + relatedChunks.length + openchatRows.length,
       meta: {
+        embeddingCacheHit:cached.cacheHit,
+        embeddingMs,
         commentHitCount: commentRows.length,
         chunkHitCount: relatedChunks.length,
         openchatHitCount: openchatRows.length,

@@ -1502,6 +1502,8 @@ const App = {
 
   hydrateHistoricalReferences: async (sessionId, loadGeneration) => {
     if(!App.authGatewayBase)return;
+    const assistants=(App.state.chatMessages||[]).filter(m=>m.role==='assistant'&&m.id!=null);
+    if(!assistants.some(m=>{const refs=(App.state.citationsByMessageId||{})[String(m.id)]||[];return !refs.length||refs.some(c=>!c.citationLabel);}))return;
     const uid=String((App.state.currentUser||{}).id||'');
     const current=()=>String((App.state.currentUser||{}).id||'')===uid&&App.state.messageLoadGeneration===loadGeneration&&String(App.state.currentSessionId)===String(sessionId);
     try{
