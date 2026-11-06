@@ -10,6 +10,9 @@ const App = {
     authToken: '',
     attachmentToken: '',
     attachmentIndex: {},
+    referenceComments: {},
+    attachmentLoading: false,
+    attachmentStatus: '',
     attachmentGeneration: 0,
     attachmentDetailCommentId: '',
     currentSessionId: null,
@@ -52,6 +55,8 @@ const App = {
     semanticMode: false,
     loadingCount: 0,
     sendAbortController: null,
+    pendingAnswerRequest: null,
+    answerJobStatus: '',
     pendingQuestionText: '',
     preferFastSummary: false,
     resetPasswordEmail: '',
@@ -94,7 +99,8 @@ const App = {
           (errorData._rawBody ? String(errorData._rawBody).trim().slice(0, 280) : '');
         const suffix = response.status ? '（HTTP ' + response.status + '）' : '';
         const apiErr = new Error((msg || 'APIエラーが発生しました') + suffix);
-        const code = errorData.errorCode || errorData.error_code;
+        apiErr.httpStatus=response.status;
+        const code = errorData.errorCode || errorData.error_code || errorData.error;
         if (code) {
           apiErr.errorCode = code;
         }
@@ -306,6 +312,10 @@ const App = {
     if (cancelXferBtn) {
       cancelXferBtn.addEventListener('click', App.cancelMasterTransfer);
     }
+    const resumeAnswerBtn=document.getElementById('resumeAnswerBtn');
+    if(resumeAnswerBtn)resumeAnswerBtn.addEventListener('click',()=>App.resumePendingAnswer());
+    const retryAttachmentsBtn=document.getElementById('retryAttachmentsBtn');
+    if(retryAttachmentsBtn)retryAttachmentsBtn.addEventListener('click',()=>{if(!App.state.attachmentLoading&&App.state.currentUser)void App.initializeAttachments('','',App.state.attachmentGeneration);});
     document.getElementById('logoutBtn').addEventListener('click', App.logout);
     document.getElementById('newChatBtn').addEventListener('click', App.createNewChatPlaceholder);
     App.elements.messageForm.addEventListener('submit', App.handleSendMessage);
@@ -475,8 +485,8 @@ const App = {
   setLoading: (isLoading) => {
     if (isLoading) App.state.loadingCount += 1;
     if (!isLoading) App.state.loadingCount = Math.max(0, App.state.loadingCount - 1);
-    if (App.state.loadingCount > 0) App.elements.loadingOverlay.classList.add('active');
-    if (App.state.loadingCount === 0) App.elements.loadingOverlay.classList.remove('active');
+    if(App.state.loadingCount>0 && !(App.authGatewayBase&&App.state.pendingQuestionText))App.elements.loadingOverlay.classList.add('active');
+    else App.elements.loadingOverlay.classList.remove('active');
     if (App.elements.fastSummaryLink) {
       if (App.state.loadingCount > 0 && App.state.pendingQuestionText) {
         App.elements.fastSummaryLink.classList.remove('hidden');
@@ -1189,8 +1199,9 @@ const App = {
       App.state.attachmentGeneration += 1;
       App.state.attachmentToken = '';
       App.state.attachmentIndex = {};
-      App.afterLogin();
+      Promise.resolve(App.afterLogin()).then(()=>App.resumePendingAnswer()).catch(()=>{});
       void App.initializeAttachments(email, password, App.state.attachmentGeneration);
+      void App.loadReferenceMetadata(App.state.attachmentGeneration);
       App.showToast('ログインしました', 'success');
     } catch (error) {
       App.showToast(error.message || 'ログインに失敗しました', 'error');
@@ -1238,9 +1249,7 @@ const App = {
     try {
       await Promise.all([
         App.loadChatSessions(),
-        App.loadSuggestedQuestions(),
-        App.loadComments(),
-        App.loadKnowledge()
+        App.loadSuggestedQuestions()
       ]);
       if (App.isStaffAdmin()) {
         await App.loadPendingUsers();
@@ -1258,16 +1267,19 @@ const App = {
   logout: () => {
     if (App.authGatewayBase && App.state.authToken) void App.apiClient('POST', '/auth/logout', {}).catch(() => {});
     App.state.authToken = '';
+    if(App.state.sendAbortController)App.state.sendAbortController.abort();
+    App.state.pendingAnswerRequest=null;App.state.answerJobStatus='';App.renderAnswerJobStatus();
     App.state.attachmentGeneration += 1;
     App.state.attachmentToken = '';
     App.state.attachmentIndex = {};
+    App.state.referenceComments={};App.state.attachmentStatus='';App.state.attachmentLoading=false;App.renderAttachmentStatus();
     App.state.attachmentDetailCommentId = '';
     App.state.currentUser = null;
     App.state.currentSessionId = null;
     App.state.chatSessions = [];
     App.state.chatMessages = [];
     App.state.suggestedQuestions = [];
-    App.state.comments = [];
+    App.state.comments = [];App.state.referenceReady={};App.state.referenceLoads={};
     App.state.pendingUsers = [];
     App.state.approvedUsers = [];
     App.state.roleRequestUsers = [];
@@ -1309,6 +1321,7 @@ const App = {
       }
     });
     App.state.currentScreen = screenName || 'chat';
+    if(['comments','lessons','knowledge'].includes(screenName))void App.ensureReferenceData(screenName);
     App.elements.sidebar.classList.remove('mobile-open');
     // サイドバー手動遷移・戻る完了時は citation 用戻るバーを隠す
     if (opts.fromNav || opts.fromBack) {
@@ -1487,17 +1500,66 @@ const App = {
     return list;
   },
 
+  hydrateHistoricalReferences: async (sessionId, loadGeneration) => {
+    if(!App.authGatewayBase)return;
+    const uid=String((App.state.currentUser||{}).id||'');
+    const current=()=>String((App.state.currentUser||{}).id||'')===uid&&App.state.messageLoadGeneration===loadGeneration&&String(App.state.currentSessionId)===String(sessionId);
+    try{
+      const data=await App.apiClient('GET','/chat-sessions/'+sessionId+'/reference-events');if(!current())return;
+      const messages=App.state.chatMessages||[];
+      (data.sources||[]).forEach(row=>{if(row.source_key)App.state.knowledgeSources[row.source_key]=row;});
+      let changed=false;
+      messages.forEach((message,index)=>{
+        if(message.role!=='assistant'||message.id==null)return;
+        const old=(App.state.citationsByMessageId||{})[String(message.id)]||[];
+        if(old.length&&old.every(c=>c.citationLabel))return;
+        const user=messages.slice(0,index).reverse().find(m=>m.role==='user');if(!user)return;
+        const posted=App.referenceDateParts(message.created_at);if(!posted)return;
+        const completed=(data.jobs||[]).filter(job=>{const date=App.referenceDateParts(job.finished_at);return date&&Math.abs(date.ms-posted.ms)<10000&&String(job.query||'').trim()===String(user.content||'').trim();});
+        if(completed.length===1&&completed[0].result){
+          const r=completed[0].result,used=App.parseUsedSources(r.usedSources||'');
+          const refs=App.buildCitationsFromRelated([].concat(r.relatedComments||[],r.relatedLessonComments||[]),r.relatedChunks||[],r.relatedSources||[],used.ok?{commentIds:used.commentIds,chunkKeys:used.chunkKeys,openchatIds:used.openchatIds,strict:true}:null,r.relatedOpenchat||[],r.referenceSelection);
+          if(refs.length){App.saveCitationsForMessage(sessionId,String(message.id),refs);changed=true;return;}
+        }
+        const candidates=(data.events||[]).filter(event=>{
+          const date=App.referenceDateParts(event.created_at);
+          return date&&Math.abs(date.ms-posted.ms)<10000&&String(event.query_text||'').trim()===String(user.content||'').trim();
+        });
+        // Ambiguous or missing history never gets a guessed number assignment.
+        if(candidates.length!==1)return;
+        let used=candidates[0].used_sources;try{if(typeof used==='string')used=JSON.parse(used);}catch(error){return;}
+        if(!used||!Array.isArray(used.chunk_keys)||!Array.isArray(used.comment_ids))return;
+        const labels={};
+        (used.comment_ids||[]).forEach((key,i)=>{labels['comment:'+key]='コミュニティ'+(i+1);labels['lesson:'+key]='コミュニティ'+(i+1);});
+        (used.chunk_keys||[]).forEach((key,i)=>{labels['video_chunk:'+key]='セミナー'+(i+1);});
+        (used.openchat_ids||[]).forEach((key,i)=>{labels['openchat:'+key]='LINEオプチャ'+(i+1);});
+        const next=old.map(c=>Object.assign({},c,{citationLabel:labels[c.kind+':'+String(c.commentId||c.chunkKey||c.openchatId)]||c.citationLabel||''}));
+        for(const key of used.chunk_keys){
+          if(next.some(c=>c.chunkKey===key))continue;
+          const chunk=(data.chunks||[]).find(row=>row.chunk_key===key);if(!chunk)continue;
+          const extra=App.buildCitationsFromRelated([], [Object.assign({},chunk,{citation_label:labels['video_chunk:'+key]})],data.sources||[],null,[]);
+          next.push(...extra);
+        }
+        if(next.length){App.saveCitationsForMessage(sessionId,String(message.id),next);App.state.citationsByMessageId[String(message.id)]=next;changed=true;}
+      });
+      if(changed&&current())App.renderChatMessages();
+    }catch(error){}
+  },
+
   loadSessionDetails: async (sessionId) => {
     if (!sessionId) {
       App.showToast('セッションIDが未選択です', 'error');
       return;
     }
+    const owner=String((App.state.currentUser||{}).id||'');const generation=(App.state.messageLoadGeneration||0)+1;App.state.messageLoadGeneration=generation;
     const res = await App.apiClient('GET', '/chat-sessions/' + sessionId);
+    if(generation!==App.state.messageLoadGeneration||owner!==String((App.state.currentUser||{}).id||''))return;
     App.state.chatMessages = (res && res.messages) ? res.messages : [];
     App.restoreCitationsForSession(sessionId);
     App.renderChatMessages();
     App.state.currentSessionId = sessionId;
     App.renderSessionList();
+    void App.hydrateHistoricalReferences(sessionId,generation);
   },
 
   loadSuggestedQuestions: async () => {
@@ -1684,9 +1746,40 @@ const App = {
       .join('');
   },
 
+  ensureReferenceData: async (screen) => {
+    const key=screen==='knowledge'?'knowledge':'comments';
+    const ready=App.state.referenceReady||(App.state.referenceReady={});
+    const loads=App.state.referenceLoads||(App.state.referenceLoads={});
+    if(ready[key])return;
+    if(loads[key])return loads[key];
+    const generation=App.state.attachmentGeneration;
+    if(key==='comments'&&App.elements.commentListMeta)App.elements.commentListMeta.textContent='コメント一覧を取得中…';
+    const task=(key==='comments'?App.loadComments():App.loadKnowledge()).then(()=>{if(App.state.attachmentGeneration===generation)ready[key]=true;}).catch(error=>{if(App.state.attachmentGeneration===generation)App.showToast(error.message||'参照一覧の取得に失敗しました。メニューを開き直して再試行してください。','error');}).finally(()=>{delete loads[key];});
+    loads[key]=task;return task;
+  },
+
   loadComments: async () => {
-    const res = await App.apiClient('GET', '/comments');
-    const rows = (res && res.comments) ? res.comments : [];
+    const generation=App.state.attachmentGeneration;
+    const uid=String((App.state.currentUser||{}).id||'');
+    const current=()=>App.state.attachmentGeneration===generation&&String((App.state.currentUser||{}).id||'')===uid;
+    let rows=[];
+    if(App.authGatewayBase){
+      let after=0;
+      for(let page=0;page<100;page++){
+        const res=await App.retryRead(()=>App.apiClient('POST','/comments-page',{after_id:after}),current);
+        if(!current())return;
+        const part=res&&res.comments;
+        if(!Array.isArray(part)||part.length>500)throw new Error('コメント一覧の取得結果を確認できませんでした');
+        let previous=after;
+        for(const row of part){const id=Number(row.id);if(!Number.isSafeInteger(id)||id<=previous)throw new Error('コメント一覧の順序を確認できませんでした');previous=id;}
+        rows.push(...part);
+        if(part.length<500)break;
+        after=previous;
+        if(page===99)throw new Error('コメント一覧の上限を超えました');
+      }
+    }else{const res=await App.apiClient('GET','/comments');rows=(res&&res.comments)||[];}
+    if(!current())return;
+    rows.sort((a,b)=>String(b.posted_at||'').localeCompare(String(a.posted_at||''))||Number(b.id)-Number(a.id));
     App.state.comments = rows.map(App.enrichCommentCategory);
     App.renderCommentCategoryFilterOptions();
     App.renderCommentTable();
@@ -1732,6 +1825,8 @@ const App = {
 
   enrichCommentCategory: (row) => {
     if (!row || typeof row !== 'object') return row;
+    const referenceMeta=(App.state.referenceComments||{})[String(row.comment_id||row.commentId||'')]||{};
+    if(!row.forum_category && referenceMeta.forum_category)row.forum_category=referenceMeta.forum_category;
     const existing = String(row.forum_category || row.forumCategory || '').trim();
     if (existing && existing !== '未分類') {
       row.forum_category = existing;
@@ -1757,6 +1852,8 @@ const App = {
     if (direct) return direct;
     const cid = String(row.comment_id || row.commentId || '').trim();
     if (!cid) return '';
+    const metadata = (App.state.referenceComments || {})[cid];
+    if(metadata && metadata.posted_at)return String(metadata.posted_at);
     const hit = (App.state.comments || []).find(function (c) {
       return String(App.commentField(c, 'comment_id') || '').trim() === cid;
     });
@@ -1764,11 +1861,13 @@ const App = {
   },
 
   loadKnowledge: async () => {
+    const generation=App.state.attachmentGeneration;
     try {
       const [srcRes, chunkRes] = await Promise.all([
         App.apiClient('GET', '/knowledge-sources'),
         App.apiClient('GET', '/knowledge-chunks')
       ]);
+      if(App.state.attachmentGeneration!==generation)return;
       const sources = (srcRes && srcRes.sources) ? srcRes.sources : [];
       const map = {};
       sources.forEach(function (s) {
@@ -1778,8 +1877,7 @@ const App = {
       App.state.knowledgeChunks = (chunkRes && chunkRes.chunks) ? chunkRes.chunks : [];
     } catch (e) {
       console.warn('knowledge load skipped', e);
-      App.state.knowledgeChunks = App.state.knowledgeChunks || [];
-      App.state.knowledgeSources = App.state.knowledgeSources || {};
+      throw e;
     }
     App.renderKnowledgeTable();
   },
@@ -1799,17 +1897,14 @@ const App = {
   },
 
   withVideoTimeUrl: (url, startSec) => {
-    if (!url) return '';
-    if (/[?&#]t=/.test(url)) return url;
-    // Vimeo は ?t= では頭出しされないため #t=秒s を使う
-    if (/^https?:\/\/(?:www\.)?vimeo\.com\//.test(url)) {
-      return url.split('#')[0] + '#t=' + Math.floor(Number(startSec) || 0) + 's';
-    }
-    const hashIdx = url.indexOf('#');
-    const base = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
-    const hash = hashIdx >= 0 ? url.slice(hashIdx) : '';
-    const sep = base.indexOf('?') >= 0 ? '&' : '?';
-    return base + sep + 't=' + Math.floor(Number(startSec) || 0) + hash;
+    if(!url)return '';
+    try {
+      const u=new URL(url);if(!['http:','https:'].includes(u.protocol))return '';
+      const sec=Math.max(0,Math.floor(Number(startSec)||0));
+      if(u.hostname==='vimeo.com'||u.hostname.endsWith('.vimeo.com')){u.searchParams.delete('t');u.hash='t='+sec+'s';}
+      else {u.searchParams.set('t',String(sec));}
+      return u.href;
+    }catch(e){return '';}
   },
 
   normalizeRelatedList: (value) => {
@@ -2010,7 +2105,7 @@ const App = {
       lastId && map[lastId] ? map[lastId] : [];
   },
 
-  buildCitationsFromRelated: (relatedComments, relatedChunks, relatedSources, usedFilter, relatedOpenchat) => {
+  buildCitationsFromRelated: (relatedComments, relatedChunks, relatedSources, usedFilter, relatedOpenchat, selection) => {
     const citations = [];
     const sourcesMap = Object.assign({}, App.state.knowledgeSources || {});
     const sourcesById = {};
@@ -2039,10 +2134,12 @@ const App = {
       const isLesson = srcSystem === 'lesson' || String(cid).startsWith('lesson_desc_');
       citations.push({
         kind: isLesson ? 'lesson' : 'comment',
+        citationLabel: enriched.citation_label || '',
         sourceType: isLesson ? 'WeStudy基礎動画' : 'WeStudyコミュニティ',
         commentId: cid,
         authorName: enriched.author_name || enriched.authorName || '',
         postedAt: App.resolveCommentPostedAt(enriched),
+        inferredYear: Number(((App.state.referenceComments||{})[cid]||{}).inferred_year)||null,
         forumCategory:
           String(enriched.forum_category || enriched.forumCategory || '').trim() || '未分類',
         topicTitle: String(enriched.topic_title || enriched.topicTitle || '').trim(),
@@ -2069,10 +2166,14 @@ const App = {
       const start = ch.start_sec != null ? Number(ch.start_sec) : 0;
       citations.push({
         kind: 'video_chunk',
+        citationLabel: ch.citation_label || '',
         sourceType: 'WeStudyセミナー動画',
         chunkKey: chunkKey,
-        videoTitle: src.title || sk || '（タイトル不明）',
+        sourceKey: sk,
+        sourceId: ch.source_id,
+        videoTitle: App.displaySourceTitle(src.title || sk || '（タイトル不明）'),
         videoUrl: App.withVideoTimeUrl(src.video_url || '', start),
+        videoPageUrl: App.knowledgeVideoPageUrl(src,App.knowledgeSourceMeta(src)),
         startSec: start,
         startLabel: App.formatMmSs(start),
         snippet: String(ch.content || '').replace(/\s+/g, ' ').slice(0, 220)
@@ -2092,6 +2193,7 @@ const App = {
             : 'メイン';
       citations.push({
         kind: 'openchat',
+        citationLabel: o.citation_label || '',
         sourceType: 'LINEオプチャ',
         openchatId: oid,
         chatTitle: String(o.chat_title || o.chatTitle || o.chat_name || o.chatName || '').trim(),
@@ -2102,7 +2204,7 @@ const App = {
         snippet: String(o.content || '').replace(/\s+/g, ' ').slice(0, 220)
       });
     });
-    return citations;
+    return citations.map(c=>Object.assign({},c,{referenceSelection:selection||'unknown'}));
   },
 
   /**
@@ -2209,257 +2311,57 @@ const App = {
   /**
    * 関連セミナー動画（タイトル単位で集約）＋関連コミュニティ投稿＋関連動画ページ説明
    */
-  renderCitationsPanel: (citations) => {
-    if (!citations || !citations.length) return '';
+  citationDateLabel: (c) => {
+    const date=App.referenceDateParts(c.postedAt);
+    return date?date.label:c.inferredYear?c.inferredYear+'年（IDから推定・月日不明）':'日時未記録';
+  },
 
-    const videoList = [];
-    const commentList = [];
-    const lessonList = [];
-    const openchatList = [];
-    citations.forEach(function (c) {
-      if (!c) return;
-      if (c.kind === 'video_chunk') {
-        videoList.push(c);
-        return;
+  renderCitationsPanel: (citations, messageId, answer) => {
+    if(!citations||!citations.length)return '';
+    const esc=App.escapeHtml;
+    const badge=c=>c.citationLabel?'<strong class="text-blue-900">['+esc(c.citationLabel)+']</strong> ':'';
+    const attrs=c=>' id="'+esc(App.citationAnchor(c,messageId))+'" class="mb-2 scroll-mt-4"';
+    const db=(kind,key)=>' <button type="button" class="citation-db-link text-blue-700 underline" data-kind="'+esc(kind)+'" data-key="'+esc(key||'')+'">本文を見る</button>';
+    const dated=(list,item)=>App.groupReferencesByDate(list).map(g=>'<div class="font-medium text-slate-700 mt-2">'+esc(g.label)+'</div><ul class="citations-list mb-2">'+g.items.map(item).join('')+'</ul>').join('');
+    const comments=citations.filter(c=>c.kind==='comment');
+    const lines=citations.filter(c=>c.kind==='openchat');
+    const lessons=citations.filter(c=>c.kind==='lesson');
+    const videos=citations.filter(c=>c.kind==='video_chunk');
+    const parts=[];
+    const expanded=String(answer||'').replace(/(LINEオプチャ|コミュニティ|セミナー)(\d+(?:\s*[、,]\s*\d+)+)/g,(_,p,ns)=>ns.split(/[、,]/).map(n=>p+Number(n.trim())).join('、'));
+    const mentioned=Array.from(new Set(expanded.match(/(?:LINEオプチャ|コミュニティ|セミナー)\d+/g)||[]));
+    const cited=mentioned.map(label=>citations.find(c=>c.citationLabel===label)).filter(Boolean);
+    if(cited.length)parts.push('<div class="font-semibold mb-1">本文で引用した根拠（登場順）</div><ul class="mb-3">'+cited.map(c=>{
+      const anchor='<a class="text-blue-700 underline" href="#'+esc(App.citationAnchor(c,messageId))+'">'+esc(c.citationLabel)+'</a>';
+      if(c.kind==='video_chunk'){
+        const page=App.safeReferenceUrl(c.videoPageUrl),u=page||App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl,c.startSec||0));const title=esc(c.videoTitle||'動画タイトル未登録')+' ・ '+esc(App.formatMmSs(c.startSec||0));
+        return '<li class="mb-1">'+anchor+' ・ '+(u?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+title+(page?' 元動画ページを開く':' から再生')+'</a>':title)+'</li>';
       }
-      if (c.kind === 'openchat' || c.sourceType === 'LINEオプチャ') {
-        openchatList.push(c);
-        return;
-      }
-      const cid = String(c.commentId || '').trim();
-      const isLesson =
-        c.kind === 'lesson' ||
-        c.sourceType === 'WeStudy学習動画' ||
-        cid.indexOf('lesson_desc_') === 0;
-      if (isLesson) lessonList.push(c);
-      else commentList.push(c);
-    });
-
-    const groups = {};
-    const groupOrder = [];
-    videoList.forEach(function (c) {
-      const title = String(c.videoTitle || '').trim() || '（タイトル不明）';
-      if (!groups[title]) {
-        groups[title] = {
-          title: title,
-          entries: [],
-          videoUrl: '',
-          searchKey: c.chunkKey || title
-        };
-        groupOrder.push(title);
-      }
-      const g = groups[title];
-      const sec = c.startSec != null ? Number(c.startSec) : NaN;
-      if (!isNaN(sec) && !g.entries.some(function (e) { return e.sec === sec; })) {
-        g.entries.push({ sec: sec, snippet: String(c.snippet || '').trim().slice(0, 120) });
-      }
-      if (!g.videoUrl && c.videoUrl) g.videoUrl = String(c.videoUrl);
-      if (c.chunkKey && g.searchKey === title) g.searchKey = c.chunkKey;
-    });
-    groupOrder.forEach(function (t) {
-      groups[t].entries.sort(function (a, b) {
-        return a.sec - b.sec;
-      });
-    });
-
-    const parts = [];
-
-    const videoLis = groupOrder.map(function (t) {
-      const g = groups[t];
-      const baseUrl = String(g.videoUrl || '')
-        .replace(/#t=\d+s?$/, '')
-        .replace(/[?&]t=\d+/g, '')
-        .replace(/\?&/, '?')
-        .replace(/[?&]$/, '');
-      const openDb =
-        '<button type="button" class="citation-db-link text-blue-700 underline ml-1" data-kind="video_chunk" data-key="' +
-        App.escapeHtml(g.title) +
-        '">DBで見る</button>';
-      // 「何分何秒あたりで何を話しているか」を1行ずつ。時刻リンクでその位置から再生
-      const entryLis = g.entries.map(function (e) {
-        const label = App.formatMmSs(e.sec) + '〜';
-        const timeHtml = baseUrl
-          ? '<a class="text-blue-600 underline whitespace-nowrap" target="_blank" rel="noopener noreferrer" href="' +
-            App.escapeHtml(App.withVideoTimeUrl(baseUrl, e.sec)) +
-            '">' + App.escapeHtml(label) + '</a>'
-          : '<span class="whitespace-nowrap">' + App.escapeHtml(label) + '</span>';
-        return (
-          '<li class="mt-0.5">' +
-          timeHtml +
-          (e.snippet ? ' <span class="text-slate-600">「' + App.escapeHtml(e.snippet) + '…」</span>' : '') +
-          '</li>'
-        );
-      });
-      return (
-        '<li class="mb-2">' +
-        '<span class="font-medium">' + App.escapeHtml(App.displaySourceTitle(g.title)) + '</span>' +
-        openDb +
-        (entryLis.length ? '<ul class="ml-4 list-none text-xs">' + entryLis.join('') + '</ul>' : '') +
-        '</li>'
-      );
-    });
-    if (videoLis.length) {
-      parts.push(
-        '<div class="font-semibold mb-1">関連セミナー動画</div>' +
-          '<ul class="citations-list mb-2">' +
-          videoLis.join('') +
-          '</ul>'
-      );
+      if(c.kind==='lesson')return '<li class="mb-1">'+anchor+' ・ '+esc(c.lessonTitle||c.topicTitle||'講座ページ')+db('lesson',c.commentId)+'</li>';
+      return '<li class="mb-1">'+anchor+' ・ '+esc(App.citationDateLabel(c))+db(c.kind,c.commentId||c.openchatId)+'</li>';
+    }).join('')+'</ul>');
+    if(videos.length){
+      const rows=videos.map(c=>{
+        const page=App.safeReferenceUrl(c.videoPageUrl),url=page||App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl||'',c.startSec||0));
+        const label=esc(c.videoTitle||'動画タイトル未登録')+' ・ '+esc(App.formatMmSs(c.startSec||0));
+        return '<li'+attrs(c)+'>'+badge(c)+(url?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(url)+'">'+label+(page?' 元動画ページを開く':' から再生')+'</a>':label+'（動画URL未登録）')+db('video_chunk',c.chunkKey||c.videoTitle)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div></li>';
+      }).join('');
+      parts.push('<div class="font-semibold mb-1">動画の根拠（タイトル・再生位置）</div>'+(videos.some(c=>c.videoPageUrl)?'<p class="text-slate-600 mb-2">元動画ページでは、表示された時刻へ移動してください。</p>':'')+'<ul class="citations-list mb-2">'+rows+'</ul>');
     }
-
-    const commentItemHtml = function (c) {
-      const authorLabel = App.formatAuthorForDisplay(c.authorName || '');
-      return (
-        '<li class="mb-1">' +
-        App.escapeHtml(authorLabel) +
-        ' #' +
-        App.escapeHtml(c.commentId || '') +
-        ' <button type="button" class="citation-db-link text-blue-700 underline" data-kind="comment" data-key="' +
-        App.escapeHtml(c.commentId || '') +
-        '">DBで見る</button>' +
-        '<div class="text-slate-600">' +
-        App.escapeHtml(c.snippet || '') +
-        '</div><span class="citation-attachments" data-comment-id="' +
-        App.escapeHtml(c.commentId || '') + '"></span></li>'
-      );
-    };
-
-    const lessonItemHtml = function (c) {
-      const title =
-        String(c.lessonTitle || '').trim() ||
-        String(c.topicTitle || '').trim() ||
-        String(c.commentId || '').trim();
-      const tab = String(c.sourceKind || '').trim();
-      const openUrl = String(c.lessonUrl || '').trim();
-      const openLesson = openUrl
-        ? (' <a class="text-blue-600 underline" target="_blank" rel="noopener noreferrer" href="' +
-          App.escapeHtml(openUrl) +
-          '">ページを開く</a>')
-        : '';
-      return (
-        '<li class="mb-1">' +
-        (tab ? App.escapeHtml(tab) + ' / ' : '') +
-        App.escapeHtml(title) +
-        ' <button type="button" class="citation-db-link text-blue-700 underline" data-kind="lesson" data-key="' +
-        App.escapeHtml(c.commentId || '') +
-        '">DBで見る</button>' +
-        openLesson +
-        '<div class="text-slate-600">' +
-        App.escapeHtml(c.snippet || '') +
-        '</div></li>'
-      );
-    };
-
-    // 分類 → 年（新しい年優先）→ 投稿（新しい順）。参照分は全件
-    const sortedComments = commentList.slice().sort(function (a, b) {
-      const ta = App.postedAtSortKey(a.postedAt);
-      const tb = App.postedAtSortKey(b.postedAt);
-      return tb - ta;
-    });
-    const byCategory = {};
-    const categoryOrder = [];
-    sortedComments.forEach(function (c) {
-      const cat = String(c.forumCategory || '未分類').trim() || '未分類';
-      if (!byCategory[cat]) {
-        byCategory[cat] = [];
-        categoryOrder.push(cat);
-      }
-      byCategory[cat].push(c);
-    });
-    categoryOrder.sort(function (a, b) {
-      if (a === '未分類') return 1;
-      if (b === '未分類') return -1;
-      return a.localeCompare(b, 'ja');
-    });
-
-    let commentBlock = '';
-    categoryOrder.forEach(function (cat) {
-      const list = byCategory[cat];
-      const byYear = {};
-      const yearOrder = [];
-      list.forEach(function (c) {
-        const y = App.parsePostedYear(c.postedAt);
-        const key = y != null ? String(y) : 'unknown';
-        if (!byYear[key]) {
-          byYear[key] = [];
-          yearOrder.push(key);
-        }
-        byYear[key].push(c);
-      });
-      yearOrder.sort(function (a, b) {
-        if (a === 'unknown') return 1;
-        if (b === 'unknown') return -1;
-        return Number(b) - Number(a);
-      });
-      commentBlock +=
-        '<div class="font-semibold text-slate-800 mt-2 mb-0.5">' +
-        App.escapeHtml(cat) +
-        '</div>';
-      yearOrder.forEach(function (key) {
-        const heading = key === 'unknown' ? '日時不明' : key + '年';
-        commentBlock +=
-          '<div class="font-medium text-slate-600 mt-1 mb-0.5 ml-1">' +
-          App.escapeHtml(heading) +
-          '</div>' +
-          '<ul class="citations-list mb-1 ml-1">' +
-          byYear[key].map(commentItemHtml).join('') +
-          '</ul>';
-      });
-    });
-    if (commentBlock) {
-      parts.push(
-        '<div class="font-semibold mb-1">関連コミュニティ投稿</div>' + commentBlock
-      );
-    }
-
-    if (lessonList.length) {
-      const lessonLis = lessonList.map(lessonItemHtml).join('');
-      parts.push(
-        '<div class="font-semibold mb-1">関連動画ページ説明</div>' +
-          '<ul class="citations-list mb-2">' +
-          lessonLis +
-          '</ul>'
-      );
-    }
-
-    if (openchatList.length) {
-      const openchatItemHtml = function (c) {
-        const when = App.formatOpenchatDateTime(c.postedAt);
-        const title = String(c.chatTitle || '').trim() || '（オプチャ名不明）';
-        const stream = String(c.streamLabel || '').trim();
-        const thread = String(c.threadTitle || '').trim();
-        const author = App.formatAuthorForDisplay
-          ? App.formatAuthorForDisplay(c.authorName || '')
-          : String(c.authorName || '');
-        const meta =
-          App.escapeHtml(title) +
-          (stream ? ' / ' + App.escapeHtml(stream) : '') +
-          (thread ? ' / ' + App.escapeHtml(thread) : '') +
-          (when ? ' / ' + App.escapeHtml(when) : '') +
-          (author ? ' / ' + App.escapeHtml(author) : '');
-        return (
-          '<li class="mb-1">' +
-          meta +
-          ' <button type="button" class="citation-db-link text-blue-700 underline" data-kind="openchat" data-key="' +
-          App.escapeHtml(c.openchatId || '') +
-          '">DBで見る</button>' +
-          '<div class="text-slate-600">' +
-          App.escapeHtml(App.cleanOpenchatDisplayText(c.snippet)) +
-          '</div></li>'
-        );
-      };
-      parts.push(
-        '<div class="font-semibold mb-1">関連LINEオプチャ</div>' +
-          '<ul class="citations-list mb-2">' +
-          openchatList.map(openchatItemHtml).join('') +
-          '</ul>'
-      );
-    }
-
-    if (!parts.length) return '';
-    return (
-      '<div class="citations-panel mt-3 border-t pt-2 text-xs">' + parts.join('') + '</div>'
-    );
+    if(comments.length)parts.push('<div class="font-semibold mb-1">コミュニティの根拠</div>'+dated(comments,c=>{
+      const d=App.referenceDateParts(c.postedAt),cat=c.forumCategory&&c.forumCategory!=='未分類'?' ・ '+esc(c.forumCategory):'';
+      return '<li'+attrs(c)+'>'+badge(c)+esc(App.citationDateLabel(c))+' ・ '+esc(App.formatAuthorForDisplay(c.authorName||''))+cat+' #'+esc(c.commentId||'')+db('comment',c.commentId)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div><span class="citation-attachments" data-comment-id="'+esc(c.commentId||'')+'"></span></li>';
+    }));
+    if(lines.length)parts.push('<div class="font-semibold mb-1">LINEオプチャの根拠</div>'+dated(lines,c=>{
+      const d=App.referenceDateParts(c.postedAt);
+      return '<li'+attrs(c)+'>'+badge(c)+(d?esc(d.label)+' ・ ':'')+esc(c.chatTitle||'オプチャ名未登録')+(c.streamLabel?' / '+esc(c.streamLabel):'')+(c.threadTitle?' / '+esc(c.threadTitle):'')+db('openchat',c.openchatId)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div></li>';
+    }));
+    if(lessons.length)parts.push('<div class="font-semibold mb-1">講座ページの根拠</div><ul class="citations-list mb-2">'+lessons.map(c=>{
+      const url=App.safeReferenceUrl(c.lessonUrl);
+      return '<li'+attrs(c)+'>'+badge(c)+esc(c.lessonTitle||c.topicTitle||c.commentId||'講座')+db('lesson',c.commentId)+(url?' <a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(url)+'">講座を開く</a>':'')+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div></li>';
+    }).join('')+'</ul>');
+    const note=citations.some(c=>c.referenceSelection==='provided-context')?'<p class="text-slate-600 mb-2">回答作成時の参考候補です。本文中の使用箇所が明示されていない情報も含みます。</p>':'';
+    return '<div class="citations-panel mt-3 border-t pt-2 text-xs">'+note+parts.join('')+'</div>';
   },
 
   cleanOpenchatDisplayText: (value) => {
@@ -3339,10 +3241,12 @@ const App = {
         if (m.role !== 'assistant' || !msgId) return [];
         const raw = (App.state.citationsByMessageId || {})[msgId] || [];
         return raw.map(function (c) {
-          if (!c || c.kind !== 'comment' || c.postedAt) return c;
+          if(!c)return c;
+          if(c.kind==='video_chunk'){const src=Object.values(App.state.knowledgeSources||{}).find(s=>s.source_key===c.sourceKey||String(s.id)===String(c.sourceId));if(src)return Object.assign({},c,{videoTitle:App.displaySourceTitle(src.title||c.videoTitle),videoUrl:App.withVideoTimeUrl(src.video_url||c.videoUrl||'',c.startSec||0),videoPageUrl:App.knowledgeVideoPageUrl(src,App.knowledgeSourceMeta(src))});}
+          if (c.kind !== 'comment' || c.postedAt) return c;
           const pa = App.resolveCommentPostedAt({ comment_id: c.commentId });
-          if (!pa) return c;
-          return Object.assign({}, c, { postedAt: pa });
+          const inferred=Number(((App.state.referenceComments||{})[c.commentId]||{}).inferred_year)||c.inferredYear||null;
+          return Object.assign({}, c, { postedAt: pa||'',inferredYear:inferred });
         });
       })();
 
@@ -3353,10 +3257,10 @@ const App = {
         '</div>' +
         '<div>' +
         (m.role === 'assistant'
-          ? '<div class="md-body">' + App.formatAssistantHtml(m.content || '') + '</div>'
+          ? '<div class="md-body">' + App.formatAssistantHtml(App.linkReferenceLabels(m.content || '', messageCitations, msgId)) + '</div>'
           : App.escapeHtml(m.content || '')) +
         '</div>' +
-        (m.role === 'assistant' ? App.renderCitationsPanel(messageCitations) : '');
+        (m.role === 'assistant' ? App.renderCitationsPanel(messageCitations, msgId, m.content) : '');
 
       wrap.appendChild(bubble);
       area.appendChild(wrap);
@@ -3378,6 +3282,13 @@ const App = {
       });
     });
 
+    area.querySelectorAll('a[href^="#reference-"]').forEach(function(link){
+      link.addEventListener('click',function(event){
+        const id=String(link.getAttribute('href')||'').slice(1),target=document.getElementById(id);
+        if(!target||!area.contains(target))return;
+        event.preventDefault();target.scrollIntoView({block:'start',behavior:'auto'});
+      });
+    });
     area.scrollTop = area.scrollHeight;
     area.querySelectorAll('.citation-attachments').forEach(function (container) {
       App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：');
@@ -3599,57 +3510,42 @@ const App = {
   },
 
   initializeAttachments: async (email, password, generation) => {
-    const userId = String((App.state.currentUser || {}).id || '');
-    const current = () => App.state.attachmentGeneration === generation &&
-      String((App.state.currentUser || {}).id || '') === userId;
-    try {
-      const session = await App.apiClient('POST', '/auth/attachment-session', {
-        ...(App.authGatewayBase ? {} : { email: email, password_hash: password })
-      });
-      if (!current()) return;
-      const token = String(session.token || '');
-      if (!token) throw new Error('添付セッションを取得できません');
-      App.state.attachmentToken = token;
-      const index = {};
-      let offset = 0;
-      for (let page = 0; page < 201; page++) {
-        if (!current()) return;
-        const data = await App.attachmentRequest({ operation: 'index', offset: offset }, token);
-        if (!current()) return;
-        (data.attachments || []).forEach(function (item) {
-          const cid = String(item.comment_id || '');
-          if (!index[cid]) index[cid] = [];
-          index[cid].push(item);
-        });
-        if (data.next_offset == null) {
-          App.state.attachmentIndex = index;
-          App.renderCommentTable();
-          App.renderChatMessages();
-          if (App.elements.commentDetailDialog && App.elements.commentDetailDialog.open &&
-              App.elements.commentDetailBody && App.state.attachmentDetailCommentId) {
-            App.appendAttachmentLinks(App.elements.commentDetailBody, App.state.attachmentDetailCommentId);
-          }
+    const userId=String((App.state.currentUser||{}).id||'');
+    const current=()=>App.state.attachmentGeneration===generation && String((App.state.currentUser||{}).id||'')===userId;
+    if(!current()||!userId)return;
+    App.state.attachmentLoading=true;App.state.attachmentStatus='添付情報を読み込み中…';App.renderAttachmentStatus();
+    try{
+      const session=await App.retryRead(()=>App.apiClient('POST','/auth/attachment-session',App.authGatewayBase?{}:{email:email,password_hash:password}),current);
+      if(!current())return;
+      const token=String(session.token||'');if(!token)throw new Error('invalid_attachment_session');
+      App.state.attachmentToken=token;
+      const index={};let offset=0;
+      for(let page=0;page<201;page++){
+        if(!current())return;
+        const data=await App.retryRead(()=>App.attachmentRequest({operation:'index',offset:offset},token),current);
+        if(!current())return;
+        if(!Array.isArray(data.attachments))throw new Error('invalid_attachment_index');
+        data.attachments.forEach(item=>{const cid=String(item.comment_id||'');if(!index[cid])index[cid]=[];index[cid].push(item);});
+        if(data.next_offset==null){
+          App.state.attachmentIndex=index;App.state.attachmentStatus='';
+          App.renderCommentTable();App.renderChatMessages();
+          if(App.elements.commentDetailDialog&&App.elements.commentDetailDialog.open&&App.elements.commentDetailBody&&App.state.attachmentDetailCommentId)App.appendAttachmentLinks(App.elements.commentDetailBody,App.state.attachmentDetailCommentId);
           return;
         }
-        offset = data.next_offset;
+        if(!Number.isInteger(data.next_offset)||data.next_offset<=offset)throw new Error('invalid_attachment_offset');
+        offset=data.next_offset;
       }
-      throw new Error('添付一覧の取得上限を超えました');
-    } catch (error) {
-      if (current()) App.showToast('添付情報を取得できませんでした。本文の閲覧は続けられます。', 'error');
-    }
+      throw new Error('attachment_index_limit');
+    }catch(error){
+      if(current())App.state.attachmentStatus=error&&[401,403].includes(error.httpStatus)?'添付の確認にはログインし直してください。':'添付の読み込みが中断しました。再取得できます。本文の閲覧は続けられます。';
+    }finally{if(current()){App.state.attachmentLoading=false;App.renderAttachmentStatus();}}
   },
 
   attachmentRequest: async (body, token) => {
-    const response = await fetch('https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/community-attachments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (token || App.state.attachmentToken || '') },
-      body: JSON.stringify(body)
+    const response=await fetch('https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/community-attachments',{
+      method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+(token||App.state.attachmentToken||'')},body:JSON.stringify(body)
     });
-    if (!response.ok) {
-      throw new Error(response.status === 401 || response.status === 403
-        ? '添付を開くには承認済みのアカウントでログインし直してください。'
-        : '添付ファイルを取得できませんでした。時間を置いて再試行してください。');
-    }
+    if(!response.ok){const error=new Error('attachment_request_failed');error.httpStatus=response.status;throw error;}
     return response.json();
   },
 
@@ -3748,15 +3644,16 @@ const App = {
     const missingDateCount = communityRows.reduce(function (n, row) {
       return n + (App.hasPostedAtValue(row) ? 0 : 1);
     }, 0);
+    const unknownYearCount=communityRows.reduce((n,row)=>n+(!App.hasPostedAtValue(row)&&!Number(((App.state.referenceComments||{})[String(App.commentField(row,'comment_id'))]||{}).inferred_year)?1:0),0);
     if (App.elements.commentListMeta) {
       App.elements.commentListMeta.textContent =
         '表示 ' +
         (filtered.length ? (offset + 1) + '〜' + (offset + visibleRows.length) : '0') +
         ' / 検索結果 ' + filtered.length + ' / 全 ' +
         totalCount +
-        ' 件（日時なし ' +
+        ' 件（月日不明 ' +
         missingDateCount +
-        ' 件）';
+        ' 件・年も不明 ' + unknownYearCount + ' 件）';
       if (filtered.length > pageSize) {
         const controls = document.createElement('span');
         controls.className = 'inline-flex gap-3 ml-3';
@@ -3781,7 +3678,8 @@ const App = {
       const tr = document.createElement('tr');
       tr.className = 'border-t';
       const postedAt = String(App.commentField(r, 'posted_at') || '').trim();
-      const postedAtLabel = App.formatOpenchatDateTime(postedAt) || '（日時なし）';
+      const inferredYear=Number(((App.state.referenceComments||{})[String(App.commentField(r,'comment_id'))]||{}).inferred_year)||null;
+      const postedAtLabel = App.formatOpenchatDateTime(postedAt) || (inferredYear?inferredYear+'年（IDから推定・月日不明）':'（日時なし）');
       const forumCategory =
         String(App.commentField(r, 'forum_category') || '').trim() || '未分類';
       const authorParsed = App.parseWeStudyAuthorName(App.commentField(r, 'author_name'));
@@ -3819,7 +3717,7 @@ const App = {
         '</td>' +
         '<td class="p-2">' +
         App.escapeHtml(postedAtLabel) +
-        (postedAt ? '' : ' <span class="text-[10px] text-amber-700">missing</span>') +
+        (postedAt||inferredYear ? '' : ' <span class="text-[10px] text-amber-700">missing</span>') +
         '</td>' +
         '<td class="p-2 whitespace-nowrap font-mono text-xs">' +
         App.escapeHtml(authorParsed.memberNo || '—') +
@@ -4000,6 +3898,7 @@ const App = {
   handleFastSummaryClick: (event) => {
     if (event) event.preventDefault();
     if (!App.state.pendingQuestionText) return;
+    if(App.authGatewayBase&&App.state.pendingAnswerRequest){App.showToast('現在の回答を作成しています。完了までお待ちください。','info');return;}
     App.state.preferFastSummary = true;
     if (App.state.sendAbortController) {
       try {
@@ -4508,6 +4407,156 @@ const App = {
     };
   },
 
+  citationAnchor: (c, messageId) => 'reference-' + encodeURIComponent(String(messageId || 'answer')) + '-' + encodeURIComponent(String(c.kind || '')) + '-' + encodeURIComponent(String(c.commentId || c.openchatId || c.chunkKey || '')),
+
+  referenceDateParts: (value) => {
+    let raw=String(value || '').trim();
+    if (!raw) return null;
+    if (/^\d{4}[/-]\d{1,2}[/-]\d{1,2}(?:\s|$)/.test(raw) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)) raw=raw.replace(/\//g,'-').replace(' ','T') + (raw.length<=10 ? 'T00:00:00' : '') + '+09:00';
+    const ms=Date.parse(raw); if (!Number.isFinite(ms)) return null;
+    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(ms));
+    const get=(kind)=>parts.find(p=>p.type===kind).value;
+    return {year:Number(get('year')),month:Number(get('month')),day:Number(get('day')),ms:ms,label:get('year')+'/'+get('month')+'/'+get('day')};
+  },
+
+  groupReferencesByDate: (items, currentYear) => {
+    const year=currentYear || Number(new Intl.DateTimeFormat('en',{timeZone:'Asia/Tokyo',year:'numeric'}).format(new Date()));
+    const groups={};
+    items.slice().sort((a,b)=>((App.referenceDateParts(b.postedAt)||{}).ms||0)-((App.referenceDateParts(a.postedAt)||{}).ms||0)).forEach(c=>{
+      const d=App.referenceDateParts(c.postedAt),inferred=Number(c.inferredYear),y=d?d.year:(inferred>=1900&&inferred<=2100?inferred:null);
+      const key=!y?'unknown':y===year?String(y)+'-'+(d?String(d.month).padStart(2,'0'):'00'):String(y);
+      if(!groups[key])groups[key]={key:key,label:!y?'日時未記録':y===year?y+'年'+(d?d.month+'月':'（月不明）'):y+'年',items:[]};
+      groups[key].items.push(c);
+    });
+    return Object.keys(groups).sort((a,b)=>a==='unknown'?1:b==='unknown'?-1:b.localeCompare(a)).map(k=>groups[k]);
+  },
+
+  linkReferenceLabels: (text, citations, messageId) => {
+    const labels={};(citations||[]).forEach(c=>{if(c.citationLabel)labels[c.citationLabel]=c;});
+    const expanded=String(text||'').replace(/(LINEオプチャ|コミュニティ|セミナー)(\d+(?:\s*[、,]\s*\d+)+)/g,(_,prefix,numbers)=>numbers.split(/[、,]/).map(n=>prefix+Number(n.trim())).join('、'));
+    let linked=expanded.replace(/(?:LINEオプチャ|コミュニティ|セミナー)\d+/g,label=>labels[label]?'['+label+'](#'+App.citationAnchor(labels[label],messageId)+')':label);
+    (citations||[]).filter(c=>c.kind==='video_chunk'&&c.videoTitle&&c.videoUrl).forEach(c=>{
+      const url=App.safeReferenceUrl(c.videoPageUrl)||App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl,c.startSec||0));if(!url)return;
+      const time=App.formatMmSs(c.startSec||0),plain=String(Math.floor(Number(c.startSec||0)/60))+time.slice(-3);
+      [time,plain].forEach(t=>{const phrase=App.displaySourceTitle(c.videoTitle)+' '+t+'頃';if(linked.includes(phrase))linked=linked.split(phrase).join('['+phrase.replace(/[\[\]]/g,'')+']('+url.replace(/\(/g,'%28').replace(/\)/g,'%29')+')');});
+    });
+    return linked;
+  },
+
+  safeReferenceUrl: (value) => {
+    try {const u=new URL(String(value||''));return ['https:','http:'].includes(u.protocol)?u.href:'';}catch(e){return '';}
+  },
+
+  retryRead: async (operation, current) => {
+    for(let attempt=0;attempt<3;attempt++){
+      if(current && !current())throw new Error('session_changed');
+      try{return await operation();}catch(error){
+        const status=error && error.httpStatus;
+        if((status && status<500 && status!==429)||attempt===2)throw error;
+        await App.retryDelay(attempt===0?1000:3000);
+      }
+    }
+  },
+
+  retryDelay: (milliseconds) => new Promise(resolve=>window.setTimeout(resolve,milliseconds)),
+
+  renderAttachmentStatus: () => {
+    const box=document.getElementById('attachmentStatus'),text=document.getElementById('attachmentStatusText'),button=document.getElementById('retryAttachmentsBtn');
+    if(!box||!text||!button)return;
+    box.classList.toggle('hidden',!App.state.attachmentStatus);
+    text.textContent=App.state.attachmentStatus;
+    button.disabled=App.state.attachmentLoading;
+    button.classList.toggle('hidden',App.state.attachmentLoading);
+  },
+
+  loadReferenceMetadata: async (generation) => {
+    const uid=String((App.state.currentUser||{}).id||'');
+    const current=()=>App.state.attachmentGeneration===generation && String((App.state.currentUser||{}).id||'')===uid;
+    if(!App.authGatewayBase)return;
+    try{
+      const data=await App.retryRead(()=>App.apiClient('GET','/reference-metadata'),current);
+      if(!current())return;
+      const map={};(data.comments||[]).forEach(row=>{map[String(row.comment_id)]=row;});
+      App.state.referenceComments=map;
+      (data.sources||[]).forEach(row=>{if(row.source_key)App.state.knowledgeSources[row.source_key]=row;});
+      App.renderChatMessages();App.renderCommentTable();
+    }catch(error){if(current())App.state.referenceMetadataUnavailable=true;}
+  },
+
+  pendingAnswerStorageKey: () => 'qa_pending_answer_v1_'+String((App.state.currentUser||{}).id||''),
+
+  readPendingAnswer: () => {
+    try{
+      if(typeof sessionStorage==='undefined')return App.state.pendingAnswerRequest||null;
+      const value=JSON.parse(sessionStorage.getItem(App.pendingAnswerStorageKey())||'null');
+      return value&&String(value.userId)===String((App.state.currentUser||{}).id)?value:null;
+    }catch(error){return null;}
+  },
+
+  savePendingAnswer: (value) => {
+    App.state.pendingAnswerRequest=value;
+    try{if(typeof sessionStorage!=='undefined')sessionStorage.setItem(App.pendingAnswerStorageKey(),JSON.stringify(value));}catch(error){}
+  },
+
+  clearPendingAnswer: () => {
+    try{if(typeof sessionStorage!=='undefined')sessionStorage.removeItem(App.pendingAnswerStorageKey());}catch(error){}
+    App.state.pendingAnswerRequest=null;App.state.answerJobStatus='';App.renderAnswerJobStatus();
+  },
+
+  renderAnswerJobStatus: () => {
+    const box=document.getElementById('answerJobStatus'),text=document.getElementById('answerJobStatusText'),button=document.getElementById('resumeAnswerBtn');
+    if(!box||!text||!button)return;
+    box.classList.toggle('hidden',!App.state.answerJobStatus);text.textContent=App.state.answerJobStatus;
+    button.classList.toggle('hidden',!!App.state.sendAbortController);button.disabled=!!App.state.sendAbortController;
+  },
+
+  answerPollDelay: (ms,signal) => new Promise((resolve,reject)=>{
+    const cancel=()=>{window.clearTimeout(timer);const error=new Error('aborted');error.name='AbortError';reject(error);};
+    const timer=window.setTimeout(()=>{signal.removeEventListener('abort',cancel);resolve();},ms);
+    signal.addEventListener('abort',cancel,{once:true});if(signal.aborted)cancel();
+  }),
+
+  runAnswerJob: async (sessionId,query,mode,signal) => {
+    const uid=String((App.state.currentUser||{}).id||'');
+    const current=()=>!signal.aborted&&String((App.state.currentUser||{}).id||'')===uid;
+    let pending=App.state.pendingAnswerRequest||App.readPendingAnswer();
+    if(pending&&(pending.query!==query||pending.mode!==mode||String(pending.sessionId)!==String(sessionId)))throw new Error('前の回答を作成中です。「回答の取得を再開」から確認してください。');
+    if(!pending){pending={userId:uid,sessionId:String(sessionId),query:query,mode:mode,requestId:crypto.randomUUID(),startedAt:Date.now(),jobId:null};App.savePendingAnswer(pending);}
+    App.state.answerJobStatus='回答を作成中です。数分かかる場合があります。';App.renderAnswerJobStatus();
+    const call=(method,path,body)=>App.retryRead(()=>App.apiClient(method,path,body,{signal:AbortSignal.any([signal,AbortSignal.timeout(20000)])}),current);
+    try{
+      let state=pending.jobId?null:await call('POST','/chat-sessions/'+sessionId+'/answer-jobs',{request_id:pending.requestId,query:query,mode:mode});
+      if(!current()){const error=new Error('aborted');error.name='AbortError';throw error;}
+      if(state){if(!/^[0-9a-f-]{36}$/i.test(state.job_id||''))throw new Error('回答の受付結果を確認できませんでした。取得を再開してください。');pending.jobId=state.job_id;App.savePendingAnswer(pending);}
+      const pollStartedAt=Date.now();
+      while(Date.now()-pollStartedAt<330000){
+        if(!current()){const error=new Error('aborted');error.name='AbortError';throw error;}
+        if(!state)state=await call('GET','/chat-sessions/'+sessionId+'/answer-jobs/'+pending.jobId);
+        if(!current()){const error=new Error('aborted');error.name='AbortError';throw error;}
+        if(state.status==='done'&&state.result)return state.result;
+        if(state.status==='failed'){
+          App.clearPendingAnswer();
+          throw new Error(state.error==='answer_timeout'?'回答の作成が制限時間に達しました。履歴を確認してから再試行してください。':state.error==='semantic_disabled'?'意味検索は一時停止中です。':'回答を作成できませんでした。履歴を確認してから再試行してください。');
+        }
+        await App.answerPollDelay(5000,signal);state=null;
+      }
+      App.state.answerJobStatus='回答の処理状況を再確認できます。';App.renderAnswerJobStatus();
+      throw new Error('回答の取得を再開して処理状況を確認してください。');
+    }catch(error){
+      if(error&&[403,404,409].includes(error.httpStatus))App.clearPendingAnswer();
+      if(current()&&App.state.pendingAnswerRequest){App.state.answerJobStatus='通信が中断しました。回答を作り直さずに取得を再開できます。';App.renderAnswerJobStatus();}
+      throw error;
+    }
+  },
+
+  resumePendingAnswer: async () => {
+    if(!App.state.currentUser||App.state.sendAbortController)return;
+    const pending=App.state.pendingAnswerRequest||App.readPendingAnswer();if(!pending)return;
+    App.state.pendingAnswerRequest=pending;App.state.currentSessionId=pending.sessionId;
+    App.state.semanticMode=pending.mode==='semantic';App.updateSemanticModeButton();
+    await App.sendQuestion(pending.query,true);
+  },
+
   sendQuestion: async (questionText, fromSuggested) => {
     if (!questionText) {
       App.showToast('質問内容が空です', 'error');
@@ -4561,7 +4610,11 @@ const App = {
         const controller = new AbortController();
         App.state.sendAbortController = controller;
         try {
-          if (App.state.semanticMode && !fast) {
+          if(App.authGatewayBase){
+            const pending=App.state.pendingAnswerRequest||App.readPendingAnswer();
+            const mode=pending?pending.mode:(fast?'fast':App.state.semanticMode?'semantic':'normal');
+            msgRes=await App.runAnswerJob(sessionId,questionText,mode,controller.signal);
+          } else if (App.state.semanticMode && !fast) {
             // 意味検索: Raimo api ネスト障害を避け、Edge をブラウザから直接呼ぶ
             msgRes = await App.sendQuestionSemantic(
               sessionId,
@@ -4609,7 +4662,8 @@ const App = {
               strict: true
             }
           : null,
-        (msgRes && msgRes.relatedOpenchat) || []
+        (msgRes && msgRes.relatedOpenchat) || [],
+        (msgRes && msgRes.referenceSelection) || 'unknown'
       );
       if (msgRes && Array.isArray(msgRes.citations) && msgRes.citations.length) {
         pendingCitations = msgRes.citations;
@@ -4617,7 +4671,7 @@ const App = {
       App.state.lastCitations = pendingCitations;
 
       if (!fromSuggested) {
-        await App.createSuggestedQuestionIfNeeded(questionText);
+        try{await App.createSuggestedQuestionIfNeeded(questionText);}catch(error){}
       }
 
       await App.loadSessionDetails(sessionId);
@@ -4626,11 +4680,11 @@ const App = {
         App.saveCitationsForMessage(sessionId, assistantMsgId, pendingCitations);
       }
       App.renderChatMessages();
-      await App.loadSuggestedQuestions();
+      try{await App.loadSuggestedQuestions();}catch(error){}
 
-      App.elements.messageInput.value = '';
-      await App.bumpSessionToTop(sessionId);
-      await App.loadChatSessions();
+      if(String(App.elements.messageInput.value||'').trim()===questionText)App.elements.messageInput.value = '';
+      try{await App.bumpSessionToTop(sessionId);await App.loadChatSessions();}catch(error){}
+      if(App.authGatewayBase)App.clearPendingAnswer();
       App.state.currentSessionId = sessionId;
       App.renderSessionList();
       App.showToast(usedFast ? '送信しました（準拠省略）' : '送信しました', 'success');
@@ -4650,7 +4704,7 @@ const App = {
       if (!(error && error.name === 'AbortError')) {
         const st = error && error.httpStatus;
         let msg = (error && error.message) || '送信に失敗しました';
-        if (st === 503 || (error && error.code === 'semantic_disabled')) {
+        if ((App.state.semanticMode && st === 503) || (error && error.code === 'semantic_disabled')) {
           msg =
             msg.indexOf('一時停止') >= 0
               ? msg
@@ -4664,6 +4718,7 @@ const App = {
       App.state.pendingQuestionText = '';
       App.state.preferFastSummary = false;
       App.state.sendAbortController = null;
+      App.renderAnswerJobStatus();
       App.setButtonLoading(App.elements.sendMessageBtn, false);
       App.setLoading(false);
     }

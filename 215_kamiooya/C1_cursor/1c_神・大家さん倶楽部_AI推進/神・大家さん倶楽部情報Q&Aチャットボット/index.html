@@ -185,6 +185,15 @@
           <button id="logoutBtn" class="px-3 py-1 rounded bg-blue-700 hover:bg-blue-600">ログアウト</button>
         </div>
       </header>
+      <div id="attachmentStatus" class="hidden shrink-0 px-4 py-2 bg-amber-50 text-sm flex items-center justify-between gap-2">
+        <span id="attachmentStatusText" role="status" aria-live="polite"></span>
+        <button id="retryAttachmentsBtn" type="button" class="text-blue-700 underline shrink-0">添付を再取得</button>
+      </div>
+
+      <div id="answerJobStatus" class="hidden shrink-0 px-4 py-2 bg-blue-50 text-sm flex items-center justify-between gap-2">
+        <span id="answerJobStatusText" role="status" aria-live="polite"></span>
+        <button id="resumeAnswerBtn" type="button" class="text-blue-700 underline shrink-0">回答の取得を再開</button>
+      </div>
 
       <div class="flex flex-1 min-h-0 overflow-hidden">
         <!-- サイドバー -->
@@ -796,7 +805,5 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <!-- Raimo 公開時は jsContent が app.js として自動挿入される（ローカル検証時のみ下を有効化） -->
-    <!-- <script src="forum_category_lookup.js"></script> -->
-    <!-- <script src="app.js"></script> -->
 </body>
 </html>
