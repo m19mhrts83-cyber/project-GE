@@ -31,6 +31,10 @@ jobs:
           node-version: "22"
       - run: node --experimental-strip-types --test apps/kamiooya-qa-web/tests/*.test.mjs
       - run: node --check apps/kamiooya-qa-web/public/raimo/app.js
+      - name: Attachment source PostgreSQL integration (local WASM, no external database)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/openchat-pg" --no-save --ignore-scripts @electric-sql/pglite@0.5.15
+          NODE_PATH="$RUNNER_TEMP/openchat-pg/node_modules" node --test scripts/tests/openchat_attachment_sources.integration.mjs
 
   search-edge-typecheck:
     runs-on: ubuntu-latest

@@ -20,7 +20,7 @@ import requests
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'line_unofficial_poc'))
-from openchat_attachments import Queue
+from openchat_attachments import Queue,source_context
 
 PROJECT = 'https://mwubzgefkkjjbingrmqu.supabase.co'
 STORAGE = 'https://mwubzgefkkjjbingrmqu.storage.supabase.co'
@@ -176,8 +176,35 @@ class Store:
     def metadata(self, job, path, digest):
         row={k:job[k] for k in ['id','room_id','message_id','thread_id','kind']}
         row.update(original_name=job['filename'],content_type=job['mime'],byte_size=job['bytes'],sha256=digest,bucket=BUCKET,storage_path=path)
+        row['source_context']=json.loads(job.get('source_context') or '{}')
         self.request('POST',PROJECT+'/rest/v1/openchat_attachments',json=row,
           headers={'Prefer':'resolution=merge-duplicates'},params={'on_conflict':'id'})
+
+def sync_source_metadata(queue,store,limit=100):
+    """Refresh saved sources independently of binary downloads and LINE login."""
+    rows=queue.db.execute("SELECT * FROM jobs WHERE state='saved' AND metadata_dirty=1 ORDER BY id LIMIT ?",(limit,)).fetchall()
+    for row in rows:
+        job=dict(row)
+        store.metadata(job,job['storage_path'],job['sha256'])
+        queue.update(job['id'],metadata_dirty=0)
+    return len(rows)
+
+def enrich_saved_routes(queue,routes_file):
+    """An exact room ID match may recover labels, never a guessed post date/text."""
+    import yaml
+    config=yaml.safe_load(Path(routes_file).read_text()) or {}
+    routes=config.get('routes',[]) if isinstance(config,dict) else []
+    for route in routes:
+        if not isinstance(route,dict) or route.get('enabled') is False: continue
+        room=str(route.get('square_chat_mid') or '')
+        if not room: continue
+        for row in queue.db.execute("SELECT * FROM jobs WHERE room_id=? AND state='saved'",(room,)).fetchall():
+            job=dict(row);titles=route.get('thread_titles') or {}
+            context={'route_id':str(route.get('id') or ''),'chat_title':str(route.get('org_label') or route.get('title_substring') or ''),
+                     'thread_title':str(titles.get(job['thread_id']) or '') if isinstance(titles,dict) else ''}
+            queue.enqueue(room_id=room,message_id=job['message_id'],thread_id=job['thread_id'],
+                content_type=next(k for k,v in {1:'image',2:'video',3:'audio',14:'file'}.items() if v==job['kind']),
+                context=context)
 
 def process(queue, store, fetch, *, limit=10, max_file=MAX_FILE, budget=DEFAULT_BUDGET, spool_limit=2*1024**3):
     # One worker process at a time (CLI also holds the LINE session lock).
@@ -204,7 +231,7 @@ def process(queue, store, fetch, *, limit=10, max_file=MAX_FILE, budget=DEFAULT_
             queue.update(job['id'],bytes=size,mime=job['mime'])
             path,digest=store.upload(queue,job,file)
             store.metadata(job,path,digest)
-            queue.update(job['id'],state='saved',sha256=digest,storage_path=path,error=None,upload_url=None,saved_at=time.time())
+            queue.update(job['id'],state='saved',sha256=digest,storage_path=path,error=None,upload_url=None,saved_at=time.time(),metadata_dirty=0)
             file.unlink() # only the verified temporary spool, never the archived original
         except Exception as e:
             code=e.code if isinstance(e,Failure) else 'transfer_failed'
@@ -258,7 +285,9 @@ def scan(cl, queue, routes_file, *, pages=2, active_threads=None, thread_limit=1
                     stats['messages']+=1;ct=_get(cl,msg,'contentType',15)
                     if ct not in (1,2,3,14):continue
                     queue.enqueue(room_id=route.square_chat_mid,message_id=str(_get(cl,msg,'id',4) or ''),thread_id=thread,
-                      content_type=ct,metadata=_get(cl,msg,'contentMetadata',18),encrypted=bool(_get(cl,msg,'chunks',20)),cohort=cohort)
+                      content_type=ct,metadata=_get(cl,msg,'contentMetadata',18),encrypted=bool(_get(cl,msg,'chunks',20)),cohort=cohort,
+                      context=source_context(msg,lambda m,k,f:_get(cl,m,k,f),route_id=route.rid,
+                        chat_title=getattr(route,'org_label',''),thread_title=getattr(route,'thread_titles',{}).get(thread,'')))
                 return events
             try:
                 anchor_key=route.square_chat_mid+('::thread::'+thread if thread else '::main')
@@ -323,6 +352,7 @@ def main():
     p.add_argument('--budget-bytes',type=int,default=DEFAULT_BUDGET)
     p.add_argument('--retry-held',action='store_true',help='Requeue capacity-held jobs only with --apply')
     p.add_argument('--scan',action='store_true',help='Scan attachment source events with independent cursors')
+    p.add_argument('--sync-sources-only',action='store_true',help='With --apply, sync saved metadata only; no LINE login or media downloads')
     p.add_argument('--routes-yaml',type=Path)
     p.add_argument('--scan-pages',type=int,default=2)
     p.add_argument('--active-threads',type=Path)
@@ -337,6 +367,12 @@ def main():
         import fcntl
         with (q.root/'worker.lock').open('a') as lock:
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            if a.sync_sources_only:
+                if a.scan or a.retry_held:p.error('--sync-sources-only cannot scan or retry files')
+                store=Store();store.check_private()
+                if a.routes_yaml:enrich_saved_routes(q,a.routes_yaml)
+                print(json.dumps({'source_metadata_synced':sync_source_metadata(q,store,a.limit)}))
+                return 0
             from chrline_client_utils import open_chat_session_lock,save_root_from_env,build_logged_in_client,chrline_throttle
             with open_chat_session_lock(save_root_from_env(),blocking=False):
                 store=Store();store.check_private()
@@ -352,6 +388,7 @@ def main():
                     chrline_throttle()
                     return download(cl,job,path,size)
                 report=process(q,store,fetch,limit=a.limit,max_file=a.max_file_mib*1024**2,budget=a.budget_bytes)
+                report['source_metadata_synced']=sync_source_metadata(q,store)
                 report['project_storage_bytes']=store.usage()
                 print(json.dumps(report))
                 return 1 if (scanned and scanned['streams_failed']) or any(report['states'].get(k,0) for k in ('retry','held','invalid','unsupported')) else 0

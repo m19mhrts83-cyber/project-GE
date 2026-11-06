@@ -587,7 +587,9 @@ def main() -> int:
             if not message_id:
                 return
             capture_attachment(msg, getter=lambda m,k,f: _get(m,k,f),
-                room_id=route.chat_mid, thread_id=thread_mid or '')
+                room_id=route.chat_mid, thread_id=thread_mid or '',
+                route_id=route.rid,chat_title=route.org_label,
+                thread_title=route.thread_titles.get(thread_mid or '', ''))
             text = _msg_text(msg)
             if text == "[本文なし]":
                 return
