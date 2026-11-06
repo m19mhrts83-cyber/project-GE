@@ -162,3 +162,9 @@ for (const path of [new URL('../public/raimo/app.js',import.meta.url),new URL('.
     assert.equal(app.state.authToken,'');assert.equal(s.saved.has(token),false);
   });
 }
+
+test('bounded comment pages require an approved current session',async()=>{
+ const s=setup();assert.equal((await s.handler(req('/comments-page','',{after_id:0}))).status,401);
+ const token=await s.login();assert.equal((await s.handler(req('/comments-page',token,{after_id:500}))).status,200);
+ s.members.get('u').status='withdrawn';assert.equal((await s.handler(req('/comments-page',token,{after_id:0}))).status,403);
+});

@@ -13,7 +13,7 @@ class Element {
   addEventListener(name, fn) { this.listeners[name] = fn; }
 }
 function load(path) {
-  const document = { addEventListener() {}, createElement: () => new Element(), createTextNode: text => ({ textContent: text }) };
+  const document = { getElementById:()=>null, addEventListener() {}, createElement: () => new Element(), createTextNode: text => ({ textContent: text }) };
   return vm.runInNewContext(readFileSync(path, 'utf8') + '\nApp;', { document, window: {}, console, URL, fetch: () => { throw new Error('unexpected fetch'); } });
 }
 const sources = [new URL('../public/raimo/app.js', import.meta.url), new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js', import.meta.url)];

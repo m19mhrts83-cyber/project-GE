@@ -1,3 +1,4 @@
+import type {AnswerActor} from './qaAnswerJobs.ts';
 // Shared gateway: the production adapter supplies persistent sessions and live membership checks.
 type Member = { id: string; email: string; role: string; status: string; authVersion: string; name?: string; member_no?: string; prefecture?: string };
 type Session = { uid: string; authVersion: string; expires: number };
@@ -10,6 +11,9 @@ export type GatewayDependencies = {
   chatOwner(id: string): Promise<string | null>;
   forward(method: string, path: string, input: Record<string, unknown>): Promise<unknown>;
   attachmentSession(uid: string, parentSession: string): Promise<unknown>;
+  jobs?: {start(actor:AnswerActor,chatId:string,input:Record<string,unknown>):Promise<unknown>;get(actor:AnswerActor,chatId:string,id:string):Promise<unknown>};
+  referenceEvents?(userId:string,chatId:string):Promise<unknown>;
+  referenceMetadata?(): Promise<unknown>;
   semanticConfig?(): Promise<{url: string; secret: string}>;
   publicAction?(path: string, input: Record<string, unknown>): Promise<unknown>;
   now?: () => number;
@@ -18,6 +22,7 @@ const approved = (u: Member | null): u is Member => !!u && u.status === 'approve
 const publicUser = (u: Member) => ({ id: u.id, email: u.email, role: u.role, status: u.status, ...(u.name !== undefined ? {name:u.name}:{}), ...(u.member_no !== undefined ? {member_no:u.member_no}:{}), ...(u.prefecture !== undefined ? {prefecture:u.prefecture}:{}) });
 // Only explicitly reviewed operations may pass; all other legacy routes stay closed.
 function permission(method: string, path: string): 'member' | 'staff' | 'master' | 'chat' | 'own-list' | null {
+  if (method === 'POST' && path === '/comments-page') return 'member';
   if (method === 'GET' && ['/comments', '/knowledge-chunks', '/knowledge-sources', '/suggested-questions'].includes(path)) return 'member';
   if (method === 'GET' && ['/admin/users', '/admin/users/pending'].includes(path)) return 'staff';
   if (method === 'PUT' && /^\/admin\/users\/[a-zA-Z0-9_-]+\/(approve|reject)$/.test(path)) return 'master';
@@ -91,6 +96,21 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       }
       const user = await d.member(session.uid);
       if (!approved(user) || user.id !== session.uid || user.authVersion !== session.authVersion) return json({ error: 'membership_required' }, 403);
+      const historyRefs=/^\/chat-sessions\/([a-zA-Z0-9_-]+)\/reference-events$/.exec(path);
+      if(historyRefs&&req.method==='GET'&&d.referenceEvents){
+        if(await d.chatOwner(historyRefs[1])!==user.id)return json({error:'forbidden'},403);
+        return json(stripPrivate(await d.referenceEvents(user.id,historyRefs[1])));
+      }
+      const answerJob=/^\/chat-sessions\/([a-zA-Z0-9_-]+)\/answer-jobs(?:\/([0-9a-f-]+))?$/.exec(path);
+      if(answerJob && d.jobs){
+        if(await d.chatOwner(answerJob[1])!==user.id)return json({error:'forbidden'},403);
+        const raw=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token!)));
+        const actor={id:user.id,authVersion:user.authVersion,sessionRef:Array.from(raw,b=>b.toString(16).padStart(2,'0')).join('')};
+        if(req.method==='POST'&&!answerJob[2])return json(stripPrivate(await d.jobs.start(actor,answerJob[1],input)),202);
+        if(req.method==='GET'&&answerJob[2])return json(stripPrivate(await d.jobs.get(actor,answerJob[1],answerJob[2])));
+        return json({error:'invalid_answer_request'},400);
+      }
+      if(path==='/reference-metadata' && req.method==='GET' && d.referenceMetadata)return json(await d.referenceMetadata());
       // This legacy browser search credential is separate from every privileged server secret.
       if(path==='/semantic-search-config' && req.method==='POST' && d.semanticConfig)return json(await d.semanticConfig());
       if (path === '/auth/attachment-session' && req.method === 'POST') {
@@ -122,7 +142,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       return json(req.method === 'GET' && ['/admin/users','/admin/users/pending'].includes(path) ? safeUsers(result) : stripPrivate(result));
     } catch (err) {
       const e=err as {code?:string;status?:number};
-      if(e && ['email_taken','not_on_roster','already_registered','invalid_token','not_approved','user_not_found','forbidden','member_not_found','invalid_password','try_later','route_not_reviewed','operation_failed'].includes(e.code||'')) return json({error:e.code,errorCode:e.code},[400,403,429,503].includes(e.status||0)?e.status:400);
+      if(e && ['invalid_request','email_taken','not_on_roster','already_registered','invalid_token','not_approved','user_not_found','forbidden','member_not_found','invalid_password','try_later','route_not_reviewed','operation_failed','invalid_answer_request','answer_request_conflict','answer_in_progress','answer_not_found','answer_unavailable'].includes(e.code||'')) return json({error:e.code,errorCode:e.code},[400,403,404,409,429,503].includes(e.status||0)?e.status:400);
       // Neither upstream response bodies nor credential/session values are exposed.
       return json({ error: 'service_unavailable' }, 503);
     }
