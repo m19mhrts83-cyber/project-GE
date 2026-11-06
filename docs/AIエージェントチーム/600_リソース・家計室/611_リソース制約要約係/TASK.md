@@ -5,7 +5,7 @@
 | task_id | 611-impl-1 |
 | agent_id | 611 |
 | executor | 実装は全エージェントの使用量を見て決める（2026-11-05 訂正）。ミスレモン（Claude Code）でも Codex でも可。ローカルログの確認は Mac 上で動かす必要がある |
-| status | queued |
+| status | review（2026-11-06 ミスレモン実装。下書き PR・松野さんの判断待ち） |
 | 依頼者 | 松野さん（2026-11-05 に「611の実装を渡す」を選択） |
 
 ## 依頼
@@ -44,4 +44,10 @@
 
 ## 検証結果
 
-（実装した側が記入）
+2026-11-06 ミスレモン（Claude Code、Mac 上で実行）。詳細: [`output/20261106_実装1_使用量集計の結果.md`](output/20261106_実装1_使用量集計の結果.md)
+
+- 取れる: Claude Code（トークン・枠到達。％は無し）、Codex（トークン＋5時間／週次％）。取れない＝手入力: Cursor・GenCode・ChatGPT モード（Claude の％も手入力欄あり）
+- `scripts/jarvis_ai_usage_weekly.py` を追加（LLM なし）。直近7日のドライランで Codex 週次 63%、Claude 枠到達3回を確認
+- 週次は 314 の土曜 runner に相乗り（失敗しても 314 は止めない）。Supabase へは未送信
+- テスト: `python3 -m unittest scripts/tests/test_ai_usage_weekly.py` → 4件 OK
+- 未了（松野さん判断）: 新テーブル `ai_usage_weekly` 案、`--push` の可否、手入力の担当
