@@ -53,6 +53,22 @@ test('calendar grouping uses JST, this year by month and older years, newest fir
  assert.deepEqual(Array.from(groups,g=>g.label),['2026年11月','2026年1月','2025年','日時未記録']);
  assert.equal(groups[1].items.length,2);
 });
+test('year-only inference never invents a month or day and citations are listed before reference details',()=>{
+ const app=load();const refs=[{kind:'comment',commentId:'one',inferredYear:2025,citationLabel:'コミュニティ4'},{kind:'openchat',openchatId:'two',postedAt:'2026-01-02',citationLabel:'LINEオプチャ2'}];
+ assert.equal(app.groupReferencesByDate(refs,2026)[1].label,'2025年');
+ assert.equal(app.citationDateLabel(refs[0]),'2025年（IDから推定・月日不明）');
+ assert.equal(app.groupReferencesByDate([{inferredYear:2026}],2026)[0].label,'2026年（月不明）');
+ const html=app.renderCitationsPanel(refs,'m','LINEオプチャ2とコミュニティ4');
+ assert.ok(html.indexOf('本文で引用した根拠')<html.indexOf('コミュニティの根拠'));
+ assert.ok(html.indexOf('>LINEオプチャ2</a>')<html.indexOf('>コミュニティ4</a>'));
+});
+test('large comment listings use advancing bounded pages and publish only complete results',async()=>{
+ const app=load();app.authGatewayBase='https://gateway.example';app.state.currentUser={id:'one'};
+ ['renderCommentCategoryFilterOptions','renderCommentTable','renderLessonCourseTabFilterOptions','renderLessonTable'].forEach(k=>app[k]=()=>{});app.enrichCommentCategory=x=>x;
+ const after=[];app.apiClient=async(method,path,body)=>{assert.equal(path,'/comments-page');after.push(body.after_id);return {comments:body.after_id===0?Array.from({length:500},(_,i)=>({id:i+1})): [{id:501}]};};
+ await app.loadComments();assert.deepEqual(after,[0,500]);assert.equal(app.state.comments.length,501);
+ app.apiClient=async()=>({comments:[{id:0}]});await assert.rejects(app.loadComments(),/順序/);assert.equal(app.state.comments.length,501);
+});
 test('missing dates are hydrated by exact comment id, never by ingestion date',()=>{
  const app=load();app.state.referenceComments={'42':{posted_at:'2026-11-03T00:00:00Z'}};
  assert.equal(app.resolveCommentPostedAt({comment_id:'42'}),'2026-11-03T00:00:00Z');
@@ -83,4 +99,12 @@ test('attachment permission errors are not retried and leave a recoverable statu
  const app=load();app.authGatewayBase='https://gateway.example';app.state.currentUser={id:'one'};app.state.attachmentGeneration=1;let calls=0;
  app.apiClient=async()=>({token:'fixture'});app.attachmentRequest=async()=>{calls++;const e=new Error('denied');e.httpStatus=401;throw e;};
  await app.initializeAttachments('','',1);assert.equal(calls,1);assert.match(app.state.attachmentStatus,/ログイン/);assert.equal(app.state.attachmentLoading,false);
+});
+
+test('reference listings load on demand, share one active read, and retry an explicit failed read',async()=>{
+ const app=load();let calls=0,finish;app.showToast=()=>{};
+ app.loadComments=async()=>{calls++;await new Promise(r=>{finish=r;});};
+ const a=app.ensureReferenceData('comments'),b=app.ensureReferenceData('lessons');assert.equal(calls,1);finish();await Promise.all([a,b]);await app.ensureReferenceData('comments');assert.equal(calls,1);
+ app.state.referenceReady={};app.loadComments=async()=>{calls++;throw new Error('temporary');};await app.ensureReferenceData('comments');assert.equal(app.state.referenceReady.comments,undefined);
+ app.loadComments=async()=>{calls++;};await app.ensureReferenceData('comments');assert.equal(calls,3);
 });

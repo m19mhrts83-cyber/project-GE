@@ -1249,9 +1249,7 @@ const App = {
     try {
       await Promise.all([
         App.loadChatSessions(),
-        App.loadSuggestedQuestions(),
-        App.loadComments(),
-        App.loadKnowledge()
+        App.loadSuggestedQuestions()
       ]);
       if (App.isStaffAdmin()) {
         await App.loadPendingUsers();
@@ -1281,7 +1279,7 @@ const App = {
     App.state.chatSessions = [];
     App.state.chatMessages = [];
     App.state.suggestedQuestions = [];
-    App.state.comments = [];
+    App.state.comments = [];App.state.referenceReady={};App.state.referenceLoads={};
     App.state.pendingUsers = [];
     App.state.approvedUsers = [];
     App.state.roleRequestUsers = [];
@@ -1323,6 +1321,7 @@ const App = {
       }
     });
     App.state.currentScreen = screenName || 'chat';
+    if(['comments','lessons','knowledge'].includes(screenName))void App.ensureReferenceData(screenName);
     App.elements.sidebar.classList.remove('mobile-open');
     // サイドバー手動遷移・戻る完了時は citation 用戻るバーを隠す
     if (opts.fromNav || opts.fromBack) {
@@ -1747,9 +1746,40 @@ const App = {
       .join('');
   },
 
+  ensureReferenceData: async (screen) => {
+    const key=screen==='knowledge'?'knowledge':'comments';
+    const ready=App.state.referenceReady||(App.state.referenceReady={});
+    const loads=App.state.referenceLoads||(App.state.referenceLoads={});
+    if(ready[key])return;
+    if(loads[key])return loads[key];
+    const generation=App.state.attachmentGeneration;
+    if(key==='comments'&&App.elements.commentListMeta)App.elements.commentListMeta.textContent='コメント一覧を取得中…';
+    const task=(key==='comments'?App.loadComments():App.loadKnowledge()).then(()=>{if(App.state.attachmentGeneration===generation)ready[key]=true;}).catch(error=>{if(App.state.attachmentGeneration===generation)App.showToast(error.message||'参照一覧の取得に失敗しました。メニューを開き直して再試行してください。','error');}).finally(()=>{delete loads[key];});
+    loads[key]=task;return task;
+  },
+
   loadComments: async () => {
-    const res = await App.apiClient('GET', '/comments');
-    const rows = (res && res.comments) ? res.comments : [];
+    const generation=App.state.attachmentGeneration;
+    const uid=String((App.state.currentUser||{}).id||'');
+    const current=()=>App.state.attachmentGeneration===generation&&String((App.state.currentUser||{}).id||'')===uid;
+    let rows=[];
+    if(App.authGatewayBase){
+      let after=0;
+      for(let page=0;page<100;page++){
+        const res=await App.retryRead(()=>App.apiClient('POST','/comments-page',{after_id:after}),current);
+        if(!current())return;
+        const part=res&&res.comments;
+        if(!Array.isArray(part)||part.length>500)throw new Error('コメント一覧の取得結果を確認できませんでした');
+        let previous=after;
+        for(const row of part){const id=Number(row.id);if(!Number.isSafeInteger(id)||id<=previous)throw new Error('コメント一覧の順序を確認できませんでした');previous=id;}
+        rows.push(...part);
+        if(part.length<500)break;
+        after=previous;
+        if(page===99)throw new Error('コメント一覧の上限を超えました');
+      }
+    }else{const res=await App.apiClient('GET','/comments');rows=(res&&res.comments)||[];}
+    if(!current())return;
+    rows.sort((a,b)=>String(b.posted_at||'').localeCompare(String(a.posted_at||''))||Number(b.id)-Number(a.id));
     App.state.comments = rows.map(App.enrichCommentCategory);
     App.renderCommentCategoryFilterOptions();
     App.renderCommentTable();
@@ -1831,11 +1861,13 @@ const App = {
   },
 
   loadKnowledge: async () => {
+    const generation=App.state.attachmentGeneration;
     try {
       const [srcRes, chunkRes] = await Promise.all([
         App.apiClient('GET', '/knowledge-sources'),
         App.apiClient('GET', '/knowledge-chunks')
       ]);
+      if(App.state.attachmentGeneration!==generation)return;
       const sources = (srcRes && srcRes.sources) ? srcRes.sources : [];
       const map = {};
       sources.forEach(function (s) {
@@ -1845,8 +1877,7 @@ const App = {
       App.state.knowledgeChunks = (chunkRes && chunkRes.chunks) ? chunkRes.chunks : [];
     } catch (e) {
       console.warn('knowledge load skipped', e);
-      App.state.knowledgeChunks = App.state.knowledgeChunks || [];
-      App.state.knowledgeSources = App.state.knowledgeSources || {};
+      throw e;
     }
     App.renderKnowledgeTable();
   },
@@ -2108,6 +2139,7 @@ const App = {
         commentId: cid,
         authorName: enriched.author_name || enriched.authorName || '',
         postedAt: App.resolveCommentPostedAt(enriched),
+        inferredYear: Number(((App.state.referenceComments||{})[cid]||{}).inferred_year)||null,
         forumCategory:
           String(enriched.forum_category || enriched.forumCategory || '').trim() || '未分類',
         topicTitle: String(enriched.topic_title || enriched.topicTitle || '').trim(),
@@ -2278,7 +2310,12 @@ const App = {
   /**
    * 関連セミナー動画（タイトル単位で集約）＋関連コミュニティ投稿＋関連動画ページ説明
    */
-  renderCitationsPanel: (citations, messageId) => {
+  citationDateLabel: (c) => {
+    const date=App.referenceDateParts(c.postedAt);
+    return date?date.label:c.inferredYear?c.inferredYear+'年（IDから推定・月日不明）':'日時未記録';
+  },
+
+  renderCitationsPanel: (citations, messageId, answer) => {
     if(!citations||!citations.length)return '';
     const esc=App.escapeHtml;
     const badge=c=>c.citationLabel?'<strong class="text-blue-900">['+esc(c.citationLabel)+']</strong> ':'';
@@ -2290,6 +2327,17 @@ const App = {
     const lessons=citations.filter(c=>c.kind==='lesson');
     const videos=citations.filter(c=>c.kind==='video_chunk');
     const parts=[];
+    const expanded=String(answer||'').replace(/(LINEオプチャ|コミュニティ|セミナー)(\d+(?:\s*[、,]\s*\d+)+)/g,(_,p,ns)=>ns.split(/[、,]/).map(n=>p+Number(n.trim())).join('、'));
+    const mentioned=Array.from(new Set(expanded.match(/(?:LINEオプチャ|コミュニティ|セミナー)\d+/g)||[]));
+    const cited=mentioned.map(label=>citations.find(c=>c.citationLabel===label)).filter(Boolean);
+    if(cited.length)parts.push('<div class="font-semibold mb-1">本文で引用した根拠（登場順）</div><ul class="mb-3">'+cited.map(c=>{
+      const anchor='<a class="text-blue-700 underline" href="#'+esc(App.citationAnchor(c,messageId))+'">'+esc(c.citationLabel)+'</a>';
+      if(c.kind==='video_chunk'){
+        const u=App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl,c.startSec||0));const title=esc(c.videoTitle||'動画タイトル未登録')+' ・ '+esc(App.formatMmSs(c.startSec||0));
+        return '<li class="mb-1">'+anchor+' ・ '+(u?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+title+' から再生</a>':title)+'</li>';
+      }
+      return '<li class="mb-1">'+anchor+' ・ '+esc(App.citationDateLabel(c))+db(c.kind,c.commentId||c.openchatId)+'</li>';
+    }).join('')+'</ul>');
     if(videos.length){
       const rows=videos.map(c=>{
         const url=App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl||'',c.startSec||0));
@@ -2300,7 +2348,7 @@ const App = {
     }
     if(comments.length)parts.push('<div class="font-semibold mb-1">コミュニティの根拠</div>'+dated(comments,c=>{
       const d=App.referenceDateParts(c.postedAt),cat=c.forumCategory&&c.forumCategory!=='未分類'?' ・ '+esc(c.forumCategory):'';
-      return '<li'+attrs(c)+'>'+badge(c)+(d?esc(d.label)+' ・ ':'')+esc(App.formatAuthorForDisplay(c.authorName||''))+cat+' #'+esc(c.commentId||'')+db('comment',c.commentId)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div><span class="citation-attachments" data-comment-id="'+esc(c.commentId||'')+'"></span></li>';
+      return '<li'+attrs(c)+'>'+badge(c)+esc(App.citationDateLabel(c))+' ・ '+esc(App.formatAuthorForDisplay(c.authorName||''))+cat+' #'+esc(c.commentId||'')+db('comment',c.commentId)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div><span class="citation-attachments" data-comment-id="'+esc(c.commentId||'')+'"></span></li>';
     }));
     if(lines.length)parts.push('<div class="font-semibold mb-1">LINEオプチャの根拠</div>'+dated(lines,c=>{
       const d=App.referenceDateParts(c.postedAt);
@@ -3195,8 +3243,8 @@ const App = {
           if(c.kind==='video_chunk'){const src=Object.values(App.state.knowledgeSources||{}).find(s=>s.source_key===c.sourceKey||String(s.id)===String(c.sourceId));if(src)return Object.assign({},c,{videoTitle:App.displaySourceTitle(src.title||c.videoTitle),videoUrl:App.withVideoTimeUrl(src.video_url||c.videoUrl||'',c.startSec||0)});}
           if (c.kind !== 'comment' || c.postedAt) return c;
           const pa = App.resolveCommentPostedAt({ comment_id: c.commentId });
-          if (!pa) return c;
-          return Object.assign({}, c, { postedAt: pa });
+          const inferred=Number(((App.state.referenceComments||{})[c.commentId]||{}).inferred_year)||c.inferredYear||null;
+          return Object.assign({}, c, { postedAt: pa||'',inferredYear:inferred });
         });
       })();
 
@@ -3210,7 +3258,7 @@ const App = {
           ? '<div class="md-body">' + App.formatAssistantHtml(App.linkReferenceLabels(m.content || '', messageCitations, msgId)) + '</div>'
           : App.escapeHtml(m.content || '')) +
         '</div>' +
-        (m.role === 'assistant' ? App.renderCitationsPanel(messageCitations, msgId) : '');
+        (m.role === 'assistant' ? App.renderCitationsPanel(messageCitations, msgId, m.content) : '');
 
       wrap.appendChild(bubble);
       area.appendChild(wrap);
@@ -3620,7 +3668,8 @@ const App = {
       const tr = document.createElement('tr');
       tr.className = 'border-t';
       const postedAt = String(App.commentField(r, 'posted_at') || '').trim();
-      const postedAtLabel = App.formatOpenchatDateTime(postedAt) || '（日時なし）';
+      const inferredYear=Number(((App.state.referenceComments||{})[String(App.commentField(r,'comment_id'))]||{}).inferred_year)||null;
+      const postedAtLabel = App.formatOpenchatDateTime(postedAt) || (inferredYear?inferredYear+'年（IDから推定・月日不明）':'（日時なし）');
       const forumCategory =
         String(App.commentField(r, 'forum_category') || '').trim() || '未分類';
       const authorParsed = App.parseWeStudyAuthorName(App.commentField(r, 'author_name'));
@@ -3658,7 +3707,7 @@ const App = {
         '</td>' +
         '<td class="p-2">' +
         App.escapeHtml(postedAtLabel) +
-        (postedAt ? '' : ' <span class="text-[10px] text-amber-700">missing</span>') +
+        (postedAt||inferredYear ? '' : ' <span class="text-[10px] text-amber-700">missing</span>') +
         '</td>' +
         '<td class="p-2 whitespace-nowrap font-mono text-xs">' +
         App.escapeHtml(authorParsed.memberNo || '—') +
@@ -4364,8 +4413,9 @@ const App = {
     const year=currentYear || Number(new Intl.DateTimeFormat('en',{timeZone:'Asia/Tokyo',year:'numeric'}).format(new Date()));
     const groups={};
     items.slice().sort((a,b)=>((App.referenceDateParts(b.postedAt)||{}).ms||0)-((App.referenceDateParts(a.postedAt)||{}).ms||0)).forEach(c=>{
-      const d=App.referenceDateParts(c.postedAt),key=!d?'unknown':d.year===year?String(d.year)+'-'+String(d.month).padStart(2,'0'):String(d.year);
-      if(!groups[key])groups[key]={key:key,label:!d?'日時未記録':d.year===year?d.year+'年'+d.month+'月':d.year+'年',items:[]};
+      const d=App.referenceDateParts(c.postedAt),inferred=Number(c.inferredYear),y=d?d.year:(inferred>=1900&&inferred<=2100?inferred:null);
+      const key=!y?'unknown':y===year?String(y)+'-'+(d?String(d.month).padStart(2,'0'):'00'):String(y);
+      if(!groups[key])groups[key]={key:key,label:!y?'日時未記録':y===year?y+'年'+(d?d.month+'月':'（月不明）'):y+'年',items:[]};
       groups[key].items.push(c);
     });
     return Object.keys(groups).sort((a,b)=>a==='unknown'?1:b==='unknown'?-1:b.localeCompare(a)).map(k=>groups[k]);
@@ -4419,7 +4469,7 @@ const App = {
       const map={};(data.comments||[]).forEach(row=>{map[String(row.comment_id)]=row;});
       App.state.referenceComments=map;
       (data.sources||[]).forEach(row=>{if(row.source_key)App.state.knowledgeSources[row.source_key]=row;});
-      App.renderChatMessages();
+      App.renderChatMessages();App.renderCommentTable();
     }catch(error){if(current())App.state.referenceMetadataUnavailable=true;}
   },
 

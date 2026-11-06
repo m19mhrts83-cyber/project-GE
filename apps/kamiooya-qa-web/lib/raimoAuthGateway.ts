@@ -22,6 +22,7 @@ const approved = (u: Member | null): u is Member => !!u && u.status === 'approve
 const publicUser = (u: Member) => ({ id: u.id, email: u.email, role: u.role, status: u.status, ...(u.name !== undefined ? {name:u.name}:{}), ...(u.member_no !== undefined ? {member_no:u.member_no}:{}), ...(u.prefecture !== undefined ? {prefecture:u.prefecture}:{}) });
 // Only explicitly reviewed operations may pass; all other legacy routes stay closed.
 function permission(method: string, path: string): 'member' | 'staff' | 'master' | 'chat' | 'own-list' | null {
+  if (method === 'POST' && path === '/comments-page') return 'member';
   if (method === 'GET' && ['/comments', '/knowledge-chunks', '/knowledge-sources', '/suggested-questions'].includes(path)) return 'member';
   if (method === 'GET' && ['/admin/users', '/admin/users/pending'].includes(path)) return 'staff';
   if (method === 'PUT' && /^\/admin\/users\/[a-zA-Z0-9_-]+\/(approve|reject)$/.test(path)) return 'master';
@@ -141,7 +142,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       return json(req.method === 'GET' && ['/admin/users','/admin/users/pending'].includes(path) ? safeUsers(result) : stripPrivate(result));
     } catch (err) {
       const e=err as {code?:string;status?:number};
-      if(e && ['email_taken','not_on_roster','already_registered','invalid_token','not_approved','user_not_found','forbidden','member_not_found','invalid_password','try_later','route_not_reviewed','operation_failed','invalid_answer_request','answer_request_conflict','answer_in_progress','answer_not_found','answer_unavailable'].includes(e.code||'')) return json({error:e.code,errorCode:e.code},[400,403,404,409,429,503].includes(e.status||0)?e.status:400);
+      if(e && ['invalid_request','email_taken','not_on_roster','already_registered','invalid_token','not_approved','user_not_found','forbidden','member_not_found','invalid_password','try_later','route_not_reviewed','operation_failed','invalid_answer_request','answer_request_conflict','answer_in_progress','answer_not_found','answer_unavailable'].includes(e.code||'')) return json({error:e.code,errorCode:e.code},[400,403,404,409,429,503].includes(e.status||0)?e.status:400);
       // Neither upstream response bodies nor credential/session values are exposed.
       return json({ error: 'service_unavailable' }, 503);
     }

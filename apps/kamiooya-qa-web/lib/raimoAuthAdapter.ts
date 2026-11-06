@@ -52,6 +52,14 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     member:async id=>memberOf(await lookup({user_id:id})),
     chatOwner:async id=>{const r=await backend('GET','/chat-sessions/'+id);return r.session?String(r.session.user_id):null;},
     forward:async(method,path,input)=>{
+      if(method==='POST'&&path==='/comments-page'){
+        const after=Number(input.after_id??0);
+        if(!Number.isSafeInteger(after)||after<0)throw new UpstreamError('invalid_request',400);
+        const result=await backend('POST','/internal/read/comments-page',{after_id:after});
+        if(!Array.isArray(result.comments)||result.comments.length>500)throw new Error('invalid_comment_page');
+        const keys=['id','source_type','comment_id','posted_at','author_name','content','parent_comment_id','created_at','updated_at','source_system','source_kind','forum_category','topic_title','course_tab','section_name','lesson_title','lesson_url','content_hash'];
+        return {comments:result.comments.map((row:any)=>Object.fromEntries(keys.filter(k=>row[k]!==undefined).map(k=>[k,row[k]])))};
+      }
       if(['/admin/master-transfer/validate','/admin/master-transfer/accept'].includes(path)){
         const x=await backend('POST','/admin/master-transfer/validate',{token:input.token});
         if(!(Date.parse(x.expires_at)>Date.now()) || String(x.to_user_id)!==String(input.actor_user_id))throw new UpstreamError('invalid_token',400);
