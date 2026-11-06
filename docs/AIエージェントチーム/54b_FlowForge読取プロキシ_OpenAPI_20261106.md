@@ -114,12 +114,18 @@ Tool: `resolve_flowforge_flow`（`url` / `shareId` / `flowId` / `agentId`、既�
 
 **ChatGPT への登録**
 
-1. [chatgpt.com/plugins](https://chatgpt.com/plugins) → **追加** → **カスタム MCP サーバー**
-2. 名前: `FlowForge Jarvis MCP`（任意）
-3. URL: `https://jarvis-dashboard-amber.vercel.app/api/flowforge/mcp`
-4. Authentication: API Key / Bearer → `.env.jarvis_private` の `FLOWFORGE_READ_PROXY_KEY`
-5. リスク確認 → 作成 → インストール
-6. 既存プラグイン **FlowForge読取（Jarvis）** と併用可（スキル＋MCP）
+ChatGPT の「カスタム MCP」UIは **OAuth / 認証なし**のみ（Bearer 欄なし）。  
+→ 登録 URL に `?key=` を埋め、認証は **認証なし** を選ぶ。
+
+1. [chatgpt.com/plugins](https://chatgpt.com/plugins) → **追加** → **カスタム MCP サーバーを追加**
+2. 名前: `FlowForge Jarvis MCP`
+3. 説明: `FlowForge フロー読取（read-only）`
+4. URL: `https://jarvis-dashboard-amber.vercel.app/api/flowforge/mcp?key=` + `FLOWFORGE_READ_PROXY_KEY`
+5. 認証: **認証なし**
+6. リスク確認にチェック → **プラグインとして作成** → インストール
+7. 既存 **FlowForge読取（Jarvis）**（スキル）と併用可
+
+curl / Jarvis 本線は従来どおり `Authorization: Bearer …`（`?key=` 不要）。
 
 ### チャッピー（ChatGPT）での使い方
 

@@ -175,13 +175,27 @@ export function timingSafeEqual(a: string, b: string): boolean {
   return out === 0;
 }
 
-export function proxyAuthorized(headers: Headers): boolean {
+/**
+ * Auth for FlowForge read proxy / MCP.
+ * Prefer Authorization: Bearer or x-flowforge-read-key.
+ * ChatGPT カスタム MCP は Bearer UI が無いため、登録 URL の ?key= も可（認証なし接続用）。
+ */
+export function proxyAuthorized(
+  headers: Headers,
+  url?: URL | { searchParams: URLSearchParams },
+): boolean {
   const expected = (process.env.FLOWFORGE_READ_PROXY_KEY || "").trim();
   if (!expected) return false;
-  const got = (
+  const fromHeader = (
     headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
     headers.get("x-flowforge-read-key") ||
     ""
   ).trim();
+  const fromQuery = (
+    url?.searchParams.get("key") ||
+    url?.searchParams.get("api_key") ||
+    ""
+  ).trim();
+  const got = fromHeader || fromQuery;
   return Boolean(got) && timingSafeEqual(got, expected);
 }
