@@ -884,11 +884,31 @@ def iso_week_id(d: date | None = None) -> str:
     return f"{iso.year}-W{iso.week:02d}"
 
 
+def _form_first(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Grok はフォーム送信のみ実施（メール窓口のみ・電話のみは deferred のまま残る）。
+
+    フォーム URL のある行を先に、メール・電話だけの行を後ろへ（順序は保つ）。
+    """
+    def is_form(v: dict[str, Any]) -> bool:
+        return str(v.get("channel") or "web_form") == "web_form" and bool(
+            str(v.get("contact_url") or v.get("url") or "").strip()
+        )
+
+    return [v for v in rows if is_form(v)] + [v for v in rows if not is_form(v)]
+
+
 def build_batch_week_payload(
     *,
     batch_days: int = 7,
     outreach_phase: int | None = None,
+    exclude_ids: set[str] | frozenset[str] | None = None,
+    batch_id: str | None = None,
 ) -> dict[str, Any]:
+    """exclude_ids: 過去のバッチ・送信再開で渡したのに mark が無い社（Grok が skip／保留した社）。
+
+    Grok は skip・deferred を --mark しないため台帳では pending のまま残り、毎週同じ社が
+    キュー先頭に戻っていた（chubu-083〜085 は W40 で処理済みなのに W45 にも再掲・2026-11-06）。
+    """
     data = load_list()
     settings = data.get("settings") or {}
     phase, daily_limit = outreach_phase_settings(settings)
@@ -896,10 +916,16 @@ def build_batch_week_payload(
         phase = outreach_phase
         daily_limit = PHASE_DAILY_LIMIT.get(phase, 3)
     queue_size = batch_days * daily_limit
-    pending = [enrich_vendor(v) for v in next_pending(limit=queue_size)]
+    excl = set(exclude_ids or ())
+    rows = [
+        v
+        for v in next_pending(limit=queue_size * 4 + len(excl))
+        if str(v.get("id") or "") not in excl
+    ]
+    pending = [enrich_vendor(v) for v in _form_first(rows)[:queue_size]]
     contacted_vendors, routes_contacted, group_contacted = contacted_snapshot(data)
     today = date.today().isoformat()
-    batch_id = iso_week_id()
+    batch_id = batch_id or iso_week_id()
     form_contact = load_form_contact()
     payload: dict[str, Any] = {
         "ok": True,
