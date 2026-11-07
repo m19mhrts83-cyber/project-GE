@@ -5,6 +5,7 @@
  */
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
+import { logOwnerDecision } from "@/lib/ownerDecisionLog";
 import { createTodoistTask } from "@/lib/todoistTasks";
 
 export type Todoist312Action = "create" | "dismiss";
@@ -271,7 +272,22 @@ export async function applyT312Action(opts: {
   const author =
     (process.env.TODOIST_312_AUTHOR || "").trim() || "FRIDAY";
 
+  const proposalLog = {
+    surface: "todoist_312" as const,
+    source: opts.source,
+    employee: "312",
+    subject: p.title,
+    aiProposal: [p.title, p.summary].filter(Boolean).join("\n"),
+    payload: { n: p.n ?? null, lane: p.lane ?? null, origin: p.origin ?? null },
+  };
+
   if (opts.action === "dismiss") {
+    await logOwnerDecision({
+      ...proposalLog,
+      action: "dismiss",
+      targetType: "t312_proposal",
+      targetId: String(p.n ?? p.title ?? ""),
+    });
     return {
       ok: true,
       message:
@@ -320,6 +336,13 @@ export async function applyT312Action(opts: {
       ? `- [会議](${p.project_url})\n`
       : `- [該当タスク](${r.url})\n`);
   await postTodoistComment(r.id, comment);
+  await logOwnerDecision({
+    ...proposalLog,
+    action: "create",
+    targetType: "todoist_task",
+    targetId: String(r.id),
+    note: title !== p.title ? `title=${title}` : null,
+  });
 
   return {
     ok: true,

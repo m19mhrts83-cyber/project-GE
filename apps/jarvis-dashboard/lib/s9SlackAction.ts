@@ -9,6 +9,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { logOwnerDecision } from "@/lib/ownerDecisionLog";
 
 export type S9Decision = "adopt" | "skip";
 
@@ -367,6 +368,16 @@ export async function applyS9Action(opts: {
     if (error) {
       return { ok: false, message: `ジョブ登録に失敗: ${error.message}` };
     }
+    await logOwnerDecision({
+      surface: "s9",
+      action: opts.decision,
+      source: opts.source,
+      employee: "S9",
+      targetType: "s9_candidate",
+      targetId: c.name,
+      subject: c.name,
+      payload: { job_id: String(data?.id || "") },
+    });
     return {
       ok: true,
       message:

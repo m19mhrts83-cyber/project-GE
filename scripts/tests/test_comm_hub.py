@@ -227,11 +227,17 @@ class _Query:
         self.filters.append(("eq", col, val))
         return self
 
+    def is_(self, col, val):
+        self.filters.append(("is", col, None if val == "null" else val))
+        return self
+
     def _match(self, row):
         for kind, col, val in self.filters:
             if kind == "in" and row.get(col) not in val:
                 return False
             if kind == "eq" and row.get(col) != val:
+                return False
+            if kind == "is" and row.get(col) is not val:
                 return False
             if kind == "gte" and str(row.get(col)) < str(val):
                 return False
