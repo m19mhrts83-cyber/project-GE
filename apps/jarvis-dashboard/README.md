@@ -117,6 +117,14 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - NotebookLM 投入: [`docs/Jarvis_Dashboard_NotebookLM投入_20260801.md`](../../docs/Jarvis_Dashboard_NotebookLM投入_20260801.md)
 - Drive: `200_NoteBookLM/05_Jarvisダッシュボード_設計と引き継ぎ/`
 
+### 見た目（Personal Board デザインシステム・2026-11-07〜）
+
+- 正本: Claude の Design System「Personal Board」https://claude.ai/artifact/F9dySGWWbRcU6yT3WW4nJj （Jarvis と KURASHIFT 共通の部品、テーマは別。判断ログ＝ループウェアの考え方もここ）
+- 実装: `app/theme-jarvis.css` を `globals.css` の後に読み込み、色・背景グラデーション・すりガラスのカード・紺のサイドバー・注目カードだけを上書き。いまは **jarvis-light**（明るい本文＋紺のサイドバー）
+- アイコン: `components/Icon.tsx`（線アイコン、外部ライブラリなし）。メニューのアイコンは `lib/nav.ts` の `icon`
+- 注目カード: ホーム最初のピン（`HomePinBanner` の1枚目）を `OpsPinCard focus` で「いまやること」表示。注目は1画面1つ
+- 次: `globals.css` の固定色（約300か所）をトークン化 → ダーク版（jarvis）切替、判断ログ（Good/Bad＋理由タグ＋一言）を「確認しました」系ボタンに付ける
+
 ### 収集の役割分担
 
 | 経路 | 内容 |

@@ -100,7 +100,7 @@ export default async function HomePinBanner() {
 
   return (
     <>
-      {visible.map((data) => {
+      {visible.map((data, i) => {
         const id = String(data.id);
         const level = (
           ["attention", "warn", "info"].includes(String(data.level))
@@ -140,6 +140,7 @@ export default async function HomePinBanner() {
           <OpsPinCard
             key={id}
             id={id}
+            focus={i === 0}
             level={level}
             levelLabel={LEVEL_LABEL[level]}
             title={pinTitle(id, String(data.title || id))}
