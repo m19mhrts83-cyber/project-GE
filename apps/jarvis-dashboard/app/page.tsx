@@ -13,18 +13,33 @@ import HomeOpenchatBand from "@/components/home/HomeOpenchatBand";
 import HomeMetaDetails from "@/components/home/HomeMetaDetails";
 import HomeKurashiftLink from "@/components/home/HomeKurashiftLink";
 
+/** 例: "SAT · 07 NOV 2026"（日本時間） */
+function todayLabel(): string {
+  const d = new Date();
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Tokyo",
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("weekday")} · ${get("day")} ${get("month")} ${get("year")}`;
+}
+
 export default function HomePage() {
   return (
     <Shell active="/">
-      <h1>ホーム</h1>
-      <p className="sub">
-        今日のキュー → パートナー → モチベーション（入居率ヒーロー＋手残りCF） → 状況ウォッチ → その他メール → 神大家オプチャまとめの順。
-        号室表・履歴は{" "}
-        <a href="/properties" style={{ color: "var(--accent)", fontWeight: 600 }}>
-          所有物件
-        </a>
-        。⌘K で画面移動。
-      </p>
+      <div className="home-hero">
+        <div>
+          <div className="pb-eyebrow-t">{todayLabel()}</div>
+          <h1>おかえりなさい、松野さん</h1>
+        </div>
+        <p className="sub">
+          いまやること → 今日のキュー → パートナー → 数値 → 状況ウォッチ。号室表は{" "}
+          <a href="/properties">所有物件</a>。⌘K で移動。
+        </p>
+      </div>
 
       <Suspense fallback={null}>
         <HomePinBanner />

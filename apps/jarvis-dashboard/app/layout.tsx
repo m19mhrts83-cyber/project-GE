@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./theme-jarvis.css";
 
 export const metadata: Metadata = {
   title: "Jarvis Dashboard",
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1c1917",
+  themeColor: "#0e1520",
 };
 
 export default function RootLayout({

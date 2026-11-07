@@ -1,0 +1,445 @@
+/*
+ * Jarvis テーマ（Personal Board デザインシステム「jarvis-light」）
+ * globals.css の後に読み込み、色・背景・カード・サイドバー・注目カードだけを上書きする。
+ * 正本: https://claude.ai/artifact/F9dySGWWbRcU6yT3WW4nJj （tokens.json / bundle.css）
+ * ダーク版（jarvis）は globals.css の固定色をトークン化してから切り替える。
+ */
+
+:root {
+  /* Personal Board tokens — jarvis-light */
+  --surface-0: #f3f6fa;
+  --surface-1: #ffffff;
+  --surface-2: #e8eef5;
+  --side-bg: #0e1520;
+  --side-ink: #e6eef8;
+  --side-muted: #8a9ab0;
+  --pb-line: #d6dee8;
+  --pb-ink: #0b1220;
+  --pb-ink-muted: #4f5d70;
+  --pb-accent: #0068a8;
+  --pb-accent-bright: #38d1ff;
+  --accent-soft: #e0f1fb;
+  --focus: #9a5b00;
+  --focus-bright: #ffb547;
+  --focus-soft: #fff1d6;
+  --positive: #0b7d5e;
+  --alert: #b8352a;
+  --font-sans: "Inter", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  --shadow-card: 0 1px 2px rgba(11, 18, 32, 0.06), 0 8px 24px rgba(11, 18, 32, 0.06);
+  --shadow-focus: 0 0 0 1px rgba(154, 91, 0, 0.35), 0 10px 30px rgba(154, 91, 0, 0.14);
+
+  /* 既存変数を新しい色に寄せる（globals.css 全体に効く） */
+  --bg: var(--surface-0);
+  --ink: var(--pb-ink);
+  --text: var(--pb-ink);
+  --muted: var(--pb-ink-muted);
+  --line: var(--pb-line);
+  --card: var(--surface-1);
+  --accent: var(--pb-accent);
+  --high: var(--alert);
+  --med: var(--focus);
+  --info: var(--pb-accent);
+  --side: var(--side-bg);
+  --radius-card: 14px;
+  --radius-chip: 10px;
+  --shadow-soft: var(--shadow-card);
+  --shadow-hover: 0 2px 4px rgba(11, 18, 32, 0.06), 0 14px 32px rgba(11, 18, 32, 0.1);
+}
+
+.pb-i {
+  flex: none;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ---------- 背景：単色にしない（光のグラデーション＋上部のグリッド） ---------- */
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--surface-0);
+  background-image:
+    radial-gradient(900px 520px at 92% -10%, color-mix(in srgb, var(--pb-accent-bright) 22%, transparent), transparent 62%),
+    radial-gradient(700px 480px at 30% 112%, color-mix(in srgb, var(--focus-bright) 16%, transparent), transparent 60%),
+    linear-gradient(180deg, #ffffff 0%, var(--surface-0) 50%);
+  background-attachment: fixed;
+}
+
+.layout > main {
+  position: relative;
+}
+
+.layout > main::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 420px;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--pb-accent) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--pb-accent) 7%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+}
+
+.layout > main > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- サイドバー：紺のグラデーション＋アイコン ---------- */
+.sidebar {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--pb-accent-bright) 12%, var(--side-bg)) 0%, var(--side-bg) 38%);
+  color: var(--side-muted);
+  border-right: 1px solid rgba(230, 238, 248, 0.06);
+}
+
+.side-brand-row {
+  margin: 0 6px 14px;
+}
+
+.pb-logo {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: #061019;
+  background: linear-gradient(145deg, #9be7ff, var(--pb-accent-bright));
+  box-shadow: 0 6px 18px rgba(56, 209, 255, 0.35);
+  flex-shrink: 0;
+}
+
+.side-brand {
+  color: var(--side-ink);
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+}
+
+.side-brand small {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--side-muted);
+}
+
+.side-cmd-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 4px);
+  margin: 0 2px 14px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(230, 238, 248, 0.12);
+  background: rgba(230, 238, 248, 0.04);
+  color: var(--side-muted);
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.side-cmd-btn:hover {
+  background: rgba(230, 238, 248, 0.08);
+  color: var(--side-ink);
+}
+
+.side-cmd-btn kbd {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(230, 238, 248, 0.16);
+}
+
+.side-group-title {
+  margin: 6px 10px 6px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  color: rgba(138, 154, 176, 0.85);
+}
+
+.side-link {
+  color: var(--side-muted);
+  font-size: 0.86rem;
+  padding: 7px 10px;
+  margin-bottom: 2px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.side-link-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.side-link:hover {
+  background: rgba(230, 238, 248, 0.06);
+  color: var(--side-ink);
+}
+
+.side-link.active {
+  color: var(--side-ink);
+  font-weight: 600;
+  background: linear-gradient(90deg, rgba(56, 209, 255, 0.24), rgba(56, 209, 255, 0.06));
+  box-shadow: inset 0 0 0 1px rgba(56, 209, 255, 0.3);
+}
+
+.side-link.active .pb-i {
+  color: var(--pb-accent-bright);
+}
+
+.side-link-home {
+  font-size: 0.92rem;
+  padding: 8px 10px;
+  margin: 0 0 12px;
+}
+
+.nav-badge {
+  font-family: var(--font-mono);
+  background: rgba(230, 238, 248, 0.1);
+  color: var(--side-ink);
+}
+
+.side-link.active .nav-badge {
+  background: var(--pb-accent-bright);
+  color: #061019;
+}
+
+.side-note {
+  color: var(--side-muted);
+}
+
+/* ---------- 見出し ---------- */
+h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.pb-eyebrow-t {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pb-ink-muted);
+}
+
+.home-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 24px;
+  margin-bottom: 18px;
+}
+
+.home-hero h1 {
+  margin: 2px 0 0;
+}
+
+.home-hero .sub {
+  margin: 0;
+  max-width: 30rem;
+  font-size: 0.8rem;
+}
+
+.home-hero .sub a {
+  color: var(--pb-accent);
+  font-weight: 600;
+}
+
+/* ---------- カード：すりガラス ---------- */
+.card,
+.home-band,
+.today-queue,
+.stat {
+  background: color-mix(in srgb, var(--surface-1) 80%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-color: color-mix(in srgb, var(--pb-line) 85%, transparent);
+  box-shadow: var(--shadow-card);
+}
+
+.today-queue {
+  border-color: color-mix(in srgb, var(--pb-accent) 22%, var(--pb-line));
+}
+
+.today-queue-item {
+  background: color-mix(in srgb, var(--surface-1) 70%, transparent);
+}
+
+/* 状態は左の太線ではなく、枠とタグで伝える */
+.level-attention,
+.level-warn,
+.level-info {
+  border-left-width: 1px;
+  background: color-mix(in srgb, var(--surface-1) 80%, transparent);
+}
+
+.level-attention .lvl {
+  color: var(--alert);
+  background: color-mix(in srgb, var(--alert) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alert) 45%, transparent);
+}
+
+.level-warn .lvl {
+  color: var(--focus);
+  background: color-mix(in srgb, var(--focus) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--focus) 40%, transparent);
+}
+
+.level-info .lvl {
+  color: var(--pb-accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pb-accent) 30%, transparent);
+}
+
+/* ---------- ボタン ---------- */
+.btn {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-1) 75%, transparent);
+  transition: background 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn.primary {
+  background: linear-gradient(180deg, #1d86c8, var(--pb-accent));
+  border-color: var(--pb-accent);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(0, 104, 168, 0.22);
+}
+
+/* ---------- 注目カード（ホーム最初のピン） ---------- */
+.home-pin-banner.is-focus {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  padding: 22px 24px;
+  border: 1px solid color-mix(in srgb, var(--focus) 50%, transparent);
+  border-radius: 18px;
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--focus-bright) 26%, #ffffff) 0%,
+    color-mix(in srgb, var(--focus-bright) 9%, #ffffff) 45%,
+    rgba(255, 255, 255, 0.85) 100%
+  );
+  box-shadow: var(--shadow-focus);
+}
+
+.home-pin-banner.is-focus::after {
+  content: "";
+  position: absolute;
+  right: -80px;
+  top: -120px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--focus-bright) 30%, transparent), transparent 70%);
+}
+
+.home-pin-banner.is-focus > * {
+  position: relative;
+  z-index: 1;
+}
+
+.home-pin-banner.is-focus .pb-ficon {
+  grid-row: 1 / span 2;
+  align-self: start;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  color: #ffffff;
+  background: linear-gradient(145deg, #e0a040, var(--focus));
+  box-shadow: 0 8px 22px rgba(154, 91, 0, 0.3);
+}
+
+.home-pin-banner.is-focus .pb-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--focus);
+  margin-bottom: 4px;
+}
+
+.home-pin-banner.is-focus header strong {
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+
+.home-pin-banner.is-focus .home-pin-banner-actions {
+  grid-column: 2;
+  border-top-color: color-mix(in srgb, var(--focus) 18%, transparent);
+}
+
+.home-pin-banner.is-focus .btn.primary {
+  background: linear-gradient(180deg, #b87412, var(--focus));
+  border-color: var(--focus);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(154, 91, 0, 0.28);
+}
+
+.home-pin-banner.is-focus:hover {
+  transform: none;
+}
+
+/* 2枚目以降のピンは控えめに（注目は1つだけ） */
+.home-pin-banner:not(.is-focus).home-pin-banner-alert,
+.home-pin-banner:not(.is-focus).home-pin-banner-info {
+  border-width: 1px;
+  box-shadow: var(--shadow-card);
+}
+
+.home-pin-banner:not(.is-focus).home-pin-banner-alert {
+  border-color: color-mix(in srgb, var(--alert) 45%, var(--pb-line));
+}
+
+.home-pin-banner:not(.is-focus).home-pin-banner-info {
+  border-color: color-mix(in srgb, var(--pb-accent) 30%, var(--pb-line));
+}
+
+@media (max-width: 640px) {
+  .home-pin-banner.is-focus {
+    padding: 16px;
+    grid-template-columns: 1fr;
+  }
+
+  .home-pin-banner.is-focus .pb-ficon {
+    grid-row: auto;
+    width: 38px;
+    height: 38px;
+  }
+
+  .home-pin-banner.is-focus .home-pin-banner-actions {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 860px) {
+  .side-cmd-btn {
+    display: none;
+  }
+}
