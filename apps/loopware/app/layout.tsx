@@ -3,7 +3,7 @@ import "./globals.css";
 import TabBar from "@/components/TabBar";
 
 export const metadata: Metadata = {
-  title: "ループウェア",
+  title: "Nody",
   description: "312入口・313出口の判断ループ（iPhone Chrome向け）",
 };
 

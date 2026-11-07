@@ -10,8 +10,8 @@ export default function HubPage() {
           <Icon name="bolt" size={20} />
         </div>
         <div>
-          <div className="eyebrow acc">LOOPWARE</div>
-          <strong>社員ループウェア</strong>
+          <div className="eyebrow acc">NODY</div>
+          <strong>Nody</strong>
         </div>
       </div>
 
