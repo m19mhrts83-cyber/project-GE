@@ -30,7 +30,7 @@ Notion に議事録を残すときは、Genspark 等の要約をそのまま貼�
 | `apps/jarvis-dashboard` | Next.js 15 (認証ダッシュボード) | 3001 | 下記の env を渡して `npm run dev` |
 | `apps/prompt-share` | Next.js 16 (チャプロ代替プロンプト共有) | 3002 | `cd apps/prompt-share && npm run dev`（本番: https://prompt-share-taupe.vercel.app） |
 | `apps/trade-desk` | Next.js 15 (KURASHIFT・ライフプラン／資産HQ) | 3003 | 下記の env を渡して `npm run dev` |
-| `apps/loopware` | Next.js 15 (312/313 判断 UI) | 3004 | `cd apps/loopware && npm run dev`（ダッシュは外部リンクのみ） |
+| `apps/loopware` | Next.js 15 (312/313 判断 UI) | 3004 | `cd apps/loopware && npm run dev`（本番: https://jarvis-loopware.vercel.app。ダッシュは外部リンクのみ） |
 | ルート静的サイト | 素の HTML/JS（Google Maps） | 8000 | `python3 -m http.server 8000`（`index.html`） |
 
 - Node は v22 系。依存は各アプリで `npm install`（lockfile は `package-lock.json` = npm）。標準コマンドは各 `README.md` 参照。
