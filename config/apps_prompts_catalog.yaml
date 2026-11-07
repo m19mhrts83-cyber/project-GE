@@ -2,9 +2,17 @@
 # ダッシュボード表示は apps/jarvis-dashboard/data/apps_prompts_catalog.json と同期すること
 
 version: 1
-updated: "2026-08-10"
+updated: "2026-11-07"
 
 items:
+  - id: purchase-compare
+    kind: app
+    title: 購入比較（ループウェア）
+    url: "/purchase-compare"
+    note: "候補比較→選択／見送り→理由・購入後追記。最初のお題はシャワーヘッド。localStorage＋MDエクスポート"
+    tags: [購入比較, ループウェア, シャワー]
+    internal: true
+
   - id: prompt-share
     kind: app
     title: Prompt Share（チャプロ代替）
