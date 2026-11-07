@@ -192,6 +192,28 @@ def classify(row: dict[str, Any], vendors: list[dict[str, Any]]) -> tuple[str, s
     return "add", ""
 
 
+def upgrade_route(row: dict[str, Any], existing: dict[str, Any]) -> bool:
+    """台帳に電話のみで入っている社に、候補 MD でメール／フォームが見つかったら経路を足す。
+
+    緑区のベストハウス・西晃商事は台帳に電話のみで先に入っており、候補 MD に
+    メールがあっても「重複」で捨てられ、S9 の送れる相手が増えなかった（2026-11-06）。
+    """
+    if str(existing.get("status") or "pending") != "pending":
+        return False
+    if str(existing.get("channel") or "") != "phone" or row["channel"] == "phone":
+        return False
+    existing["channel"] = row["channel"]
+    if row.get("contact_email"):
+        existing["contact_email"] = row["contact_email"]
+    if row.get("contact_url") and not existing.get("contact_url"):
+        existing["contact_url"] = row["contact_url"]
+    if row.get("url") and not existing.get("url"):
+        existing["url"] = row["url"]
+    note = f"{row.get('source')}: 経路を電話→{row['channel']}に更新"
+    existing["notes"] = f"{existing['notes']} | {note}" if existing.get("notes") else note
+    return True
+
+
 def build_consult(items: list[tuple[dict[str, Any], str, str]]) -> str:
     """プレーン本文（ログ・通知用）。Slack はボタン付きカードで投稿する。"""
     rows = [{**row, "n": n, "why": why} for n, (row, why, _md) in enumerate(items, 1)]
@@ -259,6 +281,7 @@ def main() -> int:
     consult: list[tuple[dict[str, Any], str, str]] = []
     dropped: list[tuple[dict[str, Any], str]] = []
     dups = 0
+    upgraded: list[str] = []
     files_done: list[Path] = []
     for p in list_queue_files(inbox):
         meta, body = parse_frontmatter(p.read_text(encoding="utf-8", errors="replace"))
@@ -271,7 +294,11 @@ def main() -> int:
             if kind == "add":
                 to_add.append(row)
             elif kind == "dup":
-                dups += 1
+                ex = find_existing(row, vendors)
+                if ex is not None and upgrade_route(row, ex):
+                    upgraded.append(str(ex.get("name") or ""))
+                else:
+                    dups += 1
             elif kind == "drop":
                 dropped.append((row, why))
             else:
@@ -281,7 +308,10 @@ def main() -> int:
     clean = [{k: v for k, v in r.items() if not k.startswith("_")} for r in to_add]
     res: dict[str, Any] = {"files": [f.name for f in files_done], "add": [r["name"] for r in clean], "dups": dups,
                            "consult": [(r["name"], why) for r, why, _ in consult],
-                           "dropped": [(r["name"], why) for r, why in dropped]}
+                           "dropped": [(r["name"], why) for r, why in dropped],
+                           "upgraded": upgraded}
+    if args.apply and upgraded:
+        ml.save_list(data)  # merge_append より先に保存（merge_append は読み直す）
     if args.apply and files_done:
         res["merge"] = ml.merge_append(clean, dry_run=False)
         if args.post:
