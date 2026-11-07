@@ -10,6 +10,7 @@
 ## 起点
 
 - **ローカル引き継ぎ（2026-10-26）**: CodexはJARVIS/Claude Code由来の案件を引き継いだら、各ターンの最終報告前に元担当宛てメモを更新する。Claude Code→`to_MissLemon/`、JARVIS→`to_Jarvis/`。共通場所は `/Users/matsunomasaharu2/git-repos/agent-handoff/`。別worktreeでもこの絶対パスを使う。詳細は `/Users/matsunomasaharu2/git-repos/docs/AIエージェントチーム/51_ローカル受け渡し_20261026.md`。通知・自動起動は含まない。
+- 次の実行者がClaude Code／Cursorのどちらか未定、両者が把握すべき、または松野さんが両方への共有を依頼した案件は、同じ `handoff_group_id` の短い入口を両宛てに置き、Slack `#ai-hub` へ短報する。詳細は一つの案件正本に集約する。人向け入口は `docs/AIエージェントチーム/53_Codex_Claude_Cursor共通再開_20261101.md`。
 
 - 運用の起点は **Jarvis（Cursor）**。ルールの正本更新も Jarvis 経由を優先する。
 - 秘密・トークン・パスワードはチャット／MD／Slack に書かない。正本は `~/git-repos/.env.jarvis_private`（社員は各 `.env` 二層）。
@@ -29,6 +30,7 @@
 - 文字起こしは AI チャットでやらない → `scripts/jarvis_transcribe_m4a.py`
 - PDF を作ったら元 MD を同じフォルダに同名で置く。AI は MD を読む
 - ダッシュの「聞く」はオートでもコスパの良い順（追加費用ゼロ→軽い→不足時だけ重い・従量）
+- ツールもコスパの良い順: 取得済み記録・専用スクリプト → 公式API／コネクタ／MCP／CLI → 内蔵ブラウザ／Chrome → スクリーンショット中心のComputer Use。Webは内蔵ブラウザを第一候補にしつつ、軽く確実な構造化経路を優先
 - `48_読まなくてよいMD一覧` は名指し時のみ。`docs/運用コマンド一覧.md` は該当節だけ読む
 - Todoist: 起票 → 結論コメント → 質問と対応を追記 → 納得でクローズ。書き出しに「ミスレモン」等の名乗り（R7）
 

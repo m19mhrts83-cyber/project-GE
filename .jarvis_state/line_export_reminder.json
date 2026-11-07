@@ -3,9 +3,9 @@
   "routes": {
     "tcell_caramel_g": {
       "route_id": "tcell_caramel_g",
-      "folder": "103_Tcell",
+      "folder": "P103_Tcell",
       "interval_days": 30,
-      "last_import_at": "2026-10-15T22:27:45+09:00",
+      "last_import_at": "2026-11-05T11:00:10+09:00",
       "last_import_source": "inbox",
       "last_prompted_at": "2026-10-15T22:23:05+09:00"
     },
@@ -35,7 +35,7 @@
     "tokai_dx_gojokai": {
       "route_id": "tokai_dx_gojokai",
       "folder": "P820_LINE_東海DX互助会",
-      "last_import_at": "2026-10-27T06:15:59+09:00",
+      "last_import_at": "2026-11-03T09:37:34+09:00",
       "last_import_source": "inbox",
       "last_prompted_at": "2026-09-20T16:07:26+09:00"
     },

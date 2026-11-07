@@ -153,6 +153,7 @@ lanes:
     project_key: kodate
     project_id: 6hXX2mMc58ff5QH2
     lane_label: kodate
+    use_owner_token: true
     initial_section: 未着手
     open_sections:
     - 未着手
@@ -162,6 +163,7 @@ lanes:
     - オーナー確認
     done_sections: []
     hide_done_on_board: false
+    note: admin所有。Jarvis Free共有枠外のため CLI は OWNER トークンを使う
   kazoku:
     title: 家族
     project_key: kazoku

@@ -11,11 +11,12 @@ Cursor（Jarvis）がメインの作業場。**FRIDAY／Grok／他経路が Slac
 
 | 正 | 内容 |
 |---|---|
-| **エージェント同士** | Slack `#ai-hub`（Hawk／FRIDAY／Jarvis） |
+| **エージェント同士** | Slack `#ai-hub`（Hawk／FRIDAY／Jarvis／Claude Code／**番頭 Banto・Muse**） |
 | **見える共有（人向け）** | Slack `#consult` / `#ops` / `#report` |
 | **Mac 実行手渡し** | Drive JarvisBox（捨てない） |
 | **読取本線** | Cursor **Slack MCP**（`slack_read_channel`） |
 | **投稿本線** | **Incoming Webhook**（`jarvis_slack_webhook_post.py`）。通知用。MCP `slack_send_message` は使わない |
+| **番頭との分担** | 停滞の先回り指摘は番頭本線。Jarvis は重複報告せず Mac 実行だけ相乗り（`jarvis-banto-muse-collab.mdc`） |
 
 正本: `docs/AIエージェントチーム/37_Slackハブ_Jarvis読取_20261018.md`  
 設定: `config/slack_ai_team_hub.yaml`  

@@ -4,12 +4,13 @@
 容量・詳細リンクの正本は admin Drive [`240_いけとも`](https://drive.google.com/drive/folders/1UrfAzlxQDVkQBkIeyGNWmWZ1RYAjNHsr)。  
 Jarvis ダッシュボード: [/materials](https://jarvis-dashboard-amber.vercel.app/materials)（レーン「いけともWS」）
 
-更新: 2026-10-15
+更新: 2026-11-07
 
 ## 受講済みセミナー
 
 | 日付 | セミナー | Drive（参照一覧） | 主なリンク |
 |---|---|---|---|
+| 2026-11-07 | ループウェア Day1 基礎編 | [`2026-11_ループウェア/`](https://drive.google.com/drive/folders/1UrfAzlxQDVkQBkIeyGNWmWZ1RYAjNHsr)（admin `240_いけとも` 内） | [動画](https://youtu.be/sPyBpJKks8w) · [資料HTML](https://superslide-share.frontier.monster/s/ssm_share_MKKbgJQD7O5eGzVn76T4FxN6f3_9S8j8-lwjIqvbzyU) · [資料PDF](https://superslide-share.frontier.monster/p/ssm_pdf_iphecQ5sS9_aeCJMnX8b6H5nBNKvOy8YqtHWO7CMN8U) · [Luma](https://luma.com/iketomo261107) · [Notion](https://www.notion.so/411f6bbe5a76814b91cef54cd0e97c67) |
 | 2026-02-14 | 資料・ツール制作ハンズオン | [フォルダ](https://drive.google.com/drive/folders/1DWZ1V9_Muix2I_rSGb3P5iqJgEYiRV29) / [00_参照一覧](https://drive.google.com/file/d/1lieR306osuCxV7f5JM4y4GhKxvDNt88c/view) | [動画](https://www.youtube.com/watch?v=jwkZBI-T5Vk) · [資料](https://bit.ly/4qAEQYq) |
 | 2026-02-28 | AIでExcelの面倒作業を“1クリック化” | [フォルダ](https://drive.google.com/drive/folders/1oUhNh9yJ7YDIW-zPmsmxRhd5HlAHAGMm) / [00_参照一覧](https://drive.google.com/file/d/1JrrjbKfjOO5xy5HQoGA_thrYCJTGiZqw/view) | [動画](https://youtu.be/uaWoe9ggxnE) · [資料](https://drive.google.com/file/d/1lli3B7R3e0o6xgF9Ob6PCPtZaUsVKO4z/view) · Notionメモ |
 | 2026-03-11 | Google AI Studioで自分専用ツール制作 | [フォルダ](https://drive.google.com/drive/folders/1TrR94bLgY6k4Z-XzUtHa3KjwEGv1gVlE) / [00_参照一覧](https://drive.google.com/file/d/1hJn5OYMPsakvsD6ub3b7OfTo5bAQ3ZjP/view) | [資料](https://bit.ly/4ltjQCi) · [Luma](https://luma.com/iketomo260311) · Notionメモ |
@@ -29,7 +30,8 @@ Jarvis ダッシュボード: [/materials](https://jarvis-dashboard-amber.vercel
 | Notion Excel自動化メモ | [いけともワークショップ_Excel自動化](https://www.notion.so/315f6bbe5a768019812ef75df901fdc7) |
 | Notion Google AI Studioメモ | [いけともワークショップ_google AI studio](https://www.notion.so/307f6bbe5a768055ada7c31c19ccf4d5) |
 | Notion Nano Banana2メモ | [いけともワークショップ nanobanana2](https://www.notion.so/32af6bbe5a76807091eefa6c7c1cf32c) |
-| Notion Day1メモ | [いけとも_AIエージェントチームDay1_20261003](https://www.notion.so/3eef6bbe5a76815894f5e19e43b30c34) |
+| Notion Day1メモ（エージェントチーム） | [いけとも_AIエージェントチームDay1_20261003](https://www.notion.so/3eef6bbe5a76815894f5e19e43b30c34) |
+| Notion ループウェア Day1 | [いけとも_ループウェアDay1_20261107](https://www.notion.so/411f6bbe5a76814b91cef54cd0e97c67) |
 | 公式ハンズオン店（未受講含む） | [handson.workstyle-evolution.co.jp](https://handson.workstyle-evolution.co.jp/) |
 | 参考・未受講アーカイブ一覧 | [Drive `_参考_未受講アーカイブ一覧`](https://drive.google.com/drive/folders/12DsP-Rmv9DE-Xo6HLRN4-CHjZPT5L6eB) |
 | 運用への持ち帰り（エージェントチーム） | [`docs/AIエージェントチーム/`](AIエージェントチーム/00_このフォルダ.md) |
