@@ -4,6 +4,7 @@
  */
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
+import { logOwnerDecision } from "@/lib/ownerDecisionLog";
 import {
   closeTodoistTaskById,
   rescheduleTodoistTaskById,
@@ -199,6 +200,15 @@ export async function applyT313Action(opts: {
       `\nアウトプット:\n- [該当タスク](https://app.todoist.com/app/task/${id})\n`;
     const r = await closeTodoistTaskById(id, comment);
     if (!r.ok) return { ok: false, message: r.error };
+    await logOwnerDecision({
+      surface: "todoist_313",
+      action: "close",
+      source: opts.source,
+      employee: "313",
+      targetType: "todoist_task",
+      targetId: id,
+      payload: { n: opts.n ?? null },
+    });
     return {
       ok: true,
       message:
@@ -221,6 +231,16 @@ export async function applyT313Action(opts: {
     `アウトプット:\n- [該当タスク](https://app.todoist.com/app/task/${id})\n`;
   const r = await rescheduleTodoistTaskById(id, due, comment);
   if (!r.ok) return { ok: false, message: r.error };
+  await logOwnerDecision({
+    surface: "todoist_313",
+    action: "reschedule",
+    source: opts.source,
+    employee: "313",
+    targetType: "todoist_task",
+    targetId: id,
+    note: `due=${due}`,
+    payload: { n: opts.n ?? null, due },
+  });
   return {
     ok: true,
     message:
