@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
+import hmac
 import json
 import os
 import sys
@@ -274,15 +276,137 @@ def next_state(
             if new.get("last_moved_at") != a["last_moved_at"]:
                 new["last_moved_at"] = a["last_moved_at"]
                 moved = dt.date.fromisoformat(a["last_moved_at"])
-                new["next_check_at"] = (
-                    moved + dt.timedelta(days=CHECK_INTERVAL_DAYS)
-                ).isoformat()
+                cand = (moved + dt.timedelta(days=CHECK_INTERVAL_DAYS)).isoformat()
+                # ボタンで延ばした日（続ける+14／保留+30）より手前には戻さない
+                new["next_check_at"] = max(cand, str(new.get("next_check_at") or ""))
                 if new.get("state") in ("needs_check", "dormant"):
                     new["state"] = "active"
         if a["kind"] == "checklist":
             new["checklist_sent_for"] = a["date"]
     new["synced_at"] = today.isoformat()
     return new
+
+
+# ------------------------------------------------------------------ 「どうしますか？」（実装②）
+
+# 署名の秘密。apps/jarvis-dashboard/lib/dealActive113Core.ts の D113_SECRET_NAMES と同じ順。
+ACTION_SECRET_NAMES = ("DEAL_ACTIVE_113_ACTION_TOKEN", "PROPERTY_GATE_ACTION_TOKEN")
+ASK_ACTIONS = (
+    ("continue", "続ける（あと14日）", "primary"),
+    ("hold", "保留（30日後）", None),
+    ("pass", "見送り", "danger"),
+    ("done", "完了（外す）", None),
+)
+ASK_LIMIT = 15  # 1枚に載せる上限（Slack の blocks 50 個制限の内側）
+
+
+def action_secret(env: dict[str, str] | None = None) -> str:
+    env = os.environ if env is None else env
+    for name in ACTION_SECRET_NAMES:
+        v = (env.get(name) or "").strip()
+        if v:
+            return v
+    return ""
+
+
+def d113_sig(secret: str, action: str, deal_id: str) -> str:
+    msg = f"d113:{action}:{deal_id}".encode("utf-8")
+    return hmac.new(secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()[:10]
+
+
+def d113_value(secret: str, action: str, deal_id: str) -> str:
+    return f"d113:{action}:{deal_id}:{d113_sig(secret, action, deal_id)}"
+
+
+def is_due(deal: dict[str, Any], today: dt.date) -> bool:
+    """聞く対象: スレッドがあり、閉じておらず、次に聞く日が今日以前。"""
+    st = sj_of(deal).get(SJ_KEY)
+    if not isinstance(st, dict) or not st.get("ts"):
+        return False
+    if st.get("state") in ("closed", "dormant"):
+        return False
+    nxt = str(st.get("next_check_at") or "")
+    return bool(nxt) and nxt <= today.isoformat()
+
+
+def idle_days(deal: dict[str, Any], today: dt.date) -> int | None:
+    st = sj_of(deal).get(SJ_KEY) or {}
+    try:
+        return (today - dt.date.fromisoformat(str(st.get("last_moved_at"))[:10])).days
+    except ValueError:
+        return None
+
+
+def build_ask_card(deals: list[dict[str, Any]], today: dt.date, secret: str) -> dict[str, Any]:
+    head = f"*どうしますか？*　{today.month}/{today.day}（{len(deals)}件）\n14日以上動きのない案件です。1件ずつ選んでください。"
+    blocks: list[dict[str, Any]] = [{"type": "section", "text": {"type": "mrkdwn", "text": head}}]
+    for d in deals:
+        did = str(d["id"])
+        days = idle_days(d, today)
+        st = sj_of(d).get(SJ_KEY) or {}
+        note = []
+        if days is not None:
+            note.append(f"{days}日動きなし")
+        if st.get("state") == "hold":
+            note.append("保留の再確認")
+        if int(st.get("asked_count") or 0) >= 1:
+            note.append(f"{int(st['asked_count']) + 1}回目")
+        line = f"*{title_line(d)}*\n{stage_label(d)} · {' · '.join(note) or '—'} · <{deal_url(did)}|KURASHIFT>"
+        blocks.append({"type": "divider"})
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": line}})
+        els = []
+        for action, label, style in ASK_ACTIONS:
+            b: dict[str, Any] = {
+                "type": "button",
+                "text": {"type": "plain_text", "text": label},
+                "action_id": f"d113_{action}",
+                "value": d113_value(secret, action, did),
+            }
+            if style:
+                b["style"] = style
+            els.append(b)
+        blocks.append({"type": "actions", "block_id": f"d113_{did}", "elements": els})
+    blocks.append(
+        {
+            "type": "context",
+            "elements": [{"type": "mrkdwn", "text": "見送りを押すと KURASHIFT も見送りになります · 113 物件買進め確認係"}],
+        }
+    )
+    return {"text": f"どうしますか？（{len(deals)}件）", "blocks": blocks}
+
+
+def asked_state(st: dict[str, Any], today: dt.date, card_ts: str | None) -> dict[str, Any]:
+    new = dict(st)
+    new["state"] = "needs_check"
+    new["asked_count"] = int(st.get("asked_count") or 0) + 1
+    new["last_asked_at"] = today.isoformat()
+    # 返事がなければ翌週また聞く
+    new["next_check_at"] = (today + dt.timedelta(days=7)).isoformat()
+    if card_ts:
+        new["ask_card_ts"] = card_ts
+    return new
+
+
+def run_ask(sb: Any, slack: "Slack", *, today: dt.date, apply: bool, secret: str) -> dict[str, int]:
+    due = [d for d in fetch_deals(sb) if is_due(d, today)]
+    due.sort(key=lambda d: str((sj_of(d).get(SJ_KEY) or {}).get("last_moved_at") or ""))
+    due = due[:ASK_LIMIT]
+    counts = {"asked": len(due), "error": 0}
+    if not due:
+        return counts
+    try:
+        ts = slack.post(build_ask_card(due, today, secret))
+    except Exception as e:
+        print(f"❌ ask card: {e}", file=sys.stderr)
+        counts["error"] += 1
+        return counts
+    for d in due:
+        new = asked_state(dict(sj_of(d).get(SJ_KEY) or {}), today, None if ts == "dry-run" else ts)
+        if apply:
+            save_state(sb, d, new)
+        else:
+            print(f"# dry-run ask-save {d['id']}: {json.dumps(new, ensure_ascii=False)}")
+    return counts
 
 
 # ------------------------------------------------------------------ I/O
@@ -455,6 +579,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--apply", action="store_true", help="Slack に投稿し summary_json に保存する")
     ap.add_argument("--deal-id", help="1案件だけ処理する（試し用）")
     ap.add_argument("--max-posts", type=int, default=10, help="1回で新しく立てるスレッドの上限")
+    ap.add_argument(
+        "--ask",
+        choices=("auto", "always", "never"),
+        default="auto",
+        help="「どうしますか？」カード: auto=月曜のみ / always / never",
+    )
     ap.add_argument("--today", help="基準日 YYYY-MM-DD（試し用）")
     args = ap.parse_args(argv)
 
@@ -475,7 +605,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     mode = "apply" if args.apply else "dry-run"
     print(f"113 deal-active {mode} {today}: " + " ".join(f"{k}={v}" for k, v in counts.items()))
-    return 1 if counts["error"] else 0
+    err = counts["error"]
+    if args.ask == "always" or (args.ask == "auto" and today.weekday() == 0):
+        secret = action_secret() or ("dry-run-secret" if not args.apply else "")
+        if not secret:
+            print("❌ カードのボタン署名に DEAL_ACTIVE_113_ACTION_TOKEN か PROPERTY_GATE_ACTION_TOKEN が必要です", file=sys.stderr)
+            return 2
+        ac = run_ask(
+            sb_client(), Slack(token, channel, dry_run=not args.apply), today=today, apply=args.apply, secret=secret
+        )
+        print(f"113 ask {mode}: asked={ac['asked']} error={ac['error']}")
+        err += ac["error"]
+    return 1 if err else 0
 
 
 if __name__ == "__main__":
