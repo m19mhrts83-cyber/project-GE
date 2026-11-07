@@ -65,6 +65,9 @@ jobs:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          # 無いとスクリプトが URL ボタンへフォールバックし、リンク先で再度押す二度手間になる
+          # （2026-11-07 Slack FB）。署名検証は Vercel 側で行い、ここでは判定だけに使う
+          SLACK_SIGNING_SECRET: ${{ secrets.SLACK_SIGNING_SECRET }}
           SLACK_WEBHOOK_AI_TEAM_CONSULT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_CONSULT }}
           PROPERTY_GATE_ACTION_TOKEN: ${{ secrets.PROPERTY_GATE_ACTION_TOKEN }}
           MAIL_ACTION_TOKEN: ${{ secrets.MAIL_ACTION_TOKEN }}
