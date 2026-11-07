@@ -1,31 +1,53 @@
 import Link from "next/link";
+import FocusCard from "@/components/FocusCard";
+import Icon from "@/components/Icon";
 
 export default function HubPage() {
   return (
     <main>
-      <nav className="nav">
-        <strong>ループウェア</strong>
-      </nav>
-      <h1>社員ループウェア</h1>
-      <p className="sub">
-        判断は Slack またはここ（iPhone は Chrome）。ログは Supabase。改善はツール外のプロンプト／プログラムへ。
-      </p>
-      <div className="card-grid">
-        <Link className="card" href="/312">
-          <h3>312 入口・何を拾うか</h3>
-          <p className="meta">
-            重複・扱いを S05 で決める。追記／別作成／登録しない。
-          </p>
-        </Link>
-        <Link className="card" href="/313">
-          <h3>313 出口・片付ける</h3>
-          <p className="meta">
-            済んだ／いつ・優先／やめる。外作業済みの消し込み。
-          </p>
-        </Link>
+      <div className="brand">
+        <div className="logo">
+          <Icon name="bolt" size={20} />
+        </div>
+        <div>
+          <div className="eyebrow acc">LOOPWARE</div>
+          <strong>社員ループウェア</strong>
+        </div>
       </div>
-      <p className="meta" style={{ marginTop: 24 }}>
-        Jarvisダッシュからは外部リンクのみ。購入比較はダッシュに残置。
+
+      <FocusCard />
+
+      <div className="eyebrow">IN ／ OUT</div>
+      <Link className="glass nav-card" href="/312">
+        <span className="ico">
+          <Icon name="inbox" size={22} />
+        </span>
+        <span className="txt">
+          <strong>312 入口</strong>
+          <span className="meta">何を拾うか。追記／別作成／登録しない</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+      <Link className="glass nav-card" href="/313">
+        <span className="ico">
+          <Icon name="done" size={22} />
+        </span>
+        <span className="txt">
+          <strong>313 出口</strong>
+          <span className="meta">片付ける。済んだ／いつ・優先／やめる</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
+      <div className="eyebrow">LOOP</div>
+      <div className="glass loop">
+        <div><span className="mono">01</span>AIが案</div>
+        <div><span className="mono">02</span>人が選ぶ</div>
+        <div><span className="mono">03</span>ログ</div>
+        <div><span className="mono">04</span>次の案へ</div>
+      </div>
+      <p className="meta" style={{ marginTop: 10 }}>
+        判断は Slack でもここでも同じログに残る。iPhone は Chrome で開く。
       </p>
     </main>
   );
