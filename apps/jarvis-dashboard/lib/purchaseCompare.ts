@@ -13,6 +13,9 @@ export type Candidate = {
   checkedAt: string;
   source: string;
   unknowns: string;
+  /** 商品写真・現物写真（https または data URL） */
+  imageUrl?: string;
+  imageCredit?: string;
 };
 
 export type Topic = {
@@ -78,6 +81,8 @@ export const SHOWER_TOPIC: Topic = {
       checkedAt: "2026-11-07",
       source: "TOTO公式サポート・パーツショップ価格帯",
       unknowns: "現行ヘッドの正確な品番、希望する水流モード",
+      imageUrl: "",
+      imageCredit: "現物写真をアップロード推奨（品番確定後に公式画像へ差し替え可）",
     },
     {
       id: "refa-one",
@@ -90,6 +95,9 @@ export const SHOWER_TOPIC: Topic = {
       checkedAt: "2026-11-07",
       source: "ReFa公式・販売ページ（要再確認）",
       unknowns: "一時止水の有無、手元ボタンの操作感",
+      imageUrl:
+        "https://www.refa.net/item/refa_fine_bubble_one/images/img-product.jpg",
+      imageCredit: "ReFa公式商品ページ",
     },
     {
       id: "refa-pure",
@@ -104,6 +112,9 @@ export const SHOWER_TOPIC: Topic = {
       checkedAt: "2026-11-07",
       source: "ReFa公式価格・仕様",
       unknowns: "一時止水の有無、実使用でのカートリッジ交換頻度",
+      imageUrl:
+        "https://www.refa.net/item/refa_fine_bubble_pure/images/img-product.jpg",
+      imageCredit: "ReFa公式商品ページ",
     },
     {
       id: "other-fb",
@@ -115,6 +126,8 @@ export const SHOWER_TOPIC: Topic = {
       checkedAt: "2026-11-07",
       source: "未確定（購入前に公式仕様で確認）",
       unknowns: "TOTOホース適合、一時止水、消耗品供給",
+      imageUrl: "",
+      imageCredit: "機種が決まったら公式写真URLまたはアップロード",
     },
   ],
 };
@@ -125,6 +138,30 @@ export function defaultStore(): Store {
     topics: [structuredClone(SHOWER_TOPIC)],
     results: [],
   };
+}
+
+/** 既存 localStorage のお題に、シード側の写真URL等を欠けていれば補完する */
+export function mergeSeedMedia(store: Store): Store {
+  const seedById = new Map(
+    SHOWER_TOPIC.candidates.map((c) => [c.id, c] as const),
+  );
+  const topics = store.topics.map((t) => {
+    if (t.id !== SHOWER_TOPIC_ID) return t;
+    return {
+      ...t,
+      candidates: t.candidates.map((c) => {
+        const seed = seedById.get(c.id);
+        if (!seed) return c;
+        const next = { ...c };
+        if (!next.imageUrl && seed.imageUrl) next.imageUrl = seed.imageUrl;
+        if (!next.imageCredit && seed.imageCredit) {
+          next.imageCredit = seed.imageCredit;
+        }
+        return next;
+      }),
+    };
+  });
+  return { ...store, topics };
 }
 
 export function resultForTopic(
@@ -162,6 +199,14 @@ export function formatResultMd(
   for (const [i, c] of cands.entries()) {
     lines.push(`### ${i + 1}. ${c.label}`);
     lines.push("");
+    if (c.imageUrl && !c.imageUrl.startsWith("data:")) {
+      lines.push(`![${c.label}](${c.imageUrl})`);
+      if (c.imageCredit) lines.push(`*写真: ${c.imageCredit}*`);
+      lines.push("");
+    } else if (c.imageUrl?.startsWith("data:")) {
+      lines.push("（写真あり・端末内画像のためURL省略）");
+      lines.push("");
+    }
     lines.push("```text");
     lines.push(`価格：${c.price}`);
     lines.push(`機能：${c.features}`);
@@ -171,6 +216,9 @@ export function formatResultMd(
     lines.push(`確認日：${c.checkedAt}`);
     lines.push(`情報源：${c.source}`);
     lines.push(`不明点：${c.unknowns}`);
+    if (c.imageUrl && !c.imageUrl.startsWith("data:")) {
+      lines.push(`写真URL：${c.imageUrl}`);
+    }
     lines.push("```");
     lines.push("");
   }
