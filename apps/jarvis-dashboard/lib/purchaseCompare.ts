@@ -72,17 +72,18 @@ export const SHOWER_TOPIC: Topic = {
   candidates: [
     {
       id: "toto-replacement",
-      label: "TOTO 純正替えヘッド（エアイン／クリック系）",
+      label: "TOTO 現使用ヘッド相当（純正替え）",
       price: "4,000〜17,000円（機種による。要品番確認）",
-      features: "手元一時止水ありの型が多い。水流は標準〜節水寄り",
+      features:
+        "手元一時止水ボタンあり。円形フェイス・クロムボディ。水流は標準〜節水寄り（エアイン／クリック系）",
       compatibility:
-        "TOTOホース G1/2想定。アダプター不要の可能性が高い。既存フィルタ・パッキン流用可",
+        "TOTOホース G1/2想定。実機でヘッド単体着脱確認済み。アダプター不要の可能性が高い。既存フィルタ・パッキン流用可",
       annualConsumables: "ほぼ0円（フィルタ清掃のみ）",
       checkedAt: "2026-11-07",
-      source: "TOTO公式サポート・パーツショップ価格帯",
+      source: "実機写真（2026-11-07）・TOTO公式サポート・パーツショップ価格帯",
       unknowns: "現行ヘッドの正確な品番、希望する水流モード",
-      imageUrl: "",
-      imageCredit: "現物写真をアップロード推奨（品番確定後に公式画像へ差し替え可）",
+      imageUrl: "/purchase-compare/toto-current.jpg",
+      imageCredit: "自宅の現物写真（2026-11-07）",
     },
     {
       id: "refa-one",
@@ -117,17 +118,19 @@ export const SHOWER_TOPIC: Topic = {
       imageCredit: "ReFa公式商品ページ",
     },
     {
-      id: "other-fb",
-      label: "他社ファインバブル（同価格帯・任意）",
-      price: "2〜3万円台（機種による）",
-      features: "ファインバブル／節水。塩素低減の有無は機種差大",
-      compatibility: "G1/2対応を要確認。アダプター要否も要確認",
-      annualConsumables: "カートリッジ有無で0〜1万円超",
+      id: "bollina-wide",
+      label: "ボリーナワイド（Bollina Wide／TKS）",
+      price: "約11,550円（税込・公式ショップ目安。実売要確認）",
+      features:
+        "ウルトラファインバブル系。ワイドな浴び心地。ReFaより安価なファインバブル枠",
+      compatibility:
+        "日本製。一般的なG1/2想定（取り付け前にねじ確認）。工事なし・ヘッド交換想定",
+      annualConsumables: "カートリッジ無し想定（ほぼ0円）",
       checkedAt: "2026-11-07",
-      source: "未確定（購入前に公式仕様で確認）",
-      unknowns: "TOTOホース適合、一時止水、消耗品供給",
-      imageUrl: "",
-      imageCredit: "機種が決まったら公式写真URLまたはアップロード",
+      source: "TKS公式オンラインショップ・価格比較サイト",
+      unknowns: "一時止水の有無、現行TOTOホースとの実機適合、水流モード数",
+      imageUrl: "/purchase-compare/bollina-wide.jpg",
+      imageCredit: "TKS公式ショップ商品画像（保存コピー）",
     },
   ],
 };
@@ -140,26 +143,46 @@ export function defaultStore(): Store {
   };
 }
 
-/** 既存 localStorage のお題に、シード側の写真URL等を欠けていれば補完する */
+/** 既存 localStorage のお題に、シード側の写真・候補更新を反映する */
 export function mergeSeedMedia(store: Store): Store {
   const seedById = new Map(
     SHOWER_TOPIC.candidates.map((c) => [c.id, c] as const),
   );
   const topics = store.topics.map((t) => {
     if (t.id !== SHOWER_TOPIC_ID) return t;
-    return {
-      ...t,
-      candidates: t.candidates.map((c) => {
-        const seed = seedById.get(c.id);
-        if (!seed) return c;
-        const next = { ...c };
-        if (!next.imageUrl && seed.imageUrl) next.imageUrl = seed.imageUrl;
-        if (!next.imageCredit && seed.imageCredit) {
-          next.imageCredit = seed.imageCredit;
-        }
-        return next;
-      }),
-    };
+    let candidates = t.candidates.map((c) => {
+      // 旧「他社ファインバブル」枠 → ボリーナワイドへ置換
+      if (c.id === "other-fb") {
+        return structuredClone(seedById.get("bollina-wide")!);
+      }
+      const seed = seedById.get(c.id);
+      if (!seed) return c;
+      const next = { ...c };
+      // 現物写真・公式シード写真は最新シードを優先（ユーザーがdata URLを入れた場合は残す）
+      const userLocalPhoto = Boolean(
+        next.imageUrl?.startsWith("data:") ||
+          (next.imageUrl &&
+            !next.imageUrl.startsWith("/purchase-compare/") &&
+            !next.imageUrl.includes("refa.net")),
+      );
+      if (!userLocalPhoto && seed.imageUrl) {
+        next.imageUrl = seed.imageUrl;
+        next.imageCredit = seed.imageCredit || next.imageCredit;
+      }
+      if (c.id === "toto-replacement") {
+        next.label = seed.label;
+        next.features = seed.features;
+        next.source = seed.source;
+      }
+      return next;
+    });
+    if (!candidates.some((c) => c.id === "bollina-wide")) {
+      candidates = [
+        ...candidates,
+        structuredClone(seedById.get("bollina-wide")!),
+      ];
+    }
+    return { ...t, candidates };
   });
   return { ...store, topics };
 }
