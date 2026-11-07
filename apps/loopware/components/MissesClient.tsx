@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import {
   formatDecisionMd,
   loadStore,
+  syncBadge,
   upsertDecision,
   type DecisionRecord,
 } from "@/lib/storage";
+import { postDecision, syncLabel } from "@/lib/postDecision";
 
 type MissCand = {
   id: string;
@@ -72,21 +74,19 @@ export default function MissesClient() {
         (d) => d.agentId === "312" && d.topicId.startsWith("miss-"),
       ),
     );
-    setMsg(isMiss ? "漏れとして記録 → 扱いタブへ" : "漏れではないと記録");
-    try {
-      await fetch("/api/decide", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agentId: "312",
-          topicText: `[miss] ${c.source} ${c.folder}\n${c.snippet}`,
-          seedId: c.id,
-          decision: rec,
-        }),
-      });
-    } catch {
-      /* ok */
-    }
+    const head = isMiss ? "漏れとして記録" : "漏れではないと記録";
+    setMsg(`${head}・共有DBへ送信中…`);
+    const res = await postDecision(rec, {
+      agentId: "312",
+      topicText: `[miss] ${c.source} ${c.folder}\n${c.snippet}`,
+      seedId: c.id,
+    });
+    setResults(
+      loadStore().decisions.filter(
+        (d) => d.agentId === "312" && d.topicId.startsWith("miss-"),
+      ),
+    );
+    setMsg(`${head}・${syncLabel(res)}${isMiss ? " → 扱いタブへ" : ""}`);
   }
 
   return (
@@ -124,7 +124,7 @@ export default function MissesClient() {
       <ul className="list glass">
         {results.map((r) => (
           <li key={`${r.topicId}-${r.decidedAt}`}>
-            {r.topicId} · {r.finalText}
+            {r.topicId} · {r.finalText} · {syncBadge(r)}
             <button
               type="button"
               style={{ marginLeft: 8 }}

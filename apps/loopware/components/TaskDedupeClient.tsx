@@ -11,9 +11,11 @@ import {
 import {
   formatDecisionMd,
   loadStore,
+  syncBadge,
   upsertDecision,
   type DecisionRecord,
 } from "@/lib/storage";
+import { postDecision, syncLabel } from "@/lib/postDecision";
 
 export default function TaskDedupeClient({
   initialTopicId = "",
@@ -99,23 +101,17 @@ export default function TaskDedupeClient({
     };
     upsertDecision(rec);
     setResults(loadStore().decisions.filter((d) => d.agentId === "312"));
-    setMsg(choice === "none_of_above" ? "「どれも違う」を記録した" : `案${chosenIndex}で記録した`);
+    const head = choice === "none_of_above" ? "「どれも違う」を記録" : `案${chosenIndex}で記録`;
+    setMsg(`${head}・共有DBへ送信中…`);
     setEditIndex(null);
-    try {
-      await fetch("/api/decide", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agentId: "312",
-          topicText: topic.topicText,
-          seedId: topic.id,
-          proposals: topic.proposals,
-          decision: rec,
-        }),
-      });
-    } catch {
-      /* local-only ok */
-    }
+    const res = await postDecision(rec, {
+      agentId: "312",
+      topicText: topic.topicText,
+      seedId: topic.id,
+      proposals: topic.proposals,
+    });
+    setResults(loadStore().decisions.filter((d) => d.agentId === "312"));
+    setMsg(`${head}・${syncLabel(res)}`);
   }
 
   if (!topic) return null;
@@ -290,7 +286,7 @@ export default function TaskDedupeClient({
               </span>
             </div>
             <div className="meta">
-              {(r.reasonTags || []).join(" / ") || "理由タグなし"}
+              {(r.reasonTags || []).join(" / ") || "理由タグなし"} · {syncBadge(r)}
             </div>
             <div className="btn-row">
               <button
