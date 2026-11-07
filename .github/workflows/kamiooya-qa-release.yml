@@ -17,6 +17,10 @@ on:
         required: false
         default: ""
 
+# GITHUB_TOKEN はチェックアウトだけ（2026-11-07 314: 最小権限）
+permissions:
+  contents: read
+
 concurrency:
   group: kamiooya-qa-release
   cancel-in-progress: false
