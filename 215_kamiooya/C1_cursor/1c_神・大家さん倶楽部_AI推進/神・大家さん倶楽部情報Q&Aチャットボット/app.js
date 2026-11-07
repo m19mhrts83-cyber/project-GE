@@ -205,6 +205,7 @@ const App = {
     App.elements.suggestedQuestions = document.getElementById('suggestedQuestions');
     App.elements.commentTableBody = document.getElementById('commentTableBody');
     App.elements.commentSearchInput = document.getElementById('commentSearchInput');
+    App.elements.commentAttachmentsOnly = document.getElementById('commentAttachmentsOnly');
     App.elements.commentCategoryFilter = document.getElementById('commentCategoryFilter');
     App.elements.commentDateFilter = document.getElementById('commentDateFilter');
     App.elements.commentListMeta = document.getElementById('commentListMeta');
@@ -406,6 +407,9 @@ const App = {
     });
     if (App.elements.knowledgeSearchInput) {
       App.elements.knowledgeSearchInput.addEventListener('input', App.renderKnowledgeTable);
+    }
+    if (App.elements.commentAttachmentsOnly) {
+      App.elements.commentAttachmentsOnly.addEventListener('change', App.renderCommentTable);
     }
     if (App.elements.commentCategoryFilter) {
       App.elements.commentCategoryFilter.addEventListener('change', App.renderCommentTable);
@@ -1771,7 +1775,7 @@ const App = {
     if(loads[key])return loads[key];
     const generation=App.state.attachmentGeneration;
     if(key==='comments'&&App.elements.commentListMeta)App.elements.commentListMeta.textContent='コメント一覧を取得中…';
-    const task=(key==='comments'?App.loadComments():App.loadKnowledge()).then(()=>{if(App.state.attachmentGeneration===generation)ready[key]=true;}).catch(error=>{if(App.state.attachmentGeneration===generation)App.showToast(error.message||'参照一覧の取得に失敗しました。メニューを開き直して再試行してください。','error');}).finally(()=>{delete loads[key];});
+    const task=(key==='comments'?App.loadComments():App.loadKnowledge()).then(()=>{if(App.state.attachmentGeneration===generation)ready[key]=true;}).catch(error=>{if(App.state.attachmentGeneration===generation)App.showToast(error.message||'参照一覧の取得に失敗しました。メニューを開き直して再試行してください。','error');}).finally(()=>{delete loads[key];if(key==='comments'&&App.state.attachmentGeneration===generation&&App.elements.commentTableBody)App.renderCommentTable();});
     loads[key]=task;return task;
   },
 
@@ -2320,6 +2324,7 @@ const App = {
     App.switchScreen('comments');
     App.showDbReturnBar('comments');
     if (App.elements.commentSearchInput) {
+      if (App.elements.commentAttachmentsOnly) App.elements.commentAttachmentsOnly.checked = false;
       App.elements.commentSearchInput.value = commentId;
       App.renderCommentTable({ exactCommentId: commentId });
     }
@@ -3564,7 +3569,7 @@ const App = {
       }
     }catch(error){
       if(current())App.state.attachmentStatus=error&&[401,403].includes(error.httpStatus)?'添付の確認にはログインし直してください。':'添付の読み込みが中断しました。再取得できます。本文の閲覧は続けられます。';
-    }finally{if(current()){App.state.attachmentLoading=false;App.renderAttachmentStatus();}}
+    }finally{if(current()){App.state.attachmentLoading=false;App.renderAttachmentStatus();if(App.elements.commentTableBody)App.renderCommentTable();}}
   },
 
   attachmentRequest: async (body, token) => {
@@ -3573,6 +3578,14 @@ const App = {
     });
     if(!response.ok){const error=new Error('attachment_request_failed');error.httpStatus=response.status;throw error;}
     return response.json();
+  },
+
+  attachmentDisplayName: (item) => {
+    const name = String(item.original_name || '').trim();
+    if (name && !/^(image|video|audio|file)$/i.test(name)) return name;
+    const kind = String(item.content_type || item.mime_type || item.mime || '').split('/')[0] || name.toLowerCase();
+    const label = { image: '画像', video: '動画', audio: '音声' }[kind] || '添付ファイル';
+    return label + '（ファイル名未取得）';
   },
 
   appendAttachmentLinks: (container, commentId, label, source) => {
@@ -3590,7 +3603,7 @@ const App = {
       const link = document.createElement('a');
       link.href = '#attachment-' + String(item.id);
       link.className = 'block text-blue-700 hover:underline break-all';
-      link.textContent = String(item.original_name || '添付ファイル');
+      link.textContent = App.attachmentDisplayName(item);
       link.addEventListener('click', async function (event) {
         event.preventDefault();
         const generation = App.state.attachmentGeneration;
@@ -3626,6 +3639,8 @@ const App = {
     const categoryFilter =
       (App.elements.commentCategoryFilter && App.elements.commentCategoryFilter.value) || '';
     const dateFilter = (App.elements.commentDateFilter && App.elements.commentDateFilter.value) || '';
+    const commentsLoading = !!(App.state.referenceLoads && App.state.referenceLoads.comments);
+    const attachmentsOnly = !!(App.elements.commentAttachmentsOnly && App.elements.commentAttachmentsOnly.checked);
     body.innerHTML = '';
 
     const communityRows = (App.state.comments || []).filter(function (row) {
@@ -3633,6 +3648,7 @@ const App = {
     });
     const filtered = communityRows.filter(function (row) {
       const cid = String(App.commentField(row, 'comment_id') || '').trim();
+      const attachments = (App.state.attachmentIndex || {})[cid] || [];
       const forumCategory =
         String(App.commentField(row, 'forum_category') || '').trim() || '未分類';
       const hasDate = App.hasPostedAtValue(row);
@@ -3653,14 +3669,15 @@ const App = {
           t2m.indexOf(keyword) !== -1 ||
           t2n.indexOf(keyword) !== -1 ||
           t4.indexOf(keyword) !== -1 ||
-          t5.indexOf(keyword) !== -1;
+          t5.indexOf(keyword) !== -1 ||
+          attachments.some(item => String(item.original_name || '').toLowerCase().includes(keyword));
       }
       const hitCategory = !categoryFilter || forumCategory === categoryFilter;
       const hitDate =
         !dateFilter ||
         (dateFilter === 'hasDate' && hasDate) ||
         (dateFilter === 'missingDate' && !hasDate);
-      return hitKeyword && hitCategory && hitDate;
+      return hitKeyword && hitCategory && hitDate && (!attachmentsOnly || attachments.length > 0);
     });
 
     const pageSize = 100;
@@ -3680,7 +3697,10 @@ const App = {
         totalCount +
         ' 件（月日不明 ' +
         missingDateCount +
-        ' 件・年も不明 ' + unknownYearCount + ' 件）';
+        ' 件・年も不明 ' + unknownYearCount + ' 件）' +
+        (commentsLoading ? '・コメント一覧を取得中（件数は暫定）' : '') +
+        (attachmentsOnly && App.state.attachmentLoading ? '・添付情報を確認中（件数は暫定）' :
+          attachmentsOnly && App.state.attachmentStatus ? '・添付情報が未確認のため一部のみ表示。上部から再取得してください。' : '');
       if (filtered.length > pageSize) {
         const controls = document.createElement('span');
         controls.className = 'inline-flex gap-3 ml-3';
@@ -3697,7 +3717,8 @@ const App = {
     }
 
     if (filtered.length === 0) {
-      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">該当データがありません</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">' +
+        (commentsLoading ? 'コメント一覧を取得中…' : attachmentsOnly && (App.state.attachmentLoading || App.state.attachmentStatus) ? '添付情報の確認が完了していません。' : '該当データがありません') + '</td></tr>';
       return;
     }
 
