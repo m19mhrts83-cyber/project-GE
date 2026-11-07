@@ -6,6 +6,7 @@ import {
   STORAGE_KEY,
   defaultStore,
   formatResultMd,
+  mergeSeedMedia,
   resultForTopic,
   upsertResult,
   type Candidate,
@@ -25,11 +26,12 @@ function loadStore(): Store {
     }
     const seed = defaultStore();
     const hasSeed = parsed.topics.some((t) => t.id === seed.topics[0].id);
-    return {
+    const base: Store = {
       version: 1,
       topics: hasSeed ? parsed.topics : [...seed.topics, ...parsed.topics],
       results: Array.isArray(parsed.results) ? parsed.results : [],
     };
+    return mergeSeedMedia(base);
   } catch {
     return defaultStore();
   }
@@ -50,7 +52,94 @@ function emptyCandidate(n: number): Candidate {
     checkedAt: new Date().toISOString().slice(0, 10),
     source: "",
     unknowns: "",
+    imageUrl: "",
+    imageCredit: "",
   };
+}
+
+function CandidatePhoto({
+  label,
+  imageUrl,
+  imageCredit,
+}: {
+  label: string;
+  imageUrl?: string;
+  imageCredit?: string;
+}) {
+  const src = imageUrl?.trim();
+  return (
+    <div
+      style={{
+        width: "100%",
+        aspectRatio: "1 / 1",
+        borderRadius: 12,
+        background: "#f0ebe3",
+        border: "1px solid var(--line)",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+      }}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={label}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            background: "#fff",
+          }}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            const el = e.currentTarget;
+            el.style.display = "none";
+            const fallback = el.nextElementSibling as HTMLElement | null;
+            if (fallback) fallback.style.display = "flex";
+          }}
+        />
+      ) : null}
+      <div
+        style={{
+          display: src ? "none" : "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 4,
+          padding: 12,
+          color: "var(--muted)",
+          fontSize: 13,
+          textAlign: "center",
+          position: src ? "absolute" : "static",
+          inset: 0,
+        }}
+      >
+        <span>写真なし</span>
+        <span className="meta">編集からURLまたは端末写真を追加</span>
+      </div>
+      {imageCredit && src ? (
+        <span
+          className="meta"
+          style={{
+            position: "absolute",
+            left: 8,
+            bottom: 6,
+            right: 8,
+            fontSize: 11,
+            background: "#ffffffcc",
+            borderRadius: 6,
+            padding: "2px 6px",
+          }}
+        >
+          {imageCredit}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 export default function PurchaseCompareClient() {
@@ -77,6 +166,7 @@ export default function PurchaseCompareClient() {
   useEffect(() => {
     const s = loadStore();
     setStore(s);
+    saveStore(s);
     const first = s.topics[0];
     if (first) {
       setTopicId(first.id);
@@ -323,6 +413,11 @@ export default function PurchaseCompareClient() {
                   gap: 8,
                 }}
               >
+                <CandidatePhoto
+                  label={c.label}
+                  imageUrl={c.imageUrl}
+                  imageCredit={c.imageCredit}
+                />
                 <header
                   style={{
                     display: "flex",
@@ -355,6 +450,8 @@ export default function PurchaseCompareClient() {
                         ["checkedAt", "確認日"],
                         ["source", "情報源"],
                         ["unknowns", "不明点"],
+                        ["imageUrl", "写真URL"],
+                        ["imageCredit", "写真クレジット"],
                       ] as const
                     ).map(([key, label]) => (
                       <label key={key} className="meta">
@@ -375,6 +472,49 @@ export default function PurchaseCompareClient() {
                         />
                       </label>
                     ))}
+                    <label className="meta">
+                      端末から写真を追加
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: "block", marginTop: 4 }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 2_500_000) {
+                            window.alert(
+                              "2.5MB以下の画像にしてください（localStorage制限）。",
+                            );
+                            e.target.value = "";
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const dataUrl = String(reader.result || "");
+                            updateCandidate(c.id, {
+                              imageUrl: dataUrl,
+                              imageCredit: c.imageCredit || "端末アップロード",
+                            });
+                          };
+                          reader.readAsDataURL(file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {c.imageUrl ? (
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() =>
+                          updateCandidate(c.id, {
+                            imageUrl: "",
+                            imageCredit: "",
+                          })
+                        }
+                      >
+                        写真を消す
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="btn"
