@@ -49,6 +49,21 @@ class AttachmentsTest(unittest.TestCase):
         ctx=json.loads(self.row(ident)['source_context'])
         self.assertEqual(ctx,{'caption':'見積資料','chat_title':'修繕相談'});self.assertNotIn('posted_at',ctx)
 
+    def test_late_filename_enrichment_keeps_saved_media_without_redownload(self):
+        ident=self.add(ct=1)
+        w.process(self.q,self.s,self.pdf,max_file=1024)
+        self.add(ct=1,metadata={'fileName':'../../見積写真.jpg'})
+        self.assertEqual(self.row(ident)['filename'],'見積写真.jpg')
+        self.assertEqual(self.row(ident)['state'],'saved')
+        self.assertEqual(self.row(ident)['metadata_dirty'],1)
+        self.assertEqual(w.sync_source_metadata(self.q,self.s),1)
+        self.assertEqual(self.s.uploads,1)
+        self.assertEqual(self.row(ident)['metadata_dirty'],0)
+        for meta in ({},{'FILE_NAME':'image'},{'FILE_NAME':'different.jpg'}):
+            self.add(ct=1,metadata=meta)
+            self.assertEqual(self.row(ident)['filename'],'見積写真.jpg')
+            self.assertEqual(self.row(ident)['metadata_dirty'],0)
+
     def test_metadata_sync_failure_keeps_original_saved_and_retryable(self):
         ident=self.add();w.process(self.q,self.s,self.pdf,max_file=1024)
         self.add(context={'chat_title':'new'})

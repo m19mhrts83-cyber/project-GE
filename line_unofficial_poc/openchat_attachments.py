@@ -72,9 +72,9 @@ class Queue:
         if thread_id and not re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', str(thread_id)):
             raise ValueError('invalid_thread')
         meta = metadata if isinstance(metadata, dict) else {}
-        filename = str(meta.get('FILE_NAME') or meta.get('filename') or '')
+        filename = str(meta.get('FILE_NAME') or meta.get('filename') or meta.get('fileName') or '')
         filename = re.split(r'[/\\]', filename)[-1]
-        filename = re.sub(r'[\x00-\x1f\x7f]', '', filename)[:255] or KINDS[content_type]
+        filename = re.sub(r'[\x00-\x1f\x7f]', '', filename).strip()[:255] or KINDS[content_type]
         size = meta.get('FILE_SIZE') or meta.get('fileSize')
         try: size = int(size) if size is not None else None
         except (TypeError, ValueError): size = None
@@ -86,6 +86,10 @@ class Queue:
               (id,room_id,message_id,thread_id,kind,filename,source_bytes,state,created_at,error,cohort)
               VALUES (?,?,?,?,?,?,?,?,?,?,?)''', (ident,str(room_id),str(message_id),str(thread_id),
               KINDS[content_type],filename,size,state,time.time(),'encrypted_media_requires_adapter' if encrypted else None,cohort))
+            old_name = self.db.execute('SELECT filename FROM jobs WHERE id=?',(ident,)).fetchone()[0]
+            generic = {'image','video','audio','file',''}
+            if old_name.lower() in generic and filename.lower() not in generic:
+                self.db.execute('UPDATE jobs SET filename=?,metadata_dirty=1 WHERE id=?',(filename,ident))
             if isinstance(context,dict):
                 old=self.db.execute('SELECT source_context FROM jobs WHERE id=?',(ident,)).fetchone()[0]
                 merged=json.loads(old)
