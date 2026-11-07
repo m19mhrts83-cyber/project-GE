@@ -114,4 +114,33 @@ for (const source of sources) {
     assert.match(app.elements.commentListMeta.textContent, /検索結果 1 /);
   });
 
+  test(source.pathname + ': community attachment filter composes with name, category, date and pages', () => {
+    const app=load(source);
+    app.state.comments=Array.from({length:205},(_,i)=>({comment_id:String(30000+i),content:'本文',forum_category:i===0?'other':'repair',posted_at:i===1?'':'2026-01-01'}));
+    app.state.attachmentIndex=Object.fromEntries(app.state.comments.slice(0,202).map(row=>[row.comment_id,[{id:row.comment_id,original_name:'見積書.pdf'}]]));
+    app.elements.commentTableBody=new Element();app.elements.commentListMeta=new Element();
+    app.elements.commentSearchInput={value:''};app.elements.commentAttachmentsOnly={checked:true};
+    app.elements.commentCategoryFilter={value:'repair'};app.elements.commentDateFilter={value:'hasDate'};
+    app.isLessonCommentRow=()=>false;app.commentField=(row,k)=>row[k]||'';
+    app.hasPostedAtValue=row=>!!row.posted_at;app.parseWeStudyAuthorName=()=>({raw:'author'});
+    app.renderCommentTable();assert.match(app.elements.commentListMeta.textContent,/検索結果 200 /);
+    app.renderCommentTable({offset:100});assert.equal(app.elements.commentTableBody.children.length,100);
+    app.elements.commentSearchInput.value='見積書.pdf';app.renderCommentTable();assert.match(app.elements.commentListMeta.textContent,/検索結果 200 /);
+    app.elements.commentSearchInput.value='30204';app.renderCommentTable();assert.equal(app.elements.commentTableBody.children.length,0);
+    app.elements.commentAttachmentsOnly.checked=false;app.renderCommentTable();assert.equal(app.elements.commentTableBody.children.length,1);
+    app.elements.commentSearchInput.value='';app.elements.commentAttachmentsOnly.checked=true;
+    app.state.referenceLoads={comments:Promise.resolve()};app.renderCommentTable();assert.match(app.elements.commentListMeta.textContent,/コメント一覧を取得中/);
+    app.state.referenceLoads={};app.state.attachmentLoading=true;app.renderCommentTable();assert.match(app.elements.commentListMeta.textContent,/確認中.*暫定/);
+    app.state.attachmentLoading=false;app.state.attachmentStatus='failed';app.renderCommentTable();assert.match(app.elements.commentListMeta.textContent,/一部のみ表示/);
+    app.state.attachmentStatus='';app.renderCommentTable();assert.doesNotMatch(app.elements.commentListMeta.textContent,/確認中|一部のみ表示/);
+  });
+  test(source.pathname + ': meaningful filenames survive and generic media names are explicit', () => {
+    const app=load(source);
+    assert.equal(app.attachmentDisplayName({original_name:'image'}),'画像（ファイル名未取得）');
+    assert.equal(app.attachmentDisplayName({original_name:'VIDEO'}),'動画（ファイル名未取得）');
+    assert.equal(app.attachmentDisplayName({content_type:'audio/mp4'}),'音声（ファイル名未取得）');
+    assert.equal(app.attachmentDisplayName({original_name:'file'}),'添付ファイル（ファイル名未取得）');
+    assert.equal(app.attachmentDisplayName({original_name:'写真 01.jpg'}),'写真 01.jpg');
+  });
+
 }
