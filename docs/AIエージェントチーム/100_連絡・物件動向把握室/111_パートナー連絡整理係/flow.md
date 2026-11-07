@@ -27,7 +27,7 @@
 |---|---|---|---|---|
 | 1a | **昼トリガー** 11:50 JST（GHA） | 時間 | AI | GitHub Actions |
 | 1b | **夜トリガー** 20:30 JST（launchd）／未実施なら Jarvis 会話でも可 | 時間＋起動 | AI | `com.matsunoma.jarvis.partner-111-night` |
-| 1c | （副）合図「パートナー確認して」 | 1 | AI | Cursor / Jarvis |
+| 1c | （副）合図「パートナー確認して」／「パートナーからのメールなどを確認して」 | 1 | AI | Cursor / Jarvis / Codex |
 | 2 | 昼: Gmail＋Chatwork → `5.やり取り.md` | 2+3 | AI | `jarvis_gha_partner_*`（Graph） |
 | 3 | 夜: ダッシュボードを開く | 2 | AI（表示）／人が見る | Jarvis dashboard |
 | 4 | 夜: LINEグループ取込（Tcell/LEAF/823）。必要なら iMessage・MailGates | 2+3（QR時は人） | AI | CHRLINE／公式エクスポート／yoritoori |
@@ -37,5 +37,6 @@
 | 8 | 送信は別係・了承後のみ | 2+3 | **人が確かめる** | `yoritoori_send` 等 |
 
 **人が確かめる印**: 6＝報告材料／7＝読み直し／8＝送信。金・削除はこの係では原則やらない。  
+**ウェイクワードの意味**: 「パートナーからのメールなどを確認して」は Gmail 単独ではなく、Gmail／Chatwork／LINE／メッセージ（必要時 iMessage・MailGates・くらさぽ）の最新化・横断確認。  
 **やらない**: 昼に CHRLINE／オプチャ必須、夜に全社員フロー個別オープン、更新ゼロの「特になし」連投、**Notion へのワークログ記録**。  
 **人が見る場所**: 詳細は `5.やり取り.md` のみで足りる。気づきは Slack `#report`（受動）＋ Gmail 要対応（能動）→ Jarvis に指示。→ [`運用メモ_人が見る場所.md`](./運用メモ_人が見る場所.md)

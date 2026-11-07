@@ -1,30 +1,68 @@
 # TASK — 713 総務・DXコーチ材料係
 
-規格: [`30_共通Agentフォルダ規格_BCP`](../../30_共通Agentフォルダ規格_BCP_20261017.md)
+- task_id: dx-mobile-note-20261104-1205
+- agent_id: 713
+- executor: codex
+- status: done
+- started_at: 2026-11-04T12:05:00+09:00
+- finished_at: 2026-11-04T12:06:02+09:00
 
-| 項目 | 値 |
-|---|---|
-| task_id | （Todoist id または run_id） |
-| agent_id | 713 |
-| executor | cursor / claude_code / gencode / launchd / gha / … |
-| status | queued |
-| started_at | |
-| finished_at | |
+## 今回の改訂
 
-## 依頼
+初回を「インプット→プロセス→アウトプットの全体像」から「Markdown・3R・音声入力」へ掘り下げる導入へ変更。原稿・30分構成・NotebookLM投入資料を用意し、同じミスレモン受取口とSlackへ更新を通知する。以下の前回引き継ぎ記録を保持する。
 
-（何をするか。入力は `input/` または外部パス）
+## 前回の依頼・実績
+
+松野さんの依頼により、このスレッドで整理したDX講座の当初目的・確定事項・AI提案・成果物・残作業をミスレモンへ引き継ぐ。共有フォルダとSlack #ai-hubを確認し、正本TASK・受け渡しメモ・短い通知を用意する。
 
 ## 完了条件
 
-- [ ] 期待する成果物が `output/`（または記した外部パス）にある
-- [ ] `tests/` のチェックを通す
-- [ ] 必要なとき Slack `#report`／`#consult`／`#ops` に報告
+- [x] 内部の正本TASKに、原意・確定と提案の区別・現物・再開手順がまとまっている。
+- [x] ローカル受取口 to_MissLemon/ に pending の索引がある。
+- [x] #ai-hubへの通知結果を確認し、受領と区別して記録する。
+- [x] 正本と受取メモに検証結果・未確認事項が記録されている。
 
 ## 成果物
 
-- 
+- 正本：`/Users/matsunomasaharu2/git-repos/planning/dx-course-beginner/TASK.md`
+- 受取メモ：`/Users/matsunomasaharu2/git-repos/agent-handoff/to_MissLemon/20261104-0657-chappy-dx-beginner-course.md`
 
-## メモ・障害
+## 検証結果
 
-- 
+正本TASK・受取口を配置し、ローカル専用メモがGit除外対象であることを確認。教材25ファイルを確認、NotebookLM原稿8本はDrive側と一致、diff --check通過。Slack専用Webhookで07:00:57に通知し、HTTP 200とコネクタでの読み戻しを確認した。
+
+通知：https://aiwsnetwork.slack.com/archives/C0CA3M5SNNS/p1793743257726669
+
+ミスレモンの受領は未確認。正本はhandoff_pending、受取メモはpendingを維持する。元の教材・Webは未コミット・本番未公開。一時プレビューは現在未応答。
+
+## 範囲
+
+今回は引き継ぎ整備。講座の実施、NotebookLM生成、本番公開、受取側の自動起動は含まない。713のregistry上の運用状態は変更しない。
+
+## 今回の完了記録（2026-11-04 07:20 JST）
+
+新しい初回原稿08・8枚30分の構成と生成指示09・初回導入ワークを作成。教育プラン・投入用ソース一覧・旧版の扱い・正本TASK・同じミスレモン受取口を更新。投入原稿10本と実習1本をDriveへ配置し、一致を確認した。時間配分の合計30分・3R定義・秘密形式・対象差分を確認。
+
+Slack更新を専用Webhookで投稿し、HTTP 200とコネクタでの読み戻しを確認。https://aiwsnetwork.slack.com/archives/C0CA3M5SNNS/p1793744365211039
+
+原稿と引き継ぎ更新は完了。受領はpending。NotebookLM生成・Web差し替え・公開は未実施。次はミスレモンによる原稿レビューと資料化。
+
+## Typeless補足の完了（2026-11-04 07:22 JST）
+
+ユーザー追伸に従い、整文と修正単語の辞書学習を原稿08・構成09へ補足。選択文章の要約依頼を通常の整文と区別。公式資料の確認範囲を05へ追加。3ファイルのDrive一致と8枚30分維持を確認し、正本と同じミスレモン受取メモを更新した。受領はpending。生成・Web反映は未実施。
+
+## 将来のプロセス編メモ保存（2026-11-04 07:38 JST）
+
+Cursor／Claude Code／ChatGPT・Codex／GenCode／Grokbotの役割、利用枠の説明候補、将来の比較表案を `planning/dx-course-beginner/将来メモ_プロセス編_エージェントの使い分け_20261104.md` へ記録。現行教材への即時反映はユーザー指定で対象外。正本TASKと同じミスレモン受取メモに、将来用として保留することを追記した。仕様・枠は未確認、資料化時に確認する。
+
+検証：現行教材・Webの27ファイルは作業前後のSHA256がすべて一致。Drive・NotebookLM・Slackへの反映操作なし。将来メモと引き継ぎ更新を完了。
+
+## 業務自動化を軸とした再構成（2026-11-04 12:03 JST）
+
+全体構成の検討と引き継ぎ整備を担当。最新の目的と手段を整理し、6段階・初回30分案・実演候補・本人確認・講師準備・ミスレモン制作要件を `planning/dx-course-beginner/業務自動化を軸にした講座再構成案_20261104.md` に作成。正本TASK、同じ受取メモ、社員CLAUDEを更新した。既存教材・Drive・Webは変更せず、生成・実装・公開・Slack追加通知も行わない。
+
+検証：初回案の6区間は連続し合計30分。確定事項・AI案・未作成の区別と、現行教材／Webの27ファイルのSHA256不変を確認。構成案と引き継ぎ整備を完了。
+
+## スマホ活用の特徴メモ追加（2026-11-04 12:06 JST）
+
+将来メモのClaude Code・ChatGPT／Codexの各欄へ、iPhoneから思いつきを頼み、追加指示しやすい利点を追加。身近な使い方の紹介文と、比較表の項目候補にも反映。正本と同じ受取口を更新。原稿の文言と保存を確認。現行の初回教材・Web・Drive・NotebookLM・Slackは変更していない。
