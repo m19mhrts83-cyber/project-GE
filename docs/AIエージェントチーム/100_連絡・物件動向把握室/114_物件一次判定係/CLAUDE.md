@@ -81,3 +81,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-13 | Slack Bカード: コードブロック表廃止→箇条書き＋詳細HTML。カード先頭に位置づけ（Grok S1／114／511）を明記。表示名「114 物件一次判定」 |
 | 2026-10-13 | Bカードに **土地値の評価**／**利回りの評価** を独立節として詳述（基準・クリア/惜しい/未達）。先頭に判断軸1行。詳細HTMLも同軸カード |
 | 2026-10-17 | 共通フォルダ規格パイロット: TASK.md / config / input / output / tests / scripts |
+| 2026-10-30 | Slackの物件判断からTodoist判断チケットが抜ける穴を確認。`slack-fb-daily` が当日 `#consult` の要ボス／Jarvis依頼を重複確認し、判断用Todoistへ落とす取りこぼし保険を追加 |

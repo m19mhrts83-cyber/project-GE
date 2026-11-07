@@ -4,7 +4,7 @@
 
 | 層 | 正 | 理由 |
 |---|---|---|
-| **エージェント同士の共有** | Slack `#ai-hub` | Hawk／FRIDAY／Jarvis／**Claude Code** の進捗・手渡し。**Jarvisへの依頼・確認はここ**（2026-10-19 松野指示）。Claude 受け渡し: [`43_`](43_Claude_Code参加_受け渡し_20261023.md) |
+| **エージェント同士の共有** | Slack `#ai-hub` | Hawk／FRIDAY／Jarvis／**Claude Code**／**番頭（Banto・Muse）** の進捗・手渡し。**Jarvisへの依頼・確認はここ**（2026-10-19 松野指示）。Claude 受け渡し: [`43_`](43_Claude_Code参加_受け渡し_20261023.md)。Grok×番頭: [`54_`](54_Grok_番頭Banto相互補完_20261107.md) |
 | **見える共有・残す報告（人向け）** | Slack `#report` / `#consult` / `#ops`（**投稿は Webhook**・通知） | `#report`=松野への情報共有のみ／`#consult`=要判断／`#ops`=障害・是正 |
 | **Mac 実行の手渡し** | Drive `【with Grok bot】` inbox／outbox | 秘密・長文・スクリプトキックは Drive のまま（フォーク維持） |
 | **Cursor 本題** | Jarvis がセッションで Slack を読んで気づく | 都度「Slack見て」と言わなくてよい |

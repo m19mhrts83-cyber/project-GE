@@ -78,6 +78,7 @@ export async function handleVrBlockAction(opts: {
   triggerId?: string;
   channelId?: string;
   messageTs?: string;
+  actorId?: string;
 }): Promise<{
   kind: "replace" | "ephemeral" | "modal_opened" | "error";
   text: string;
@@ -117,6 +118,7 @@ export async function handleVrBlockAction(opts: {
 
   const result = await applyVendorReplySlack(triageId, action, {
     source: "slack_block_actions",
+    actorId: opts.actorId,
   });
   const title =
     action === "send"
@@ -138,6 +140,7 @@ export async function handleVrModalSubmit(opts: {
   body: string;
   channelId?: string;
   messageTs?: string;
+  actorId?: string;
 }): Promise<{
   ok: boolean;
   text: string;
@@ -158,6 +161,7 @@ export async function handleVrModalSubmit(opts: {
   const result = await applyVendorReplySlack(opts.triageId, "send", {
     body,
     source: "slack_modal",
+    actorId: opts.actorId,
   });
 
   if (result.ok && opts.channelId && opts.messageTs) {

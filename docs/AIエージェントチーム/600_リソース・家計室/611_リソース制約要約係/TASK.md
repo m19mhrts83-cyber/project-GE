@@ -45,3 +45,40 @@
 ## 検証結果
 
 （実装した側が記入）
+
+---
+
+## 以前の完了タスクの記録（2026-11-01）
+
+以下は `ai-usage-management-20261101` の調査完了記録です。上の `611-impl-1`（2026-11-05に依頼された実装・queued）とは別タスクとして保持します。調査の完了を、新しい実装の完了として扱わないでください。
+
+### TASK — 611 リソース制約要約係
+
+- task_id: ai-usage-management-20261101
+- agent_id: 611
+- executor: codex
+- status: done
+- started_at: 2026-11-01T10:03:42+09:00
+
+#### 依頼・完了条件
+
+Codex、Claude Code、Cursor、Gensparkの本人契約、請求／補充日、短期・週次制限、残量を一次資料で調べ、確認済み／旧記録／未確認を区別してObsidian正本へ保存する。既存OGDスクリプトで対象ノートのみ同期し、成否を確認する。契約・課金設定は変更しない。
+
+#### 確認状況
+
+- Codex: Plus、5時間4%使用、週次89%使用（ツール取得時点）。
+- Claude: Pro月額、11月23日更新、週次97%、水曜7時リセット、使用クレジットOFF。ブラウザと領収書を確認。
+- Cursor/Genspark: Chrome拡張機能のUIが自動操作を阻害。ユーザーへ解除依頼済み。既存記録も参照中。
+
+#### 成果物・検証結果
+
+- 完了: /Users/matsunomasaharu2/Documents/500_Obsidian_r1/03_Literature Note(まとめノート)/仕事術・AI連携/20261101_AIエージェント使用量管理_Codex_Claude_Cursor_Genspark.md
+- 既存OGDプログラムの実行成功: uploaded=1 updated=0 already_ok=0 missing_local=0。iPhoneでのPull確認は未実施。
+- 社員outputに一次確認記録、CLAUDE.mdに参照を追加。
+- 契約／課金／リセット権／本番頻度は未変更。
+- 未確認: Codex月額更新日・実請求額、Cursorの税等、Genspark次回年額。本人へCodex更新日を確認中。
+- 調査保存終了: 2026-11-01T10:08:06+09:00
+
+#### 追加質問への対応 2026-11-01T10:11:58+09:00
+
+Codexの月額更新日を本人請求画面で11/25と特定。Claude週次回復は契約開始日と独立、Codex曜日変更は未確認。主担当曜日を分ける案を正本へ追記。課金変更・リセット権使用は行わず。
