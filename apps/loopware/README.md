@@ -3,7 +3,13 @@
 312（入口・何を拾うか）と 313（出口・片付け）の判断 UI。  
 Jarvis ダッシュボードには載せない。ダッシュ／Slack からリンクで開く。
 
-## 起動
+## 本番
+
+- URL: https://jarvis-loopware.vercel.app
+- Vercel プロジェクト: `jarvis-loopware`（Root Directory = `apps/loopware`）
+- デプロイ: `cd ~/git-repos && ./scripts/vercel_loopware_deploy.sh`
+
+## 起動（ローカル）
 
 ```bash
 cd ~/git-repos/apps/loopware

@@ -14,7 +14,7 @@
       "id": "loopware-312-313",
       "kind": "app",
       "title": "ループウェア（312入口／313出口）",
-      "url": "https://loopware.vercel.app",
+      "url": "https://jarvis-loopware.vercel.app",
       "note": "別アプリ apps/loopware。判断ログ→Supabase。ダッシュは外部リンクのみ。iPhoneはChrome",
       "tags": ["ループウェア", "312", "313", "Todoist"],
       "internal": false

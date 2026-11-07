@@ -22,7 +22,7 @@ export const KURASHIFT_URL = TRADE_DESK_URL;
 export const LOOPWARE_URL =
   process.env.NEXT_PUBLIC_LOOPWARE_URL ||
   process.env.JARVIS_LOOPWARE_URL ||
-  "https://loopware.vercel.app";
+  "https://jarvis-loopware.vercel.app";
 
 /**
  * B+A: グループ見出し＋分かりやすい名前。
