@@ -1581,7 +1581,11 @@ const App = {
   loadOpenchatLogs: async (opts) => {
     const options = opts && typeof opts === 'object' ? opts : {};
     const generation=App.state.attachmentGeneration,userId=String((App.state.currentUser||{}).id||'');
+    const sequence=(App.state.openchatRequestSequence||0)+1;
+    App.state.openchatRequestSequence=sequence;
+    const current=()=>generation===App.state.attachmentGeneration&&userId===String((App.state.currentUser||{}).id||'')&&sequence===App.state.openchatRequestSequence;
     const cfg = await App.resolveSemanticConfig();
+    if(!current())return;
     const q = (App.elements.openchatSearchInput && App.elements.openchatSearchInput.value) || '';
     const title =
       (App.elements.openchatTitleFilter && App.elements.openchatTitleFilter.value) || '';
@@ -1611,6 +1615,7 @@ const App = {
       body: JSON.stringify(body)
     });
     const text = await response.text();
+    if(!current())return;
     let data = {};
     if (text) {
       try {
@@ -1624,7 +1629,7 @@ const App = {
         data.errorMessage || data.message || data.error || 'LINEオプチャ一覧の取得に失敗しました'
       );
     }
-    if(generation!==App.state.attachmentGeneration||userId!==String((App.state.currentUser||{}).id||''))return;
+    if(!current())return;
     App.state.openchatLogs = App.normalizeRelatedList(data.relatedOpenchat || []);
     if (Array.isArray(data.openchatRooms)) App.state.openchatRooms = data.openchatRooms;
     App.state.openchatHighlightId = openchatId || '';
