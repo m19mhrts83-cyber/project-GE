@@ -16,6 +16,10 @@ export type Candidate = {
   /** 商品写真・現物写真（https または data URL） */
   imageUrl?: string;
   imageCredit?: string;
+  /** 価格・仕様の根拠（公式・サポート等） */
+  referenceLinks?: { label: string; url: string }[];
+  /** Amazon.co.jp 商品ページ（売っている場合） */
+  amazonUrl?: string;
 };
 
 export type Topic = {
@@ -84,6 +88,14 @@ export const SHOWER_TOPIC: Topic = {
       unknowns: "現行ヘッドの正確な品番、希望する水流モード",
       imageUrl: "/purchase-compare/toto-current.jpg",
       imageCredit: "自宅の現物写真（2026-11-07）",
+      referenceLinks: [
+        {
+          label: "TOTO公式：シャワーヘッド交換手順（G1/2）",
+          url: "https://jp.toto.com/support/repair/bath/faucet/replaceshowerhead",
+        },
+      ],
+      // クロム丸型エアイン・クリック取替用（THC57C）。現物品番確定までは参考
+      amazonUrl: "https://www.amazon.co.jp/dp/B00MWR5QC6",
     },
     {
       id: "refa-one",
@@ -99,6 +111,17 @@ export const SHOWER_TOPIC: Topic = {
       imageUrl:
         "https://www.refa.net/item/refa_fine_bubble_one/images/img-product.jpg",
       imageCredit: "ReFa公式商品ページ",
+      referenceLinks: [
+        {
+          label: "ReFa公式：FINE BUBBLE ONE 商品ページ",
+          url: "https://www.refa.net/item/refa_fine_bubble_one/",
+        },
+        {
+          label: "MTG公式通販：FINE BUBBLE ONE",
+          url: "https://www.mtgec.jp/shop/g/g5459520101",
+        },
+      ],
+      amazonUrl: "https://www.amazon.co.jp/dp/B09Q5RFJG6",
     },
     {
       id: "refa-pure",
@@ -116,6 +139,17 @@ export const SHOWER_TOPIC: Topic = {
       imageUrl:
         "https://www.refa.net/item/refa_fine_bubble_pure/images/img-product.jpg",
       imageCredit: "ReFa公式商品ページ",
+      referenceLinks: [
+        {
+          label: "ReFa公式：FINE BUBBLE PURE 商品ページ",
+          url: "https://www.refa.net/item/refa_fine_bubble_pure/",
+        },
+        {
+          label: "MTG公式通販：FINE BUBBLE PURE",
+          url: "https://www.mtgec.jp/shop/pages/refa_bubble_pure.aspx",
+        },
+      ],
+      amazonUrl: "https://www.amazon.co.jp/dp/B0BJTY5WP7",
     },
     {
       id: "bollina-wide",
@@ -131,6 +165,17 @@ export const SHOWER_TOPIC: Topic = {
       unknowns: "一時止水の有無、現行TOTOホースとの実機適合、水流モード数",
       imageUrl: "/purchase-compare/bollina-wide.jpg",
       imageCredit: "TKS公式ショップ商品画像（保存コピー）",
+      referenceLinks: [
+        {
+          label: "Bollina公式サイト",
+          url: "https://bollina.jp/",
+        },
+        {
+          label: "TKS公式ショップ：シャワーヘッド一覧",
+          url: "https://shop.tks-gifu.jp/collections/shower-head",
+        },
+      ],
+      amazonUrl: "https://www.amazon.co.jp/dp/B07TB4H2B7",
     },
   ],
 };
@@ -174,6 +219,11 @@ export function mergeSeedMedia(store: Store): Store {
         next.features = seed.features;
         next.source = seed.source;
       }
+      // 根拠URL・Amazonはシードを優先更新（手入力上書きはしない想定の比較アプリ）
+      if (seed.referenceLinks?.length) {
+        next.referenceLinks = structuredClone(seed.referenceLinks);
+      }
+      if (seed.amazonUrl) next.amazonUrl = seed.amazonUrl;
       return next;
     });
     if (!candidates.some((c) => c.id === "bollina-wide")) {
@@ -242,6 +292,13 @@ export function formatResultMd(
     if (c.imageUrl && !c.imageUrl.startsWith("data:")) {
       lines.push(`写真URL：${c.imageUrl}`);
     }
+    if (c.referenceLinks?.length) {
+      lines.push("根拠URL：");
+      for (const r of c.referenceLinks) {
+        lines.push(`- ${r.label}: ${r.url}`);
+      }
+    }
+    if (c.amazonUrl) lines.push(`Amazon：${c.amazonUrl}`);
     lines.push("```");
     lines.push("");
   }
