@@ -353,6 +353,26 @@ def _complete_task(it: dict[str, Any], *, dry_run: bool, reason: str) -> dict[st
             "title": title,
             "kind": kind,
         }
+    try:
+        from jarvis_owner_decision_log import log_owner_decision
+
+        log_owner_decision(
+            surface="todoist_313",
+            action="close",
+            source="digest_apply",
+            employee="313",
+            target_type="todoist_task",
+            target_id=tid,
+            subject=title[:500],
+            note=f"{why}（{reason}）",
+            payload={
+                "kind": "cleanup",
+                "confirm_kind": kind,
+                "reason_tags": ["済んだ", kind],
+            },
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"owner_decisions soft-fail: {e}", file=sys.stderr)
     return {
         "ok": True,
         "lane": lane,
