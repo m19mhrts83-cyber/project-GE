@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./theme-kurashift.css";
 
 export const metadata: Metadata = {
   title: "KURASHIFT｜クラシフト",
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1f4e79",
+  themeColor: "#13302a",
 };
 
 export default function RootLayout({
