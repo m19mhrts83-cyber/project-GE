@@ -107,6 +107,13 @@ function asPayload(raw: unknown): Record<string, unknown> {
   return {};
 }
 
+export function isBlockedVendorReplyRecipient(address: string): boolean {
+  const normalized = String(address || "").trim().toLowerCase();
+  return /(^|[._+-])(no-?reply|noreplyto|do-?not-?reply)([._+@-]|$)|mailer-daemon|@google\.com$/i.test(
+    normalized,
+  );
+}
+
 export async function fetchVendorReplyTriage(
   id: string,
 ): Promise<TriageRow | null> {
@@ -154,6 +161,36 @@ export function editFormHtml(row: TriageRow, sig: string): string {
 </body></html>`;
 }
 
+export function confirmActionHtml(
+  row: TriageRow,
+  action: Exclude<VendorReplySlackAction, "edit">,
+  sig: string,
+): string {
+  const partner = String(row.partner || "業者");
+  const subject = String(row.subject || "(件名なし)");
+  const to = String(row.from_email || "(宛先なし)");
+  const isSend = action === "send";
+  const title = isSend ? "業者返信を送信" : "返信なしにする";
+  const button = isSend ? "宛先と文面を確認して送信" : "返信なしを確定";
+  const color = isSend ? "#065f46" : "#374151";
+  const draft = isSend
+    ? `<pre style="white-space:pre-wrap;background:#f9fafb;padding:0.75rem;border-radius:8px;font-size:0.85rem">${esc(row.draft_text || "")}</pre>`
+    : "";
+  return `<!doctype html><html lang="ja"><meta charset="utf-8"/>
+<title>${esc(title)}</title>
+<body style="font-family:system-ui;padding:1.5rem;max-width:42rem;color:#111">
+<h1 style="font-size:1.2rem">${esc(title)} — ${esc(partner)}</h1>
+<p><strong>宛先:</strong> ${esc(to)}<br/><strong>件名:</strong> ${esc(subject)}</p>
+${draft}
+<p style="color:#991b1b;font-weight:600">この画面を開いただけでは実行されません。下のボタン操作を最終了承として記録します。</p>
+<form method="POST" action="">
+<input type="hidden" name="s" value="${esc(sig)}"/>
+<input type="hidden" name="intent" value="confirm"/>
+<button type="submit" style="background:${color};color:#fff;border:0;padding:0.65rem 1.1rem;border-radius:8px;font-weight:600">${esc(button)}</button>
+</form>
+</body></html>`;
+}
+
 export type VrApplyResult = {
   ok: boolean;
   message: string;
@@ -163,7 +200,7 @@ export type VrApplyResult = {
 export async function applyVendorReplySlack(
   id: string,
   action: VendorReplySlackAction,
-  opts?: { body?: string; source?: string },
+  opts?: { body?: string; source?: string; actorId?: string },
 ): Promise<VrApplyResult> {
   const row = await fetchVendorReplyTriage(id);
   if (!row) {
@@ -183,6 +220,12 @@ export async function applyVendorReplySlack(
   }
   const payload = asPayload(row.payload);
   const source = opts?.source || "slack_vr";
+
+  // 2026-10-29 incident: Slack/link scanners fetched signed GET URLs and
+  // triggered sends. A short-link fetch is never proof of human approval.
+  if (source === "slack_short_link") {
+    return { ok: false, message: "リンクの取得だけでは実行できません。確認画面またはSlackボタンから操作してください" };
+  }
 
   if (action === "skip") {
     const meta = VENDOR_JUDGMENT.no_reply;
@@ -219,6 +262,9 @@ export async function applyVendorReplySlack(
   if (!to) {
     return { ok: false, message: "宛先（from_email）がありません" };
   }
+  if (isBlockedVendorReplyRecipient(to)) {
+    return { ok: false, message: `送信禁止宛先です（noreply／自動通知）: ${to}` };
+  }
   let subject = String(row.subject || "").trim() || "（件名なし）";
   if (!/^re:/i.test(subject)) subject = `Re: ${subject}`;
 
@@ -241,6 +287,7 @@ export async function applyVendorReplySlack(
       action: "send",
       at: new Date().toISOString(),
       source,
+      actor_id: opts?.actorId || null,
     };
     delete payload.last_send_error;
     const { error } = await sb
