@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIの5つの進化 × あなたの仕事（分析図解）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600;700&family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f6f4ef;
+      --bg-elev: #ffffff;
+      --ink: #1c1b19;
+      --muted: #5c584f;
+      --line: #d9d3c6;
+      --feat: #3a5a7a;
+      --feat-bg: #e8f0f7;
+      --hist: #1f6b4a;
+      --hist-bg: #e5f5ec;
+      --prop: #9a6b00;
+      --prop-bg: #fff6db;
+      --val: #6b3d7a;
+      --val-bg: #f3e8f8;
+      --stairs: #2f4a3a;
+      --shadow: 0 10px 30px rgba(28, 27, 25, 0.08);
+      --radius: 14px;
+      --mono: "IBM Plex Sans JP", system-ui, sans-serif;
+      --display: "Shippori Mincho", "Hiragino Mincho ProN", serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #141312;
+        --bg-elev: #1f1d1a;
+        --ink: #f3efe6;
+        --muted: #b7b0a3;
+        --line: #3a362f;
+        --feat: #8eb6d8;
+        --feat-bg: #243443;
+        --hist: #6dcea0;
+        --hist-bg: #1d3328;
+        --prop: #e6c35c;
+        --prop-bg: #3a3014;
+        --val: #d2a8e0;
+        --val-bg: #33243a;
+        --stairs: #86b89a;
+        --shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--mono);
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, color-mix(in srgb, var(--hist) 12%, transparent), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, color-mix(in srgb, var(--prop) 10%, transparent), transparent 55%),
+        var(--bg);
+      line-height: 1.65;
+    }
+    .wrap {
+      width: min(1080px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 2rem 0 4rem;
+    }
+    header.hero {
+      padding: 1.5rem 0 2rem;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 1.75rem;
+    }
+    .eyebrow {
+      display: inline-flex;
+      gap: .5rem;
+      align-items: center;
+      font-size: .82rem;
+      letter-spacing: .04em;
+      color: var(--muted);
+      margin-bottom: .75rem;
+    }
+    h1 {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: clamp(1.6rem, 3.5vw, 2.25rem);
+      line-height: 1.3;
+      margin: 0 0 .75rem;
+    }
+    .lede {
+      margin: 0;
+      max-width: 46rem;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+    .note {
+      margin-top: 1rem;
+      padding: .85rem 1rem;
+      border-left: 4px solid var(--prop);
+      background: var(--prop-bg);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--ink);
+      font-size: .92rem;
+    }
+    h2 {
+      font-family: var(--display);
+      font-size: 1.35rem;
+      margin: 2.25rem 0 .9rem;
+    }
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .75rem;
+    }
+    @media (max-width: 800px) {
+      .legend { grid-template-columns: 1fr 1fr; }
+    }
+    .chip {
+      background: var(--bg-elev);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: .85rem .9rem;
+      box-shadow: var(--shadow);
+      font-size: .88rem;
+    }
+    .chip strong {
+      display: block;
+      margin-bottom: .25rem;
+      font-size: .8rem;
+      letter-spacing: .03em;
+    }
+    .chip.feat { border-color: color-mix(in srgb, var(--feat) 45%, var(--line)); }
+    .chip.hist { border-style: solid; border-color: color-mix(in srgb, var(--hist) 55%, var(--line)); border-width: 2px; }
+    .chip.prop { border-style: dashed; border-color: color-mix(in srgb, var(--prop) 70%, var(--line)); border-width: 2px; }
+    .chip.val { border-color: color-mix(in srgb, var(--val) 45%, var(--line)); }
+    .tag {
+      display: inline-block;
+      font-size: .72rem;
+      font-weight: 600;
+      padding: .15rem .45rem;
+      border-radius: 999px;
+      margin-right: .35rem;
+      vertical-align: middle;
+    }
+    .tag.feat { background: var(--feat-bg); color: var(--feat); }
+    .tag.hist { background: var(--hist-bg); color: var(--hist); border: 1px solid currentColor; }
+    .tag.prop { background: var(--prop-bg); color: var(--prop); border: 1px dashed currentColor; }
+    .tag.val { background: var(--val-bg); color: var(--val); }
+    .stairs {
+      display: grid;
+      gap: .7rem;
+      margin: 1rem 0 2rem;
+    }
+    .stair {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: .85rem;
+      align-items: stretch;
+    }
+    .stair-step {
+      background: var(--stairs);
+      color: #fff;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: .95rem;
+    }
+    .stair-body {
+      background: var(--bg-elev);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: .9rem 1rem;
+      box-shadow: var(--shadow);
+    }
+    .stair:nth-child(1) .stair-body { margin-right: 18%; }
+    .stair:nth-child(2) .stair-body { margin-right: 12%; }
+    .stair:nth-child(3) .stair-body { margin-right: 8%; }
+    .stair:nth-child(4) .stair-body { margin-right: 4%; }
+    @media (max-width: 700px) {
+      .stair { grid-template-columns: 48px 1fr; }
+      .stair .stair-body { margin-right: 0 !important; }
+    }
+    .stair-title {
+      font-weight: 700;
+      margin: 0 0 .2rem;
+    }
+    .stair-one {
+      margin: 0;
+      color: var(--muted);
+      font-size: .92rem;
+    }
+    .status {
+      display: inline-block;
+      margin-top: .55rem;
+      font-size: .78rem;
+      font-weight: 600;
+      padding: .2rem .55rem;
+      border-radius: 999px;
+    }
+    .status.ok { background: var(--hist-bg); color: var(--hist); border: 1px solid currentColor; }
+    .status.maybe { background: var(--prop-bg); color: var(--prop); border: 1px dashed currentColor; }
+    .cards {
+      display: grid;
+      gap: 1.1rem;
+    }
+    .card {
+      background: var(--bg-elev);
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 2px);
+      padding: 1.1rem;
+      box-shadow: var(--shadow);
+    }
+    .card h3 {
+      margin: 0 0 .75rem;
+      font-size: 1.1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+      align-items: center;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 720px) {
+      .card-grid { grid-template-columns: 1fr; }
+    }
+    .svg-box {
+      background: color-mix(in srgb, var(--bg) 70%, var(--bg-elev));
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: .6rem;
+      display: grid;
+      place-items: center;
+      min-height: 150px;
+    }
+    svg { width: 100%; height: auto; max-width: 170px; }
+    .feat-lines {
+      background: var(--feat-bg);
+      border: 1px solid color-mix(in srgb, var(--feat) 30%, var(--line));
+      border-radius: 10px;
+      padding: .75rem .85rem;
+      margin: 0 0 .75rem;
+      font-size: .9rem;
+    }
+    .feat-lines p { margin: .2rem 0; }
+    .triple {
+      display: grid;
+      gap: .55rem;
+    }
+    .row {
+      border-radius: 10px;
+      padding: .7rem .8rem;
+      font-size: .9rem;
+    }
+    .row.hist {
+      background: var(--hist-bg);
+      border: 2px solid color-mix(in srgb, var(--hist) 55%, transparent);
+    }
+    .row.prop {
+      background: var(--prop-bg);
+      border: 2px dashed color-mix(in srgb, var(--prop) 70%, transparent);
+    }
+    .row.val {
+      background: var(--val-bg);
+      border: 1px solid color-mix(in srgb, var(--val) 40%, transparent);
+    }
+    .flow {
+      background: var(--bg-elev);
+      border: 2px dashed color-mix(in srgb, var(--prop) 65%, var(--line));
+      border-radius: var(--radius);
+      padding: 1rem;
+      box-shadow: var(--shadow);
+    }
+    .flow-warn {
+      display: inline-block;
+      margin-bottom: .8rem;
+      font-size: .8rem;
+      font-weight: 700;
+      color: var(--prop);
+      background: var(--prop-bg);
+      border: 1px dashed currentColor;
+      padding: .25rem .55rem;
+      border-radius: 999px;
+    }
+    .flow-svg { width: 100%; overflow-x: auto; }
+    .flow-svg svg { max-width: none; width: 980px; height: auto; }
+    .qbox {
+      background: var(--bg-elev);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      box-shadow: var(--shadow);
+    }
+    .qbox ol { margin: .4rem 0 0; padding-left: 1.2rem; }
+    .qbox li { margin: .45rem 0; }
+    footer {
+      margin-top: 2.5rem;
+      color: var(--muted);
+      font-size: .8rem;
+      border-top: 1px solid var(--line);
+      padding-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="eyebrow">AI活用コーチ分析 · 5つの進化 · 仕事当てはめ</div>
+      <h1>AIの5つの進化を、あなたの仕事に当てはめる</h1>
+      <p class="lede">
+        この図は「このチャットの往復は少ない」前提で、ワークスペースに残っている運用ルール・最近の仕事ファイルから読み取った
+        <span class="tag hist">履歴（事実）</span> と、コーチとしての <span class="tag prop">提案</span> を分けて示します。
+      </p>
+      <div class="note">
+        <strong>読み取り範囲の注記：</strong>
+        このチャット本文のやりとりは分析依頼が中心です。一方で、パートナー連絡・契約確認・AIエージェント運用の正本ルールと、
+        最近開いていた「神大家AI推進」「Todoist起票整理」などの仕事ファイルは参照できました。個人・家族の話題は図に含めていません。
+      </div>
+    </header>
+
+    <h2>凡例</h2>
+    <div class="legend" aria-label="凡例">
+      <div class="chip feat"><strong><span class="tag feat">特徴</span>一般的な説明</strong>どの仕事でも共通する仕組みの話。履歴とは別。</div>
+      <div class="chip hist"><strong><span class="tag hist">履歴</span>事実（実線・緑）</strong>実際の運用やファイルから確認できたこと。</div>
+      <div class="chip prop"><strong><span class="tag prop">提案</span>案（破線・黄）</strong>これから足すと効きそうな案。実運用の記録ではない。</div>
+      <div class="chip val"><strong><span class="tag val">価値</span>効果</strong>時間・ミス・質のどれがどう良くなるか。</div>
+    </div>
+
+    <h2>5段の階段（いまの到達イメージ）</h2>
+    <div class="stairs">
+      <div class="stair">
+        <div class="stair-step">1</div>
+        <div class="stair-body">
+          <p class="stair-title">プロンプト</p>
+          <p class="stair-one">頼み方を工夫する（役割・条件・形・見本）</p>
+          <span class="status ok">状況：履歴で実践</span>
+        </div>
+      </div>
+      <div class="stair">
+        <div class="stair-step">2</div>
+        <div class="stair-body">
+          <p class="stair-title">コンテキスト</p>
+          <p class="stair-one">資料・過去やりとり・ルール・メモリをつなぐ</p>
+          <span class="status ok">状況：履歴で実践</span>
+        </div>
+      </div>
+      <div class="stair">
+        <div class="stair-step">3</div>
+        <div class="stair-body">
+          <p class="stair-title">ハーネス</p>
+          <p class="stair-one">手順地図・道具・ルール・できた確認で環境を整える</p>
+          <span class="status ok">状況：履歴で実践</span>
+        </div>
+      </div>
+      <div class="stair">
+        <div class="stair-step">4</div>
+        <div class="stair-body">
+          <p class="stair-title">ループ</p>
+          <p class="stair-one">作る→選ぶ・直す→理由を残して次へ渡す</p>
+          <span class="status ok">状況：履歴で実践</span>
+        </div>
+      </div>
+      <div class="stair">
+        <div class="stair-step">5</div>
+        <div class="stair-body">
+          <p class="stair-title">グラフ</p>
+          <p class="stair-one">仕事の流れを工程のつながりで設計する</p>
+          <span class="status ok">状況：履歴で実践（一部は推測）</span>
+        </div>
+      </div>
+    </div>
+
+    <h2>段ごとのカード</h2>
+    <div class="cards">
+
+      <!-- 1 Prompt -->
+      <section class="card">
+        <h3><span class="tag hist">1</span>プロンプト</h3>
+        <div class="card-grid">
+          <div class="svg-box" aria-hidden="true">
+            <svg viewBox="0 0 160 140" role="img">
+              <rect x="18" y="18" width="124" height="104" rx="10" fill="none" stroke="currentColor" stroke-width="2"/>
+              <rect x="28" y="30" width="40" height="18" rx="4" fill="none" stroke="currentColor"/>
+              <text x="33" y="43" font-size="9">役割</text>
+              <rect x="74" y="30" width="56" height="18" rx="4" fill="none" stroke="currentColor"/>
+              <text x="80" y="43" font-size="9">条件</text>
+              <rect x="28" y="58" width="48" height="18" rx="4" fill="none" stroke="currentColor"/>
+              <text x="33" y="71" font-size="9">出力形</text>
+              <rect x="82" y="58" width="48" height="18" rx="4" fill="none" stroke="currentColor"/>
+              <text x="90" y="71" font-size="9">見本</text>
+              <path d="M48 86 L48 98 L112 98 L112 86" fill="none" stroke="currentColor" stroke-width="2"/>
+              <rect x="40" y="98" width="80" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+              <text x="58" y="110" font-size="9">1通の依頼</text>
+            </svg>
+          </div>
+          <div>
+            <div class="feat-lines">
+              <p><span class="tag feat">特徴</span>設計するもの：依頼文の部品（役割・条件・形・見本）</p>
+              <p>効く場面：単発の文章・要約・下書き</p>
+              <p>限界：材料や手順が無いと品質がぶれやすい</p>
+            </div>
+            <div class="triple">
+              <div class="row hist"><span class="tag hist">履歴</span>役割付きの長い依頼文（本分析プロンプト含む）や、送信前の文面チェック指示など、「頼み方」を細かく書いている。</div>
+              <div class="row prop"><span class="tag prop">提案</span>契約・見積・返信など、よく使う依頼を「型カード」化し、毎回ゼロから書かない。</div>
+              <div class="row val"><span class="tag val">価値</span>時間短縮（依頼の迷い減）／質の安定（出力の形が揃う）。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 Context -->
+      <section class="card">
+        <h3><span class="tag hist">2</span>コンテキスト</h3>
+        <div class="card-grid">
+          <div class="svg-box" aria-hidden="true">
+            <svg viewBox="0 0 160 140" role="img">
+              <circle cx="80" cy="72" r="22" fill="none" stroke="currentColor" stroke-width="2"/>
+              <text x="68" y="76" font-size="10">AI</text>
+              <rect x="10" y="18" width="42" height="22" rx="4" fill="none" stroke="currentColor"/>
+              <text x="16" y="33" font-size="8">資料</text>
+              <rect x="108" y="18" width="42" height="22" rx="4" fill="none" stroke="currentColor"/>
+              <text x="114" y="33" font-size="8">過去履歴</text>
+              <rect x="10" y="100" width="42" height="22" rx="4" fill="none" stroke="currentColor"/>
+              <text x="16" y="115" font-size="8">社内ルール</text>
+              <rect x="108" y="100" width="42" height="22" rx="4" fill="none" stroke="currentColor"/>
+              <text x="116" y="115" font-size="8">メモリ</text>
+              <path d="M52 30 L62 58 M108 30 L98 58 M52 110 L62 88 M108 110 L98 88" fill="none" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </div>
+          <div>
+            <div class="feat-lines">
+              <p><span class="tag feat">特徴</span>設計するもの：依頼文の外にある材料の渡し方</p>
+              <p>効く場面：継続案件・社内ルールがある仕事</p>
+              <p>限界：古い・余計な材料を渡すと誤誘導が起きる</p>
+            </div>
+            <div class="triple">
+              <div class="row hist"><span class="tag hist">履歴</span>パートナーの「5.やり取り」「送信下書き」、契約修正案、運用ルール（.mdc）などをAIに読ませて作業している。</div>
+              <div class="row prop"><span class="tag prop">提案</span>案件ごとに「必読3点セット」（やり取り末尾／下書き／判断メモ）を先に渡す習慣を固定する。</div>
+              <div class="row val"><span class="tag val">価値</span>ミス減少（前提の取り違え減）／質向上（相手文脈に合う返答）。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 Harness -->
+      <section class="card">
+        <h3><span class="tag hist">3</span>ハーネス</h3>
+        <div class="card-grid">
+          <div class="svg-box" aria-hidden="true">
+            <svg viewBox="0 0 160 140" role="img">
+              <rect x="20" y="20" width="120" height="100" rx="12" fill="none" stroke="currentColor" stroke-width="2"/>
+              <text x="40" y="42" font-size="9">手順地図 / 道具 / ルール</text>
+              <rect x="36" y="54" width="88" height="28" rx="6" fill="none" stroke="currentColor"/>
+              <text x="58" y="72" font-size="10">AI作業</text>
+              <path d="M80 82 L80 94" stroke="currentColor" stroke-width="2"/>
+              <rect x="40" y="94" width="80" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+              <text x="52" y="107" font-size="9">できた？→やり直し</text>
+            </svg>
+          </div>
+          <div>
+            <div class="feat-lines">
+              <p><span class="tag feat">特徴</span>設計するもの：AIが動く環境（手順・道具・確認）</p>
+              <p>効く場面：同じ失敗を繰り返したくない定型業務</p>
+              <p>限界：ルールが増えすぎると保守コストが上がる</p>
+            </div>
+            <div class="triple">
+              <div class="row hist"><span class="tag hist">履歴</span>パートナー確認の手順、送信前ゲート、アカウント使い分け、コマンド一覧など「同じミスを仕組みで防ぐ」環境が厚い。</div>
+              <div class="row prop"><span class="tag prop">提案</span>契約・見積まわりにも「完了チェック表（添付Bか／宛名一致か）」をハーネスへ追加する。</div>
+              <div class="row val"><span class="tag val">価値</span>ミス大幅減（誤送信・手順抜け防止）／時間の安定（毎回の思い出し不要）。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 Loop -->
+      <section class="card">
+        <h3><span class="tag hist">4</span>ループ</h3>
+        <div class="card-grid">
+          <div class="svg-box" aria-hidden="true">
+            <svg viewBox="0 0 160 140" role="img">
+              <circle cx="80" cy="70" r="42" fill="none" stroke="currentColor" stroke-width="2"/>
+              <text x="58" y="42" font-size="9">AIが作る</text>
+              <text x="98" y="78" font-size="9">人が直す</text>
+              <text x="48" y="104" font-size="9">理由を残す</text>
+              <path d="M80 28 A42 42 0 1 1 42 98" fill="none" stroke="currentColor" stroke-width="2" marker-end="url(#arrow)"/>
+              <defs>
+                <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="currentColor"/>
+                </marker>
+              </defs>
+            </svg>
+          </div>
+          <div>
+            <div class="feat-lines">
+              <p><span class="tag feat">特徴</span>設計するもの：フィードバックの戻し方</p>
+              <p>効く場面：下書きや提案を人が最終決定する仕事</p>
+              <p>限界：直しの理由を残さないと学習が進まない</p>
+            </div>
+            <div class="triple">
+              <div class="row hist"><span class="tag hist">履歴</span>下書き→プレビュー→了承→送信、タスクは「オーナー確認」を挟んでから完了、など人の選択・承認が組み込まれている。</div>
+              <div class="row prop"><span class="tag prop">提案</span>直した理由を1行コメントで残す型（例：「宛名を実務担当に変更」）を毎回固定する。</div>
+              <div class="row val"><span class="tag val">価値</span>質の継続改善／時間減（同じ直しの繰り返しが減る）。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5 Graph -->
+      <section class="card">
+        <h3><span class="tag hist">5</span>グラフ</h3>
+        <div class="card-grid">
+          <div class="svg-box" aria-hidden="true">
+            <svg viewBox="0 0 160 140" role="img">
+              <rect x="8" y="20" width="40" height="22" rx="4" fill="none" stroke="currentColor"/>
+              <text x="14" y="35" font-size="8">取込</text>
+              <rect x="60" y="20" width="40" height="22" rx="4" fill="none" stroke="currentColor"/>
+              <text x="66" y="35" font-size="8">下書き</text>
+              <rect x="112" y="20" width="40" height="22" rx="4" fill="none" stroke="currentColor"/>
+              <text x="118" y="35" font-size="8">点検</text>
+              <rect x="60" y="70" width="40" height="22" rx="4" fill="none" stroke="currentColor"/>
+              <text x="68" y="85" font-size="8">承認</text>
+              <rect x="112" y="70" width="40" height="22" rx="4" fill="none" stroke="currentColor"/>
+              <text x="120" y="85" font-size="8">送信</text>
+              <path d="M48 31 H60 M100 31 H112 M132 42 V70 H100 M80 42 V70" fill="none" stroke="currentColor" stroke-width="2"/>
+              <path d="M80 92 V110 H40 V50 H28" fill="none" stroke="currentColor" stroke-dasharray="3 2"/>
+              <text x="10" y="126" font-size="8">差し戻し</text>
+            </svg>
+          </div>
+          <div>
+            <div class="feat-lines">
+              <p><span class="tag feat">特徴</span>設計するもの：工程のつながり（並行・関所・差し戻し）</p>
+              <p>効く場面：複数チャネル・複数担当が絡む業務</p>
+              <p>限界：設計が過大だと運用が重くなる</p>
+            </div>
+            <div class="triple">
+              <div class="row hist"><span class="tag hist">履歴</span>メール／Chatwork／LINE取込→要約・下書き→品質ゲート→人の了承→送信、という多段フローが確認できる。AI社員の役割分担も見られる。</div>
+              <div class="row prop"><span class="tag prop">提案</span>契約交渉フローを「受領→論点抽出→修正案→人承認→送付」の1本のグラフとして図にし、毎回同じ関所を通す。</div>
+              <div class="row val"><span class="tag val">価値</span>ミス減（関所で止まる）／時間の見通し（どこで待つかが明確）。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <h2>提案フロー図（最初に自動化しやすい流れ）</h2>
+    <div class="flow">
+      <span class="flow-warn">提案であり、実運用の記録ではない</span>
+      <p style="margin-top:0;color:var(--muted);font-size:.92rem;">
+        想定シーン：パートナー／運営への返信・契約関連メール（神大家AI推進など）。
+        既存の「取込→下書き→点検→了承→送信」を、関所と差し戻しが見える形にしたものです。
+      </p>
+      <div class="flow-svg">
+        <svg viewBox="0 0 980 220" role="img" aria-label="提案フロー">
+          <defs>
+            <marker id="a1" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#9a6b00"/></marker>
+          </defs>
+          <!-- nodes -->
+          <rect x="20" y="70" width="120" height="54" rx="10" fill="none" stroke="#9a6b00" stroke-width="2" stroke-dasharray="6 4"/>
+          <text x="42" y="92" font-size="13" fill="currentColor">①取込・要約</text>
+          <text x="36" y="110" font-size="11" fill="currentColor">（コンテキスト）</text>
+
+          <rect x="180" y="70" width="130" height="54" rx="10" fill="none" stroke="#9a6b00" stroke-width="2" stroke-dasharray="6 4"/>
+          <text x="205" y="92" font-size="13" fill="currentColor">②下書き生成</text>
+          <text x="205" y="110" font-size="11" fill="currentColor">（プロンプト）</text>
+
+          <rect x="350" y="70" width="140" height="54" rx="10" fill="none" stroke="#9a6b00" stroke-width="2" stroke-dasharray="6 4"/>
+          <text x="372" y="92" font-size="13" fill="currentColor">③品質関所</text>
+          <text x="365" y="110" font-size="11" fill="currentColor">宛名・添付・トーン</text>
+
+          <rect x="530" y="70" width="140" height="54" rx="10" fill="none" stroke="#9a6b00" stroke-width="2" stroke-dasharray="6 4"/>
+          <text x="552" y="92" font-size="13" fill="currentColor">④人の承認</text>
+          <text x="545" y="110" font-size="11" fill="currentColor">（ループの関所）</text>
+
+          <rect x="710" y="70" width="120" height="54" rx="10" fill="none" stroke="#9a6b00" stroke-width="2" stroke-dasharray="6 4"/>
+          <text x="742" y="92" font-size="13" fill="currentColor">⑤送信</text>
+          <text x="728" y="110" font-size="11" fill="currentColor">記録へ戻す</text>
+
+          <!-- arrows -->
+          <path d="M140 97 H180" stroke="#9a6b00" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#a1)"/>
+          <path d="M310 97 H350" stroke="#9a6b00" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#a1)"/>
+          <path d="M490 97 H530" stroke="#9a6b00" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#a1)"/>
+          <path d="M670 97 H710" stroke="#9a6b00" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#a1)"/>
+
+          <!-- reject loop -->
+          <path d="M600 124 V170 H245 V124" fill="none" stroke="#9a6b00" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#a1)"/>
+          <text x="360" y="190" font-size="12" fill="currentColor">差し戻し：直し理由を1行残して②へ（ループ）</text>
+
+          <text x="840" y="40" font-size="12" fill="currentColor">※破線＝提案</text>
+        </svg>
+      </div>
+    </div>
+
+    <h2>確認の質問（3つだけ）</h2>
+    <div class="qbox">
+      <ol>
+        <li>いまの本業の中心は「不動産賃貸の運営連絡」と「神大家関連の契約・AI推進」のどちらに近いですか？（両方なら比率も）</li>
+        <li>AIに一番時間を使わせている作業は、返信下書き／取込整理／契約文面／タスク整理のどれですか？</li>
+        <li>次の90日で伸ばしたいのは「速さ」「ミス防止」「文章の質」のどれを最優先にしますか？</li>
+      </ol>
+    </div>
+
+    <footer>
+      作成日：2026-11-07 · 本ページはコーチ分析の図解です。履歴に無い事項は事実として扱っていません。
+    </footer>
+  </div>
+</body>
+</html>
