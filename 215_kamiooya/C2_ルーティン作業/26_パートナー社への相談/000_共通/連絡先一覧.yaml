@@ -88,11 +88,12 @@ partners:
     line: "目黒 啓太 / 【神大家】松野さん・スクール運営社員"
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
-    contact: "目黒"
-    chatwork_room_id: ["422374412", "439357504"]
+    contact: "目黒／今村／渡部"
+    chatwork_room_id: ["422374412", "439357504", "410050275"]
     chatwork_rooms:
       "422374412": "目黒 啓太"
       "439357504": "【神大家】松野さん・スクール運営社員"
+      "410050275": "渡部 拓哉"
     chatwork_account_name: ""
   - folder: "809_神大家運営回答"
     name: "神大家運営回答"
@@ -230,9 +231,10 @@ partners:
     line_group_chat_mid: ""
     line_direct_chat_mid: ""
     contact: "種村／千葉／松野"
-    chatwork_room_id: ["447466105"]
+    chatwork_room_id: ["447466105", "391166457"]
     chatwork_rooms:
       "447466105": "名古屋幹事グループ"
+      "391166457": "種村 直美"
     chatwork_account_name: ""
     # 生ログ正本（2026-09-11一本化）: LINE「東海飲み会幹事やりとり」＋ Chatwork「名古屋幹事グループ」→ 5.やり取り.md
     # 旧パス: 815_神大家オプチャ/東海飲み会幹事やりとり/
