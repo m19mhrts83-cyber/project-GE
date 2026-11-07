@@ -129,7 +129,8 @@ for (const source of sources) {
     app.elements.commentSearchInput.value='30204';app.renderCommentTable();assert.equal(app.elements.commentTableBody.children.length,0);
     app.elements.commentAttachmentsOnly.checked=false;app.renderCommentTable();assert.equal(app.elements.commentTableBody.children.length,1);
     app.elements.commentSearchInput.value='';app.elements.commentAttachmentsOnly.checked=true;
-    app.state.attachmentLoading=true;app.renderCommentTable();assert.match(app.elements.commentListMeta.textContent,/確認中.*暫定/);
+    app.state.referenceLoads={comments:Promise.resolve()};app.renderCommentTable();assert.match(app.elements.commentListMeta.textContent,/コメント一覧を取得中/);
+    app.state.referenceLoads={};app.state.attachmentLoading=true;app.renderCommentTable();assert.match(app.elements.commentListMeta.textContent,/確認中.*暫定/);
     app.state.attachmentLoading=false;app.state.attachmentStatus='failed';app.renderCommentTable();assert.match(app.elements.commentListMeta.textContent,/一部のみ表示/);
     app.state.attachmentStatus='';app.renderCommentTable();assert.doesNotMatch(app.elements.commentListMeta.textContent,/確認中|一部のみ表示/);
   });

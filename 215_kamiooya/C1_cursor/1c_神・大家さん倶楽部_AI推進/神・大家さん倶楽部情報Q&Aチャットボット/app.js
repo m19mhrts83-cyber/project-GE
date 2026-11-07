@@ -1775,7 +1775,7 @@ const App = {
     if(loads[key])return loads[key];
     const generation=App.state.attachmentGeneration;
     if(key==='comments'&&App.elements.commentListMeta)App.elements.commentListMeta.textContent='コメント一覧を取得中…';
-    const task=(key==='comments'?App.loadComments():App.loadKnowledge()).then(()=>{if(App.state.attachmentGeneration===generation)ready[key]=true;}).catch(error=>{if(App.state.attachmentGeneration===generation)App.showToast(error.message||'参照一覧の取得に失敗しました。メニューを開き直して再試行してください。','error');}).finally(()=>{delete loads[key];});
+    const task=(key==='comments'?App.loadComments():App.loadKnowledge()).then(()=>{if(App.state.attachmentGeneration===generation)ready[key]=true;}).catch(error=>{if(App.state.attachmentGeneration===generation)App.showToast(error.message||'参照一覧の取得に失敗しました。メニューを開き直して再試行してください。','error');}).finally(()=>{delete loads[key];if(key==='comments'&&App.state.attachmentGeneration===generation&&App.elements.commentTableBody)App.renderCommentTable();});
     loads[key]=task;return task;
   },
 
@@ -3639,6 +3639,7 @@ const App = {
     const categoryFilter =
       (App.elements.commentCategoryFilter && App.elements.commentCategoryFilter.value) || '';
     const dateFilter = (App.elements.commentDateFilter && App.elements.commentDateFilter.value) || '';
+    const commentsLoading = !!(App.state.referenceLoads && App.state.referenceLoads.comments);
     const attachmentsOnly = !!(App.elements.commentAttachmentsOnly && App.elements.commentAttachmentsOnly.checked);
     body.innerHTML = '';
 
@@ -3697,6 +3698,7 @@ const App = {
         ' 件（月日不明 ' +
         missingDateCount +
         ' 件・年も不明 ' + unknownYearCount + ' 件）' +
+        (commentsLoading ? '・コメント一覧を取得中（件数は暫定）' : '') +
         (attachmentsOnly && App.state.attachmentLoading ? '・添付情報を確認中（件数は暫定）' :
           attachmentsOnly && App.state.attachmentStatus ? '・添付情報が未確認のため一部のみ表示。上部から再取得してください。' : '');
       if (filtered.length > pageSize) {
@@ -3716,7 +3718,7 @@ const App = {
 
     if (filtered.length === 0) {
       body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">' +
-        (attachmentsOnly && (App.state.attachmentLoading || App.state.attachmentStatus) ? '添付情報の確認が完了していません。' : '該当データがありません') + '</td></tr>';
+        (commentsLoading ? 'コメント一覧を取得中…' : attachmentsOnly && (App.state.attachmentLoading || App.state.attachmentStatus) ? '添付情報の確認が完了していません。' : '該当データがありません') + '</td></tr>';
       return;
     }
 
