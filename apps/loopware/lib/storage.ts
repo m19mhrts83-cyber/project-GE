@@ -10,6 +10,9 @@ export type DecisionRecord = {
   freeNote?: string;
   decidedAt: string;
   decidedVia: "app" | "slack";
+  /** shared = 共有DB（Supabase）に保存できた／local = この端末だけ。未送信は undefined */
+  sync?: "shared" | "local";
+  syncReason?: string;
 };
 
 export type StoreV1 = {
@@ -47,6 +50,26 @@ export function upsertDecision(rec: DecisionRecord) {
   saveStore({ version: 1, decisions: next.slice(0, 200) });
 }
 
+export function updateDecisionSync(
+  rec: DecisionRecord,
+  sync: "shared" | "local",
+  reason?: string,
+) {
+  const store = loadStore();
+  const next = store.decisions.map((d) =>
+    d.topicId === rec.topicId && d.agentId === rec.agentId && d.decidedAt === rec.decidedAt
+      ? { ...d, sync, syncReason: sync === "local" ? reason : undefined }
+      : d,
+  );
+  saveStore({ version: 1, decisions: next });
+}
+
+export function syncBadge(rec: DecisionRecord): string {
+  if (rec.sync === "shared") return "共有DB";
+  if (rec.sync === "local") return "端末のみ（共有DB未保存）";
+  return "送信中／未確認";
+}
+
 export function formatDecisionMd(rec: DecisionRecord): string {
   return [
     `# loopware ${rec.agentId}`,
@@ -56,6 +79,7 @@ export function formatDecisionMd(rec: DecisionRecord): string {
     `- tags: ${(rec.reasonTags || []).join(", ") || "-"}`,
     `- note: ${rec.freeNote || "-"}`,
     `- at: ${rec.decidedAt}`,
+    `- saved: ${syncBadge(rec)}`,
     "",
     "## final",
     rec.finalText || rec.afterText || "(empty)",

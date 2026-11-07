@@ -7,9 +7,11 @@ import { REASON_TAGS_313 } from "@/lib/seed312";
 import {
   formatDecisionMd,
   loadStore,
+  syncBadge,
   upsertDecision,
   type DecisionRecord,
 } from "@/lib/storage";
+import { postDecision, syncLabel } from "@/lib/postDecision";
 
 type Tab = "cleanup" | "misses";
 
@@ -57,22 +59,16 @@ export default function CleanupClient({
     };
     upsertDecision(rec);
     setResults(loadStore().decisions.filter((d) => d.agentId === "313"));
-    setMsg(`記録した：${ACTS.find((a) => a.id === choice)?.label ?? choice}`);
-    try {
-      await fetch("/api/decide", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agentId: "313",
-          topicText: title || tid,
-          seedId: tid,
-          decision: rec,
-          todoistTaskId: taskId || null,
-        }),
-      });
-    } catch {
-      /* ok */
-    }
+    const head = `「${ACTS.find((a) => a.id === choice)?.label ?? choice}」と記録`;
+    setMsg(`${head}・共有DBへ送信中…`);
+    const res = await postDecision(rec, {
+      agentId: "313",
+      topicText: title || tid,
+      seedId: tid,
+      todoistTaskId: taskId || null,
+    });
+    setResults(loadStore().decisions.filter((d) => d.agentId === "313"));
+    setMsg(`${head}・${syncLabel(res)}。Todoist はまだ変わっていません`);
   }
 
   const cur = ACTS.find((a) => a.id === act) ?? ACTS[0];
@@ -125,6 +121,9 @@ export default function CleanupClient({
           </div>
 
           <div className="eyebrow">どうする？</div>
+          <p className="meta" style={{ marginTop: 0 }}>
+            ここでは判断を記録するだけです。Todoist の完了・期日変更・コメントは、313 の Slack ボタンか CLI で行います。
+          </p>
           {ACTS.map((a) => (
             <button
               key={a.id}
@@ -224,7 +223,9 @@ export default function CleanupClient({
                 {ACTS.find((a) => a.id === r.choice)?.label ?? r.choice}
               </span>
             </div>
-            <div className="meta">{(r.reasonTags || []).join(" / ") || "理由タグなし"}</div>
+            <div className="meta">
+              {(r.reasonTags || []).join(" / ") || "理由タグなし"} · {syncBadge(r)}
+            </div>
             <div className="btn-row">
               <button
                 type="button"
@@ -255,7 +256,7 @@ export default function CleanupClient({
               style={{ background: cur.color }}
               onClick={() => decide(cur.id)}
             >
-              {cur.label} で記録する
+              「{cur.label}」と記録する
             </button>
           </div>
         </div>
@@ -265,9 +266,9 @@ export default function CleanupClient({
 }
 
 const ACTS = [
-  { id: "close", label: "済んだ", desc: "Todoist を完了にして記録", icon: "check", color: "var(--positive)" },
-  { id: "reschedule", label: "いつ・優先", desc: "期日を動かす。外すことも選べる", icon: "calendar", color: "var(--accent)" },
-  { id: "drop", label: "やめる", desc: "完了にして、やめた理由をコメント", icon: "trash", color: "var(--alert)" },
+  { id: "close", label: "済んだ", desc: "終わっていると判断（Todoist の完了は Slack／CLI で）", icon: "check", color: "var(--positive)" },
+  { id: "reschedule", label: "いつ・優先", desc: "期日を動かすと判断（外すことも選べる）", icon: "calendar", color: "var(--accent)" },
+  { id: "drop", label: "やめる", desc: "やめると判断（完了とコメントは Slack／CLI で）", icon: "trash", color: "var(--alert)" },
 ] as const;
 
 function ymd(plusDays: number) {

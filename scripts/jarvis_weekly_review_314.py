@@ -21,6 +21,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -56,6 +57,36 @@ def _run(cmd: list[str], *, timeout: int = 120) -> str:
     if r.returncode != 0:
         raise RuntimeError(f"{' '.join(cmd[:3])}: {r.stderr.strip()[:200]}")
     return r.stdout
+
+
+# Mac のスリープ明け直後は DNS がまだ戻っていないことがある（11/07 は fetch・gh・Slack が全部失敗）。
+# ネットが要る処理だけ、少し待って取り直す。
+NET_RETRY_WAITS = (30, 90)
+SLACK_RETRY_WAITS = (30, 120)
+
+
+def with_retry(fn, waits=NET_RETRY_WAITS, *, sleep=time.sleep):
+    """fn() を最大 len(waits)+1 回。最後の例外はそのまま投げる。"""
+    for w in (*waits, None):
+        try:
+            return fn()
+        except Exception:
+            if w is None:
+                raise
+            sleep(w)
+    return None
+
+
+def post_slack(cmd: list[str], *, waits=SLACK_RETRY_WAITS, sleep=time.sleep, run=subprocess.run) -> bool:
+    for w in (*waits, None):
+        r = run(cmd, cwd=str(REPO), timeout=60)
+        if r.returncode == 0:
+            return True
+        print(f"{LOG}: slack FAIL rc={r.returncode}", file=sys.stderr)
+        if w is None:
+            return False
+        sleep(w)
+    return False
 
 
 # ---- cron（GHA は UTC）-------------------------------------------------------
@@ -399,15 +430,17 @@ def main() -> int:
 
     now = datetime.now(JST)
     since = now - timedelta(days=args.days)
+    fetch_error = ""
     try:
-        _run(["git", "fetch", "--quiet", "origin", "main"])
+        with_retry(lambda: _run(["git", "fetch", "--quiet", "origin", "main"]))
     except Exception as exc:
+        fetch_error = str(exc)
         print(f"{LOG}: git fetch FAIL（ローカルの origin/main で続行）: {exc}", file=sys.stderr)
 
     facts: dict[str, Any] = {"date": now.strftime("%Y-%m-%d"), "since": since.strftime("%Y-%m-%d")}
     for key, fn in (
         ("commits", lambda: collect_commits(since)),
-        ("gha", lambda: collect_gha(since)),
+        ("gha", lambda: with_retry(lambda: collect_gha(since))),
         # 読んだ位置を覚えるのは本番（--post）だけ。--dry-run は何度流しても同じ件数
         ("launchd", lambda: collect_launchd_logs(
             since, save_offsets=bool(args.post and not args.dry_run))),
@@ -435,6 +468,11 @@ def main() -> int:
     for key in ("commits", "gha", "tests"):
         if facts[key].get("error"):
             facts["flags"].append(f"収集失敗: {key} — {facts[key]['error'][:80]}")
+    if fetch_error:
+        facts["fetch_error"] = fetch_error[:200]
+        facts["flags"].append(
+            f"収集失敗: git fetch（手元の origin/main で集計。コミットが古い可能性） — {fetch_error[:80]}"
+        )
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     md = render_md(facts)
@@ -448,15 +486,20 @@ def main() -> int:
 
     if args.post and not args.dry_run:
         ch = "ops" if facts["flags"] else "report"
-        r = subprocess.run(
+        ok = post_slack(
             [
                 sys.executable, str(REPO / "scripts" / "jarvis_slack_webhook_post.py"),
                 "--channel", ch, "--username", "314 業務品質監査", "--text", slack_text(facts),
-            ],
-            cwd=str(REPO), timeout=60,
+            ]
         )
-        if r.returncode != 0:
-            print(f"{LOG}: slack FAIL rc={r.returncode}", file=sys.stderr)
+        # 9:30 のレビューが「Slack に出ていない回」だと分かるように残す
+        facts["slack_posted"] = ok
+        (OUT_DIR / "latest.json").write_text(
+            json.dumps(facts, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        if not ok:
+            # exit 0 で黙らない（launchctl の last exit code に残る）
+            return 2
     return 0
 
 
