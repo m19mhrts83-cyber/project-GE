@@ -323,6 +323,11 @@ def comm_hub_sync(
             needs.append(iid)
     hub.mark_needs_reply(sb, needs)
     hub.link_items(sb, links)
+    try:  # 前の回や夜の Mac トリアージ由来の未返信もつなぐ（/partner と台帳の件数をそろえる）
+        lp = hub.link_pending(sb, apply=True)
+        print(f"# comm hub link-pending: {lp}", file=sys.stderr)
+    except Exception as e:  # noqa: BLE001
+        print(f"# comm hub link-pending soft-fail: {e}", file=sys.stderr)
     print(
         f"# comm hub: new={len(items)} known={len(existing)} "
         f"linked={len(links)} needs_reply={len(needs)}",
