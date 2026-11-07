@@ -11,6 +11,7 @@ import {
 import {
   formatDecisionMd,
   loadStore,
+  removeDecision,
   upsertDecision,
   type DecisionRecord,
 } from "@/lib/storage";
@@ -122,6 +123,19 @@ export default function TaskDedupeClient({
 
   const doneRec = results.find((r) => r.topicId === topic.id);
   const doneIdx = topicIndexOf(SEED_TOPICS_312, topic.id);
+  const decidedProposal = doneRec?.chosenIndex
+    ? topic.proposals.find((p) => p.index === doneRec.chosenIndex)
+    : undefined;
+
+  function reopen() {
+    removeDecision(topic!.id, "312");
+    setResults(loadStore().decisions.filter((d) => d.agentId === "312"));
+    setMsg("");
+    setSel(1);
+    setRate({});
+    setTags([]);
+    setNote("");
+  }
   const selProposal = topic.proposals.find((p) => p.index === sel);
 
   return (
@@ -171,6 +185,51 @@ export default function TaskDedupeClient({
         )}
       </div>
 
+      {doneRec ? (
+        <>
+          <div className="eyebrow">
+            決めた案<small>この1枚だけ残しています</small>
+          </div>
+          <div className="card opt sel done" style={{ minHeight: 0 }}>
+            <div className="done-head">
+              <span className="radio">
+                <Icon name="check" size={12} stroke={3.5} />
+              </span>
+              <span style={{ flexGrow: 1 }}>
+                {doneRec.choice === "none_of_above" ? (
+                  "どれも違う"
+                ) : (
+                  <>
+                    <span className="n">{doneRec.chosenIndex}</span>
+                    {decidedProposal?.label}
+                    {doneRec.choice === "edit_use" ? "（直して使う）" : ""}
+                  </>
+                )}
+              </span>
+              <span className="done-badge">決定済み</span>
+            </div>
+            {doneRec.choice === "none_of_above" ? null : (
+              <dl className="rows" style={{ margin: 0 }}>
+                {parseRows(doneRec.finalText || "").map((r, i) => (
+                  <div key={i}>
+                    <dt>{r.k}</dt>
+                    <dd>{r.v}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {doneRec.reasonTags.length || doneRec.freeNote ? (
+              <div className="meta">
+                {[...doneRec.reasonTags, doneRec.freeNote].filter(Boolean).join(" ／ ")}
+              </div>
+            ) : null}
+            <button type="button" className="secondary" onClick={reopen}>
+              <Icon name="back" size={16} /> やっぱり見直す
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
       <div className="eyebrow">
         3案から選ぶ<small>良い／悪いの評価は任意</small>
       </div>
@@ -269,6 +328,9 @@ export default function TaskDedupeClient({
         placeholder="一言（なくても保存できる）"
       />
 
+        </>
+      )}
+
       <div className="eyebrow">記録</div>
       <ul className="list glass">
         {results.length === 0 ? (
@@ -307,6 +369,7 @@ export default function TaskDedupeClient({
         ))}
       </ul>
 
+      {doneRec ? null : (
       <div className="bar">
         <div className="bar-in">
           {msg || doneRec ? (
@@ -373,6 +436,7 @@ export default function TaskDedupeClient({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

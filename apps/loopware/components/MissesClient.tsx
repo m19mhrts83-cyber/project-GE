@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Icon from "./Icon";
 import {
   formatDecisionMd,
   loadStore,
+  removeDecision,
   upsertDecision,
   type DecisionRecord,
 } from "@/lib/storage";
@@ -55,6 +57,20 @@ export default function MissesClient() {
       .catch(() => undefined);
   }, []);
 
+  function verdictOf(id: string) {
+    return results.find((r) => r.topicId === id);
+  }
+
+  function reopen(id: string) {
+    removeDecision(id, "312");
+    setResults(
+      loadStore().decisions.filter(
+        (d) => d.agentId === "312" && d.topicId.startsWith("miss-"),
+      ),
+    );
+    setMsg("決定を取り消した。もう一度選べます");
+  }
+
   async function verdict(c: MissCand, isMiss: boolean) {
     const rec: DecisionRecord = {
       topicId: c.id,
@@ -104,18 +120,50 @@ export default function MissesClient() {
             </strong>
             <div className="meta">{c.snippet}</div>
             <div className="meta">{c.hypothesis}</div>
-            <div className="btn-row" style={{ marginTop: 8 }}>
-              <button
-                type="button"
-                className="primary"
-                onClick={() => verdict(c, true)}
-              >
-                漏れ
-              </button>
-              <button type="button" onClick={() => verdict(c, false)}>
-                漏れではない
-              </button>
-            </div>
+            {(() => {
+              const v = verdictOf(c.id);
+              if (!v) {
+                return (
+                  <div className="verdict-row">
+                    <button
+                      type="button"
+                      className="verdict miss"
+                      onClick={() => verdict(c, true)}
+                    >
+                      漏れ
+                    </button>
+                    <button
+                      type="button"
+                      className="verdict ok"
+                      onClick={() => verdict(c, false)}
+                    >
+                      漏れではない
+                    </button>
+                  </div>
+                );
+              }
+              const isMiss = v.choice === "use";
+              return (
+                <div className="verdict-row">
+                  <span
+                    className={`verdict ${isMiss ? "miss" : "ok"} on`}
+                    role="status"
+                  >
+                    <Icon name="check" size={16} stroke={3} />
+                    {isMiss ? "漏れ" : "漏れではない"}
+                    <small>決定済み</small>
+                  </span>
+                  <button
+                    type="button"
+                    className="verdict redo"
+                    onClick={() => reopen(c.id)}
+                  >
+                    <Icon name="back" size={16} />
+                    やっぱり見直す
+                  </button>
+                </div>
+              );
+            })()}
           </li>
         ))}
       </ul>

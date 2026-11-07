@@ -47,6 +47,17 @@ export function upsertDecision(rec: DecisionRecord) {
   saveStore({ version: 1, decisions: next.slice(0, 200) });
 }
 
+/** 決定を取り消す（もう一度選べるようにする）。サーバ側の判断ログは履歴として残る */
+export function removeDecision(topicId: string, agentId: "312" | "313") {
+  const store = loadStore();
+  saveStore({
+    version: 1,
+    decisions: store.decisions.filter(
+      (d) => !(d.topicId === topicId && d.agentId === agentId),
+    ),
+  });
+}
+
 export function formatDecisionMd(rec: DecisionRecord): string {
   return [
     `# loopware ${rec.agentId}`,
