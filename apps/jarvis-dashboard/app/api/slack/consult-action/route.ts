@@ -242,6 +242,7 @@ export async function POST(request: NextRequest) {
         body,
         channelId: meta.channel,
         messageTs: meta.message_ts,
+        actorId: String(((payload.user || {}) as Record<string, unknown>).id || ""),
       });
       if (!result.ok && result.response_action === "errors") {
         return NextResponse.json({
@@ -338,12 +339,14 @@ export async function POST(request: NextRequest) {
 
     const vr = parseVrButtonValue(value);
     if (vr) {
+      const userObj = (payload.user || {}) as Record<string, unknown>;
       const result = await handleVrBlockAction({
         action: vr.action,
         triageId: vr.id,
         triggerId,
         channelId,
         messageTs,
+        actorId: String(userObj.id || userObj.username || ""),
       });
       if (result.kind === "modal_opened") {
         return new NextResponse("", { status: 200 });

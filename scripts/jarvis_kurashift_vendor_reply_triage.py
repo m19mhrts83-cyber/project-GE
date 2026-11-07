@@ -45,6 +45,8 @@ from jarvis_kurashift_vendor_match import (  # noqa: E402
     match_vendor,
 )
 from jarvis_night_triage_general import (  # noqa: E402
+    NOISE_FROM_RE,
+    NOISE_SUBJECT_RE,
     is_kurashift_property_mail,
     is_partner_address,
     load_partner_filters,
@@ -126,6 +128,11 @@ def decode_body(payload: dict) -> str:
     return "\n".join(texts)[:8000]
 
 
+def is_unsafe_vendor_reply_sender(from_email: str, from_raw: str = "") -> bool:
+    """返信先にできない自動通知・noreply差出人か。"""
+    return bool(NOISE_FROM_RE.search(from_email or "") or NOISE_FROM_RE.search(from_raw or ""))
+
+
 def parse_internal_dt(ms: str) -> datetime | None:
     try:
         return datetime.fromtimestamp(int(ms) / 1000, tz=JST)
@@ -179,10 +186,16 @@ def find_vendor_replies(
         from_email = (from_email or "").lower()
         if not from_email or from_email == my_email:
             continue
+        # 自動通知・noreply は業者名が本文に含まれても返信候補にしない。
+        # 2026-10-29: Google通知を丸喜不動産の返信と誤認した事故の再発防止。
+        if is_unsafe_vendor_reply_sender(from_email, from_raw):
+            continue
         if is_partner_address(from_email, partner_emails, partner_domains):
             continue
 
         subject = headers.get("subject") or "(件名なし)"
+        if NOISE_SUBJECT_RE.search(subject):
+            continue
         body = decode_body(payload)
         display = from_raw.split("<")[0].strip().strip('"') or from_email
         vendor = match_vendor(
