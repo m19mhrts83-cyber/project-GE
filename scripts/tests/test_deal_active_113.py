@@ -184,5 +184,49 @@ class RunTests(unittest.TestCase):
         self.assertEqual(c["deferred"], 1)
 
 
+class AskTests(unittest.TestCase):
+    def test_sig_matches_ts_side(self):
+        # apps/jarvis-dashboard/tests/dealActive113.test.mjs と同じ値
+        v = m.d113_value("s3cret", "pass", "11111111-2222-3333-4444-555555555555")
+        self.assertEqual(v, "d113:pass:11111111-2222-3333-4444-555555555555:52900d74dc")
+
+    def test_due_rules(self):
+        self.assertTrue(m.is_due(deal(slack_deal_active={"ts": "1", "next_check_at": "2026-11-06"}), TODAY))
+        self.assertFalse(m.is_due(deal(slack_deal_active={"ts": "1", "next_check_at": "2026-11-07"}), TODAY))
+        self.assertFalse(m.is_due(deal(slack_deal_active={"ts": "1", "next_check_at": "2026-11-01", "state": "closed"}), TODAY))
+        self.assertFalse(m.is_due(deal(slack_deal_active={"next_check_at": "2026-11-01"}), TODAY))
+
+    def test_card_has_four_buttons_per_deal(self):
+        d = deal(slack_deal_active={"ts": "1", "last_moved_at": "2026-10-20"})
+        card = m.build_ask_card([d], TODAY, "s3cret")
+        acts = [b for b in card["blocks"] if b["type"] == "actions"]
+        self.assertEqual(len(acts), 1)
+        self.assertEqual(acts[0]["block_id"], "d113_d1")
+        self.assertEqual([e["action_id"] for e in acts[0]["elements"]], ["d113_continue", "d113_hold", "d113_pass", "d113_done"])
+        self.assertIn("17日動きなし", card["blocks"][2]["text"]["text"])
+
+    def test_asked_state_rechecks_next_week(self):
+        st = m.asked_state({"ts": "1", "asked_count": 1}, TODAY, "9.9")
+        self.assertEqual(st["state"], "needs_check")
+        self.assertEqual(st["asked_count"], 2)
+        self.assertEqual(st["next_check_at"], "2026-11-13")
+        self.assertEqual(st["ask_card_ts"], "9.9")
+
+    def test_sync_never_shortens_button_extension(self):
+        acts = [{"kind": "save", "stage_key": "viewing:candidate", "last_moved_at": "2026-11-06"}]
+        st = m.next_state({"ts": "1", "state": "hold", "next_check_at": "2026-12-06"}, acts, ts=None, today=TODAY)
+        self.assertEqual(st["next_check_at"], "2026-12-06")
+        self.assertEqual(st["state"], "hold")
+
+    def test_run_ask_posts_one_card_and_saves(self):
+        due = deal(slack_deal_active={"ts": "1", "next_check_at": "2026-11-01", "last_moved_at": "2026-10-20"})
+        sb = FakeSB([due, deal() | {"id": "d2"}])
+        slack = FakeSlack()
+        c = m.run_ask(sb, slack, today=TODAY, apply=True, secret="s3cret")
+        self.assertEqual(c["asked"], 1)
+        self.assertEqual(len(slack.calls), 1)
+        self.assertEqual(len(sb.updates), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
