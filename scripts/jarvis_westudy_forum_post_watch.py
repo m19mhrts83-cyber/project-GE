@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """Glucon WeStudy 投稿 watch — KeepAlive 常駐。
 
-Dashboard「e-STUDYに投稿」で status=queued になったら、短いポーリング（既定 3秒）
-＋ Realtime UPDATE で即ドレインする（2時間待ち／手動 worker 不要）。
+Dashboard「e-STUDYに投稿」で status=queued になったら、Realtime UPDATE で即ドレインする
+（2時間待ち／手動 worker 不要）。ポーリングは保険:
+- Realtime 購読中は 30 秒ごと（JARVIS_WESTUDY_FORUM_FALLBACK_POLL_SEC）
+- Realtime が落ちている間だけ 3 秒ごと（JARVIS_WESTUDY_FORUM_POLL_SEC）
+- Supabase が失敗（402 制限・オフライン等）している間は 2 倍ずつ最大 300 秒まで間を空ける
+- sync_meta への heartbeat 書き込みは 300 秒に1回（ローカル state は毎回）
+（2026-11-07 314: 3 秒×3 リクエストを 402 中も打ち続け egress を押し上げていたため）
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_westudy_forum_post_watch.py
@@ -27,6 +32,9 @@ STATE_PATH = REPO / ".jarvis_state" / "westudy_forum_post_watch.json"
 LOCK_PATH = REPO / ".jarvis_state" / "westudy_forum_post_watch.pid"
 WORKER = REPO / "scripts" / "jarvis_westudy_forum_post_worker.py"
 POLL_SEC = int(os.environ.get("JARVIS_WESTUDY_FORUM_POLL_SEC") or "3")
+FALLBACK_POLL_SEC = int(os.environ.get("JARVIS_WESTUDY_FORUM_FALLBACK_POLL_SEC") or "30")
+MAX_BACKOFF_SEC = 300
+HEARTBEAT_DB_EVERY_SEC = 300
 WAKE_NETWORK_WAIT_SEC = 4
 KICK_META_KEY = "westudy_forum_post_kick"
 
@@ -34,6 +42,23 @@ _stop = False
 _wake = threading.Event()
 _drain_lock = threading.Lock()
 _last_kick_seen: str | None = None
+_realtime_ok = False
+_sb_fail_streak = 0
+_last_db_heartbeat = 0.0
+_sb_cached = None
+
+
+def _note_sb(ok: bool) -> None:
+    global _sb_fail_streak
+    _sb_fail_streak = 0 if ok else _sb_fail_streak + 1
+
+
+def next_poll_delay() -> float:
+    """次のポーリングまでの秒数。Realtime 購読中は保険の間隔、失敗が続けば倍々で空ける。"""
+    base = FALLBACK_POLL_SEC if _realtime_ok else POLL_SEC
+    if _sb_fail_streak <= 0:
+        return float(base)
+    return float(min(MAX_BACKOFF_SEC, base * (2 ** min(_sb_fail_streak, 10))))
 
 
 def now_iso() -> str:
@@ -41,13 +66,17 @@ def now_iso() -> str:
 
 
 def sb_client():
-    from supabase import create_client
-
+    global _sb_cached
+    if _sb_cached is not None:
+        return _sb_cached
     url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
     key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
     if not url or not key:
         return None
-    return create_client(url, key)
+    from supabase import create_client
+
+    _sb_cached = create_client(url, key)
+    return _sb_cached
 
 
 def write_heartbeat(**extra: object) -> None:
@@ -69,6 +98,12 @@ def write_heartbeat(**extra: object) -> None:
     STATE_PATH.write_text(
         json.dumps(prev, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+    global _last_db_heartbeat
+    if time.time() - _last_db_heartbeat < HEARTBEAT_DB_EVERY_SEC and not extra:
+        return
+    if _sb_fail_streak > 0 and not extra:
+        return
+    _last_db_heartbeat = time.time()
     try:
         sb = sb_client()
         if sb:
@@ -122,10 +157,12 @@ def queued_count() -> int:
             .limit(1)
             .execute()
         )
+        _note_sb(True)
         if getattr(r, "count", None) is not None:
             return int(r.count or 0)
         return len(r.data or [])
     except Exception as e:
+        _note_sb(False)
         print(f"# queued_count fail: {type(e).__name__}: {e}", flush=True)
         return 0
 
@@ -144,6 +181,7 @@ def kick_meta_changed() -> bool:
             .limit(1)
             .execute()
         )
+        _note_sb(True)
         rows = r.data or []
         if not rows:
             return False
@@ -158,6 +196,7 @@ def kick_meta_changed() -> bool:
             _last_kick_seen = stamp
             return True
     except Exception as e:
+        _note_sb(False)
         print(f"# kick_meta skip: {type(e).__name__}: {e}", flush=True)
     return False
 
@@ -202,14 +241,17 @@ def request_drain(reason: str) -> None:
 
 
 def realtime_thread_main() -> None:
+    global _realtime_ok
     try:
         asyncio.run(_realtime_async())
     except Exception as e:
+        _realtime_ok = False
         print(f"# realtime thread end: {type(e).__name__}: {e}", flush=True)
         write_heartbeat(realtime=f"end:{type(e).__name__}")
 
 
 async def _realtime_async() -> None:
+    global _realtime_ok
     from supabase import create_async_client
 
     url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
@@ -238,10 +280,12 @@ async def _realtime_async() -> None:
         table="glucon_report_drafts",
     )
     await ch.subscribe()
+    _realtime_ok = True
     write_heartbeat(realtime="subscribed")
     print("# realtime subscribed (glucon_report_drafts)", flush=True)
     while not _stop:
         await asyncio.sleep(1)
+    _realtime_ok = False
     try:
         await sb.remove_channel(ch)
     except Exception:
@@ -281,7 +325,7 @@ def main() -> int:
     rt = threading.Thread(target=realtime_thread_main, name="realtime", daemon=True)
     rt.start()
 
-    next_poll = time.time() + POLL_SEC
+    next_poll = time.time() + next_poll_delay()
     while not _stop:
         timeout = max(0.2, next_poll - time.time())
         woke = _wake.wait(timeout=timeout)
@@ -296,11 +340,11 @@ def main() -> int:
                 reason = "kick_meta"
             elif queued_count() <= 0:
                 write_heartbeat()
-                next_poll = time.time() + POLL_SEC
+                next_poll = time.time() + next_poll_delay()
                 continue
         drain_once(reason=reason)
         write_heartbeat()
-        next_poll = time.time() + POLL_SEC
+        next_poll = time.time() + next_poll_delay()
     release_lock()
     return 0
 
