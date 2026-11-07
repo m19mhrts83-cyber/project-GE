@@ -21,3 +21,12 @@ Notion 看板（`/notion`）は `NOTION_API_TOKEN`（正本 `.env.jarvis_private
 - 画面タイトル／ログイン見出しは **KURASHIFT**（`app/layout.tsx` / `login`）
 - ダッシュボード上の表示名を変えるときは Vercel → Project Settings → General → Project Name  
   （例: `kurashift`）。ルート URL を変える場合はドメイン設定も合わせて確認
+
+## 見た目（Personal Board デザインシステム・2026-11-07〜）
+
+- 正本: Claude の Design System「Personal Board」https://claude.ai/artifact/F9dySGWWbRcU6yT3WW4nJj （Jarvis と部品は共通・テーマは別）
+- 実装: `app/theme-kurashift.css` を `globals.css` の後に読み込み、色・背景グラデーション・すりガラスのカード・森の緑のサイドバー・注目カードだけを上書き
+- テーマ: アイボリーの紙＋深い森の緑（`--accent`）＋真鍮（注目）。Jarvis（紺＋シアン）と被せない
+- 書体: 本文はゴシックのまま。**ホームの見出しと「3本の柱」の金額だけ明朝**（Shippori Mincho／ヒラギノ明朝。Web フォントは読み込まず、端末の明朝を使う）
+- アイコン: `components/Icon.tsx`（Jarvis と同じ線アイコン、外部ライブラリなし）。メニューのアイコンは `components/Shell.tsx` の `NAV[].icon`
+- ホーム: 「いまやること」を注目カード（`hq-focus`）、「データの鮮度」は1行に畳む（`hq-fresh`、詳細は開いて見る）、送信ジョブ失敗は控えめな赤枠（`job-fail`）

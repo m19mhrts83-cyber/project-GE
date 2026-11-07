@@ -1,0 +1,346 @@
+/*
+ * KURASHIFT テーマ（Personal Board デザインシステム「kurashift」）
+ * globals.css の後に読み込み、色・背景・カード・サイドバー・注目カード・柱の金額だけを上書きする。
+ * 正本: https://claude.ai/artifact/F9dySGWWbRcU6yT3WW4nJj （tokens.json / bundle.css）
+ * Jarvis（紺＋シアン）とは被せない：アイボリーの紙＋深い森の緑＋真鍮。
+ */
+
+:root {
+  /* Personal Board tokens — kurashift */
+  --surface-0: #f4efe4;
+  --surface-1: #fffdf8;
+  --surface-2: #ede6d6;
+  --side-bg: #13302a;
+  --side-text: #f2ede1;
+  --side-muted: #a9bdb3;
+  --pb-line: #ddd3bf;
+  --pb-ink: #1b2420;
+  --pb-ink-muted: #5e665f;
+  --green: #1f6b52;
+  --green-bright: #5fc79d;
+  --green-soft: #e1eee6;
+  --brass: #8a5a00;
+  --brass-bright: #e2b65a;
+  --brass-soft: #f6e7c4;
+  --alert: #a8321f;
+  --font-serif: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  --shadow-card: 0 1px 2px rgba(27, 36, 32, 0.06), 0 10px 28px rgba(60, 48, 20, 0.07);
+  --shadow-focus: 0 0 0 1px rgba(138, 90, 0, 0.35), 0 12px 32px rgba(138, 90, 0, 0.12);
+
+  /* 既存変数を新しい色に寄せる（globals.css 全体に効く） */
+  --bg: var(--surface-0);
+  --bg-wash: #fffaf0;
+  --ink: var(--pb-ink);
+  --muted: var(--pb-ink-muted);
+  --line: var(--pb-line);
+  --line-strong: #c9bca2;
+  --card: var(--surface-1);
+  --card-soft: #f8f3e8;
+  --accent: var(--green);
+  --accent-deep: #174f3d;
+  --accent-soft: var(--green-soft);
+  --ink-blue: var(--green);
+  --high: var(--alert);
+  --ok: var(--green);
+  --med: var(--brass);
+  --side: var(--side-bg);
+  --side-ink: var(--side-text);
+  --radius: 12px;
+  --shadow: var(--shadow-card);
+}
+
+.pb-i {
+  flex: none;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ---------- 背景：アイボリーの紙に真鍮と緑の光 ---------- */
+body {
+  background-color: var(--surface-0);
+  background-image:
+    radial-gradient(900px 520px at 92% -10%, color-mix(in srgb, var(--green-bright) 18%, transparent), transparent 62%),
+    radial-gradient(700px 480px at 20% 110%, color-mix(in srgb, var(--brass-bright) 22%, transparent), transparent 60%),
+    linear-gradient(180deg, #fffaf0 0%, var(--surface-0) 55%);
+  background-attachment: fixed;
+}
+
+a:hover {
+  color: var(--accent-deep);
+}
+
+/* ---------- サイドバー：深い森の緑＋アイコン ---------- */
+.sidebar {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--green-bright) 12%, var(--side-bg)) 0%, var(--side-bg) 40%);
+  color: var(--side-muted);
+  border-right: 1px solid rgba(242, 237, 225, 0.08);
+}
+
+.side-brand-block {
+  border-bottom-color: rgba(242, 237, 225, 0.12);
+}
+
+.side-brand-mark {
+  gap: 10px;
+}
+
+.pb-logo {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: #13302a;
+  background: linear-gradient(145deg, #f3dc9e, var(--brass-bright));
+  box-shadow: 0 6px 18px rgba(226, 182, 90, 0.35);
+  flex-shrink: 0;
+}
+
+.side-brand {
+  color: var(--side-text);
+}
+
+.side-brand-ja,
+.side-tagline {
+  color: var(--side-muted);
+}
+
+.side-group-title {
+  color: rgba(169, 189, 179, 0.9);
+  letter-spacing: 0.12em;
+}
+
+.side-group-title--rule,
+.side-footer {
+  border-top-color: rgba(242, 237, 225, 0.12);
+}
+
+.side-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--side-muted);
+  font-size: 0.9rem;
+  padding: 7px 10px;
+}
+
+.side-link:hover:not(.active) {
+  background: rgba(242, 237, 225, 0.07);
+  color: var(--side-text);
+}
+
+.side-link.active {
+  color: var(--side-text);
+  font-weight: 600;
+  background: linear-gradient(90deg, rgba(95, 199, 157, 0.26), rgba(95, 199, 157, 0.06));
+  border-color: rgba(95, 199, 157, 0.32);
+}
+
+.side-link.active .pb-i {
+  color: var(--green-bright);
+}
+
+.side-footer .meta {
+  color: var(--side-muted);
+}
+
+/* ---------- 見出し ---------- */
+.page-kicker {
+  color: var(--brass);
+}
+
+.page-kicker::before {
+  background: var(--brass-bright);
+}
+
+h1.hq-title {
+  font-family: var(--font-serif);
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* ---------- カード：すりガラス ---------- */
+.card,
+.notice {
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  backdrop-filter: blur(14px) saturate(130%);
+  border-color: color-mix(in srgb, var(--pb-line) 85%, transparent);
+  box-shadow: var(--shadow-card);
+}
+
+.lvl {
+  color: var(--green);
+}
+
+/* ---------- ボタン ---------- */
+.btn.primary {
+  background: linear-gradient(180deg, #2b8467, var(--green));
+  border-color: var(--green);
+  color: #fffdf8;
+  box-shadow: 0 6px 16px rgba(31, 107, 82, 0.22);
+}
+
+/* ---------- 注目カード（いまやること） ---------- */
+.card.hq-focus {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px 18px;
+  margin-top: 12px;
+  padding: 22px 24px;
+  border: 1px solid color-mix(in srgb, var(--brass) 50%, transparent);
+  border-radius: 18px;
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--brass-bright) 34%, #fffdf8) 0%,
+    color-mix(in srgb, var(--brass-bright) 12%, #fffdf8) 45%,
+    rgba(255, 253, 248, 0.88) 100%
+  );
+  box-shadow: var(--shadow-focus);
+}
+
+.card.hq-focus::after {
+  content: "";
+  position: absolute;
+  right: -80px;
+  top: -120px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--brass-bright) 34%, transparent), transparent 70%);
+}
+
+.card.hq-focus > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hq-focus .pb-ficon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  color: #fffdf8;
+  background: linear-gradient(145deg, #c08a2a, var(--brass));
+  box-shadow: 0 8px 22px rgba(138, 90, 0, 0.28);
+}
+
+.hq-focus.is-warn .pb-ficon {
+  background: linear-gradient(145deg, #c9563f, var(--alert));
+}
+
+.hq-focus .pb-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--brass);
+  margin-bottom: 2px;
+}
+
+.hq-focus-title {
+  display: block;
+  font-size: 1.15rem;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.hq-focus-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  background: linear-gradient(180deg, #a87515, var(--brass)) !important;
+  border-color: var(--brass) !important;
+  box-shadow: 0 6px 18px rgba(138, 90, 0, 0.28) !important;
+}
+
+@media (max-width: 720px) {
+  .card.hq-focus {
+    grid-template-columns: auto 1fr;
+    padding: 16px;
+    overflow: hidden;
+  }
+
+  .hq-focus-btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+/* ---------- データの鮮度：1行に畳む ---------- */
+details.hq-fresh {
+  margin-top: 12px;
+  padding: 12px 18px;
+}
+
+details.hq-fresh > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+details.hq-fresh > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.hq-fresh > summary::after {
+  content: "詳細 ▾";
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+details.hq-fresh[open] > summary::after {
+  content: "閉じる ▴";
+}
+
+.hq-fresh-state {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.hq-fresh-state.is-bad {
+  color: var(--alert);
+  background: color-mix(in srgb, var(--alert) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--alert) 40%, transparent);
+}
+
+/* ---------- 3本の柱：明朝の大きな金額 ---------- */
+.card.hq-pillar header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.card.hq-pillar header strong {
+  font-family: var(--font-serif);
+  font-size: 1.9rem;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 送信ジョブの失敗：注目カードと競わない控えめな警告 ---------- */
+.card.job-fail {
+  border-color: color-mix(in srgb, var(--alert) 38%, var(--pb-line));
+}
+
+.card.job-fail .lvl {
+  color: var(--alert);
+}
