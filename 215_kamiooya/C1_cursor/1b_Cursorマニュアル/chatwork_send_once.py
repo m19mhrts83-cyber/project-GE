@@ -43,6 +43,10 @@ ROOM_ALIASES = {
     "group": "439357504",
     "スクール": "439357504",
     "グループ": "439357504",
+    "watabe": "410050275",
+    "渡部": "410050275",
+    "わたべ": "410050275",
+    "わたなべ": "410050275",
 }
 
 
@@ -122,7 +126,7 @@ def resolve_room(partner: dict, *, room: str | None, room_id: str | None) -> tup
         if not rid:
             print(
                 f"エラー: --room '{room}' を解決できません。"
-                " meguro（目黒 啓太）または group（スクール運営グループ）を指定してください。",
+                " meguro（目黒）/ group（スクール運営）/ watabe（渡部 拓哉）を指定してください。",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -138,6 +142,7 @@ def resolve_room(partner: dict, *, room: str | None, room_id: str | None) -> tup
     print("エラー: Chatwork 送信先が複数あります。--room を指定してください。", file=sys.stderr)
     print("  目黒さん（1:1）     → --room meguro", file=sys.stderr)
     print("  スクール運営グループ → --room group", file=sys.stderr)
+    print("  渡部さん（1:1）     → --room watabe", file=sys.stderr)
     for rid in room_ids:
         print(f"    room_id={rid}  名前: {names.get(rid, '（未設定）')}", file=sys.stderr)
     sys.exit(1)
@@ -176,7 +181,7 @@ def main():
     parser = argparse.ArgumentParser(description=f"{FOLDER_806} の Chatwork 送信")
     parser.add_argument(
         "--room",
-        help="送信先: meguro=目黒 啓太（1:1）, group=【神大家】松野さん・スクール運営社員",
+        help="送信先: meguro=目黒 啓太（1:1）, group=スクール運営, watabe=渡部 拓哉（1:1）",
     )
     parser.add_argument("--room-id", help="room_id を直接指定（上級者用）")
     args = parser.parse_args()
