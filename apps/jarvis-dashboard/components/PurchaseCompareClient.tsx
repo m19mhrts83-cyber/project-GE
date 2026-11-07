@@ -570,6 +570,41 @@ export default function PurchaseCompareClient() {
                     </div>
                   </dl>
                 )}
+                {(c.referenceLinks?.length || c.amazonUrl) &&
+                editingId !== c.id ? (
+                  <div
+                    className="meta"
+                    style={{
+                      display: "grid",
+                      gap: 4,
+                      marginTop: 2,
+                      paddingTop: 6,
+                      borderTop: "1px solid var(--line)",
+                    }}
+                  >
+                    {c.referenceLinks?.map((r) => (
+                      <a
+                        key={r.url}
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "var(--accent)", wordBreak: "break-all" }}
+                      >
+                        根拠: {r.label} ↗
+                      </a>
+                    ))}
+                    {c.amazonUrl ? (
+                      <a
+                        href={c.amazonUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "var(--accent)", wordBreak: "break-all" }}
+                      >
+                        Amazonで見る ↗
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   className="btn"
