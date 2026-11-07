@@ -86,3 +86,4 @@ ID: **611**。〔Grok:Resource〕ミックス。報告先: Slack `#ops`（判断
 |---|---|
 | 2026-10-09 | Phase D スタブ |
 | 2026-10-10 | 使用状況把握＋レビュー連動の頻度コントロールを役割に追加 |
+| 2026-11-06 | 実装 第1弾: `scripts/jarvis_ai_usage_weekly.py`（Claude Code・Codex はローカルログ、Cursor・GenCode・ChatGPT は手入力）。314 の土曜 runner に相乗り。Supabase は案のみ（`output/20261106_実装1_使用量集計の結果.md`） |

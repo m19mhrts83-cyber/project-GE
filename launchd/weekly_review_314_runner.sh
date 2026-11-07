@@ -10,4 +10,6 @@ set -a
 source "$REPO_DIR/.env.jarvis_private"
 set +a
 PY="${JARVIS_PYTHON:-/Users/matsunomasaharu2/selenium_env/venv/bin/python}"
+# 611 AI 使用量の週次集計（相乗り。失敗しても 314 は止めない。Supabase へは写さない＝--push なし）
+"$PY" "$REPO_DIR/scripts/jarvis_ai_usage_weekly.py" >/dev/null || echo "611 ai_usage_weekly failed" >&2
 exec "$PY" "$REPO_DIR/scripts/jarvis_weekly_review_314.py" --post
