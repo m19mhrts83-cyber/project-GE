@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import Icon from "@/components/Icon";
 import CleanupClient from "@/components/CleanupClient";
 
 export default async function Page313({
@@ -13,17 +14,15 @@ export default async function Page313({
 
   return (
     <main>
-      <nav className="nav">
-        <Link href="/">ハブ</Link>
-        <span>／</span>
-        <Link href="/312">312</Link>
-        <span>／</span>
-        <strong>313</strong>
-      </nav>
-      <h1>313 出口・片付ける</h1>
-      <p className="sub">
-        Slack 3択が本線。ここでは直す・一覧・閉じ漏れ。やめる＝完了＋コメント。
-      </p>
+      <div className="top">
+        <Link className="back" href="/" aria-label="ハブへ戻る">
+          <Icon name="back" size={22} />
+        </Link>
+        <div className="grow">
+          <div className="eyebrow acc">313 ／ 出口</div>
+          <h1>片付ける</h1>
+        </div>
+      </div>
       <Suspense fallback={<p className="meta">読み込み中…</p>}>
         <CleanupClient
           initialTaskId={taskId}
