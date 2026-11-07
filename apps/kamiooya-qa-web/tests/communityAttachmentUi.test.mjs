@@ -83,6 +83,23 @@ for (const source of sources) {
     resolve({ok:true,text:async()=>JSON.stringify({relatedOpenchat:[{id:'old-user-data'}]})});
     await pending;assert.equal(app.state.openchatLogs.length,0);
   });
+  test(source.pathname + ': changing LINE search ignores an older response arriving last',async()=>{
+    const pending=[],starts=[];
+    const app=load(source,()=>new Promise(resolve=>{pending.push(resolve);if(starts[pending.length-1])starts[pending.length-1]();}));
+    app.resolveSemanticConfig=async()=>({url:'https://gateway.example',secret:'fixture'});
+    app.elements.openchatSearchInput={value:'old.pdf'};
+    app.renderOpenchatTitleFilterOptions=()=>{};
+    const rendered=[];app.renderOpenchatTable=()=>rendered.push(app.state.openchatLogs[0].id);
+    const firstStarted=new Promise(r=>{starts[0]=r;});
+    const older=app.loadOpenchatLogs();await firstStarted;
+    app.elements.openchatSearchInput.value='new.pdf';
+    const secondStarted=new Promise(r=>{starts[1]=r;});
+    const newer=app.loadOpenchatLogs();await secondStarted;
+    const result=id=>({ok:true,text:async()=>JSON.stringify({relatedOpenchat:[{id}]})});
+    pending[1](result('new'));await newer;
+    pending[0](result('old'));await older;
+    assert.equal(app.state.openchatLogs[0].id,'new');assert.deepEqual(rendered,['new']);
+  });
   test(source.pathname + ': large comment lists remain paged and exact search reaches old attachments', () => {
     const app = load(source);
     app.state.comments = Array.from({length: 250}, (_,i) => ({comment_id: String(20000+i), content: 'body', author_name: 'author'}));
