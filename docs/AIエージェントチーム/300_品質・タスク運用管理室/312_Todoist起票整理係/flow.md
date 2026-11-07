@@ -6,11 +6,12 @@
 - FlowForge（閲覧／編集）: [flow_M8SvKC1IDTDi496Vw-DgGjpD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD)
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
-- 更新: 2026-10-22（Phase2 ボタン本線・GAS見送り）
+- 更新: 2026-11-07（ループウェア入口・apps/loopware）
 
 ## いまの結論（文字1行）
 
-材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult`（**起票／見送りボタン**または番号）→ **採用時に Todoist へ create**。ホーク・AI同士の直入れは L0 で維持。**Todoist起票の本線は312**。close は 313。GAS 5分 poll は見送り。
+材料できたとき即スキャン → 塩梅（L0静かに／L1ダイジェスト見るだけ／L2個別採用・見送り）→ Slack `#consult`（**起票／見送りボタン**または番号）→ **採用時に Todoist へ create**。ホーク・AI同士の直入れは L0 で維持。**Todoist起票の本線は312**。close は 313。GAS 5分 poll は見送り。  
+**迷い・重複はループウェア**（`apps/loopware` `/312`・S05）経由可。単純起票／見送りは Slack のまま。
 
 ## Todoistへの登録動線（出口・必読）
 
