@@ -87,7 +87,7 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 2. L1 で Ack／分類。確認のみは 313 候補化可（二段維持）
 3. Phase B・許可リスト命中時のみ L2
 4. Slack は **内容が変わったときだけ** 完了1通。Todoist には `【AIチーム】` コメント
-5. Slack FB スレの「受けた → 対応した」は毎晩 19:45 起動の `slack-fb-daily`（20:10 ごろまでに返信）（Miss Lemon）。手順は [`40_`](../../40_Slack報告FB_スレ拾い_20261020.md) Phase 2
+5. Slack FB スレの「受けた → 対応した」は毎晩 19:45 起動の `slack-fb-daily`（20:10 ごろまでに返信）（Miss Lemon）。同タスクは当日 `#consult` ルートの「要ボス」＋Jarvis依頼も確認し、判断用Todoistが無ければ重複確認後に起票する（対外送信はしない）。手順は [`40_`](../../40_Slack報告FB_スレ拾い_20261020.md) Phase 2
 
 
 ## 7. 改善ログ
@@ -98,6 +98,7 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 | 2026-10-22 | 対応可視性（L1 見たよ／👀・L2 対応したよ）を 40_ と揃える |
 | 2026-10-23 | #report 同一 fingerprint 連投防止。webhook 返信1件失敗でバッチ中断しない。滞留 `note:added` 消化＋cleanup CLI |
 | 2026-10-25 | 名乗りを `【AIチーム】` に。FB の「ラベルを付けて再送」依頼と投稿末尾の FB 案内をやめる。毎日の FB 対応（`slack-fb-daily`・`--pending`／`--done`）を追加。記録は `output/YYYYMMDD_FB対応.md` |
+| 2026-10-30 | `#consult` ルートの要ボス／Jarvis依頼がTodoistに落ちない穴を確認。`slack-fb-daily` の当日スキャンと重複確認付き判断用起票を追加 |
 
 ## 4. #report の形（2026-10-25 iPhone 見直し）
 
