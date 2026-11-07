@@ -1,63 +1,13 @@
-# PROGRESS — Todoist起票整理係（312）
+# 312 PROGRESS
 
-作業を再開したらこのファイルを先に読む。
+更新: 2026-11-07
 
-## 2026-10-21 — 運用確認へ格上げ
+## ループウェア実装
 
-- registry `status`: 設計中 → **運用確認**（松野「ステータス更新して」）
-- ダッシュ: `jarvis_agent_team_status_sync.py` → `agentTeam.json`
-
-## 2026-10-21 — 意図OK（Phase1＋1.5a）
-
-- 受け入れ: 松野「意図オーケー」→ Phase1（digest本線）＋1.5a（ノイズ抑制ルール）を **意図OK**
-- 通し create（#consult 番号了承→apply）は運用時任意。必須ゲートではない
-- commit: `752024fa`
-
-## 2026-10-21 — Phase 1.5a（ノイズ抑制ルール）
-
-- やったこと: `.cursor/rules/jarvis-chat-open-tasks-312.mdc`。受け入れ済・未完了・最大5・無言create禁止。GenCodeは#ai-hub/inbox経由
-- できたもの: ルール＋`chat_open_tasks_inbox.example.md`＋flow/CLAUDE追記
-- 次の一手: 1.5b は別了承後
-
-## 2026-10-21 — Phase 1 実装
-
-- やったこと: `scripts/jarvis_todoist_312_digest.py` 追加。SB+GenMail候補→#consult L1投稿。了承後 `--apply --select N` で①create
-- できたもの: digest スクリプト・state `todoist_312_digest.json`・初回 #consult 投稿
-- 次の一手: 運用で番号了承時に apply。Phase 2 は L2 ボタン
-
-## 2026-10-21 — FlowForge伴走開始
-
-- やったこと: 設計（A/B/C）・flow.md・FlowForge・登録動線①②③
-- できたもの: `flow.md` / `CLAUDE.md` / FlowForge URL
-
-## 運用格上げタイミング（確定 2026-10-21）
-
-ノイズ爆発を避けるため、**コード意図OK ≠ すぐ定時自動化**。段階で格上げする。
-
-| 段階 | いつから | 何が「運用」になるか | まだやらない |
-|---|---|---|---|
-| **A 今すぐ（済）** | 2026-10-21〜 | 1.5a ルール常時（チャット残→L1候補のみ・無言create禁止）。人手／会話で `312_digest` 可 | launchd 定時なし |
-| **B ソフト運用** | **2026-10-22（翌朝）〜** | パートナー確認・セッション区切りの**ついで**に digest（`--dry-run` または本投稿）。了承番号だけ `--apply` | 毎日自動投稿しない |
-| **C 定時ダイジェスト** | **初回「起票して N」成功の翌日**、または **2026-10-28** の早い方（ノイズ苦情が無ければ） | 週2〜3回 or 隔日の digest→#consult（launchd／GHA どちらか最小） | 毎時・毎日大量は禁止 |
-| **D 1.5b** | **C が1週間安定**したあと（目安 **2026-11-04以降**）＋松野了承 | transcripts差分→L1候補 | いきなり全会話スクレイプ |
-| **E Phase2/3** | Dのあと、または `#consult` テキスト了承が痛いとき | L2ボタン／材料即時 | C未達で急がない |
-
-**停止**: `#consult` がノイズと感じたら `JARVIS_TODOIST_312_DIGEST_DISABLE=1`（digest／Slack投稿のみ停止。`--apply` は可）。ルール1.5aは残してよい。
-
-## 2026-10-22 — Phase 2（Slack ボタン）＋GAS 見送り
-
-- **GAS**（PR #118）: クローズ／見送り確定（Cloud 不可・ボタンで代替）
-- **本線**: 313 同型 Block Kit（起票／見送り）＋署名 URL `/api/g/t312/`＋`consult-action`
-- **実装**: PR [#127](https://github.com/m19mhrts83-cyber/project-GE/pull/127)（`jarvis_todoist_312_slack_blocks.py`／`todoist312SlackAction.ts`）
-- **番号返信**（`起票して N`）・CLI `--apply --select` は互換維持
-- 物件問合せ Mac スリープ耐性: Vercel failover（[`45_`](../../45_物件問合せ_Vercel送信冗長_20261022.md)）
-
-## ロードマップ
-
-| Phase | 内容 | 状態 |
-|---|---|---|
-| 1 | L1ダイジェストを #consult に出し、了承後 create | **意図OK**（2026-10-21） |
-| 1.5a | チャット残→L1候補ルール（ノイズ抑制） | **意図OK・運用A**（2026-10-21） |
-| 1.5b | transcripts差分→digest | 運用D（了承後） |
-| 2 | L2 採用／見送りボタン（313同型） | **済**（2026-10-22・#127） |
-| 3 | 材料即時トリガー＋定期取りこぼし | 運用E |
+- [x] 入口設計 docs／CLAUDE／flow／設計書コピー
+- [x] Supabase `task_loop_*` migration（`20261107_task_loop.sql`）
+- [x] `apps/loopware` `/312`（S05・シード3・localStorage＋API）
+- [x] `prompts/proposal.md`
+- [x] 拾い漏れスキャン `jarvis_todoist_312_miss_scan.py`／`/312?tab=misses`
+- [ ] 本番 Vercel デプロイ＋Chrome 受け入れ確認（松野）
+- [ ] 段階3: 単純確定の Slack 完結（ログ十分後）

@@ -1,5 +1,15 @@
 # AGENTS.md
 
+## 神大家運営の新規作業（2026-10-29）
+
+さくらいふ株式会社／神・大家さん倶楽部運営に関する新規の有償作業は、概算工数・安全係数・概算金額を提示し、メールまたはChatworkで運営の承認を得てから着手する。未承認の可能性があれば、AI側から「見積もり・運営承認は済んでいますか」と指摘し、過去実績に基づく見積案を出す。詳細の正本: `docs/神大家運営_新規作業の事前見積もり承認ルール_20261029.md`。
+
+作業中は累計実績＋残工数から完了見込みを更新し、超過・2割以上超過見込みを記録して松野さんへ調整案を出す。詳細は同じ正本の「着手後の工数と超過見込みの記録」。表示先は松野さん個人のJARVIS Dashboardで、運営との共有・運営への開発費請求は前提にしない。
+
+## AI使用量とツール選択（2026-10-28）
+
+同じ品質・安全性なら、AI使用量と追加費用が少ない順で進める。原則は、取得済み記録・専用スクリプト → 公式API／コネクタ／MCP／CLI → DOM等を直接読める内蔵ブラウザ／Chrome → スクリーンショット中心のComputer Use → 重いモデル・従量課金。Web作業は内蔵ブラウザを第一候補にするが、構造化経路の方が軽く確実ならそちらを優先する。重い経路へ上げた場合は理由を一言報告する。正本: `docs/AIエージェントチーム/49_共通ルール_AI使用量と入力_20261024.md`。
+
 ## ツール間の引き継ぎ（2026-10-26）
 
 JARVIS/Claude Code由来の案件をCodexが続行したら、各ターンの最終報告前に `/Users/matsunomasaharu2/git-repos/agent-handoff/` の元担当宛てメモを更新する（Claude Code→`to_MissLemon/`、Cursor→`to_Jarvis/`）。起点はユーザー指定・元会話で確認する。受取側は再開時に現在の案件のpendingを読み、実変更を確認して続行する。詳細の正本: `docs/AIエージェントチーム/51_ローカル受け渡し_20261026.md`。別worktreeでも上記絶対パスを使う。
@@ -20,6 +30,7 @@ Notion に議事録を残すときは、Genspark 等の要約をそのまま貼�
 | `apps/jarvis-dashboard` | Next.js 15 (認証ダッシュボード) | 3001 | 下記の env を渡して `npm run dev` |
 | `apps/prompt-share` | Next.js 16 (チャプロ代替プロンプト共有) | 3002 | `cd apps/prompt-share && npm run dev`（本番: https://prompt-share-taupe.vercel.app） |
 | `apps/trade-desk` | Next.js 15 (KURASHIFT・ライフプラン／資産HQ) | 3003 | 下記の env を渡して `npm run dev` |
+| `apps/loopware` | Next.js 15 (312/313 判断 UI) | 3004 | `cd apps/loopware && npm run dev`（ダッシュは外部リンクのみ） |
 | ルート静的サイト | 素の HTML/JS（Google Maps） | 8000 | `python3 -m http.server 8000`（`index.html`） |
 
 - Node は v22 系。依存は各アプリで `npm install`（lockfile は `package-lock.json` = npm）。標準コマンドは各 `README.md` 参照。

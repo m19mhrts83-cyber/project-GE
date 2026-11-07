@@ -18,6 +18,12 @@ export const TRADE_DESK_URL =
 
 export const KURASHIFT_URL = TRADE_DESK_URL;
 
+/** 312/313 判断 UI（別アプリ。ダッシュにルートを足さない） */
+export const LOOPWARE_URL =
+  process.env.NEXT_PUBLIC_LOOPWARE_URL ||
+  process.env.JARVIS_LOOPWARE_URL ||
+  "https://loopware.vercel.app";
+
 /**
  * B+A: グループ見出し＋分かりやすい名前。
  * ホームはサイドバー最上段に固定（「見る」より前。他項目をホームより上に差し込まない）。
@@ -53,6 +59,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/materials", label: "資料ハブ", icon: "folder" },
       { href: "/kiso-transcripts", label: "基礎講座・文字起こし", icon: "book" },
       { href: "/purchase-compare", label: "購入比較", icon: "cart" },
+      { href: LOOPWARE_URL, label: "ループウェア（312/313）", external: true, icon: "grid" },
       { href: "/apps", label: "アプリ・プロンプト集", icon: "grid" },
       { href: "/agent-team", label: "AIエージェントチーム", icon: "bolt" },
       { href: "/notebooklm", label: "NotebookLM", icon: "book" },

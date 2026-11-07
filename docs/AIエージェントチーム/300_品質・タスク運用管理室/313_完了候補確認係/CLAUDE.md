@@ -5,25 +5,36 @@
 ビルダー「物件と連絡の見守り隊」由来。Todoist の完了候補を仕分けし、**確認のみは自動クローズ**、**要判断だけ人に残す**。  
 **Todoist完了の本線は313**（起票は312）。作業フロー正本: [`flow.md`](./flow.md)
 
+### ループウェア（2026-11-07〜）
+
+- 意図: **外で済んだ作業**と Todoist カードを紐づけ、根拠コメント付きで消し込み／残件のいつ・優先を決める
+- 設計: [`docs/ループウェア_出口設計_20261107.md`](./docs/ループウェア_出口設計_20261107.md)
+- Slack: 「313 片付け」**3択**（済んだ／いつ・優先／やめる）。要判断は済んだに載せない
+- UI: **`apps/loopware` `/313`**（直す・一覧）。ダッシュ新ルートなし
+- ログ: `owner_decisions`＋Todoistコメント。改善→プロンプト**と**プログラム
+- iPhone: **Chrome**
+
 ## AIオートメーション（作業フロー）
 
 - **FlowForge（開く）**: [flow_6s1nyBIKzluSsdgR-hs9IolD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_6s1nyBIKzluSsdgR-hs9IolD)
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
 - 設計の流れ図: [`flow.md`](./flow.md)（微修正はここを見て人が直す）
 - Phase1: [`docs/phase1-l1-digest.md`](./docs/phase1-l1-digest.md)
-- CLI: `scripts/jarvis_todoist_313_digest.py`（完了候補）／`scripts/jarvis_todoist_313_overdue.py`（期日超過の整理）
+- CLI 本線: `scripts/jarvis_todoist_313_cleanup.py`（片付け3択1通）
+- 互換: `jarvis_todoist_313_digest.py`／`jarvis_todoist_313_overdue.py`
+- 段階0: `jarvis_todoist_313_stage0_clear.py`／外済み: `jarvis_todoist_313_done_elsewhere.py`
 - Cursor skill: `todoist-batch-sweep`（`.cursor/skills/todoist-batch-sweep/`）
 - Cursor コマンド: `/todoist-batch`（掃除・並列）／入口俯瞰は `/todoist`
 - Cursor ルール: `jarvis-todoist-batch-sweep.mdc` / `jarvis-todoist-owner-confirm.mdc` / `jarvis-chat-open-complete-313.mdc`
 - 起票側: [`312_Todoist起票整理係`](../312_Todoist起票整理係/CLAUDE.md)
 
-## 0. 期日超過の整理（2026-10-22〜）
+## 0. 片付け（2026-11-07〜・段階1本線）
 
-- 毎日20:00の2通目。**期限が今日より前**のタスクを上位**5件**に順位づけし、新期日案を `#consult` へ（完了候補とは**別投稿**）
-- 番号は **📅N**（完了候補の **✅N** と区別）。返信「リスケ 📅3,📅5」
-- 期日は了承後だけ動かす（`--apply --select 📅N`）。コメント必須
-- Slack返信拾い: `scripts/jarvis_todoist_313_slack_ingest.py`（✅→close／📅→リスケ）
-- 期限なしは対象外。完了（close）は本体フロー（下記）
+- 毎日20:00 **1通**「313 片付け」。上位5件に **✅済んだ／📅いつ・優先／🗑やめる**（推し★）
+- やめる＝物理削除せず完了＋コメント。要判断は「済んだ」に載せない
+- アプリ: loopware `/313?task=`（Chrome）
+- 段階0棚卸し後に超過≤10を目指す。旧 ✅／📅 2通は互換残置
+- Slack返信拾い: `jarvis_todoist_313_slack_ingest.py`（互換）＋ボタン `/api/g/t313/{close|reschedule|drop}`
 
 ## 1. 役割
 

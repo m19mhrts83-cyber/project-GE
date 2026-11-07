@@ -1,74 +1,21 @@
-## 2026-10-22 — L2ボタン（完了／提案日へ延期）
+# 313 PROGRESS
 
-- Block Kit: 「完了する」「→MM-DD へ延期」（Bot `action_id` → `consult-action`）
-- URL予備: `/api/g/t313/close|reschedule/{task_id}`（開いただけでは実行せず確認画面）
-- Todoistタイトルリンクは詳細確認のみ（アクションにしない）
+更新: 2026-11-07
+
+## ループウェア実装（進行中→本線化）
+
+- [x] 出口設計 docs／CLAUDE／flow
+- [x] Slack「313 片付け」3択（済んだ／いつ優先／やめる）＋`owner_decisions` payload
+- [x] `scripts/jarvis_todoist_313_cleanup.py`／runner 切替
+- [x] 外で済んだ検知: `scripts/jarvis_todoist_313_done_elsewhere.py`
+- [x] 段階0棚卸し: `scripts/jarvis_todoist_313_stage0_clear.py`（要確認は松野・applyは了承後）
+- [x] drop アクション: `/api/g/t313/drop`＋Block Kit
+- [x] loopware `/313`
+- [ ] 段階0 apply で超過≤10（人了承）
+- [ ] 段階3: 高信頼型のみ auto-close（`jarvis_loopware_stage3_rules.py` 草案）
+
+## 既存
+
 - ヘルパー: `jarvis_todoist_313_slack_blocks.py` ／ TS: `todoist313SlackAction.ts`
-
-## 2026-10-22 — Slack番号明記・5件・✅/📅区別
-
-- 書き出し: `【相談】313 完了候補確認`／Webhook `313 完了候補確認`
-- 上限: 完了候補・期日超過とも **最大5件**（旧10）
-- 記号: 完了=**✅N**／期日=**📅N**・**別投稿**（番号返信の取り違え防止）
 - 返信拾い: `scripts/jarvis_todoist_313_slack_ingest.py`（✅→close／📅→リスケ）
-
-## 2026-10-22 — 期日超過の整理を追加（第2機能）
-
-- `scripts/jarvis_todoist_313_overdue.py`: 期限切れを順位づけ→上位＋新期日案を `#consult`（投稿済み）
-- 返信「リスケ 📅3,📅5」→ `--apply --select` で due_date 移動＋`【FRIDAY】`コメント
-- 20:00 runner を2本立てに（完了候補 → 期日整理。どちらも自動変更なし）
-- 新期日: 〜7日超過=+2営業日／8〜30日=+7日／31日+=+14日（土日は翌営業日）
-
-## 2026-10-21 — 夜20:00ソフト運用開始（FRIDAY 実行）
-
-- 稼働: launchd `com.matsunoma.jarvis.todoist-313-digest`（毎日20:00・0件なら投稿しない・自動closeなし）
-- runner: `launchd/jarvis_todoist_313_digest_runner.sh`（`TODOIST_313_AUTHOR=FRIDAY`）
-- flow.md に「開始トリガー」節を新設。未実装から「専用定時ジョブ」を削除
-- 組織図（ダッシュ）: 313 を 運用確認 / 時間＋イベント / 「毎日20:00（＋完了相当の即時）」に更新
-
-## 2026-10-21 — Phase2: 「閉じて N」実弾テスト（#5）
-
-- `--apply --select 5` で1件をコメント付き close（checked=true を API で確認）／`#report` 通知
-- 修正: 完了コメント先頭の自動前置で `【FRIDAY】` が2番目にずれていた → `jarvis_todoist_api.py` を修正＋既存コメント更新
-
-## 2026-10-21 — Slack可読性・詳細動線
-
-- 名称を Todoist完了候補確認に統一。1件ごとに空行、タイトル＝Todoistリンク、番号返信の型
-
-# PROGRESS — 完了候補確認係（313）
-
-作業を再開したらこのファイルを先に読む。
-
-## 2026-10-21 — ステータス再確認（運用確認維持）
-
-- registry: **運用確認**維持。FlowForgeを実装同型に同期。L1＝残件把握（見てもcloseしない）を明文化
-- ダッシュ: status sync で `agentTeam.json` 更新
-
-## 2026-10-21 — Phase1＋flow正本（312同型）
-
-- やったこと: `flow.md` を本線化。`jarvis_todoist_313_digest.py`（L1→#consult→了承後close／確認のみauto）。運用格上げA〜E
-- できたもの: digest・state・CLAUDE／docs／Drive同期
-- 次の一手: Bソフト運用（翌朝〜）。通しは「閉じて N」または `--auto-close-confirm` を運用で
-
-## 運用格上げタイミング（確定 2026-10-21）
-
-ノイズ爆発を避けるため、**コード有 ≠ すぐ定時自動化**。312と同型の段階格上げ。
-
-| 段階 | いつから | 何が「運用」になるか | まだやらない |
-|---|---|---|---|
-| **A 今すぐ** | 2026-10-21〜 | skill／batch-sweep ルール。人手で `313_digest` 可 | launchd 定時なし |
-| **B ソフト運用** | **2026-10-22（翌朝）〜** | パートナー確認・セッション区切りの**ついで**に digest（dry-run可）。確認のみは `--auto-close-confirm` を慎重に | 毎日自動投稿しない |
-| **C 定時ダイジェスト** | **初回通し成功の翌日**、または **2026-10-28** の早い方（ノイズ苦情が無ければ） | 週2〜3回 or 隔日の digest→#consult | 毎時・毎日大量は禁止 |
-| **D 分類強化** | **C が1週間安定**したあと（目安 **2026-11-04以降**）＋了承 | ラベル／コメント印で誤分類を減らす | いきなり全自動 close |
-| **E Phase2** | Dのあと、または `#consult` テキスト了承が痛いとき | L2 閉じる／残すボタン | C未達で急がない |
-
-**停止**: `JARVIS_TODOIST_313_DIGEST_DISABLE=1`（digest／Slack投稿のみ停止。`--apply` は可）。
-
-## ロードマップ
-
-| Phase | 内容 | 状態 |
-|---|---|---|
-| 1 | L1ダイジェスト→#consult→了承後close／確認のみauto | **実装済**（2026-10-21） |
-| 1.5 | 分類ヒューリスティック改善・印コメント | 運用D |
-| 2 | L2 閉じる／延期ボタン（116同型 consult-action） | **実装済** 2026-10-22 |
-| 3 | 定時取りこぼしジョブ | 運用C〜 |
+- launchd: `com.matsunoma.jarvis.todoist-313-digest` → cleanup 本線
