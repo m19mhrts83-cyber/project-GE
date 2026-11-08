@@ -1,5 +1,5 @@
 # PR 時の自動チェック（AI 不使用）。2026-10-24 Miss Lemon 起案・初回は PR 上で動作確認する
-# - アプリ: npm ci → build（型チェック込み）。KURASHIFT は selftest も
+# - アプリ: npm ci → build（型チェック込み）→ npm test。KURASHIFT は selftest も。loopware（判断デスク）も同じ
 # - scripts/tests: unittest
 name: PR Checks
 
@@ -8,6 +8,7 @@ on:
     paths:
       - "apps/jarvis-dashboard/**"
       - "apps/trade-desk/**"
+      - "apps/loopware/**"
       - "apps/kamiooya-qa-web/**"
       - "215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/**"
       - "scripts/**"
@@ -53,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [jarvis-dashboard, trade-desk]
+        app: [jarvis-dashboard, trade-desk, loopware]
     defaults:
       run:
         working-directory: apps/${{ matrix.app }}
