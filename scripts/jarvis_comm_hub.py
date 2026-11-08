@@ -16,6 +16,7 @@ migration: apps/jarvis-dashboard/supabase/migrations/20261104_comm_hub.sql
 
   # 確認（分類で絞る＋日本語キーワード）
   python scripts/jarvis_comm_hub.py dedupe --dry-run   # 二重記載の整理（--apply で削除）
+  python scripts/jarvis_comm_hub.py link-pending --dry-run   # /partner の未返信を台帳へつなぐ（--apply）
   python scripts/jarvis_comm_hub.py search --party partner:P102_ミニテック --query エアコン
 """
 from __future__ import annotations
@@ -408,7 +409,7 @@ def existing_by_dedupe_key(sb, since_iso: str) -> dict[tuple[str, str, str, str,
         )
         batch = r.data or []
         for x in sorted(batch, key=lambda y: (str(y.get("created_at") or ""), str(y["id"]))):
-            if (x.get("source_ref") or {}).get("source") != "yoritoori_md":
+            if (x.get("source_ref") or {}).get("source") not in ("yoritoori_md", "triage_item"):
                 continue
             out.setdefault(dedupe_key(x), str(x["id"]))
         if len(batch) < 1000:
@@ -456,6 +457,108 @@ def link_items(sb, links: list[dict[str, Any]]) -> int:
             chunk, on_conflict="item_id,target_type,target_id", ignore_duplicates=True
         ).execute()
     return len(links)
+
+
+def _triage_entry(t: dict[str, Any]) -> dict[str, Any]:
+    """triage_items 行 → item_from_md_entry に渡せる形。"""
+    return {
+        "folder": t.get("folder") or "",
+        "received_at": t.get("received_at") or "",
+        "channel": t.get("channel") or "Gmail",
+        "subject": t.get("subject") or "",
+        "summary": t.get("summary") or "",
+        "body": t.get("original_body") or "",
+        "partner_name": t.get("partner") or t.get("folder") or "",
+    }
+
+
+def link_pending(sb, *, apply: bool) -> dict[str, int]:
+    """台帳とつながっていない未返信（/partner の pending）を台帳へつなぐ。
+
+    1. 同じ鍵（dedupe_key）の行 → 2. 同じ相手・チャネル・日時の受信が1行だけ → 3. 無ければ新規
+    （external_id = triage:<id>）。つないだ行は needs_reply にする（md 取込で過去分扱いの done も戻す）。
+    """
+    rows: list[dict[str, Any]] = []
+    start = 0
+    while True:
+        r = (
+            sb.table("triage_items")
+            .select("id,folder,partner,channel,received_at,subject,summary,original_body,status,comm_item_id")
+            .eq("lane", "partner")
+            .eq("status", "pending")
+            .is_("comm_item_id", "null")
+            .range(start, start + 499)
+            .execute()
+        )
+        batch = r.data or []
+        rows.extend(batch)
+        if len(batch) < 500:
+            break
+        start += 500
+    stats = {"pending_unlinked": len(rows), "matched": 0, "created": 0, "skipped": 0}
+    if not rows:
+        return stats
+
+    cands: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for t in rows:
+        item = item_from_md_entry(_triage_entry(t))
+        if item is None or not item.get("party_id"):
+            stats["skipped"] += 1
+            continue
+        item["direction"] = "inbound"  # pending = 相手からの未返信
+        cands.append((t, item))
+    if not cands:
+        return stats
+
+    since = min(
+        datetime.fromisoformat(i["occurred_at"]).astimezone(ZoneInfo("UTC")) for _t, i in cands
+    ).isoformat()
+    by_key = existing_by_dedupe_key(sb, since)
+    by_slot: dict[tuple[str, str, str], list[str]] = {}
+    for (party, ch, occ, direction, _b), iid in by_key.items():
+        if direction == "inbound":
+            by_slot.setdefault((party, ch, occ), []).append(iid)
+
+    link_rows: list[tuple[str, str]] = []  # (triage_id, item_id)
+    new_items: list[tuple[str, dict[str, Any]]] = []
+    for t, item in cands:
+        dk = dedupe_key(item)
+        iid = by_key.get(dk)
+        if not iid:
+            slot = by_slot.get(dk[:3]) or []
+            iid = slot[0] if len(slot) == 1 else None
+        if iid:
+            link_rows.append((str(t["id"]), iid))
+            stats["matched"] += 1
+            continue
+        new = dict(item)
+        new["external_id"] = f"triage:{t['id']}"
+        new["work_status"] = "needs_reply"
+        new["source_ref"] = {**(item.get("source_ref") or {}), "source": "triage_item", "triage_id": t["id"]}
+        new_items.append((str(t["id"]), new))
+        stats["created"] += 1
+
+    if not apply:
+        return stats
+
+    if new_items:
+        ids = insert_items(sb, [x for _tid, x in new_items])
+        for tid, x in new_items:
+            if x["external_id"] in ids:
+                link_rows.append((tid, ids[x["external_id"]]))
+    item_ids = sorted({iid for _tid, iid in link_rows})
+    for i in range(0, len(item_ids), 100):
+        (
+            sb.table("comm_items")
+            .update({"work_status": "needs_reply"})
+            .in_("id", item_ids[i : i + 100])
+            .in_("work_status", ["new", "done"])
+            .execute()
+        )
+    for tid, iid in link_rows:
+        sb.table("triage_items").update({"comm_item_id": iid}).eq("id", tid).execute()
+    link_items(sb, [{"item_id": iid, "target_type": "triage_item", "target_id": tid} for tid, iid in link_rows])
+    return stats
 
 
 # ------------------------------------------------------------------ CLI
@@ -621,6 +724,16 @@ def recent_context(
         return []
 
 
+def cmd_link_pending(args: argparse.Namespace) -> int:
+    stats = link_pending(client(), apply=bool(args.apply))
+    mode = "apply" if args.apply else "dry-run"
+    print(
+        f"📒 comm link-pending {mode} pending_unlinked={stats['pending_unlinked']} "
+        f"matched={stats['matched']} created={stats['created']} skipped={stats['skipped']}"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -647,6 +760,12 @@ def main(argv: list[str] | None = None) -> int:
     g4.add_argument("--dry-run", action="store_true")
     g4.add_argument("--apply", action="store_true")
     s4.set_defaults(func=cmd_dedupe)
+
+    s5 = sub.add_parser("link-pending", help="台帳とつながっていない /partner の未返信を台帳へつなぐ")
+    g5 = s5.add_mutually_exclusive_group()
+    g5.add_argument("--dry-run", action="store_true")
+    g5.add_argument("--apply", action="store_true")
+    s5.set_defaults(func=cmd_link_pending)
 
     s3 = sub.add_parser("search")
     s3.add_argument("--party", action="append")

@@ -18,6 +18,8 @@ import {
 import {
   extractMaModalState,
   handleMaBlockAction,
+  handleMaFollowupAction,
+  maTimingFromMeta,
   handleMaModalAction,
   handleMaModalSubmit,
   isMaModalAction,
@@ -214,6 +216,7 @@ export async function POST(request: NextRequest) {
           bodyBlockId,
           channelId: meta.channel,
           messageTs: meta.message_ts,
+          timing: maTimingFromMeta(meta),
         });
         if (!result.ok) {
           return NextResponse.json({
@@ -242,6 +245,7 @@ export async function POST(request: NextRequest) {
         body,
         channelId: meta.channel,
         messageTs: meta.message_ts,
+        actorId: String(((payload.user || {}) as Record<string, unknown>).id || ""),
       });
       if (!result.ok && result.response_action === "errors") {
         return NextResponse.json({
@@ -338,12 +342,14 @@ export async function POST(request: NextRequest) {
 
     const vr = parseVrButtonValue(value);
     if (vr) {
+      const userObj = (payload.user || {}) as Record<string, unknown>;
       const result = await handleVrBlockAction({
         action: vr.action,
         triageId: vr.id,
         triggerId,
         channelId,
         messageTs,
+        actorId: String(userObj.id || userObj.username || ""),
       });
       if (result.kind === "modal_opened") {
         return new NextResponse("", { status: 200 });
@@ -359,6 +365,16 @@ export async function POST(request: NextRequest) {
         text: result.text,
         blocks: result.blocks,
       };
+      if (responseUrl) {
+        await postResponseUrl(responseUrl, body);
+      }
+      return NextResponse.json(body);
+    }
+
+    // 見送り後の理由タグ／「次からも？」の答え
+    const followup = await handleMaFollowupAction(value);
+    if (followup) {
+      const body = { replace_original: true, text: followup.text, blocks: followup.blocks };
       if (responseUrl) {
         await postResponseUrl(responseUrl, body);
       }

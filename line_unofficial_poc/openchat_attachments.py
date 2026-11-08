@@ -8,8 +8,22 @@ import re
 import sqlite3
 import sys
 import time
+from datetime import datetime, timezone
 
 KINDS = {1: 'image', 2: 'video', 3: 'audio', 14: 'file'}
+
+def source_context(msg, getter, *, route_id='', chat_title='', thread_title=''):
+    """Keep only explicit source fields, never raw metadata, URLs or member IDs."""
+    ctx = {k: str(v)[:300] for k,v in dict(route_id=route_id,chat_title=chat_title,
+            thread_title=thread_title).items() if v}
+    caption = getter(msg, 'text', 10)
+    if isinstance(caption,str) and caption.strip(): ctx['caption']=caption[:4000]
+    for field,fid in [('createdTime',5),('deliveredTime',6)]:
+        try: stamp=int(getter(msg,field,fid))
+        except (TypeError,ValueError): continue
+        if 1262304000000 <= stamp <= (time.time()+86400)*1000:
+            ctx['posted_at']=datetime.fromtimestamp(stamp/1000,timezone.utc).isoformat();break
+    return ctx
 
 def private_root(path=None):
     root = Path(path or os.environ.get('LINE_OPENCHAT_ATTACHMENTS_DIR') or
@@ -41,11 +55,16 @@ class Queue:
           created_at REAL NOT NULL, error TEXT, sha256 TEXT, bytes INTEGER,
           mime TEXT, storage_path TEXT, upload_url TEXT,
           cohort TEXT NOT NULL DEFAULT 'backfill', saved_at REAL)''')
+        columns={r[1] for r in self.db.execute('PRAGMA table_info(jobs)')}
+        if 'source_context' not in columns:
+            self.db.execute("ALTER TABLE jobs ADD COLUMN source_context TEXT NOT NULL DEFAULT '{}'")
+        if 'metadata_dirty' not in columns:
+            self.db.execute('ALTER TABLE jobs ADD COLUMN metadata_dirty INTEGER NOT NULL DEFAULT 1')
         self.db.commit()
 
     def close(self): self.db.close()
 
-    def enqueue(self, *, room_id, message_id, thread_id='', content_type, metadata=None, encrypted=False, cohort='backfill'):
+    def enqueue(self, *, room_id, message_id, thread_id='', content_type, metadata=None, encrypted=False, cohort='backfill', context=None):
         if content_type not in KINDS: return None
         if cohort not in ('backfill','daily'): raise ValueError('invalid_cohort')
         if not re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', str(room_id)) or not re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', str(message_id)):
@@ -53,9 +72,9 @@ class Queue:
         if thread_id and not re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', str(thread_id)):
             raise ValueError('invalid_thread')
         meta = metadata if isinstance(metadata, dict) else {}
-        filename = str(meta.get('FILE_NAME') or meta.get('filename') or '')
+        filename = str(meta.get('FILE_NAME') or meta.get('filename') or meta.get('fileName') or '')
         filename = re.split(r'[/\\]', filename)[-1]
-        filename = re.sub(r'[\x00-\x1f\x7f]', '', filename)[:255] or KINDS[content_type]
+        filename = re.sub(r'[\x00-\x1f\x7f]', '', filename).strip()[:255] or KINDS[content_type]
         size = meta.get('FILE_SIZE') or meta.get('fileSize')
         try: size = int(size) if size is not None else None
         except (TypeError, ValueError): size = None
@@ -67,10 +86,23 @@ class Queue:
               (id,room_id,message_id,thread_id,kind,filename,source_bytes,state,created_at,error,cohort)
               VALUES (?,?,?,?,?,?,?,?,?,?,?)''', (ident,str(room_id),str(message_id),str(thread_id),
               KINDS[content_type],filename,size,state,time.time(),'encrypted_media_requires_adapter' if encrypted else None,cohort))
+            old_name = self.db.execute('SELECT filename FROM jobs WHERE id=?',(ident,)).fetchone()[0]
+            generic = {'image','video','audio','file',''}
+            if old_name.lower() in generic and filename.lower() not in generic:
+                self.db.execute('UPDATE jobs SET filename=?,metadata_dirty=1 WHERE id=?',(filename,ident))
+            if isinstance(context,dict):
+                old=self.db.execute('SELECT source_context FROM jobs WHERE id=?',(ident,)).fetchone()[0]
+                merged=json.loads(old)
+                for key,limit in [('route_id',128),('chat_title',300),('thread_title',300),('posted_at',64),('sender_name',200),('caption',4000)]:
+                    value=context.get(key)
+                    if isinstance(value,str) and value.strip(): merged[key]=value[:limit]
+                encoded=json.dumps(merged,ensure_ascii=False,sort_keys=True)
+                if json.loads(old)!=merged:
+                    self.db.execute('UPDATE jobs SET source_context=?,metadata_dirty=1 WHERE id=?',(encoded,ident))
         return ident
 
     def update(self, ident, **values):
-        if set(values)-{'state','attempts','next_at','error','sha256','bytes','mime','storage_path','upload_url','saved_at','source_bytes'}:
+        if set(values)-{'state','attempts','next_at','error','sha256','bytes','mime','storage_path','upload_url','saved_at','source_bytes','metadata_dirty'}:
             raise ValueError('invalid_queue_update')
         with self.db:
             self.db.execute('UPDATE jobs SET '+','.join(f'{k}=?' for k in values)+' WHERE id=?', [*values.values(),ident])
@@ -96,7 +128,7 @@ class Queue:
                 'daily_last30_unique_bytes':daily_bytes,'daily_observation_days':round(days,2),
                 'projected_monthly_bytes':round(daily_bytes/days*30) if days>=2 else None}
 
-def capture(msg, *, getter, room_id, thread_id='', dry_run=False):
+def capture(msg, *, getter, room_id, thread_id='', dry_run=False, route_id='', chat_title='', thread_title=''):
     """Called before text dedup. Failures are visible but never stop MD ingestion."""
     if dry_run or os.environ.get('LINE_OPENCHAT_ATTACHMENTS_QUEUE') != '1': return
     queue = None
@@ -107,7 +139,8 @@ def capture(msg, *, getter, room_id, thread_id='', dry_run=False):
         queue.enqueue(room_id=room_id,thread_id=thread_id,
           message_id=str(getter(msg,'id',4) or ''),content_type=ct,
           metadata=getter(msg,'contentMetadata',18),encrypted=bool(getter(msg,'chunks',20)),
-          cohort=os.environ.get('LINE_OPENCHAT_ATTACHMENTS_COHORT','backfill'))
+          cohort=os.environ.get('LINE_OPENCHAT_ATTACHMENTS_COHORT','backfill'),
+          context=source_context(msg,getter,route_id=route_id,chat_title=chat_title,thread_title=thread_title))
     except Exception:
         # Never include an exception body, source URL, credentials or message metadata.
         print('# openchat attachment queue failed; attachment capture needs review',file=sys.stderr)

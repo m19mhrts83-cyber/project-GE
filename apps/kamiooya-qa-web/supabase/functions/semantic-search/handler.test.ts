@@ -1,6 +1,33 @@
 import assert from 'node:assert/strict';
 import {handleSemanticSearch} from './handler.ts';
 
+Deno.test('LINE filename browse and exact attachment source reads use ready rows without AI calls',async()=>{
+ const keys=['GEMINI_API_KEY','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SEMANTIC_SEARCH_SHARED_SECRET','SEMANTIC_SEARCH_DISABLED'];
+ const saved=keys.map(k=>Deno.env.get(k)),originalFetch=globalThis.fetch;
+ ['fixture','https://fixture.supabase.co','fixture-service','fixture-semantic','0'].forEach((v,i)=>Deno.env.set(keys[i],v));
+ const id='oc_'+'a'.repeat(64),reads:URL[]=[];
+ globalThis.fetch=async(input)=>{
+  const url=new URL(input instanceof Request?input.url:String(input));
+  if(url.pathname.endsWith('/line_openchat_logs')){
+   reads.push(url);assert.equal(url.searchParams.get('ingest_status'),'eq.ready');
+   return Response.json([{id,chat_title:'修繕',content:'【LINE添付・内容未解析】見積,改訂.pdf',posted_at:null}]);
+  }
+  if(url.pathname.endsWith('/app_qa_search_events'))return Response.json([],{status:201});
+  throw new Error('unexpected network/AI request');
+ };
+ try{
+  const call=(body:unknown)=>handleSemanticSearch(new Request('https://fixture.supabase.co/functions/v1/semantic-search',{
+   method:'POST',headers:{'x-semantic-shared-secret':'fixture-semantic'},body:JSON.stringify(body)}));
+  let r=await call({list_openchat:true,query:'見積,改訂.pdf',only_attachments:true});
+  assert.equal(r.status,200);assert.equal((await r.json()).relatedOpenchat[0].id,id);
+  assert.equal(reads[0].searchParams.get('source_system'),'eq.line_openchat_attachment');
+  assert.ok(reads[0].searchParams.get('or')?.includes('content.ilike."%見積,改訂.pdf%"'));
+  r=await call({list_openchat:true,openchat_id:id,query:id});
+  assert.equal(r.status,200);assert.equal((await r.json()).relatedOpenchat[0].id,id);
+  assert.equal(reads[1].searchParams.get('id'),'eq.'+id);
+ }finally{globalThis.fetch=originalFetch;keys.forEach((k,i)=>saved[i]===undefined?Deno.env.delete(k):Deno.env.set(k,saved[i]!));}
+});
+
 Deno.test('cached query vectors still retrieve fresh sources and generate each answer with unchanged evidence',async()=>{
  const keys=['GEMINI_API_KEY','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SEMANTIC_SEARCH_SHARED_SECRET','SEMANTIC_SEARCH_DISABLED'];
  const saved=keys.map(k=>Deno.env.get(k)),originalFetch=globalThis.fetch;

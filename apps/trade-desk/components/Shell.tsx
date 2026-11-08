@@ -1,25 +1,26 @@
 import TermGlossary from "@/components/TermGlossary";
-import { DASHBOARD_URL, LOAN_TRACKER_URL } from "@/lib/format";
+import Icon from "@/components/Icon";
+import { DASHBOARD_URL, LOAN_TRACKER_URL, LOOPWARE_DESK_URL } from "@/lib/format";
 
 const NAV = [
-  { href: "/", label: "ホーム" },
-  { href: "/themes", label: "テーマ" },
-  { href: "/stock-watch", label: "株式ウォッチ" },
-  { href: "/money-ops", label: "資金移動" },
-  { href: "/portfolio", label: "資産" },
-  { href: "/household-bs", label: "家計B/S" },
-  { href: "/consultations", label: "相談" },
-  { href: "/lifeplan", label: "ライフプラン" },
-  { href: "/realestate", label: "不動産賃貸" },
-  { href: "/notion", label: "Notionタスク" },
-  { href: "/mq", label: "MQ会計評価" },
-  { href: "/roi", label: "ROI" },
-  { href: "/tax", label: "確定申告" },
-  { href: "/guide", label: "構成ガイド" },
-  { href: "/jobs", label: "ジョブ" },
-  { href: "/settings", label: "設定" },
-  { href: "/research", label: "リサーチ" },
-  { href: "/paper", label: "Lab" },
+  { href: "/", label: "ホーム", icon: "home" },
+  { href: "/themes", label: "テーマ", icon: "trend" },
+  { href: "/stock-watch", label: "株式ウォッチ", icon: "watch" },
+  { href: "/money-ops", label: "資金移動", icon: "transfer" },
+  { href: "/portfolio", label: "資産", icon: "wallet" },
+  { href: "/household-bs", label: "家計B/S", icon: "pie" },
+  { href: "/consultations", label: "相談", icon: "chat" },
+  { href: "/lifeplan", label: "ライフプラン", icon: "calendar" },
+  { href: "/realestate", label: "不動産賃貸", icon: "building" },
+  { href: "/notion", label: "Notionタスク", icon: "queue" },
+  { href: "/mq", label: "MQ会計評価", icon: "chart" },
+  { href: "/roi", label: "ROI", icon: "spark" },
+  { href: "/tax", label: "確定申告", icon: "file" },
+  { href: "/guide", label: "構成ガイド", icon: "book" },
+  { href: "/jobs", label: "ジョブ", icon: "refresh" },
+  { href: "/settings", label: "設定", icon: "shield" },
+  { href: "/research", label: "リサーチ", icon: "search" },
+  { href: "/paper", label: "Lab", icon: "ai" },
 ];
 
 function NavLinks({
@@ -42,7 +43,8 @@ function NavLinks({
               : ""
           }`}
         >
-          {n.label}
+          <Icon name={n.icon} />
+          <span>{n.label}</span>
         </a>
       ))}
     </>
@@ -70,19 +72,9 @@ export default function Shell({
       <aside className="sidebar">
         <div className="side-brand-block">
           <div className="side-brand-mark">
-            <svg
-              className="side-brand-icon"
-              viewBox="0 0 32 32"
-              width="22"
-              height="22"
-              aria-hidden
-            >
-              <rect width="32" height="32" rx="7" fill="#1f4e79" />
-              <path
-                fill="#e8762a"
-                d="M7.4 6.4h4.55v19.2H7.4zm5.35 8.55 10.85-8.55h-5.6L12.15 13.3zm.05 2.5 5.85 8.15h5.6L12.8 17.05z"
-              />
-            </svg>
+            <span className="pb-logo" aria-hidden>
+              <Icon name="yen" size={18} />
+            </span>
             <div>
               <div className="side-brand">KURASHIFT</div>
               <div className="side-brand-ja">クラシフト</div>
@@ -143,7 +135,8 @@ export default function Shell({
           rel="noopener noreferrer"
           title="ローン正本（Google: estate）"
         >
-          借入残高トラッカー ↗
+          <Icon name="file" />
+          <span>借入残高トラッカー ↗</span>
         </a>
 
         <div className="side-group-title side-group-title--rule">運用</div>
@@ -163,7 +156,17 @@ export default function Shell({
             target="_blank"
             rel="noopener noreferrer"
           >
-            Jarvis ダッシュボード ↗
+            <Icon name="bolt" />
+            <span>Jarvis ダッシュボード ↗</span>
+          </a>
+          <a
+            className="side-link"
+            href={LOOPWARE_DESK_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Icon name="check" />
+            <span>判断デスク（ループウェア） ↗</span>
           </a>
           <div className="meta" style={{ margin: "12px 8px 0" }}>
             {email ?? "—"}

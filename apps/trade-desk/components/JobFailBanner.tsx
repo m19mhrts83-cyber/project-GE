@@ -43,13 +43,9 @@ export default function JobFailBanner({
 
   return (
     <div
-      className="card"
+      className="card job-fail"
       role="alert"
-      style={{
-        marginTop: 12,
-        borderColor: "var(--danger, #b45309)",
-        background: "color-mix(in srgb, var(--danger, #b45309) 8%, transparent)",
-      }}
+      style={{ marginTop: 12 }}
     >
       <header>
         <span className="lvl">要確認</span>

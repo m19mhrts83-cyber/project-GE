@@ -12,8 +12,9 @@ export const runtime = "nodejs";
 
 /**
  * 313 Slack 操作（ログイン不要・HMAC）
- *   完了:   GET/POST /api/g/t313/close/{task_id}?s=
+ *   済んだ: GET/POST /api/g/t313/close/{task_id}?s=
  *   延期:   GET/POST /api/g/t313/reschedule/{task_id}?due=YYYY-MM-DD&s=
+ *   やめる: GET/POST /api/g/t313/drop/{task_id}?s=
  * GET は確認画面のみ（リンク展開で即実行しない）。POST + intent=confirm で実行。
  */
 
@@ -41,6 +42,7 @@ export async function GET(
   if (action === "reschedule" && !/^\d{4}-\d{2}-\d{2}$/.test(due)) {
     return htmlPage("エラー", "due=YYYY-MM-DD が必要です", false);
   }
+  // drop / close は due 不要
   if (sp.get("cancel") === "1") {
     return htmlPage("キャンセル", "実行しませんでした。", true);
   }
@@ -106,10 +108,14 @@ export async function POST(
   const title =
     action === "close"
       ? result.ok
-        ? "完了"
+        ? "済んだ"
         : "完了失敗"
-      : result.ok
-        ? "延期"
-        : "延期失敗";
+      : action === "drop"
+        ? result.ok
+          ? "やめる"
+          : "やめる失敗"
+        : result.ok
+          ? "延期"
+          : "延期失敗";
   return htmlPage(title, result.message, result.ok);
 }

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-08-12",
+  "updated": "2026-11-07",
   "items": [
     {
       "id": "kurashift",
@@ -10,6 +10,25 @@
       "note": "クラシフト（暮らし・資産HQ。ダッシュボードとは別アプリ。同じ自分用ログイン）",
       "tags": ["資産", "ライフプラン", "保険", "立花", "KURASHIFT"]
     },
+    {
+      "id": "loopware-312-313",
+      "kind": "app",
+      "title": "ループウェア（312入口／313出口）",
+      "url": "https://jarvis-loopware.vercel.app",
+      "note": "別アプリ apps/loopware。判断ログ→Supabase。ダッシュは外部リンクのみ。iPhoneはChrome",
+      "tags": ["ループウェア", "312", "313", "Todoist"],
+      "internal": false
+    },
+    {
+      "id": "purchase-compare",
+      "kind": "app",
+      "title": "購入比較（ループウェア）",
+      "url": "/purchase-compare",
+      "note": "候補比較→選択／見送り→理由・購入後追記。最初のお題はシャワーヘッド。localStorage＋MDエクスポート",
+      "tags": ["購入比較", "ループウェア", "シャワー"],
+      "internal": true
+    },
+
     {
       "id": "prompt-share",
       "kind": "app",

@@ -72,6 +72,31 @@ products:
     max_age_h: 14
     owner: 815 KURASHIFT更新
     action: "launchctl list | grep openchat-md-db-sync で登録確認 → 最新 sync_*.log の末尾を見る"
+  # ループウェア（判断ログ→週次分析→ルール反映）。見張りは .jarvis_state/loopware/status.json 1ファイル
+  - id: loopware_weekly
+    label: ループウェア 今週の学び（土曜の週次分析）
+    kind: json_time
+    file: .jarvis_state/loopware/status.json
+    path: weekly.published_at
+    max_age_h: 174
+    owner: 314 業務品質監査
+    action: "zsh launchd/weekly_review_314_runner.sh の loopware 部分 → .jarvis_state/loopware/weekly.err を見る"
+  - id: loopware_status
+    label: ループウェア 見張りファイル
+    kind: json_time
+    file: .jarvis_state/loopware/status.json
+    path: checked_at
+    max_age_h: 36
+    owner: 314 業務品質監査
+    action: "python scripts/jarvis_loopware_status.py を手で実行（朝の Mac 更新の loopware_status 段）"
+  - id: loopware_decisions
+    label: ループウェア 判断ログの記録
+    kind: json_time
+    file: .jarvis_state/loopware/status.json
+    path: last_decision_at
+    max_age_h: 72
+    owner: 116 メール要対応
+    action: "status.json の sources で止まった入口を見る → triage トリガー（pg_trigger）と Slack ボタンを確認"
   - id: gha_gmail_triage
     label: Gmail トリアージ（朝）
     kind: gha

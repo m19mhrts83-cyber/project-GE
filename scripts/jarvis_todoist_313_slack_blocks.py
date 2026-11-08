@@ -22,6 +22,7 @@ AGENT_USERNAME = "313 完了候補確認"
 T313_ACTION_IDS = {
     "close": "todoist_313_close",
     "reschedule": "todoist_313_reschedule",
+    "drop": "todoist_313_drop",
 }
 
 
@@ -30,6 +31,22 @@ def _dashboard() -> str:
         (os.environ.get("JARVIS_DASHBOARD_URL") or "").strip().rstrip("/")
         or "https://jarvis-dashboard-amber.vercel.app"
     )
+
+
+def _loopware() -> str:
+    return (
+        (os.environ.get("JARVIS_LOOPWARE_URL") or "").strip().rstrip("/")
+        or (os.environ.get("NEXT_PUBLIC_LOOPWARE_URL") or "").strip().rstrip("/")
+        or "https://jarvis-loopware.vercel.app"
+    )
+
+
+def loopware_313_url(task_id: str = "", *, tab: str = "cleanup") -> str:
+    base = _loopware()
+    q = f"tab={tab}"
+    if task_id:
+        q += f"&task={task_id}"
+    return f"{base}/313?{q}"
 
 
 def _action_secret_name() -> str:
@@ -92,11 +109,13 @@ def t313_url(task_id: str, action: str, due: str = "") -> str:
     base = _dashboard()
     if action == "reschedule":
         return f"{base}/api/g/t313/reschedule/{task_id}?due={due}&s={s}"
+    if action == "drop":
+        return f"{base}/api/g/t313/drop/{task_id}?s={s}"
     return f"{base}/api/g/t313/close/{task_id}?s={s}"
 
 
 def close_button(task_id: str, *, url_mode: bool, n: int | None = None) -> dict[str, Any]:
-    label = f"✅{n} 完了する" if n else "完了する"
+    label = f"✅{n} 済んだ" if n else "済んだ"
     if url_mode:
         return {
             "type": "button",
@@ -131,6 +150,138 @@ def reschedule_button(
         "style": "primary",
         "action_id": T313_ACTION_IDS["reschedule"],
         "value": f"t313:reschedule:{task_id}:{due}",
+    }
+
+
+def drop_button(task_id: str, *, url_mode: bool, n: int | None = None) -> dict[str, Any]:
+    label = f"🗑{n} やめる" if n else "やめる"
+    if url_mode:
+        return {
+            "type": "button",
+            "text": {"type": "plain_text", "text": label[:24], "emoji": True},
+            "url": t313_url(task_id, "drop"),
+        }
+    return {
+        "type": "button",
+        "text": {"type": "plain_text", "text": label[:24], "emoji": True},
+        "action_id": T313_ACTION_IDS["drop"],
+        "value": f"t313:drop:{task_id}",
+    }
+
+
+def build_cleanup_blocks(
+    items: list[dict[str, Any]],
+    *,
+    header_text: str,
+    fallback_text: str,
+    url_mode: bool,
+    total_overdue: int = 0,
+) -> dict[str, Any]:
+    """313 片付け本線: 各件に 済んだ／いつ・優先／やめる の3ボタン。"""
+    blocks: list[dict[str, Any]] = [
+        {
+            "type": "header",
+            "text": {"type": "plain_text", "text": header_text[:150], "emoji": True},
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    f"上位 *{len(items)}* 件"
+                    + (f"（期日超過合計 {total_overdue}）" if total_overdue else "")
+                    + "\n"
+                    "✅済んだ ／ 📅いつ・優先 ／ 🗑やめる（削除ではなく完了＋コメント）\n"
+                    "★＝推し。要判断は「済んだ」に入れない"
+                ),
+            },
+        },
+    ]
+    for it in items:
+        n = int(it.get("n") or 0)
+        tid = str(it.get("task_id") or "")
+        title = str(it.get("title_short") or it.get("title") or tid)[:70]
+        lane = str(it.get("lane") or "").replace("_", " ")
+        kind = str(it.get("kind") or "")
+        new_due = str(it.get("new_due") or "")
+        star = str(it.get("star") or "reschedule")  # close | reschedule | drop
+        days = it.get("days_over")
+        link = f"<https://app.todoist.com/app/task/{tid}|{title}>" if tid else title
+        meta = f"#{n}"
+        if days is not None:
+            meta += f" · {days}日超過"
+        if lane:
+            meta += f" · _{lane}_"
+        if kind == "confirm_only":
+            meta += " · 確認のみ"
+        star_label = {"close": "✅", "reschedule": "📅", "drop": "🗑"}.get(star, "📅")
+        due_line = f"\n案期日 *{new_due}*" if new_due else ""
+        blocks.append(
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*{meta}* · 推し{star_label}\n{link}{due_line}",
+                },
+            }
+        )
+        can_button = bool(tid) and (not url_mode or bool(_action_secret()))
+        if can_button and new_due:
+            elements = [
+                close_button(tid, url_mode=url_mode, n=n),
+                reschedule_button(tid, new_due, url_mode=url_mode, n=n),
+                drop_button(tid, url_mode=url_mode, n=n),
+            ]
+            # Slack actions max 5; we use 3
+            blocks.append(
+                {
+                    "type": "actions",
+                    "block_id": f"t313_clean_{tid[:16]}_{n}",
+                    "elements": elements,
+                }
+            )
+        elif can_button:
+            blocks.append(
+                {
+                    "type": "actions",
+                    "block_id": f"t313_clean_{tid[:16]}_{n}",
+                    "elements": [
+                        close_button(tid, url_mode=url_mode, n=n),
+                        drop_button(tid, url_mode=url_mode, n=n),
+                    ],
+                }
+            )
+        app_url = loopware_313_url(tid)
+        blocks.append(
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"<{app_url}|アプリで開く（Chrome）>",
+                    }
+                ],
+            }
+        )
+    hub = loopware_313_url()
+    blocks.append(
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"313 片付け · <{hub}|loopware /313> · "
+                        "やめる＝完了＋コメント（物理削除なし）"
+                    ),
+                }
+            ],
+        }
+    )
+    return {
+        "text": fallback_text,
+        "blocks": blocks,
+        "username": AGENT_USERNAME,
     }
 
 

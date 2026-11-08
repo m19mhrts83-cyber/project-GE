@@ -8,6 +8,7 @@ import {
   WATCH_ACK_QUIET_DAYS_DEFAULT,
 } from "@/lib/watchUserAck";
 import { queueLaneActionLog } from "@/lib/laneActionLog";
+import { logOwnerDecision } from "@/lib/ownerDecisionLog";
 import {
   isValidZaimCategory,
   type ZaimCategoryReviewItem,
@@ -125,6 +126,22 @@ export async function confirmZaimFix(
     .update({ payload, updated_at: new Date().toISOString() })
     .eq("id", WATCH_ID);
   if (uErr) return { ok: false, error: uErr.message };
+
+  // ループウェア: 「正しい／違う」を判断ログにも残す（週次分析が Zaim の学習の当たり外れを数える）
+  if (next !== "pending_confirm") {
+    const fix = fixes.find((f) => String(f.id || "") === id) || {};
+    await logOwnerDecision({
+      surface: "zaim_category",
+      action: next === "confirmed" ? "good" : "wrong",
+      source: "dashboard",
+      employee: "613",
+      targetType: "zaim_fix",
+      targetId: id,
+      subject: String(fix.proposal || "").slice(0, 200) || null,
+      note: (comment || "").trim().slice(0, 800) || null,
+      idemKey: `dash:zaim:${id}:${next}`,
+    });
+  }
 
   if (next === "disputed") {
     const note = (comment || "").trim();

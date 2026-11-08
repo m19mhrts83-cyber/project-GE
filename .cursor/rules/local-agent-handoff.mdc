@@ -6,7 +6,9 @@ alwaysApply: true
 # ローカル受け渡し
 
 - 起動・再開時に `/Users/matsunomasaharu2/git-repos/agent-handoff/to_Jarvis/` のpendingを確認する。
+- 松野さんの「Codexなどの作業の続きをして」は再開合図。案件名または直近の依頼に一致する最新メモを1件選ぶ。
 - 現在の案件に一致するメモだけを読み、Codexの進捗・判断・検証・残作業を既存チャットへ反映して続行する。
 - 実際のworktree・差分・コミットを確認し、受領時accepted、対応後doneと記録する。
-- 詳細の正本は `/Users/matsunomasaharu2/git-repos/docs/AIエージェントチーム/51_ローカル受け渡し_20261026.md`。
+- `handoff_group_id` が同じClaude Code宛てメモがあっても、Cursorは `to_Jarvis/` 側だけを更新する。詳細は共通の案件正本へ反映する。
+- 詳細の正本は `/Users/matsunomasaharu2/git-repos/docs/AIエージェントチーム/51_ローカル受け渡し_20261026.md`。人向け入口は `53_Codex_Claude_Cursor共通再開_20261101.md`。
 - ローカル専用。通知・自動起動・権限拡大は含まない。

@@ -205,6 +205,7 @@ const App = {
     App.elements.suggestedQuestions = document.getElementById('suggestedQuestions');
     App.elements.commentTableBody = document.getElementById('commentTableBody');
     App.elements.commentSearchInput = document.getElementById('commentSearchInput');
+    App.elements.commentAttachmentsOnly = document.getElementById('commentAttachmentsOnly');
     App.elements.commentCategoryFilter = document.getElementById('commentCategoryFilter');
     App.elements.commentDateFilter = document.getElementById('commentDateFilter');
     App.elements.commentListMeta = document.getElementById('commentListMeta');
@@ -217,6 +218,7 @@ const App = {
     App.elements.openchatTableBody = document.getElementById('openchatTableBody');
     App.elements.openchatSearchInput = document.getElementById('openchatSearchInput');
     App.elements.openchatTitleFilter = document.getElementById('openchatTitleFilter');
+    App.elements.openchatAttachmentsOnly = document.getElementById('openchatAttachmentsOnly');
     App.elements.openchatListMeta = document.getElementById('openchatListMeta');
     App.elements.openchatBackBar = document.getElementById('openchatBackBar');
     App.elements.openchatBackBtn = document.getElementById('openchatBackBtn');
@@ -406,6 +408,9 @@ const App = {
     if (App.elements.knowledgeSearchInput) {
       App.elements.knowledgeSearchInput.addEventListener('input', App.renderKnowledgeTable);
     }
+    if (App.elements.commentAttachmentsOnly) {
+      App.elements.commentAttachmentsOnly.addEventListener('change', App.renderCommentTable);
+    }
     if (App.elements.commentCategoryFilter) {
       App.elements.commentCategoryFilter.addEventListener('change', App.renderCommentTable);
     }
@@ -465,6 +470,9 @@ const App = {
         });
       });
     }
+    if (App.elements.openchatAttachmentsOnly) App.elements.openchatAttachmentsOnly.addEventListener('change', function () {
+      App.loadOpenchatLogs().catch(function(err){App.showToast(err.message || 'LINE添付の取得に失敗しました','error');});
+    });
   },
 
   isLessonCommentRow: (row) => {
@@ -1576,7 +1584,12 @@ const App = {
 
   loadOpenchatLogs: async (opts) => {
     const options = opts && typeof opts === 'object' ? opts : {};
+    const generation=App.state.attachmentGeneration,userId=String((App.state.currentUser||{}).id||'');
+    const sequence=(App.state.openchatRequestSequence||0)+1;
+    App.state.openchatRequestSequence=sequence;
+    const current=()=>generation===App.state.attachmentGeneration&&userId===String((App.state.currentUser||{}).id||'')&&sequence===App.state.openchatRequestSequence;
     const cfg = await App.resolveSemanticConfig();
+    if(!current())return;
     const q = (App.elements.openchatSearchInput && App.elements.openchatSearchInput.value) || '';
     const title =
       (App.elements.openchatTitleFilter && App.elements.openchatTitleFilter.value) || '';
@@ -1587,6 +1600,7 @@ const App = {
     ).trim();
     const body = {
       list_openchat: true,
+      only_attachments: !openchatId && !!(App.elements.openchatAttachmentsOnly && App.elements.openchatAttachmentsOnly.checked),
       query: openchatId ? openchatId : String(q || '').trim(),
       chat_title: openchatId ? undefined : String(title || '').trim() || undefined,
       openchat_limit: 40,
@@ -1605,6 +1619,7 @@ const App = {
       body: JSON.stringify(body)
     });
     const text = await response.text();
+    if(!current())return;
     let data = {};
     if (text) {
       try {
@@ -1618,6 +1633,7 @@ const App = {
         data.errorMessage || data.message || data.error || 'LINEオプチャ一覧の取得に失敗しました'
       );
     }
+    if(!current())return;
     App.state.openchatLogs = App.normalizeRelatedList(data.relatedOpenchat || []);
     if (Array.isArray(data.openchatRooms)) App.state.openchatRooms = data.openchatRooms;
     App.state.openchatHighlightId = openchatId || '';
@@ -1741,11 +1757,14 @@ const App = {
           '<span class="openchat-sender">' + App.escapeHtml(String(r.sender_name || r.senderName || '')) + '</span>' +
           '</td>' +
           '<td class="p-2 text-xs text-slate-700">' +
-          App.escapeHtml(snippet) +
+          App.escapeHtml(snippet) + '<span class="openchat-attachment-slot" data-openchat-source-id="'+App.escapeHtml(rowId)+'"></span>' +
           '</td></tr>'
         );
       })
       .join('');
+    tbody.querySelectorAll('.openchat-attachment-slot').forEach(function(container){
+      App.appendAttachmentLinks(container,container.getAttribute('data-openchat-source-id'),'添付：','openchat');
+    });
   },
 
   ensureReferenceData: async (screen) => {
@@ -1756,7 +1775,7 @@ const App = {
     if(loads[key])return loads[key];
     const generation=App.state.attachmentGeneration;
     if(key==='comments'&&App.elements.commentListMeta)App.elements.commentListMeta.textContent='コメント一覧を取得中…';
-    const task=(key==='comments'?App.loadComments():App.loadKnowledge()).then(()=>{if(App.state.attachmentGeneration===generation)ready[key]=true;}).catch(error=>{if(App.state.attachmentGeneration===generation)App.showToast(error.message||'参照一覧の取得に失敗しました。メニューを開き直して再試行してください。','error');}).finally(()=>{delete loads[key];});
+    const task=(key==='comments'?App.loadComments():App.loadKnowledge()).then(()=>{if(App.state.attachmentGeneration===generation)ready[key]=true;}).catch(error=>{if(App.state.attachmentGeneration===generation)App.showToast(error.message||'参照一覧の取得に失敗しました。メニューを開き直して再試行してください。','error');}).finally(()=>{delete loads[key];if(key==='comments'&&App.state.attachmentGeneration===generation&&App.elements.commentTableBody)App.renderCommentTable();});
     loads[key]=task;return task;
   },
 
@@ -2305,6 +2324,7 @@ const App = {
     App.switchScreen('comments');
     App.showDbReturnBar('comments');
     if (App.elements.commentSearchInput) {
+      if (App.elements.commentAttachmentsOnly) App.elements.commentAttachmentsOnly.checked = false;
       App.elements.commentSearchInput.value = commentId;
       App.renderCommentTable({ exactCommentId: commentId });
     }
@@ -2356,7 +2376,7 @@ const App = {
     }));
     if(lines.length)parts.push('<div class="font-semibold mb-1">LINEオプチャの根拠</div>'+dated(lines,c=>{
       const d=App.referenceDateParts(c.postedAt);
-      return '<li'+attrs(c)+'>'+badge(c)+(d?esc(d.label)+' ・ ':'')+esc(c.chatTitle||'オプチャ名未登録')+(c.streamLabel?' / '+esc(c.streamLabel):'')+(c.threadTitle?' / '+esc(c.threadTitle):'')+db('openchat',c.openchatId)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div></li>';
+      return '<li'+attrs(c)+'>'+badge(c)+(d?esc(d.label)+' ・ ':'')+esc(c.chatTitle||'オプチャ名未登録')+(c.streamLabel?' / '+esc(c.streamLabel):'')+(c.threadTitle?' / '+esc(c.threadTitle):'')+db('openchat',c.openchatId)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div><div class="openchat-citation-attachments" data-openchat-source-id="'+esc(c.openchatId||'')+'"></div></li>';
     }));
     if(lessons.length)parts.push('<div class="font-semibold mb-1">講座ページの根拠</div><ul class="citations-list mb-2">'+lessons.map(c=>{
       const url=App.safeReferenceUrl(c.lessonUrl);
@@ -3295,6 +3315,9 @@ const App = {
     area.querySelectorAll('.citation-attachments').forEach(function (container) {
       App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：');
     });
+    area.querySelectorAll('.openchat-citation-attachments').forEach(function(container){
+      App.appendAttachmentLinks(container,container.getAttribute('data-openchat-source-id'),'関連添付：','openchat');
+    });
   },
 
   renderSuggestedQuestions: () => {
@@ -3521,26 +3544,32 @@ const App = {
       if(!current())return;
       const token=String(session.token||'');if(!token)throw new Error('invalid_attachment_session');
       App.state.attachmentToken=token;
-      const index={};let offset=0;
-      for(let page=0;page<201;page++){
+      const index={};
+      for(const source of ['community','openchat']){
+       let offset=0,complete=false;
+       for(let page=0;page<201;page++){
         if(!current())return;
-        const data=await App.retryRead(()=>App.attachmentRequest({operation:'index',offset:offset},token),current);
+        const data=await App.retryRead(()=>App.attachmentRequest({operation:'index',source:source,offset:offset},token),current);
         if(!current())return;
         if(!Array.isArray(data.attachments))throw new Error('invalid_attachment_index');
-        data.attachments.forEach(item=>{const cid=String(item.comment_id||'');if(!index[cid])index[cid]=[];index[cid].push(item);});
+        data.attachments.forEach(item=>{
+          const key=source==='openchat' ? (item.source_log_id?'openchat:'+String(item.source_log_id):'') : String(item.comment_id||'');
+          if(!key)return;if(!index[key])index[key]=[];index[key].push(item);
+        });
         if(data.next_offset==null){
           App.state.attachmentIndex=index;App.state.attachmentStatus='';
-          App.renderCommentTable();App.renderChatMessages();
+          App.renderCommentTable();App.renderChatMessages();App.renderOpenchatTable();
           if(App.elements.commentDetailDialog&&App.elements.commentDetailDialog.open&&App.elements.commentDetailBody&&App.state.attachmentDetailCommentId)App.appendAttachmentLinks(App.elements.commentDetailBody,App.state.attachmentDetailCommentId);
-          return;
+          complete=true;break;
         }
         if(!Number.isInteger(data.next_offset)||data.next_offset<=offset)throw new Error('invalid_attachment_offset');
         offset=data.next_offset;
+       }
+       if(!complete)throw new Error('attachment_index_limit');
       }
-      throw new Error('attachment_index_limit');
     }catch(error){
       if(current())App.state.attachmentStatus=error&&[401,403].includes(error.httpStatus)?'添付の確認にはログインし直してください。':'添付の読み込みが中断しました。再取得できます。本文の閲覧は続けられます。';
-    }finally{if(current()){App.state.attachmentLoading=false;App.renderAttachmentStatus();}}
+    }finally{if(current()){App.state.attachmentLoading=false;App.renderAttachmentStatus();if(App.elements.commentTableBody)App.renderCommentTable();}}
   },
 
   attachmentRequest: async (body, token) => {
@@ -3551,10 +3580,19 @@ const App = {
     return response.json();
   },
 
-  appendAttachmentLinks: (container, commentId, label) => {
+  attachmentDisplayName: (item) => {
+    const name = String(item.original_name || '').trim();
+    if (name && !/^(image|video|audio|file)$/i.test(name)) return name;
+    const kind = String(item.content_type || item.mime_type || item.mime || '').split('/')[0] || name.toLowerCase();
+    const label = { image: '画像', video: '動画', audio: '音声' }[kind] || '添付ファイル';
+    return label + '（ファイル名未取得）';
+  },
+
+  appendAttachmentLinks: (container, commentId, label, source) => {
     const previous = container.querySelector('.community-attachment-links');
     if (previous) previous.remove();
-    const items = (App.state.attachmentIndex || {})[String(commentId || '')] || [];
+    const isOpenchat=source==='openchat';
+    const items = (App.state.attachmentIndex || {})[(isOpenchat?'openchat:':'')+String(commentId || '')] || [];
     if (!items.length) return;
     const wrapper = document.createElement('span');
     wrapper.className = 'community-attachment-links block mt-2 text-sm';
@@ -3565,18 +3603,18 @@ const App = {
       const link = document.createElement('a');
       link.href = '#attachment-' + String(item.id);
       link.className = 'block text-blue-700 hover:underline break-all';
-      link.textContent = String(item.original_name || '添付ファイル');
+      link.textContent = App.attachmentDisplayName(item);
       link.addEventListener('click', async function (event) {
         event.preventDefault();
         const generation = App.state.attachmentGeneration;
         const target = window.open('about:blank', '_blank');
         if (target) target.opener = null;
         try {
-          const result = await App.attachmentRequest({ operation: 'open', attachment_id: item.id });
+          const result = await App.attachmentRequest({ operation: 'open', source:isOpenchat?'openchat':'community', attachment_id: item.id });
           if (generation !== App.state.attachmentGeneration) throw new Error('ログイン状態が変わりました。開き直してください。');
           const url = new URL(result.url);
           if (url.origin !== 'https://mwubzgefkkjjbingrmqu.supabase.co' ||
-              !url.pathname.startsWith('/storage/v1/object/sign/community-attachments/')) throw new Error('添付リンクを確認できませんでした。');
+              !url.pathname.startsWith('/storage/v1/object/sign/'+(isOpenchat?'openchat-attachments':'community-attachments')+'/')) throw new Error('添付リンクを確認できませんでした。');
           if (!target) throw new Error('ポップアップを許可して、もう一度リンクを押してください。');
           target.location.replace(url.href);
         } catch (error) {
@@ -3601,6 +3639,8 @@ const App = {
     const categoryFilter =
       (App.elements.commentCategoryFilter && App.elements.commentCategoryFilter.value) || '';
     const dateFilter = (App.elements.commentDateFilter && App.elements.commentDateFilter.value) || '';
+    const commentsLoading = !!(App.state.referenceLoads && App.state.referenceLoads.comments);
+    const attachmentsOnly = !!(App.elements.commentAttachmentsOnly && App.elements.commentAttachmentsOnly.checked);
     body.innerHTML = '';
 
     const communityRows = (App.state.comments || []).filter(function (row) {
@@ -3608,6 +3648,7 @@ const App = {
     });
     const filtered = communityRows.filter(function (row) {
       const cid = String(App.commentField(row, 'comment_id') || '').trim();
+      const attachments = (App.state.attachmentIndex || {})[cid] || [];
       const forumCategory =
         String(App.commentField(row, 'forum_category') || '').trim() || '未分類';
       const hasDate = App.hasPostedAtValue(row);
@@ -3628,14 +3669,15 @@ const App = {
           t2m.indexOf(keyword) !== -1 ||
           t2n.indexOf(keyword) !== -1 ||
           t4.indexOf(keyword) !== -1 ||
-          t5.indexOf(keyword) !== -1;
+          t5.indexOf(keyword) !== -1 ||
+          attachments.some(item => String(item.original_name || '').toLowerCase().includes(keyword));
       }
       const hitCategory = !categoryFilter || forumCategory === categoryFilter;
       const hitDate =
         !dateFilter ||
         (dateFilter === 'hasDate' && hasDate) ||
         (dateFilter === 'missingDate' && !hasDate);
-      return hitKeyword && hitCategory && hitDate;
+      return hitKeyword && hitCategory && hitDate && (!attachmentsOnly || attachments.length > 0);
     });
 
     const pageSize = 100;
@@ -3655,7 +3697,10 @@ const App = {
         totalCount +
         ' 件（月日不明 ' +
         missingDateCount +
-        ' 件・年も不明 ' + unknownYearCount + ' 件）';
+        ' 件・年も不明 ' + unknownYearCount + ' 件）' +
+        (commentsLoading ? '・コメント一覧を取得中（件数は暫定）' : '') +
+        (attachmentsOnly && App.state.attachmentLoading ? '・添付情報を確認中（件数は暫定）' :
+          attachmentsOnly && App.state.attachmentStatus ? '・添付情報が未確認のため一部のみ表示。上部から再取得してください。' : '');
       if (filtered.length > pageSize) {
         const controls = document.createElement('span');
         controls.className = 'inline-flex gap-3 ml-3';
@@ -3672,7 +3717,8 @@ const App = {
     }
 
     if (filtered.length === 0) {
-      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">該当データがありません</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">' +
+        (commentsLoading ? 'コメント一覧を取得中…' : attachmentsOnly && (App.state.attachmentLoading || App.state.attachmentStatus) ? '添付情報の確認が完了していません。' : '該当データがありません') + '</td></tr>';
       return;
     }
 

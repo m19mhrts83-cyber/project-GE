@@ -73,35 +73,47 @@ export function createHandler(cfg: Config, transport: typeof fetch = fetch, now:
       const member = await statusResponse.json();
       if (String(member.user_id) !== uid || member.status !== "approved" || !["user", "admin", "master_admin"].includes(member.role)) return json({ error: "membership_required" }, 403);
       if (cfg.requireParentSession && member.session_active !== true) return json({ error: "login_required" }, 401);
+      const source = body.source ?? "community";
+      if (!["community", "openchat"].includes(source)) return json({ error: "invalid_source" }, 400);
+      const isOpenchat = source === "openchat";
+      const bucket = isOpenchat ? "openchat-attachments" : BUCKET;
+      const table = isOpenchat ? "openchat_member_attachments" : "community_attachments";
       const auth = { apikey: cfg.serviceKey, Authorization: "Bearer " + cfg.serviceKey };
       const query = new URLSearchParams();
       if (op === "open") {
         if (!/^[0-9a-f]{64}$/.test(body.attachment_id || "")) return json({ error: "invalid_attachment" }, 400);
         query.set("select", "id,bucket,storage_path"); query.set("id", "eq." + body.attachment_id); query.set("limit", "1");
       } else {
-        query.set("select", "id,comment_id,original_name,content_type,byte_size"); query.set("order", "id.asc");
+        query.set("select", "id," + (isOpenchat ? "source_log_id" : "comment_id") + ",original_name,content_type,byte_size"); query.set("order", "id.asc");
         if (op === "list") {
-          if (!/^[0-9]+$/.test(body.comment_id || "")) return json({ error: "invalid_comment" }, 400);
-          query.set("comment_id", "eq." + body.comment_id); query.set("limit", "100");
+          if (isOpenchat) {
+            if (!/^oc_[0-9a-f]{64}$/.test(body.source_log_id || "")) return json({ error: "invalid_source_log" }, 400);
+            query.set("source_log_id", "eq." + body.source_log_id);
+          } else {
+            if (!/^[0-9]+$/.test(body.comment_id || "")) return json({ error: "invalid_comment" }, 400);
+            query.set("comment_id", "eq." + body.comment_id);
+          }
+          query.set("limit", "100");
         } else {
           const offset = body.offset ?? 0;
           if (!Number.isInteger(offset) || offset < 0 || offset > 100000) return json({ error: "invalid_offset" }, 400);
           query.set("limit", "500"); query.set("offset", String(offset));
         }
       }
-      const metaResponse = await transport(cfg.projectUrl + "/rest/v1/community_attachments?" + query, { headers: auth, signal: AbortSignal.timeout(15000) });
+      const metaResponse = await transport(cfg.projectUrl + "/rest/v1/" + table + "?" + query, { headers: auth, signal: AbortSignal.timeout(15000) });
       if (!metaResponse.ok) return json({ error: "attachments_unavailable" }, 503);
       const rows = await metaResponse.json();
       if (op !== "open") return json({ attachments: rows, next_offset: op === "index" && rows.length === 500 ? (body.offset ?? 0) + 500 : null });
       const row = rows[0];
       if (!row) return json({ error: "not_found" }, 404);
-      if (row.bucket !== BUCKET || !/^comments\/[0-9]+\/[0-9a-f]{64}\.(jpg|png|pdf|xlsx|docx|pptx|zip|webp|heic|doc|csv)$/.test(row.storage_path)) return json({ error: "invalid_storage_record" }, 500);
-      const signResponse = await transport(cfg.projectUrl + "/storage/v1/object/sign/" + BUCKET + "/" + row.storage_path, {
+      const validPath = isOpenchat ? /^objects\/[0-9a-f]{64}$/.test(row.storage_path) : /^comments\/[0-9]+\/[0-9a-f]{64}\.(jpg|png|pdf|xlsx|docx|pptx|zip|webp|heic|doc|csv)$/.test(row.storage_path);
+      if (row.bucket !== bucket || !validPath) return json({ error: "invalid_storage_record" }, 500);
+      const signResponse = await transport(cfg.projectUrl + "/storage/v1/object/sign/" + bucket + "/" + row.storage_path, {
         method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn: 60 }), signal: AbortSignal.timeout(15000) });
       if (!signResponse.ok) return json({ error: "file_unavailable" }, 503);
       const signed = await signResponse.json();
       const path = String(signed.signedURL || "");
-      if (!path.startsWith("/object/sign/" + BUCKET + "/")) return json({ error: "invalid_storage_response" }, 502);
+      if (!path.startsWith("/object/sign/" + bucket + "/")) return json({ error: "invalid_storage_response" }, 502);
       return json({ url: cfg.projectUrl + "/storage/v1" + path, expires_in: 60 });
     } catch {
       // Do not log passwords, session tokens, signed URLs, or upstream response bodies.

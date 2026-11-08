@@ -1,5 +1,6 @@
 #!/bin/zsh
-# Todoist完了候補確認（313）— 夜20:00のL1ダイジェスト runner
+# Todoist完了候補確認（313）— 夜20:00 片付け runner
+# 段階1: 旧 ✅／📅 2通 → 1通「313 片付け」3択
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY="${HOME}/selenium_env/venv/bin/python"
@@ -14,15 +15,19 @@ if [[ -f "${REPO_DIR}/.env.jarvis_private" ]]; then
   set +a
 fi
 
-# FRIDAY 実行＝コメント先頭を【FRIDAY】にする（既定は Jarvis）
 export TODOIST_313_AUTHOR="${TODOIST_313_AUTHOR:-FRIDAY}"
 
-# 確認のみの自動 close はしない（L1＝見るだけ／close は人の「閉じて N」）
 if [[ $# -gt 0 ]]; then
-  # 手動テスト（--dry-run 等）は本体だけ
-  exec "$PY" "${REPO_DIR}/scripts/jarvis_todoist_313_digest.py" "$@"
+  # 手動: 従来 digest 引数を渡したいとき
+  if [[ "${1:-}" == "--legacy-digest" ]]; then
+    shift
+    exec "$PY" "${REPO_DIR}/scripts/jarvis_todoist_313_digest.py" "$@"
+  fi
+  exec "$PY" "${REPO_DIR}/scripts/jarvis_todoist_313_cleanup.py" "$@"
 fi
 
-# 定時: ①完了候補ダイジェスト → ②期日超過の整理（どちらも見るだけ）
-"$PY" "${REPO_DIR}/scripts/jarvis_todoist_313_digest.py"
-"$PY" "${REPO_DIR}/scripts/jarvis_todoist_313_overdue.py" --refresh
+# 本線: 3択片付け1通
+"$PY" "${REPO_DIR}/scripts/jarvis_todoist_313_cleanup.py"
+
+# ついで: 外で済んだ候補（投稿せず state のみ）
+"$PY" "${REPO_DIR}/scripts/jarvis_todoist_313_done_elsewhere.py" || true
