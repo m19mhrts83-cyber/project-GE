@@ -75,7 +75,10 @@ Claude デスクトップが閉じていると 9:30 の回は次の起動時に�
 
 松野さんが社員の提案（下書き・未返信判定・起票案・完了候補・S9）にどう判断したかは Supabase `owner_decisions` に毎回残る（triage は DB トリガー、312/313/S9 は `lib/ownerDecisionLog.ts`）。週次レビューで毎回これを読む。
 
-1. `~/selenium_env/venv/bin/python scripts/jarvis_owner_decisions_weekly.py --out <worktree>/docs/…/314_業務品質監査係/output/YYYYMMDD_判断ログ.md`
+1. `~/selenium_env/venv/bin/python scripts/jarvis_owner_decisions_weekly.py --loopware --improvement-logs --out <worktree>/docs/…/314_業務品質監査係/output/YYYYMMDD_判断ログ.md`
+   - `--loopware`: 機械で束ねた節（ルール候補 最大3件・効いたルール・残っている理由・次の一手の型）を足し、候補を loopware「今週の学び」（/rules）に置く。9:00 の機械チェックでも同じ候補を置いている
+   - AI が要るのは `needs_ai`（言い回し）の候補だけ。差分を読んで文言を1行にし、ルール帳の `## 仮説` に置く。それ以外は機械の結果をそのまま使う
+   - loopware で「採用」されたルールは `scripts/jarvis_loopware_apply_rules.py --commit` で1ルール=1コミットでルール帳へ（取り消しも同じ）
 2. 社員ごとに読む: **見送り率が高い**＝提案の出しすぎ（判定・閾値・ノイズ判定）、**直して送った率・書き換えが大きい**＝下書きのプロンプト。diff と見送り理由から「毎回同じ直し」を探す
 3. 同じ直しが **2件以上** ある社員だけ、その社員のプロンプト（`CLAUDE.md`／スクリプト内のプロンプト）かコードを直す。§6 の「最大 5 件」に含める。1件だけのものは「提案」に回す
 4. 週次レビュー MD に「判断ログ」節（件数・社員ごとの見送り率・直して送った率・直したこと）を足す
