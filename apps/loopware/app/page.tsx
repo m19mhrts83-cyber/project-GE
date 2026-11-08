@@ -49,6 +49,17 @@ export default function HubPage() {
         <Icon name="next" size={18} />
       </Link>
 
+      <Link className="glass nav-card" href="/rules">
+        <span className="ico">
+          <Icon name="thumb" size={22} />
+        </span>
+        <span className="txt">
+          <strong>今週の学び</strong>
+          <span className="meta">判断から見つけたルール候補。採用／今回だけ／違う</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
       <div className="eyebrow">IN ／ OUT</div>
       <Link className="glass nav-card" href="/312">
         <span className="ico">

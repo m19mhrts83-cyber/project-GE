@@ -10,4 +10,8 @@ set -a
 source "$REPO_DIR/.env.jarvis_private"
 set +a
 PY="${JARVIS_PYTHON:-/Users/matsunomasaharu2/selenium_env/venv/bin/python}"
+# ループウェア: 判断ログを機械で束ね、ルール候補（最大3件）を loopware「今週の学び」に置く（AI なし・失敗しても続ける）
+mkdir -p "$REPO_DIR/.jarvis_state/loopware"
+"$PY" "$REPO_DIR/scripts/jarvis_loopware_weekly.py" --publish \
+  > "$REPO_DIR/.jarvis_state/loopware/weekly.md" 2>> "$REPO_DIR/.jarvis_state/loopware/weekly.err" || true
 exec "$PY" "$REPO_DIR/scripts/jarvis_weekly_review_314.py" --post

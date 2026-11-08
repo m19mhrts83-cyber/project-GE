@@ -827,3 +827,12 @@ kbd { font-family: var(--font-mono); font-size: 10px; border: 1px solid currentC
 .voice-type { display: flex; gap: 8px; }
 .voice-type button { height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .mic.on .wave i { animation: none; height: 10px; } }
+
+/* ルール候補・自律度のはしご */
+.ladder { display: flex; align-items: center; gap: 4px; }
+.ladder span { width: 22px; height: 6px; border-radius: 3px; background: var(--line); }
+.ladder span.on { background: var(--accent); box-shadow: 0 0 8px rgba(56, 209, 255, 0.5); }
+.ladder em { font-style: normal; font-size: 11px; color: var(--ink-muted); margin-left: 6px; }
+.rule-line { display: block; padding: 6px 8px; border-radius: 6px; background: var(--surface-2); white-space: pre-wrap; word-break: break-all; }
+.adopted { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+.adopted button { height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line); background: transparent; white-space: nowrap; }
