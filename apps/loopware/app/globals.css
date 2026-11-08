@@ -386,7 +386,8 @@ button:disabled {
 
 /* ---- 入力 ---- */
 textarea,
-input[type="text"] {
+input[type="text"],
+input[type="password"] {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--line);
