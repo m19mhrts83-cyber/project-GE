@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Nody（apps/loopware）週1レビュー：判断ログを集めて Slack で確認を求め、確認済みになるまで見届ける。
 
-流れ（毎日の仕分けでログを貯め、週1で基準を更新する）:
+流れ（毎日の仕分けでログを貯め、週1で基準を更新する。仮説づくりと判断は Miss Lemon（Claude）のセッションで行い、アプリの従量課金APIは使わない）:
   report … 月曜朝。先週（月〜日・JST）のログを集計して #consult に「確認をお願い」を1通。
   nudge  … 毎朝。確認待ちなら2日後・4日後に1通ずつ催促。
            アプリで「この週のレビューを完了」が押されたら、#report に「確認済み」を1通返して終わり。
@@ -13,6 +13,12 @@ Slack の書式は 41_Slackスマホレイアウト（先頭1行＝番号＋役�
 必要な環境変数: JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY
                 SLACK_WEBHOOK_AI_TEAM_CONSULT（未設定なら REPORT に落ちる＝jarvis_slack_webhook_post.py）
 使い方: python scripts/loopware_weekly_review_slack.py --mode report|nudge [--dry-run] [--week YYYY-MM-DD]
+Miss Lemon 用（週次レビューのセッションで使う。Slack には出さない）:
+  --mode export                      … その週の判断ログを Markdown で出力（仮説づくりの材料）
+  --mode criteria-list               … 承認済みの基準を表示
+  --mode criteria-add --text ... [--range ...] [--basis ...]   … 松野さんが了承した基準を追記
+  --mode criteria-revoke --id cr-...  … 基準の取り消し（履歴は残る）
+  --mode review-done [--week ...]    … 週を「確認済み」にする（翌朝の「確認済み」返信につながる）
 """
 from __future__ import annotations
 
@@ -172,6 +178,135 @@ def collect(monday: datetime) -> dict:
     }
 
 
+def collect_detail(monday: datetime) -> tuple[list[dict], list[dict], list[str]]:
+    """仮説づくり用の詳細。(判断, 音声コメント, 完了した日) を返す。"""
+    frm, to = week_bounds(monday)
+    items: list[dict] = []
+    ds = rest(
+        "task_loop_decisions",
+        {
+            "select": "topic_id,chosen_index,choice,final_text,before_text,after_text,reason_tags,free_note,updated_at",
+            "updated_at": f"gte.{frm}",
+            "and": f"(updated_at.lt.{to})",
+            "order": "updated_at.asc",
+            "limit": "1000",
+        },
+    ) or []
+    topics: dict[str, str] = {}
+    if ds:
+        ids = ",".join(d["topic_id"] for d in ds)
+        for t in rest("task_loop_topics", {"select": "id,topic_text", "id": f"in.({ids})"}) or []:
+            topics[t["id"]] = t["topic_text"]
+    for d in ds:
+        note = d.get("free_note") or ""
+        rule = note.startswith("【次も同じに】")
+        items.append(
+            {
+                "at": d["updated_at"],
+                "agent": "312",
+                "topic": topics.get(d["topic_id"], ""),
+                "choice": d["choice"],
+                "reasons": d.get("reason_tags") or [],
+                "note": note.replace("【次も同じに】", ""),
+                "final": d.get("final_text") or "",
+                "before": d.get("before_text") or "",
+                "after": d.get("after_text") or "",
+                "scope": "rule" if rule else "once",
+            }
+        )
+    od = rest(
+        "owner_decisions",
+        {
+            "select": "surface,action,subject,note,payload,decided_at",
+            "surface": "in.(todoist_313,loopware_voice)",
+            "decided_at": f"gte.{frm}",
+            "and": f"(decided_at.lt.{to})",
+            "order": "decided_at.asc",
+            "limit": "1000",
+        },
+    ) or []
+    voice: list[dict] = []
+    for r in od:
+        p = r.get("payload") or {}
+        if r["surface"] == "loopware_voice":
+            if r["action"] == "voice_comment":
+                voice.append({"at": r["decided_at"], "target": r.get("subject") or "", "text": r.get("note") or "",
+                              "alt": p.get("alt_target_label")})
+        elif p.get("kind") == "loopware":
+            items.append(
+                {
+                    "at": r["decided_at"],
+                    "agent": "313",
+                    "topic": r.get("subject") or "",
+                    "choice": r["action"],
+                    "reasons": p.get("reason_tags") or [],
+                    "note": r.get("note") or "",
+                    "final": p.get("final_text") or "",
+                    "before": p.get("before_text") or "",
+                    "after": p.get("after_text") or "",
+                    "scope": p.get("scope") or "once",
+                }
+            )
+    dd = rest(
+        "owner_decisions",
+        {"select": "target_id", "surface": "eq.loopware_daily", "action": "eq.daily_done",
+         "decided_at": f"gte.{frm}", "and": f"(decided_at.lt.{to})"},
+    ) or []
+    return items, voice, sorted({r["target_id"] for r in dd})
+
+
+def criteria_live() -> list[dict]:
+    rows = rest(
+        "owner_decisions",
+        {"select": "action,target_id,note,payload,decided_at", "surface": "eq.loopware_criteria",
+         "order": "id.asc", "limit": "1000"},
+    ) or []
+    live: dict[str, dict] = {}
+    for r in rows:
+        if r["action"] == "criteria_revoked":
+            live.pop(r["target_id"], None)
+        else:
+            p = r.get("payload") or {}
+            live[r["target_id"]] = {"id": r["target_id"], "text": r.get("note") or "",
+                                    "range": p.get("range") or "", "basis": p.get("basis") or ""}
+    return list(live.values())
+
+
+def export_md(monday: datetime) -> str:
+    items, voice, days = collect_detail(monday)
+    L = [f"# Nody 判断ログ {span(monday)}（週の月曜 {monday:%Y-%m-%d}）", ""]
+    L += [f"- 仕分けを完了した日: {len(days)}日（{', '.join(days) or 'なし'}）",
+          f"- 判断: {len(items)}件／音声・文字コメント: {len(voice)}件", ""]
+    L += ["## 承認済みの基準（現在）"]
+    live = criteria_live()
+    L += [f"- {c['id']}: {c['text']}" + (f"（範囲：{c['range']}）" if c["range"] else "") +
+          (f"（根拠：{c['basis']}）" if c["basis"] else "") for c in live] or ["- なし"]
+    L += ["", "## 判断（生ログ。AIの解釈は含まない）"]
+    for i, it in enumerate(items, 1):
+        title = (it["topic"] or it["final"]).replace("\n", " / ")[:120]
+        L.append(f"{i}. [{it['agent']}] {title} → {it['choice']}（{'次も同じに' if it['scope'] == 'rule' else '今回だけ'}）")
+        if it["reasons"]:
+            L.append(f"   - 理由：{'・'.join(it['reasons'])}")
+        elif it["choice"] in ("skip", "hold", "none_of_above", "drop"):
+            L.append("   - 理由：未選択（理由不明として扱う）")
+        if it["note"]:
+            L.append(f"   - コメント：{it['note']}")
+        if it["before"] and it["after"]:
+            L.append(f"   - 修正前：{it['before'].replace(chr(10), ' / ')}")
+            L.append(f"   - 修正後：{it['after'].replace(chr(10), ' / ')}")
+    if voice:
+        L += ["", "## 音声・文字コメント（話し始めた時点に見ていたカードごと）"]
+        for v in voice:
+            L.append(f"- {v['target']}：{v['text']}" + (f"（話し終えたときは「{v['alt']}」を見ていた）" if v.get("alt") else ""))
+    L += ["", "## 仮説づくりの注意（設計書）",
+          "- 「次も同じに」が付いていない判断は『今回だけ』。基準の根拠にしない。",
+          "- 本人の理由とAIの推測を分ける。理由が未選択のものは、理由不明のまま扱う。",
+          "- 『知っている』『今は不要』『誤り』を同じ×にしない。見送った＝嫌い、ではない。",
+          "- 件数が少ない週は、断定せず『見直す候補』として出す。",
+          "- 顧客名・社名・連絡先は、外へ出す前に伏せる。"]
+    return "\n".join(L)
+
+
 def review_rows(week: str) -> list[dict]:
     return (
         rest(
@@ -235,15 +370,23 @@ def report_text(monday: datetime, s: dict) -> str:
             f"・見送り理由: {why}",
             f"・直し{s['edits']}件／次も同じに{s['rules']}件／音声{s['voice']}件",
             f"・基準: 承認済み{s['criteria']}件",
-            f"確認: {APP_URL}/review",
-            "次: 人判断のみ\n\n担当メモ: 開いて基準を承認・取り消しし、「この週のレビューを完了」を押す\n\n橋渡し: 完了すると、翌朝ここへ「確認済み」を返す",
+            f"見る: {APP_URL}/review",
+            "次: Miss Lemonで続行\n\n担当メモ: 「Nodyの週次レビューをして」と声をかけると、仮説をまとめて提案します\n\n橋渡し: 松野さんが了承した基準だけ反映。完了にすると翌朝ここへ「確認済み」を返す",
         ]
     )
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--mode", choices=["report", "nudge"], required=True)
+    ap.add_argument(
+        "--mode",
+        choices=["report", "nudge", "export", "criteria-list", "criteria-add", "criteria-revoke", "review-done"],
+        required=True,
+    )
+    ap.add_argument("--text")
+    ap.add_argument("--range", dest="rng", default="")
+    ap.add_argument("--basis", default="")
+    ap.add_argument("--id")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--week", help="対象週の月曜（YYYY-MM-DD, JST）。既定は先週")
     ap.add_argument("--channel", default="consult")
@@ -255,6 +398,48 @@ def main() -> int:
     else:
         monday = last_monday(now) - timedelta(days=7)
     wk = monday.strftime("%Y-%m-%d")
+
+    if a.mode == "export":
+        print(export_md(monday))
+        return 0
+    if a.mode == "criteria-list":
+        for c in criteria_live():
+            print(f"- {c['id']}: {c['text']}" + (f"（範囲：{c['range']}）" if c["range"] else "") + (f"（根拠：{c['basis']}）" if c["basis"] else ""))
+        return 0
+    if a.mode == "criteria-add":
+        if not a.text:
+            print("--text が必要", file=sys.stderr)
+            return 2
+        cid = f"cr-{int(datetime.now().timestamp() * 1000)}"
+        body = {"surface": "loopware_criteria", "action": "criteria_approved", "source": "miss_lemon",
+                "employee": "312", "target_type": "loopware_criteria", "target_id": cid,
+                "subject": a.text[:200], "note": a.text, "payload": {"kind": "loopware", "range": a.rng or None, "basis": a.basis or None}}
+        if a.dry_run:
+            print(json.dumps(body, ensure_ascii=False, indent=2))
+        else:
+            rest("owner_decisions", method="POST", body=body)
+            print(f"承認済みの基準に追記: {cid}")
+        return 0
+    if a.mode == "criteria-revoke":
+        if not a.id:
+            print("--id が必要", file=sys.stderr)
+            return 2
+        body = {"surface": "loopware_criteria", "action": "criteria_revoked", "source": "miss_lemon",
+                "employee": "312", "target_type": "loopware_criteria", "target_id": a.id,
+                "subject": "基準の取り消し", "payload": {"kind": "loopware"}}
+        if a.dry_run:
+            print(json.dumps(body, ensure_ascii=False))
+        else:
+            rest("owner_decisions", method="POST", body=body)
+            print(f"取り消し: {a.id}")
+        return 0
+    if a.mode == "review-done":
+        if a.dry_run:
+            print(f"review_done を {wk} に記録（dry-run）")
+        else:
+            record(wk, "review_done", "miss_lemon")
+            print(f"{wk} を確認済みにした")
+        return 0
 
     if a.mode == "report":
         rows = review_rows(wk)
@@ -312,8 +497,7 @@ def main() -> int:
                         [
                             f"【相談】Nody 週1レビュー（確認待ち） {span(m)}",
                             "📌要ボス: 判断ログの確認（5分）",
-                            f"確認: {APP_URL}/review",
-                            "次: 人判断のみ",
+                            "次: Miss Lemonで続行\n\n担当メモ: 「Nodyの週次レビューをして」と声をかける",
                         ]
                     ),
                     a.dry_run,

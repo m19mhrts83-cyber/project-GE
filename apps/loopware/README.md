@@ -32,6 +32,7 @@ npm run dev   # http://127.0.0.1:3004
 - **Slack**（`scripts/loopware_weekly_review_slack.py`／`.github/workflows/loopware-weekly-review.yml`）：
   月曜 09:00 JST に先週のログを集計して #consult へ「確認をお願い」→ 毎朝 09:30 JST に確認待ちなら催促（最大2回）→
   アプリで「この週のレビューを完了」が押されたら #report に「確認済み」を返す。状態は `owner_decisions`（surface=`loopware_review`）に追記
+- **仮説づくりと了承はアプリではなくエージェント（Miss Lemon）で行う**。手順は [docs/週次レビュー_Miss_Lemon手順.md](docs/週次レビュー_Miss_Lemon手順.md)
 - 動作確認：`python scripts/loopware_weekly_review_slack.py --mode report --dry-run --week YYYY-MM-DD`（Slack へ出さず本文だけ表示）
 
 ## 週1のレビュー（`/review`）

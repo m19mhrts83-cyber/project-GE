@@ -116,7 +116,10 @@ export async function POST(req: Request) {
       before_text: decision.beforeText || null,
       after_text: decision.afterText || null,
       reason_tags: decision.reasonTags || [],
-      free_note: decision.freeNote || null,
+      free_note:
+        decision.scope === "rule"
+          ? `【次も同じに】${decision.freeNote || ""}`.trim()
+          : decision.freeNote || null,
       decided_via: decision.decidedVia || "app",
       updated_at: new Date().toISOString(),
     });
