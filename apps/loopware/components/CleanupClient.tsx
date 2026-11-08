@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
+import SaveSheet, { type SaveLine, type SaveStatus } from "./SaveSheet";
 import { REASON_TAGS_313 } from "@/lib/seed312";
 import {
   formatDecisionMd,
@@ -31,6 +32,13 @@ export default function CleanupClient({
   const [tags, setTags] = useState<string[]>([]);
   const [results, setResults] = useState<DecisionRecord[]>([]);
   const [msg, setMsg] = useState("");
+  const [saved, setSaved] = useState<{
+    rec: DecisionRecord;
+    label: string;
+    lines: SaveLine[];
+    total: number;
+    status: SaveStatus;
+  } | null>(null);
   const [act, setAct] = useState<"close" | "reschedule" | "drop">("close");
 
   useEffect(() => {
@@ -58,8 +66,16 @@ export default function CleanupClient({
     upsertDecision(rec);
     setResults(loadStore().decisions.filter((d) => d.agentId === "313"));
     setMsg(`記録した：${ACTS.find((a) => a.id === choice)?.label ?? choice}`);
+    const label = ACTS.find((a) => a.id === choice)?.label ?? choice;
+    const lines: SaveLine[] = [
+      { k: "decision", v: `${label}：${title || tid}` },
+      { k: "reason", v: tags.join("・") || "選ぶだけで保存（理由は任意）" },
+      { k: "note", v: note || "一言なし" },
+    ];
+    if (choice === "reschedule") lines.push({ k: "due", v: due || "期日を外す" });
+    setSaved({ rec, label, lines, total: loadStore().decisions.length, status: "pending" });
     try {
-      await fetch("/api/decide", {
+      const res = await fetch("/api/decide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -70,8 +86,10 @@ export default function CleanupClient({
           todoistTaskId: taskId || null,
         }),
       });
+      const j = (await res.json().catch(() => null)) as { persisted?: boolean } | null;
+      setSaved((c) => (c ? { ...c, status: j?.persisted === false ? "local" : "server" } : c));
     } catch {
-      /* ok */
+      setSaved((c) => (c ? { ...c, status: "local" } : c));
     }
   }
 
@@ -79,6 +97,16 @@ export default function CleanupClient({
 
   return (
     <div>
+      {saved ? (
+        <SaveSheet
+          rec={saved.rec}
+          decisionLabel={saved.label}
+          lines={saved.lines}
+          total={saved.total}
+          status={saved.status}
+          onClose={() => setSaved(null)}
+        />
+      ) : null}
       <div className="seg" style={{ marginBottom: 14 }}>
         <a
           href="?tab=cleanup"

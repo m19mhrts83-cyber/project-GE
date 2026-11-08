@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
+import SaveSheet, { type SaveLine, type SaveStatus } from "./SaveSheet";
 import {
   REASON_TAGS_312,
   SEED_TOPICS_312,
@@ -33,6 +34,13 @@ export default function TaskDedupeClient({
   const [note, setNote] = useState("");
   const [results, setResults] = useState<DecisionRecord[]>([]);
   const [msg, setMsg] = useState("");
+  const [saved, setSaved] = useState<{
+    rec: DecisionRecord;
+    label: string;
+    lines: SaveLine[];
+    total: number;
+    status: SaveStatus;
+  } | null>(null);
   const [sel, setSel] = useState<number | null>(1);
   const [rate, setRate] = useState<Record<number, "good" | "bad" | null>>({});
 
@@ -102,8 +110,30 @@ export default function TaskDedupeClient({
     setResults(loadStore().decisions.filter((d) => d.agentId === "312"));
     setMsg(choice === "none_of_above" ? "「どれも違う」を記録した" : `案${chosenIndex}で記録した`);
     setEditIndex(null);
+    const label =
+      choice === "none_of_above"
+        ? "どれも違う"
+        : `案${chosenIndex} ${topic.proposals.find((p) => p.index === chosenIndex)?.label ?? ""}${choice === "edit_use" ? "（直して使う）" : ""}`;
+    const rates = Object.entries(rate)
+      .filter(([, v]) => v)
+      .map(([i, v]) => `案${i}=${v === "good" ? "良い" : "悪い"}`)
+      .join(" / ");
+    const lines: SaveLine[] = [
+      { k: "decision", v: label },
+      { k: "reason", v: tags.join("・") || "選ぶだけで保存（理由は任意）" },
+      { k: "rating", v: rates || "評価なし" },
+      { k: "note", v: note || "一言なし" },
+    ];
+    if (choice === "edit_use") lines.push({ k: "diff", v: "直す前と直した後を保存" });
+    setSaved({
+      rec,
+      label,
+      lines,
+      total: loadStore().decisions.length,
+      status: "pending",
+    });
     try {
-      await fetch("/api/decide", {
+      const res = await fetch("/api/decide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -114,8 +144,10 @@ export default function TaskDedupeClient({
           decision: rec,
         }),
       });
+      const j = (await res.json().catch(() => null)) as { persisted?: boolean } | null;
+      setSaved((cur) => (cur ? { ...cur, status: j?.persisted === false ? "local" : "server" } : cur));
     } catch {
-      /* local-only ok */
+      setSaved((cur) => (cur ? { ...cur, status: "local" } : cur));
     }
   }
 
@@ -126,6 +158,10 @@ export default function TaskDedupeClient({
   const decidedProposal = doneRec?.chosenIndex
     ? topic.proposals.find((p) => p.index === doneRec.chosenIndex)
     : undefined;
+
+  const nextPending = SEED_TOPICS_312.find(
+    (t) => t.id !== topic.id && !results.some((r) => r.topicId === t.id),
+  );
 
   function reopen() {
     removeDecision(topic!.id, "312");
@@ -140,6 +176,24 @@ export default function TaskDedupeClient({
 
   return (
     <div>
+      {saved ? (
+        <SaveSheet
+          rec={saved.rec}
+          decisionLabel={saved.label}
+          lines={saved.lines}
+          total={saved.total}
+          status={saved.status}
+          closeLabel={nextPending ? "次のお題へ" : "閉じる"}
+          onClose={() => {
+            setSaved(null);
+            if (nextPending) setTopicId(nextPending.id);
+          }}
+          onUndo={() => {
+            setSaved(null);
+            reopen();
+          }}
+        />
+      ) : null}
       <div className="tabs">
         {SEED_TOPICS_312.map((t) => {
           const done = results.some((r) => r.topicId === t.id);
