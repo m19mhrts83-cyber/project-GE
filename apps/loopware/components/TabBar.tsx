@@ -7,6 +7,12 @@ import Icon from "./Icon";
 const TABS = [
   { href: "/", label: "ハブ", icon: "bolt", match: (p: string) => p === "/" },
   {
+    href: "/desk?surface=triage",
+    label: "判断",
+    icon: "check",
+    match: (p: string) => p.startsWith("/desk"),
+  },
+  {
     href: "/312",
     label: "312 入口",
     icon: "inbox",
