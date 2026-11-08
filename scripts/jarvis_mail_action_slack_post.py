@@ -385,10 +385,20 @@ def _age_hours(received_at: str) -> float:
         return 999.0
 
 
+def is_loopware_miss_due(pl: dict[str, Any] | None) -> bool:
+    """ループウェアの見落とし画面で「要対応だった」とされ、まだ Slack に出し直していない。"""
+    pl = pl if isinstance(pl, dict) else {}
+    return bool(pl.get("loopware_miss")) and not pl.get("slack_ma_miss_posted_at")
+
+
 def score_row(row: dict[str, Any]) -> tuple[int, list[str]]:
     """対応優先度スコア（高いほど先に通知）。reasons は dry-run 用。"""
     score = 0
     reasons: list[str] = []
+    if is_loopware_miss_due(row.get("payload")):
+        # 松野さんが「出すべきだった」と判断したもの → 先頭に出す
+        score += 100
+        reasons.append("loopware:miss")
     pri = str(row.get("priority") or "").lower()
     kind = str(row.get("kind") or "").lower()
     lane = str(row.get("lane") or "").lower()
@@ -1073,6 +1083,25 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         .limit(pool)
         .execute()
     )
+    rows_all: list[dict[str, Any]] = list(r.data or [])
+    # 見落としで「要対応だった」と戻されたものは古くても拾う
+    try:
+        miss = (
+            sb.table("triage_items")
+            .select(
+                "id,status,subject,draft_text,original_body,from_email,partner,"
+                "account,lane,kind,summary,payload,received_at,priority,"
+                "gmail_message_id"
+            )
+            .eq("status", "pending")
+            .eq("payload->>loopware_miss", "true")
+            .limit(20)
+            .execute()
+        )
+        seen_ids = {str(x.get("id")) for x in rows_all}
+        rows_all = [x for x in (miss.data or []) if str(x.get("id")) not in seen_ids] + rows_all
+    except Exception as e:
+        print(f"# loopware miss load soft-fail: {e}", file=sys.stderr)
     from jarvis_kurashift_re_inquiry_channel import is_mail_action_excluded
     from jarvis_mail_human import looks_human_mail
 
@@ -1082,7 +1111,8 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
     skipped_skim = 0
     skipped_posted = 0
     skipped_self = 0
-    for row in r.data or []:
+    loopware_miss_n = 0
+    for row in rows_all:
         tid = str(row.get("id") or "")
         if tid.startswith("re-vendor-"):
             skipped_vendor += 1
@@ -1097,6 +1127,11 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
             body=str(row.get("original_body") or ""),
         ):
             skipped_self += 1
+            continue
+        # 見落とし → 仕分け・ミュート・投稿済みの判定を通さず1回だけ出し直す
+        if is_loopware_miss_due(pl):
+            loopware_miss_n += 1
+            pool_rows.append(row)
             continue
         kind = str(row.get("kind") or "").lower()
         lane = str(row.get("lane") or "").lower()
@@ -1157,6 +1192,7 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         "skim_skip": skipped_skim,
         "self_skip": skipped_self,
         "already_posted": skipped_posted,
+        "loopware_miss": loopware_miss_n,
         "content_dupes": content_dupes,
         "mute_entries": len(mute.get("entries") or {}),
         "top_scores": [
@@ -1299,6 +1335,8 @@ def _stamp_posted_payload(
     sibling_of: str | None = None,
 ) -> dict[str, Any]:
     out = dict(pl)
+    if is_loopware_miss_due(pl):
+        out["slack_ma_miss_posted_at"] = now_iso()
     out["slack_ma_posted_at"] = now_iso()
     out["slack_ma_digest"] = {
         "at": now_iso(),
