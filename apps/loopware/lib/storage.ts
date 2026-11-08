@@ -1,7 +1,7 @@
 export type DecisionRecord = {
   topicId: string;
   agentId: "312" | "313";
-  choice: "use" | "edit_use" | "none_of_above" | "close" | "reschedule" | "drop";
+  choice: "use" | "edit_use" | "none_of_above" | "close" | "reschedule" | "drop" | "take" | "skip" | "hold";
   chosenIndex?: number;
   finalText?: string;
   beforeText?: string;
@@ -71,4 +71,41 @@ export function formatDecisionMd(rec: DecisionRecord): string {
     "## final",
     rec.finalText || rec.afterText || "(empty)",
   ].join("\n");
+}
+
+/* ---- 音声（・文字）コメント：どのカードへのコメントかを targetId で持つ ---- */
+export type VoiceComment = {
+  id: string;
+  agentId: "312" | "313";
+  targetId: string;
+  targetLabel: string;
+  text: string;
+  at: string;
+  via: "voice" | "text";
+  synced: boolean | null; // null=送信中, true=Supabase保存済み, false=端末のみ
+  /** 話し始めた時刻（at は話し終えた時刻）。見ながら言う：発話の開始時点に見ていた場所に結び付ける */
+  startedAt?: string;
+  mode?: "follow" | "pin";
+  /** 話し終えたときに見ていた場所が違った場合（前のカードの話かもしれない）。あとで「こちらへ移す」で付け替えられる */
+  alt?: { id: string; label: string };
+};
+
+const VKEY = "loopware_voice_v1";
+
+export function loadVoice(): VoiceComment[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const p = JSON.parse(localStorage.getItem(VKEY) || "[]");
+    return Array.isArray(p) ? p : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveVoice(list: VoiceComment[]) {
+  try {
+    localStorage.setItem(VKEY, JSON.stringify(list.slice(0, 300)));
+  } catch {
+    /* ignore */
+  }
 }

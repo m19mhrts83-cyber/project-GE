@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
+import VoiceDock, { CommentList } from "./VoiceDock";
+import { useVoiceLog } from "./useVoiceLog";
 import SaveSheet, { type SaveLine, type SaveStatus } from "./SaveSheet";
 import { REASON_TAGS_313 } from "@/lib/seed312";
 import {
@@ -39,6 +41,7 @@ export default function CleanupClient({
     total: number;
     status: SaveStatus;
   } | null>(null);
+  const voice = useVoiceLog("313");
   const [act, setAct] = useState<"close" | "reschedule" | "drop">("close");
 
   useEffect(() => {
@@ -73,6 +76,10 @@ export default function CleanupClient({
       { k: "note", v: note || "一言なし" },
     ];
     if (choice === "reschedule") lines.push({ k: "due", v: due || "期日を外す" });
+    {
+      const n = voice.forTarget(`task-${taskId || "manual"}`).length;
+      lines.push({ k: "voice", v: n ? `音声・文字コメント ${n}件（ログへ）` : "音声コメントなし" });
+    }
     setSaved({ rec, label, lines, total: loadStore().decisions.length, status: "pending" });
     try {
       const res = await fetch("/api/decide", {
@@ -132,7 +139,7 @@ export default function CleanupClient({
 
       {tab === "cleanup" ? (
         <>
-          <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="card" data-tid={`task-${taskId || "manual"}`} data-tlabel={title || "このタスク"} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div className="eyebrow" style={{ margin: 0 }}>TASK</div>
             <input
               type="text"
@@ -142,6 +149,7 @@ export default function CleanupClient({
               placeholder="タスク名"
               aria-label="タスク名"
             />
+            <CommentList comments={voice.forTarget(`task-${taskId || "manual"}`)} onDelete={voice.remove} onMove={voice.reassign} />
             <div className="btn-row">
               {taskId ? (
                 <span className="chip-task mono">id {taskId}</span>
@@ -271,6 +279,9 @@ export default function CleanupClient({
       {tab === "cleanup" ? (
         <div className="bar">
           <div className="bar-in">
+            <VoiceDock
+              onComment={voice.add}
+            />
             {msg ? (
               <div className="ok-line" role="status">
                 <Icon name="check" size={16} stroke={2.6} />

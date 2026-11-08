@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
+import VoiceDock, { CommentList } from "./VoiceDock";
+import { useVoiceLog } from "./useVoiceLog";
 import SaveSheet, { type SaveLine, type SaveStatus } from "./SaveSheet";
 import {
   REASON_TAGS_312,
@@ -41,6 +43,7 @@ export default function TaskDedupeClient({
     total: number;
     status: SaveStatus;
   } | null>(null);
+  const voice = useVoiceLog("312");
   const [sel, setSel] = useState<number | null>(1);
   const [rate, setRate] = useState<Record<number, "good" | "bad" | null>>({});
 
@@ -125,6 +128,10 @@ export default function TaskDedupeClient({
       { k: "note", v: note || "一言なし" },
     ];
     if (choice === "edit_use") lines.push({ k: "diff", v: "直す前と直した後を保存" });
+    {
+      const n = topic.proposals.reduce((a, p) => a + voice.forTarget(`${topic.id}#${p.index}`).length, 0);
+      lines.push({ k: "voice", v: n ? `音声・文字コメント ${n}件（案ごとにログへ）` : "音声コメントなし" });
+    }
     setSaved({
       rec,
       label,
@@ -292,7 +299,13 @@ export default function TaskDedupeClient({
         const warn = /二重管理/.test(p.body);
         const rows = parseRows(p.body);
         return (
-          <div key={p.index} className={`card opt ${on ? "sel" : ""}`}>
+          <div
+            key={p.index}
+            data-tid={`${topic.id}#${p.index}`}
+            data-tlabel={`${shortTitle(topic.title)} 案${p.index} ${p.label}`}
+            className={`card opt targetable ${on ? "sel is-target" : ""}`}
+            onClick={() => setSel(p.index)}
+          >
             <button
               type="button"
               className="opt-head"
@@ -330,7 +343,8 @@ export default function TaskDedupeClient({
                 二重管理になります
               </div>
             ) : null}
-            <div className="rate">
+            <CommentList comments={voice.forTarget(`${topic.id}#${p.index}`)} onDelete={voice.remove} onMove={voice.reassign} />
+            <div className="rate" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 className={`good ${rate[p.index] === "good" ? "on" : ""}`}
@@ -426,6 +440,9 @@ export default function TaskDedupeClient({
       {doneRec ? null : (
       <div className="bar">
         <div className="bar-in">
+          <VoiceDock
+            onComment={voice.add}
+          />
           {msg || doneRec ? (
             <div className="ok-line" role="status">
               <Icon name="check" size={16} stroke={2.6} />

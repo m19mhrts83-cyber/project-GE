@@ -23,6 +23,15 @@ npm run dev   # http://127.0.0.1:3004
 - `/` ハブ
 - `/312?topic=seed-aoba` 扱いを決める（S05）
 - `/313?task=<todoist_id>` 片付ける
+- `/312?tab=misses` 提案を仕分ける（いろんなソースの候補を 採る／見送る／保留 → コメント → 最後に選ばなかった理由）
+
+## 声でフィードバック
+
+312・313 の下部バーのマイクで、字幕を見ながら声でコメントを残せる（T05「見ながら言う」）。
+対象は既定で**いま見ているカード**（スクロールに追従）。**話し始めた時点**のカードに結び付ける。カードをタップすると固定。
+話し終えたときに見ている場所が違えば、コメントに「こちらへ移す」が出る（付け替えは `voice_comment_reassigned` として追記）。
+確定した文は `/api/feedback` 経由で Supabase `owner_decisions`（surface=`loopware_voice` / action=`voice_comment`）へ追記（削除は `voice_comment_deleted` を足すだけで元の行は残す）。
+音声認識はブラウザの Web Speech API（Chrome）。マイク許可が必要。
 
 iPhone は **Chrome** 前提。
 
