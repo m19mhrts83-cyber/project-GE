@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Icon from "./Icon";
-import { loadStore, loadVoice } from "@/lib/storage";
+import { jstDay, loadDaily, loadStore, loadVoice } from "@/lib/storage";
 
 type Item = {
   at: string;
@@ -54,6 +54,7 @@ export default function ReviewClient() {
   const [voice, setVoice] = useState<VoiceItem[]>([]);
   const [configured, setConfigured] = useState(false);
   const [lastReview, setLastReview] = useState<string | null>(null);
+  const [dailyDone, setDailyDone] = useState<string[]>([]);
   const [criteria, setCriteria] = useState<Criterion[]>([]);
   const [critServer, setCritServer] = useState(false);
   const [stage, setStage] = useState<(typeof STAGES)[number]["id"]>("rule");
@@ -88,6 +89,9 @@ export default function ReviewClient() {
       const j = await (await fetch(`/api/review?from=${start.toISOString()}&to=${end.toISOString()}`)).json();
       setConfigured(!!j.configured);
       setLastReview(j.lastReview ?? null);
+      const wk = Array.from({ length: 7 }, (_, k) => jstDay(new Date(start.getTime() + k * 86400000)));
+      const localDays = Object.keys(loadDaily()).filter((d) => wk.includes(d));
+      setDailyDone(Array.from(new Set([...(j.dailyDone || []), ...localDays])));
       if (j.configured) {
         // サーバのログを正とし、サーバに無い端末のログだけ足す
         const server: Item[] = j.items || [];
@@ -103,6 +107,8 @@ export default function ReviewClient() {
       setConfigured(false);
       setItems(local);
       setVoice(lv);
+      const wk = Array.from({ length: 7 }, (_, k) => jstDay(new Date(start.getTime() + k * 86400000)));
+      setDailyDone(Object.keys(loadDaily()).filter((d) => wk.includes(d)));
     }
   }, [start, end]);
 
@@ -257,7 +263,7 @@ export default function ReviewClient() {
         <div className="tally-i skip"><b className="mono">{skip}</b><span>見送り</span></div>
         <div className="tally-i hold"><b className="mono">{hold}</b><span>保留</span></div>
       </div>
-      <p className="meta" style={{ margin: "8px 0 0" }}>直し {edits.length}件・音声コメント {voice.length}件・「次も同じに」{rules.length}件。件数は精度ではなく、確認する材料の量です。</p>
+      <p className="meta" style={{ margin: "8px 0 0" }}>毎日の仕分け：<b className="mono">{dailyDone.length}</b>／7日 完了。直し {edits.length}件・音声コメント {voice.length}件・「次も同じに」{rules.length}件。件数は精度ではなく、確認する材料の量です。</p>
 
       <div className="eyebrow">見送り・保留の理由<small>分けて見る</small></div>
       <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>

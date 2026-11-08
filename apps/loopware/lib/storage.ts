@@ -111,3 +111,40 @@ export function saveVoice(list: VoiceComment[]) {
     /* ignore */
   }
 }
+
+/* ---- 毎日の仕分け：その日の分を保存したら「今日は完了」。ログは溜まり、週1のレビューで基準へ ---- */
+export function jstDay(d: Date = new Date()): string {
+  const j = new Date(d.getTime() + 9 * 3600 * 1000);
+  return j.toISOString().slice(0, 10);
+}
+
+const DKEY = "loopware_daily_v1";
+
+export function loadDaily(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(DKEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+export function markDaily(day: string, count: number) {
+  try {
+    const m = loadDaily();
+    m[day] = count;
+    localStorage.setItem(DKEY, JSON.stringify(m));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function unmarkDaily(day: string) {
+  try {
+    const m = loadDaily();
+    delete m[day];
+    localStorage.setItem(DKEY, JSON.stringify(m));
+  } catch {
+    /* ignore */
+  }
+}

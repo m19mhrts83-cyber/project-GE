@@ -8,6 +8,7 @@ import SaveSheet, { type SaveLine, type SaveStatus } from "./SaveSheet";
 import {
   EDIT_TAGS,
   NONE,
+  propTopicId,
   SEED_PROPOSALS,
   VERDICTS,
   WHY_TAGS,
@@ -15,15 +16,20 @@ import {
   type Verdict,
 } from "@/lib/proposals";
 import {
+  jstDay,
   loadStore,
+  markDaily,
   removeDecision,
+  unmarkDaily,
   upsertDecision,
   type DecisionRecord,
 } from "@/lib/storage";
 
 type Step = "sort" | "why" | "done";
 
-const tid = (p: Proposal) => `prop-${p.id}`;
+const DAY = jstDay();
+// 毎日の仕分け：日付ごとに別のお題。前の日の判断は残る（ログ）が、今日は新しく仕分ける
+const tid = (p: Proposal) => propTopicId(DAY, p.id);
 const vLabel = (v: Verdict) => VERDICTS.find((x) => x.id === v)?.label ?? v;
 
 export default function ProposeClient() {
@@ -160,6 +166,12 @@ export default function ProposeClient() {
       };
     });
     recs.forEach(upsertDecision);
+    markDaily(DAY, recs.length);
+    void fetch("/api/criteria", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "daily", week: DAY, text: `${recs.length}件を仕分け` }),
+    }).catch(() => undefined);
 
     const whyCount = notChosen.filter((it) => (why[it.id] ?? []).length > 0).length;
     const comments = items.filter((it) => comment[it.id]).length;
@@ -243,6 +255,7 @@ export default function ProposeClient() {
 
   function reopenAll() {
     items.forEach((it) => removeDecision(tid(it), "312"));
+    unmarkDaily(DAY);
     setVerdict({});
     setWhy({});
     setComment({});
@@ -263,7 +276,7 @@ export default function ProposeClient() {
             <span className="radio" style={{ background: "var(--positive)", borderColor: "var(--positive)" }}>
               <Icon name="check" size={12} stroke={3.5} />
             </span>
-            <span style={{ flexGrow: 1 }}>仕分け済み</span>
+            <span style={{ flexGrow: 1 }}>今日の仕分けは完了</span>
             <span className="done-badge">保存済み</span>
           </div>
           <div className="tally">

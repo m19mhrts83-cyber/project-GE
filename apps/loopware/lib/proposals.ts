@@ -141,3 +141,6 @@ export const WHY_TAGS: Record<"skip" | "hold", string[]> = {
 
 /** 採るタスクを直したときの理由（設計書「完了条件つきタスク」）。任意。 */
 export const EDIT_TAGS = ["範囲が広い", "終わりが曖昧", "先に確認が必要"];
+
+/** 毎日の仕分けのお題ID（日付ごとに別。前の日の判断はログとして残る） */
+export const propTopicId = (day: string, id: string) => `prop-${day}-${id}`;
