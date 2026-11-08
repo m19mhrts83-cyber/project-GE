@@ -178,6 +178,17 @@ def ma_url(triage_id: str, action: str) -> str:
     return f"{_dashboard_base()}/api/g/ma/{action}/{triage_id}?s={ma_sig(triage_id, action)}"
 
 
+def loopware_url(triage_id: str) -> str:
+    """ループウェアの判断デスクへ（ダッシュボードが入場用 t= を付けて転送する）"""
+    return f"{_dashboard_base()}/api/g/lw/{triage_id}?s={ma_sig(triage_id, 'loopware')}"
+
+
+def _loopware_links_on() -> bool:
+    return (os.environ.get("JARVIS_MAIL_ACTION_LOOPWARE_LINK") or "1").strip().lower() not in {
+        "0", "false", "no", "off",
+    }
+
+
 def mail_detail_url(triage_id: str) -> str:
     return f"{_dashboard_base()}/mail/{triage_id}"
 
@@ -779,7 +790,9 @@ def build_compact_payload(
                     f"*From:* `{from_short}` · score=`{score}`\n"
                     f"*要旨:* {summary}\n"
                     f"{material_line}"
-                    f"<{detail}|本文の詳細（Dashboard）> · {draft_note}"
+                    f"<{detail}|本文の詳細（Dashboard）> · "
+                    + (f"<{loopware_url(tid)}|ループウェアで見る> · " if _loopware_links_on() else "")
+                    + f"{draft_note}"
                 ),
             },
         },
