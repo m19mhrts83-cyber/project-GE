@@ -96,7 +96,7 @@ export default function MissesClient() {
         <code>scripts/jarvis_todoist_312_miss_scan.py</code>
         。候補を漏れ／漏れではないで記録。漏れなら「扱いを決める」へ。
       </p>
-      <ul className="list">
+      <ul className="list glass">
         {cands.map((c) => (
           <li key={c.id}>
             <strong>
@@ -121,7 +121,7 @@ export default function MissesClient() {
       </ul>
       {msg ? <p className="meta">{msg}</p> : null}
       <h2 style={{ fontSize: "1.05rem", marginTop: 24 }}>漏れ判定ログ</h2>
-      <ul className="list">
+      <ul className="list glass">
         {results.map((r) => (
           <li key={`${r.topicId}-${r.decidedAt}`}>
             {r.topicId} · {r.finalText}

@@ -100,6 +100,11 @@ function resolveDashboardUrl(): string {
 
 export const DASHBOARD_URL = resolveDashboardUrl();
 
+/** ループウェア（判断デスク）。KURASHIFT から来たときは KURASHIFT の色で開く */
+export const LOOPWARE_DESK_URL =
+  (process.env.NEXT_PUBLIC_LOOPWARE_URL || "https://jarvis-loopware.vercel.app").replace(/\/$/, "") +
+  "/desk?from=kurashift";
+
 /** 借入残高トラッカー（ローン正本。Google: estate） */
 export const LOAN_TRACKER_URL =
   process.env.NEXT_PUBLIC_LOAN_TRACKER_URL ||

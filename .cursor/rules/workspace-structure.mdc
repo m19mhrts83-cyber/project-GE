@@ -1,0 +1,17 @@
+# ワークスペース分担（git-repos / OneDrive）
+
+## 方針
+
+- **プログラム・実行の正本**: `~/git-repos`（GitHub `project-GE`）
+- **業務データ・容量大成果物の正本**: OneDrive `215_神・大家さん倶楽部` 等（詳細は 215 側 `onedrive-authority-git-repos-execution.mdc`）
+
+## 構成の見方
+
+人間向けのフォルダ地図（分類・動かしてはいけないパス・CLAUDE 分担）:
+
+→ [`docs/リポジトリ構成_地図_20261108.md`](../../docs/リポジトリ構成_地図_20261108.md)
+
+## やらないこと
+
+- 地図なしに `scripts/` · `215_kamiooya/` · `line_unofficial_poc/` · `config/` · `launchd/` をネスト・リネームする
+- 秘密（`.env.jarvis_private` · token）を Git / Drive に置く

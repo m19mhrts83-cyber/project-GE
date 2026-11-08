@@ -175,12 +175,16 @@ export async function POST(
   }
 
   const intent = String(form.get("intent") || "");
+  // loopware 判断デスク（サーバ間・同じ署名）からは JSON で返す。入口は loopware として判断ログに残る
+  const fromLoopware = String(form.get("via") || "") === "loopware";
   if (intent !== "confirm") {
+    if (fromLoopware) return NextResponse.json({ ok: false, message: "intent required" }, { status: 400 });
     return htmlPage("キャンセル", "実行しませんでした", true);
   }
   const result = await applyMailActionSlack(id, action, {
-    source: "slack_short_link",
+    source: fromLoopware ? "loopware_desk" : "slack_short_link",
   });
+  if (fromLoopware) return NextResponse.json(result, { status: result.ok ? 200 : 409 });
   return resultPageForAction(action, result);
 }
 
