@@ -20,7 +20,7 @@ SOURCES = ("slack", "loopware", "dashboard", "kurashift", "script")
 # 採った／見送った／迷った／未判断…（decisionContract.ts の OUTCOME_OF と同じ）
 _OUTCOME = {
     **dict.fromkeys(
-        ["sent", "replied", "todo", "adopt", "accept", "good", "rule_accept", "next_good",
+        ["sent", "replied", "todo", "todoist", "adopt", "accept", "good", "rule_accept", "next_good",
          "create", "done", "close", "drop", "merge"], "take"),
     **dict.fromkeys(["skipped", "reject", "wrong", "rule_reject", "next_wrong", "dismiss", "skip"], "ng"),
     "hesitated": "hesitate",
