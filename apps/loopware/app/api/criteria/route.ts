@@ -48,18 +48,19 @@ export async function POST(req: Request) {
   const sb = serviceClient();
   if (!sb) return NextResponse.json({ ok: true, persisted: false, reason: "supabase_unconfigured" });
 
+  const daily = b.op === "daily";
   const review = b.op === "review";
   const action =
-    b.op === "revoke" ? "criteria_revoked" : b.op === "edit" ? "criteria_edited" : review ? "review_done" : "criteria_approved";
+    daily ? "daily_done" : b.op === "revoke" ? "criteria_revoked" : b.op === "edit" ? "criteria_edited" : review ? "review_done" : "criteria_approved";
   try {
     const { error } = await sb.from("owner_decisions").insert({
-      surface: review ? "loopware_review" : "loopware_criteria",
+      surface: daily ? "loopware_daily" : review ? "loopware_review" : "loopware_criteria",
       action,
       source: "app",
       employee: "312",
-      target_type: review ? "loopware_week" : "loopware_criteria",
-      target_id: review ? b.week || "-" : b.id || "-",
-      subject: review ? `週次レビュー ${b.week || ""}` : (b.text || "").slice(0, 200),
+      target_type: daily ? "loopware_day" : review ? "loopware_week" : "loopware_criteria",
+      target_id: daily ? b.week || "-" : review ? b.week || "-" : b.id || "-",
+      subject: daily ? `毎日の仕分け ${b.week || ""}` : review ? `週次レビュー ${b.week || ""}` : (b.text || "").slice(0, 200),
       note: b.text || null,
       payload: { kind: "loopware", range: b.range || null, basis: b.basis || null, week: b.week || null },
     });

@@ -25,6 +25,15 @@ npm run dev   # http://127.0.0.1:3004
 - `/313?task=<todoist_id>` 片付ける
 - `/312?tab=misses` 提案を仕分ける（いろんなソースの候補を 採る／見送る／保留 → コメント → 最後に選ばなかった理由）
 
+## 毎日の仕分け → 週1のレビュー → Slack
+
+- **毎日**：ハブの「今日の仕分け」（`/312?tab=misses`）を仕分けて保存すると、その日は完了。判断ログが溜まる（お題は日付ごと。前の日の判断はログとして残る）
+- **週1**：溜まったログを `/review` で確認し、基準を更新
+- **Slack**（`scripts/loopware_weekly_review_slack.py`／`.github/workflows/loopware-weekly-review.yml`）：
+  月曜 09:00 JST に先週のログを集計して #consult へ「確認をお願い」→ 毎朝 09:30 JST に確認待ちなら催促（最大2回）→
+  アプリで「この週のレビューを完了」が押されたら #report に「確認済み」を返す。状態は `owner_decisions`（surface=`loopware_review`）に追記
+- 動作確認：`python scripts/loopware_weekly_review_slack.py --mode report --dry-run --week YYYY-MM-DD`（Slack へ出さず本文だけ表示）
+
 ## 週1のレビュー（`/review`）
 
 判断ログ（312・313・音声コメント）を週ごとに見て、基準を更新する。

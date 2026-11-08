@@ -72,6 +72,15 @@ export async function GET(req: Request) {
       });
     });
 
+    const { data: dd } = await sb
+      .from("owner_decisions")
+      .select("target_id, note")
+      .eq("surface", "loopware_daily")
+      .eq("action", "daily_done")
+      .gte("decided_at", from)
+      .lt("decided_at", to);
+    const dailyDone = Array.from(new Set((dd || []).map((r) => r.target_id)));
+
     const { data: lr } = await sb
       .from("owner_decisions")
       .select("decided_at, payload")
@@ -83,6 +92,7 @@ export async function GET(req: Request) {
       configured: true,
       items,
       voice,
+      dailyDone,
       lastReview: lr?.[0]?.decided_at ?? null,
     });
   } catch (e) {

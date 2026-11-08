@@ -1,0 +1,57 @@
+name: Nody weekly review (Slack)
+
+# 毎日の仕分けで貯めた判断ログを、週1で確認して基準を更新する流れの Slack 側。
+#   月曜 09:00 JST … 先週のログを集計して #consult に「確認をお願い」
+#   毎朝 09:30 JST … 確認待ちなら催促（最大2回）／「この週のレビューを完了」が押されたら #report に「確認済み」
+# 確認そのものは https://jarvis-loopware.vercel.app/review で行う（アプリが review_done を記録）。
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # 月曜 09:00 JST: report
+    - cron: "30 0 * * *" # 毎朝 09:30 JST: nudge / 確認済み返信
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "report | nudge"
+        required: false
+        default: "nudge"
+      dry_run:
+        description: "Slack に投稿せず本文だけ出す"
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: loopware-weekly-review
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Weekly review job
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
+          SLACK_WEBHOOK_AI_TEAM_CONSULT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_CONSULT }}
+          SCHEDULE: ${{ github.event.schedule }}
+          IN_MODE: ${{ github.event.inputs.mode }}
+          IN_DRY: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${JARVIS_SUPABASE_URL:-}" || -z "${JARVIS_SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+            echo "::error::JARVIS_SUPABASE_* が未設定"
+            exit 1
+          fi
+          MODE="nudge"
+          if [[ "$SCHEDULE" == "0 0 * * 1" ]]; then MODE="report"; fi
+          if [[ -n "${IN_MODE:-}" ]]; then MODE="$IN_MODE"; fi
+          ARGS=(--mode "$MODE")
+          if [[ "${IN_DRY:-false}" == "true" ]]; then ARGS+=(--dry-run); fi
+          python scripts/loopware_weekly_review_slack.py "${ARGS[@]}"
