@@ -9,7 +9,7 @@
 
 やること:
   1. .env.jarvis_private に LOOPWARE_ACCESS_KEY が無ければ、ランダムな値を作って追記する
-  2. Vercel の jarvis-loopware に LOOPWARE_ACCESS_KEY / MAIL_ACTION_TOKEN /
+  2. Vercel の jarvis-loopware に LOOPWARE_ACCESS_KEY / MAIL_ACTION_TOKEN（無ければ PROPERTY_GATE_ACTION_TOKEN） /
      JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY / JARVIS_DASHBOARD_URL を登録（sensitive）
   3. Vercel の jarvis-dashboard に LOOPWARE_ACCESS_KEY を登録（Slack リンクの署名用）
   4. --sql を付けたときだけ、その SQL を Supabase Management API で流す
@@ -38,6 +38,7 @@ DEFAULT_DASHBOARD_PROJECT = "prj_3rP2c8CCYIhRFyECBycV8Y3gFluG"  # jarvis-dashboa
 LOOPWARE_KEYS = (
     "LOOPWARE_ACCESS_KEY",
     "MAIL_ACTION_TOKEN",
+    "PROPERTY_GATE_ACTION_TOKEN",  # MAIL_ACTION_TOKEN が無い環境の署名鍵（dashboard と同じ値）
     "JARVIS_SUPABASE_URL",
     "JARVIS_SUPABASE_SERVICE_ROLE_KEY",
     "JARVIS_DASHBOARD_URL",
