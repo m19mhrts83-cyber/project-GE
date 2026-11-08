@@ -194,3 +194,6 @@ scripts/jarvis_sbi_internal_xfer.py
 .jarvis_state/weekly_review_314/
 # WeStudy HTML バックアップの作業フォルダ（会員限定コンテンツ。コミット禁止）
 .jarvis_state/westudy_html_backup/
+
+# runtime residue (repo root)
+outputs/
