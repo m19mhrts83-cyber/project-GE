@@ -832,7 +832,7 @@ code {
   color: var(--ink-muted);
 }
 
-/* ---- 保存演出（ログが流れ込む） ---- */
+/* ---- 保存演出（ログが流れ込む）：経過時間 t で .in を付ける方式 ---- */
 .sheet-wrap {
   position: fixed;
   inset: 0;
@@ -863,7 +863,7 @@ code {
   border: 1px solid var(--line);
   border-bottom: 0;
   box-shadow: 0 -20px 60px rgba(56, 209, 255, 0.12);
-  animation: sheet-up 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: sheet-up 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -884,14 +884,23 @@ code {
   justify-content: center;
   background: var(--positive);
   color: var(--on-accent);
-  animation: ring-pop 0.6s 0.15s cubic-bezier(0.2, 1.4, 0.4, 1) both;
-  box-shadow: 0 0 0 0 rgba(79, 224, 166, 0.5);
+  flex-shrink: 0;
 }
 
 .sheet-title {
   font-size: 18px;
   line-height: 26px;
   font-weight: 700;
+}
+
+.skip {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 12px;
 }
 
 .log-lines {
@@ -915,7 +924,12 @@ code {
   border-bottom: 1px dashed var(--line);
   opacity: 0;
   transform: translateX(36px);
-  animation: line-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  transition: opacity 0.3s ease-out, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.log-line.in {
+  opacity: 1;
+  transform: none;
 }
 
 .log-line:last-child {
@@ -942,7 +956,11 @@ code {
   align-items: center;
   justify-content: center;
   transform: scale(0);
-  animation: tick-pop 0.3s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
+  transition: transform 0.3s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.log-tick.in {
+  transform: scale(1);
 }
 
 .log-count {
@@ -950,7 +968,11 @@ code {
   align-items: baseline;
   gap: 10px;
   opacity: 0;
-  animation: sheet-fade 0.3s ease-out forwards;
+  transition: opacity 0.3s ease-out;
+}
+
+.log-count.in {
+  opacity: 1;
 }
 
 .count-num {
@@ -958,6 +980,7 @@ code {
   line-height: 34px;
   font-weight: 600;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .count-num small {
@@ -965,25 +988,95 @@ code {
   color: var(--ink-muted);
 }
 
-.count-pop {
-  display: inline-block;
-  animation: count-pop 0.45s cubic-bezier(0.2, 1.5, 0.4, 1) both;
-}
-
 .count-plus {
   font-size: 14px;
   font-weight: 600;
   color: var(--positive);
   opacity: 0;
-  animation: plus-rise 0.9s ease-out forwards;
+  transform: translateY(8px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+
+.count-plus.in {
+  opacity: 1;
+  transform: none;
+}
+
+.log-stack {
+  list-style: none;
+  margin: -4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.log-stack li {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  opacity: 0;
+  transform: translateY(-14px);
+  transition: opacity 0.35s ease-out, transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.log-stack li.in {
+  opacity: 1;
+  transform: none;
+}
+
+.log-stack .mono {
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.stack-new {
+  background: rgba(56, 209, 255, 0.12);
+  border: 1px solid rgba(56, 209, 255, 0.5);
+  font-weight: 600;
+}
+
+.stack-old {
+  background: rgba(14, 21, 32, 0.8);
+  border: 1px solid var(--line);
+  color: var(--ink-muted);
+}
+
+.stack-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--on-accent);
+  background: var(--accent);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.ending,
+.sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease-out;
+}
+
+.ending.in,
+.sheet-actions.in {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .layers {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  opacity: 0;
-  animation: sheet-fade 0.4s ease-out forwards;
 }
 
 .layer {
@@ -1015,8 +1108,6 @@ code {
   border-radius: 12px;
   background: rgba(79, 224, 166, 0.08);
   border: 1px solid rgba(79, 224, 166, 0.4);
-  opacity: 0;
-  animation: ready-in 0.5s ease-out forwards;
 }
 
 .ready-title {
@@ -1030,11 +1121,7 @@ code {
 }
 
 .sheet-actions {
-  display: flex;
-  flex-direction: column;
   gap: 10px;
-  opacity: 0;
-  animation: sheet-fade 0.4s ease-out forwards;
 }
 
 .sheet-undo {
@@ -1045,87 +1132,24 @@ code {
   text-decoration: underline;
 }
 
+/* スキップ・完了後は動きなしで完成形 */
+.sheet.done .log-line,
+.sheet.done .log-tick,
+.sheet.done .log-count,
+.sheet.done .count-plus,
+.sheet.done .log-stack li {
+  transition: none;
+}
+
 @keyframes sheet-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-@keyframes line-in { to { opacity: 1; transform: translateX(0); } }
-@keyframes tick-pop { to { transform: scale(1); } }
-@keyframes count-pop { from { transform: translateY(60%) scale(0.7); opacity: 0; } to { transform: none; opacity: 1; } }
-@keyframes plus-rise { 0% { opacity: 0; transform: translateY(8px); } 25% { opacity: 1; } 100% { opacity: 1; transform: translateY(0); } }
-@keyframes ready-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@keyframes ring-pop {
-  0% { transform: scale(0); box-shadow: 0 0 0 0 rgba(79, 224, 166, 0.5); }
-  60% { transform: scale(1.1); }
-  100% { transform: scale(1); box-shadow: 0 0 0 14px rgba(79, 224, 166, 0); }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .sheet,
-  .sheet-dim,
-  .sheet-ring,
-  .log-line,
-  .log-tick,
-  .log-count,
-  .count-pop,
-  .count-plus,
-  .layers,
-  .log-stack li,
-  .ready,
-  .sheet-actions {
+  .sheet-dim {
     animation-duration: 0.01ms !important;
-    animation-delay: 0ms !important;
   }
-}
-
-.log-stack {
-  list-style: none;
-  margin: -4px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.log-stack li {
-  display: grid;
-  grid-template-columns: 44px 1fr auto;
-  gap: 8px;
-  align-items: center;
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 16px;
-  opacity: 0;
-  animation: stack-drop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-
-.log-stack .mono {
-  color: var(--ink-muted);
-  font-size: 11px;
-}
-
-.stack-new {
-  background: rgba(56, 209, 255, 0.12);
-  border: 1px solid rgba(56, 209, 255, 0.5);
-  font-weight: 600;
-}
-
-.stack-old {
-  background: rgba(14, 21, 32, 0.8);
-  border: 1px solid var(--line);
-  color: var(--ink-muted);
-}
-
-.stack-badge {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--on-accent);
-  background: var(--accent);
-  padding: 1px 6px;
-  border-radius: 8px;
-}
-
-@keyframes stack-drop {
-  from { opacity: 0; transform: translateY(-14px); }
-  to { opacity: 1; transform: none; }
+  .sheet * {
+    transition: none !important;
+  }
 }

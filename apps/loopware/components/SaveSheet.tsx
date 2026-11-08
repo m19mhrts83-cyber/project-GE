@@ -31,12 +31,17 @@ export default function SaveSheet({
   onUndo?: () => void;
   closeLabel?: string;
 }) {
-  const stepMs = 260;
-  const base = 450; // 最初の行が出るまで
-  const countAt = base + lines.length * stepMs + 200;
-  const doneAt = countAt + 700;
+  // いけともさんの「モーション」資料と同じ作り方：章の経過時間 t から毎フレーム状態を決める。
+// CSS の delay に任せないので、スキップ・動きを減らす設定でも完成形に飛べる。
+  const STEP = 240;
+  const BASE = 350;
+  const linesEnd = BASE + lines.length * STEP;
+  const T_COUNT = linesEnd + 150;
+  const T_STACK = T_COUNT + 250;
+  const T_END = T_STACK + 500;
 
-  const [shown, setShown] = useState(total - 1);
+  const [t, setT] = useState(0);
+  const [done, setDone] = useState(false);
   const [copied, setCopied] = useState(false);
   const [past, setPast] = useState<DecisionRecord[]>([]);
 
@@ -49,9 +54,30 @@ export default function SaveSheet({
   }, [rec]);
 
   useEffect(() => {
-    const t = window.setTimeout(() => setShown(total), countAt);
-    return () => window.clearTimeout(t);
-  }, [total, countAt]);
+    const reduce =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setDone(true);
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const el = now - start;
+      setT(el);
+      if (el >= T_END) setDone(true);
+      else raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [T_END]);
+
+  const at = (ms: number) => done || t >= ms;
+  // 件数は ease-out（1-(1-x)^3）で増える。章の経過時間から計算
+  const x = done ? 1 : Math.max(0, Math.min(1, (t - T_COUNT) / 500));
+  const eased = 1 - Math.pow(1 - x, 3);
+  const shown = Math.round(total - 1 + eased);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -64,92 +90,96 @@ export default function SaveSheet({
   return (
     <div className="sheet-wrap" role="dialog" aria-modal="true" aria-label="判断ログを保存しました">
       <div className="sheet-dim" onClick={onClose} />
-      <div className="sheet">
+      <div className={`sheet ${done ? "done" : ""}`}>
         <div className="sheet-head">
           <span className="sheet-ring" aria-hidden="true">
             <Icon name="check" size={22} stroke={3} />
           </span>
-          <div>
+          <div style={{ flexGrow: 1 }}>
             <div className="eyebrow acc" style={{ color: "var(--positive)" }}>
               SAVED
             </div>
             <div className="sheet-title">{decisionLabel}</div>
           </div>
+          {!done ? (
+            <button type="button" className="skip" onClick={() => setDone(true)}>
+              スキップ
+            </button>
+          ) : null}
         </div>
 
         <ul className="log-lines" aria-label="保存したログ">
           {lines.map((l, i) => (
-            <li
-              key={l.k}
-              className="log-line"
-              style={{ animationDelay: `${base + i * stepMs}ms` }}
-            >
+            <li key={l.k} className={`log-line ${at(BASE + i * STEP) ? "in" : ""}`}>
               <span className="log-k">{l.k}</span>
               <span className="log-v">{l.v}</span>
-              <span
-                className="log-tick"
-                style={{ animationDelay: `${base + i * stepMs + 180}ms` }}
-              >
+              <span className={`log-tick ${at(BASE + i * STEP + 160) ? "in" : ""}`}>
                 <Icon name="check" size={12} stroke={3.5} />
               </span>
             </li>
           ))}
         </ul>
 
-        <div className="log-count" style={{ animationDelay: `${countAt - 150}ms` }}>
+        <div className={`log-count ${at(T_COUNT - 100) ? "in" : ""}`}>
           <span className="meta">判断ログ</span>
           <span className="mono count-num">
-            <span key={shown} className="count-pop">
-              {shown}
-            </span>
+            {shown}
             <small> 件</small>
           </span>
-          <span className="count-plus mono" style={{ animationDelay: `${countAt}ms` }}>
-            +1
-          </span>
+          <span className={`count-plus mono ${at(T_COUNT) ? "in" : ""}`}>+1</span>
         </div>
 
-        <ol className="log-stack" aria-label="ログの積み上がり" style={{ animationDelay: `${countAt}ms` }}>
-          <li className="stack-new" style={{ animationDelay: `${countAt}ms` }}>
+        <ol className="log-stack" aria-label="ログの積み上がり">
+          <li className={`stack-new ${at(T_STACK) ? "in" : ""}`}>
             <span className="mono">{hhmm(rec.decidedAt)}</span>
-            <span>{rec.agentId} · {decisionLabel}</span>
+            <span>
+              {rec.agentId} · {decisionLabel}
+            </span>
             <span className="stack-badge">NEW</span>
           </li>
           {past.map((r, i) => (
-            <li key={`${r.topicId}-${r.decidedAt}`} className="stack-old" style={{ animationDelay: `${countAt + 120 + i * 90}ms` }}>
+            <li
+              key={`${r.topicId}-${r.decidedAt}`}
+              className={`stack-old ${at(T_STACK + 100 + i * 90) ? "in" : ""}`}
+            >
               <span className="mono">{hhmm(r.decidedAt)}</span>
-              <span>{r.agentId} · {r.finalText ? r.finalText.split("\n")[0].slice(0, 28) : r.topicId}</span>
+              <span>
+                {r.agentId} ·{" "}
+                {r.finalText ? r.finalText.split("\n")[0].slice(0, 28) : r.topicId}
+              </span>
             </li>
           ))}
         </ol>
 
-        <div className="layers" style={{ animationDelay: `${doneAt - 100}ms` }}>
-          <div className="layer on">
-            <Icon name="check" size={14} stroke={3} />
-            生の判断<small>保存済み</small>
+        <div className={`ending ${done ? "in" : ""}`} aria-hidden={!done}>
+          <div className="layers">
+            <div className="layer on">
+              <Icon name="check" size={14} stroke={3} />
+              生の判断<small>保存済み</small>
+            </div>
+            <div className="layer">
+              AIの解釈<small>まだ作らない</small>
+            </div>
+            <div className="layer">
+              承認した基準<small>確認するまで入れない</small>
+            </div>
           </div>
-          <div className="layer">
-            AIの解釈<small>まだ作らない</small>
-          </div>
-          <div className="layer">
-            承認した基準<small>確認するまで入れない</small>
+
+          <div className="ready">
+            <div className="ready-title">
+              <Icon name="check" size={16} stroke={3} />
+              改善に使える形で保存しました
+            </div>
+            <div className="meta">
+              {status === "pending" && "サーバへ送っています…"}
+              {status === "server" && "端末とサーバ（判断ログ）の両方に保存"}
+              {status === "local" && "この端末に保存。サーバ未接続のため、送信は保留です"}
+              ・今回だけの判断として記録（基準にはしていません）
+            </div>
           </div>
         </div>
 
-        <div className="ready" style={{ animationDelay: `${doneAt}ms` }}>
-          <div className="ready-title">
-            <Icon name="check" size={16} stroke={3} />
-            改善に使える形で保存しました
-          </div>
-          <div className="meta">
-            {status === "pending" && "サーバへ送っています…"}
-            {status === "server" && "端末とサーバ（判断ログ）の両方に保存"}
-            {status === "local" && "この端末に保存。サーバ未接続のため、送信は保留です"}
-            ・今回だけの判断として記録（基準にはしていません）
-          </div>
-        </div>
-
-        <div className="sheet-actions" style={{ animationDelay: `${doneAt + 150}ms` }}>
+        <div className={`sheet-actions ${done ? "in" : ""}`}>
           <button
             type="button"
             className="secondary"
