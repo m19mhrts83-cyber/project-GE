@@ -62,7 +62,9 @@ export async function isValidLinkToken(key: string, token: string | null | undef
 }
 
 /** 鍵が無くても開いてよい既存画面（312/313 は個人情報が少なく、従来どおり） */
-export function isLegacyOpenPath(path: string): boolean {
+export function isLegacyOpenPath(path: string, search: URLSearchParams | null = null): boolean {
+  // /api/misses?surface=triage はメールの中身を返すので鍵が要る
+  if (path === "/api/misses" && search?.get("surface")) return false;
   return (
     path === "/" ||
     path.startsWith("/312") ||

@@ -50,3 +50,17 @@ test('経過の表示', () => {
   assert.equal(d.agoLabel('2026-11-05T12:00:00Z', now), '3日前');
   assert.equal(d.agoLabel(null, now), '');
 });
+
+test('残り案件と次の一手（型で決める）', () => {
+  const now = new Date('2026-11-08T12:00:00Z');
+  const mk = (o) => ({ ...d.toCard({ id: 'abc-123456', lane: o.lane || 'general', received_at: o.at, draft_text: o.draft || '', payload: o.pl || {} }) });
+  assert.equal(d.isLeftover(mk({ at: '2026-11-08T10:00:00Z' }), now), false);
+  assert.equal(d.isLeftover(mk({ at: '2026-11-07T10:00:00Z' }), now), true);
+  assert.equal(d.isLeftover(mk({ at: '2026-11-08T11:00:00Z', pl: { loopware_hesitated_at: 'x' } }), now), true);
+  assert.equal(d.nextStepFor(mk({ at: '2026-11-08T11:00:00Z', pl: { loopware_stay_reason: 'waiting' } }), now).effect, 'snooze3');
+  assert.equal(d.nextStepFor(mk({ at: '2026-11-08T11:00:00Z', pl: { loopware_stay_reason: 'no_time' } }), now).effect, 'todo');
+  assert.equal(d.nextStepFor(mk({ at: '2026-11-08T11:00:00Z', draft: 'x', pl: { loopware_stay_reason: 'need_info' } }), now).id, 'needinfo_reply');
+  assert.equal(d.nextStepFor(mk({ at: '2026-11-04T11:00:00Z' }), now).id, 'old_low_skip');
+  assert.equal(d.nextStepFor(mk({ at: '2026-11-07T11:00:00Z', lane: 'partner', draft: '下書き' }), now).id, 'draft_reply');
+  assert.equal(d.nextStepFor(mk({ at: '2026-11-07T11:00:00Z' }), now).id, 'default_todo');
+});

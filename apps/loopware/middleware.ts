@@ -18,7 +18,7 @@ export async function middleware(req: NextRequest) {
   const isApi = path.startsWith("/api/");
 
   if (!key) {
-    if (process.env.NODE_ENV !== "production" || isLegacyOpenPath(path)) return NextResponse.next();
+    if (process.env.NODE_ENV !== "production" || isLegacyOpenPath(path, req.nextUrl.searchParams)) return NextResponse.next();
     if (isApi) {
       return NextResponse.json({ ok: false, error: "loopware_access_key_unset" }, { status: 503 });
     }
