@@ -154,6 +154,7 @@ def push_triage(sb) -> int:
                 "draft_cursor",
                 "message_id_header",
                 "engine",
+                "draft_rules",
             )
             if it.get(k) is not None
         }

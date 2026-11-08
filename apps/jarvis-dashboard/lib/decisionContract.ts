@@ -91,6 +91,7 @@ export const ACTIONS = [
   "dismiss",
   "close",
   "drop",
+  "merge",
   "reschedule",
   "skip",
 ] as const;
@@ -112,6 +113,7 @@ const OUTCOME_OF: Record<string, Outcome> = {
   done: "take",
   close: "take",
   drop: "take",
+  merge: "take",
   skipped: "ng",
   reject: "ng",
   wrong: "ng",
