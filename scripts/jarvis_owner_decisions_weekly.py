@@ -62,6 +62,20 @@ REASON_LABEL = {
     "handled": "対応済み",
     "notnow": "今は不要",
     "hesitate": "迷う",
+    # 契約 v1（apps/loopware/lib/decisionContract.ts）
+    "no_reply": "回答不要",
+    "self_or_grok": "自分発信・Grok部長",
+    "not_important": "そもそも重要でない",
+    "other": "その他",
+    "area": "エリア外",
+    "yield": "利回り不足",
+    "price": "価格",
+    "age_structure": "築年・構造",
+    "loan": "融資が付きにくい",
+    "no_time": "時間がない",
+    "unsure": "迷った",
+    "need_info": "情報が足りない",
+    "waiting": "誰かの返事待ち",
 }
 
 
