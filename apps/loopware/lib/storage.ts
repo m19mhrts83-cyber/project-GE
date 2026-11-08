@@ -10,6 +10,8 @@ export type DecisionRecord = {
   freeNote?: string;
   decidedAt: string;
   decidedVia: "app" | "slack";
+  /** 「今回だけ」か「次も同じに」か。既定は once。次も同じに＝基準の候補（本人が承認するまで基準にしない） */
+  scope?: "once" | "rule";
 };
 
 export type StoreV1 = {

@@ -39,6 +39,17 @@ export default function HubPage() {
         <Icon name="next" size={18} />
       </Link>
 
+      <Link className="glass nav-card" href="/review">
+        <span className="ico">
+          <Icon name="clock" size={22} />
+        </span>
+        <span className="txt">
+          <strong>週1のレビュー</strong>
+          <span className="meta">判断ログを確認して、基準を更新する</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
       <div className="eyebrow">LOOP</div>
       <div className="glass loop">
         <div><span className="mono">01</span>AIが案</div>

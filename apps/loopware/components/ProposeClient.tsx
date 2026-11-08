@@ -6,6 +6,8 @@ import VoiceDock, { CommentList } from "./VoiceDock";
 import { useVoiceLog } from "./useVoiceLog";
 import SaveSheet, { type SaveLine, type SaveStatus } from "./SaveSheet";
 import {
+  EDIT_TAGS,
+  NONE,
   SEED_PROPOSALS,
   VERDICTS,
   WHY_TAGS,
@@ -29,6 +31,10 @@ export default function ProposeClient() {
   const [verdict, setVerdict] = useState<Record<string, Verdict>>({});
   const [comment, setComment] = useState<Record<string, string>>({});
   const [why, setWhy] = useState<Record<string, string[]>>({});
+  const [edits, setEdits] = useState<Record<string, { title: string; doneWhen: string; due: string }>>({});
+  const [editOpen, setEditOpen] = useState<Record<string, boolean>>({});
+  const [editWhy, setEditWhy] = useState<Record<string, string[]>>({});
+  const [scope, setScope] = useState<Record<string, "once" | "rule">>({});
   const [step, setStep] = useState<Step>("sort");
   const [isSample, setIsSample] = useState(true);
   const voice = useVoiceLog("312");
@@ -51,9 +57,10 @@ export default function ProposeClient() {
           setItems(
             j.candidates.map((c: { id: string; source: string; folder: string; snippet: string; hypothesis: string }) => ({
               id: c.id,
+              group: c.id,
               source: c.source,
               from: c.folder,
-              snippet: c.snippet,
+              sourceText: c.snippet,
               taskTitle: c.snippet.slice(0, 40),
               hypothesis: c.hypothesis,
             })),
@@ -76,18 +83,21 @@ export default function ProposeClient() {
     const v: Record<string, Verdict> = {};
     const w: Record<string, string[]> = {};
     const c: Record<string, string> = {};
+    const sc: Record<string, "once" | "rule"> = {};
     for (const it of items) {
       const r = recs.find((d) => d.topicId === tid(it));
       if (r && (r.choice === "take" || r.choice === "skip" || r.choice === "hold")) {
         v[it.id] = r.choice;
         w[it.id] = r.reasonTags;
         if (r.freeNote) c[it.id] = r.freeNote;
+        if (r.scope) sc[it.id] = r.scope;
       }
     }
     if (items.length && items.every((it) => v[it.id])) {
       setVerdict(v);
       setWhy(w);
       setComment(c);
+      setScope(sc);
       setStep("done");
     }
   }, [items]);
@@ -119,21 +129,36 @@ export default function ProposeClient() {
 
   async function save() {
     const at = new Date().toISOString();
-    const recs: DecisionRecord[] = items.map((it) => ({
-      topicId: tid(it),
-      agentId: "312",
-      choice: verdict[it.id],
-      finalText:
-        verdict[it.id] === "take"
-          ? [`タスク：${it.taskTitle}`, it.due ? `期限：${it.due}` : "", it.project ? `プロジェクト：${it.project}` : ""]
-              .filter(Boolean)
-              .join("\n")
-          : it.taskTitle,
-      reasonTags: verdict[it.id] === "take" ? [] : (why[it.id] ?? []),
-      freeNote: comment[it.id] || undefined,
-      decidedAt: at,
-      decidedVia: "app",
-    }));
+    const finalOf = (it: Proposal) => {
+      const e = edits[it.id];
+      const title = e?.title || it.taskTitle;
+      const done = e?.doneWhen ?? it.doneWhen;
+      const due = e?.due ?? it.due;
+      return [`タスク：${title}`, done ? `完了条件：${done}` : "", due ? `期限：${due}` : "", it.project ? `プロジェクト：${it.project}` : ""]
+        .filter(Boolean)
+        .join("\n");
+    };
+    const beforeOf = (it: Proposal) =>
+      [`タスク：${it.taskTitle}`, it.doneWhen ? `完了条件：${it.doneWhen}` : "", it.due ? `期限：${it.due}` : "", it.project ? `プロジェクト：${it.project}` : ""]
+        .filter(Boolean)
+        .join("\n");
+    const recs: DecisionRecord[] = items.map((it) => {
+      const isTake = verdict[it.id] === "take";
+      const edited = isTake && !!edits[it.id] && finalOf(it) !== beforeOf(it);
+      return {
+        topicId: tid(it),
+        agentId: "312",
+        choice: verdict[it.id],
+        finalText: isTake ? finalOf(it) : it.taskTitle,
+        beforeText: edited ? beforeOf(it) : undefined,
+        afterText: edited ? finalOf(it) : undefined,
+        reasonTags: isTake ? (edited ? (editWhy[it.id] ?? []) : []) : (why[it.id] ?? []),
+        freeNote: comment[it.id] || undefined,
+        decidedAt: at,
+        decidedVia: "app",
+        scope: scope[it.id] ?? "once",
+      };
+    });
     recs.forEach(upsertDecision);
 
     const whyCount = notChosen.filter((it) => (why[it.id] ?? []).length > 0).length;
@@ -152,6 +177,20 @@ export default function ProposeClient() {
           : "選ばなかった提案なし",
       },
       { k: "comment", v: comments ? `Todoist 用コメント ${comments}件` : "コメントなし" },
+      {
+        k: "edit",
+        v: (() => {
+          const n = recs.filter((r) => r.beforeText).length;
+          return n ? `直して採る ${n}件（直す前と後を保存）` : "文面の修正なし";
+        })(),
+      },
+      {
+        k: "scope",
+        v: (() => {
+          const n = recs.filter((r) => r.scope === "rule").length;
+          return n ? `次も同じに ${n}件（承認するまで基準にしない）` : "すべて今回だけ";
+        })(),
+      },
       {
         k: "voice",
         v: (() => {
@@ -188,7 +227,7 @@ export default function ProposeClient() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               agentId: "312",
-              topicText: `[提案:${items[i].source}] ${items[i].snippet}\n→ ${items[i].taskTitle}`,
+              topicText: `[提案:${items[i].source}] ${items[i].sourceText || items[i].related || ""}\n→ ${items[i].taskTitle}`,
               seedId: r.topicId,
               decision: r,
             }),
@@ -207,6 +246,10 @@ export default function ProposeClient() {
     setVerdict({});
     setWhy({});
     setComment({});
+    setEdits({});
+    setEditOpen({});
+    setEditWhy({});
+    setScope({});
     setSaved(null);
     setStep("sort");
   }
@@ -364,14 +407,17 @@ export default function ProposeClient() {
               <span className="src-badge">{it.source}</span>
               <span className="meta">{it.from}</span>
             </div>
-            <p className="p-snip">{it.snippet}</p>
+            {it.sourceText ? <p className="p-snip">原文：{it.sourceText}</p> : null}
             <div className="p-task">
               <div className="eyebrow" style={{ margin: 0 }}>提案タスク</div>
-              <div className="p-title">{it.taskTitle}</div>
-              <div className="btn-row">
-                {it.due ? <span className="chip-task">期限 {it.due}</span> : null}
-                {it.project ? <span className="chip-task">{it.project}</span> : null}
-              </div>
+              <div className="p-title">{edits[it.id]?.title || it.taskTitle}</div>
+              <dl className="p-fields">
+                <div><dt>完了条件</dt><dd>{edits[it.id]?.doneWhen ?? it.doneWhen ?? "未設定"}</dd></div>
+                <div><dt>{it.requested ? "依頼された箇所" : "関連する原文"}</dt><dd>{it.requested || it.related || NONE}</dd></div>
+                <div><dt>担当者</dt><dd className={it.assignee ? "" : "none"}>{it.assignee || NONE}</dd></div>
+                <div><dt>期限</dt><dd className={(edits[it.id]?.due ?? it.due) ? "" : "none"}>{edits[it.id]?.due ?? it.due ?? NONE}</dd></div>
+                {it.status ? <div><dt>原文の作業状況</dt><dd>{it.status}</dd></div> : null}
+              </dl>
             </div>
             {it.hypothesis ? (
               <div className="ai-guess">
@@ -406,6 +452,49 @@ export default function ProposeClient() {
                     <Icon name="back" size={16} /> 見直す
                   </button>
                 </div>
+                {v === "take" ? (
+                  <>
+                    <button
+                      type="button"
+                      className="linkbtn"
+                      onClick={() => {
+                        setEditOpen({ ...editOpen, [it.id]: !editOpen[it.id] });
+                        if (!edits[it.id])
+                          setEdits({
+                            ...edits,
+                            [it.id]: { title: it.taskTitle, doneWhen: it.doneWhen ?? "", due: it.due ?? "" },
+                          });
+                      }}
+                    >
+                      {editOpen[it.id] ? "文面の修正を閉じる" : "採る文面を直す"}
+                    </button>
+                    {editOpen[it.id] && edits[it.id] ? (
+                      <div className="editbox">
+                        <label>タスク名
+                          <input type="text" value={edits[it.id].title} onChange={(e) => setEdits({ ...edits, [it.id]: { ...edits[it.id], title: e.target.value } })} />
+                        </label>
+                        <label>完了条件（ここまでできたら完了）
+                          <input type="text" value={edits[it.id].doneWhen} onChange={(e) => setEdits({ ...edits, [it.id]: { ...edits[it.id], doneWhen: e.target.value } })} />
+                        </label>
+                        <label>期限（原文に無ければ空のまま）
+                          <input type="text" value={edits[it.id].due} onChange={(e) => setEdits({ ...edits, [it.id]: { ...edits[it.id], due: e.target.value } })} />
+                        </label>
+                        <div className="meta">直した理由（任意）</div>
+                        <div className="tags">
+                          {EDIT_TAGS.map((t) => {
+                            const on = (editWhy[it.id] ?? []).includes(t);
+                            return (
+                              <button key={t} type="button" className={`tag ${on ? "on" : ""}`} aria-pressed={on}
+                                onClick={() => setEditWhy({ ...editWhy, [it.id]: on ? (editWhy[it.id] ?? []).filter((x) => x !== t) : [...(editWhy[it.id] ?? []), t] })}>
+                                {t}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
                 <input
                   type="text"
                   value={comment[it.id] ?? ""}
@@ -415,6 +504,12 @@ export default function ProposeClient() {
                 />
               </>
             )}
+            {v ? (
+              <div className="scope" role="group" aria-label="この判断の使い方">
+                <button type="button" className={(scope[it.id] ?? "once") === "once" ? "on" : ""} onClick={() => setScope({ ...scope, [it.id]: "once" })}>今回だけ</button>
+                <button type="button" className={scope[it.id] === "rule" ? "on" : ""} onClick={() => setScope({ ...scope, [it.id]: "rule" })}>次も同じに</button>
+              </div>
+            ) : null}
             <CommentList comments={voice.forTarget(tid(it))} onDelete={voice.remove} onMove={voice.reassign} />
           </div>
         );

@@ -111,12 +111,14 @@ export default function TaskDedupeClient({
     };
     upsertDecision(rec);
     setResults(loadStore().decisions.filter((d) => d.agentId === "312"));
-    setMsg(choice === "none_of_above" ? "「どれも違う」を記録した" : `案${chosenIndex}で記録した`);
+    setMsg(choice === "none_of_above" ? "「どれも違う」を記録した" : choice === "hold" ? "保留として記録した" : `案${chosenIndex}で記録した`);
     setEditIndex(null);
     const label =
       choice === "none_of_above"
         ? "どれも違う"
-        : `案${chosenIndex} ${topic.proposals.find((p) => p.index === chosenIndex)?.label ?? ""}${choice === "edit_use" ? "（直して使う）" : ""}`;
+        : choice === "hold"
+          ? "保留（まだ判断できない）"
+          : `案${chosenIndex} ${topic.proposals.find((p) => p.index === chosenIndex)?.label ?? ""}${choice === "edit_use" ? "（直して使う）" : ""}`;
     const rates = Object.entries(rate)
       .filter(([, v]) => v)
       .map(([i, v]) => `案${i}=${v === "good" ? "良い" : "悪い"}`)
@@ -259,6 +261,8 @@ export default function TaskDedupeClient({
               <span style={{ flexGrow: 1 }}>
                 {doneRec.choice === "none_of_above" ? (
                   "どれも違う"
+                ) : doneRec.choice === "hold" ? (
+                  "保留"
                 ) : (
                   <>
                     <span className="n">{doneRec.chosenIndex}</span>
@@ -269,7 +273,7 @@ export default function TaskDedupeClient({
               </span>
               <span className="done-badge">決定済み</span>
             </div>
-            {doneRec.choice === "none_of_above" ? null : (
+            {doneRec.choice === "none_of_above" || doneRec.choice === "hold" ? null : (
               <dl className="rows" style={{ margin: 0 }}>
                 {parseRows(doneRec.finalText || "").map((r, i) => (
                   <div key={i}>
@@ -414,6 +418,8 @@ export default function TaskDedupeClient({
                 <strong>{labelOf(r.topicId)}</strong> ·{" "}
                 {r.choice === "none_of_above"
                   ? "どれも違う"
+                  : r.choice === "hold"
+                    ? "保留"
                   : r.chosenIndex != null
                     ? `案${r.chosenIndex}`
                     : r.choice}
@@ -456,6 +462,13 @@ export default function TaskDedupeClient({
               onClick={() => decide("none_of_above")}
             >
               どれも違う
+            </button>
+            <button
+              type="button"
+              className="secondary ghost"
+              onClick={() => decide("hold")}
+            >
+              保留
             </button>
             {editIndex != null ? (
               <button
