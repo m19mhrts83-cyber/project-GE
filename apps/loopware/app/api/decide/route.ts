@@ -17,6 +17,7 @@ type Body = {
     reasonTags?: string[];
     freeNote?: string;
     decidedVia?: string;
+    scope?: string;
   };
   todoistTaskId?: string | null;
 };
@@ -61,6 +62,9 @@ export async function POST(req: Request) {
           chosen_index: decision.chosenIndex ?? null,
           reason_tags: decision.reasonTags || [],
           final_text: decision.finalText || null,
+          before_text: decision.beforeText || null,
+          after_text: decision.afterText || null,
+          scope: decision.scope || "once",
         },
       });
       if (error) {
