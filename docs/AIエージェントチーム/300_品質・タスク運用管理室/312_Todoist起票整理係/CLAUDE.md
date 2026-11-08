@@ -7,6 +7,16 @@
 作業フロー正本: [`flow.md`](./flow.md)  
 伴走 Phase1: [`docs/phase1-l1-digest.md`](./docs/phase1-l1-digest.md)
 
+### ループウェア（2026-11-07〜）
+
+- 意図: 多ソースから **何をタスクに拾うか** を提案し、判断ログで精度を上げる
+- 設計: [`docs/ループウェア_入口設計_20261107.md`](./docs/ループウェア_入口設計_20261107.md)／[`docs/重複タスクまとめ案_設計書.md`](./docs/重複タスクまとめ案_設計書.md)
+- UI: **`apps/loopware` `/312`**（Jarvisダッシュに新ルートは足さない。リンクのみ）
+- 判断: S05（追記／別作成／登録しない＋どれも違う＋一言）。ログ=`task_loop_*`（Supabase）
+- 改善: ツール外で `apps/loopware/prompts/proposal.md`・signals を直す（自動学習しない）
+- 拾い漏れ: `scripts/jarvis_todoist_312_miss_scan.py` → `/312?tab=misses`
+- iPhone: **Chrome**
+
 ## AIオートメーション（作業フロー）
 
 - **FlowForge（開く）**: [flow_M8SvKC1IDTDi496Vw-DgGjpD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD)

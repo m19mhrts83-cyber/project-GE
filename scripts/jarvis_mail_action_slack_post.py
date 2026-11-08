@@ -178,6 +178,17 @@ def ma_url(triage_id: str, action: str) -> str:
     return f"{_dashboard_base()}/api/g/ma/{action}/{triage_id}?s={ma_sig(triage_id, action)}"
 
 
+def loopware_url(triage_id: str) -> str:
+    """ループウェアの判断デスクへ（ダッシュボードが入場用 t= を付けて転送する）"""
+    return f"{_dashboard_base()}/api/g/lw/{triage_id}?s={ma_sig(triage_id, 'loopware')}"
+
+
+def _loopware_links_on() -> bool:
+    return (os.environ.get("JARVIS_MAIL_ACTION_LOOPWARE_LINK") or "1").strip().lower() not in {
+        "0", "false", "no", "off",
+    }
+
+
 def mail_detail_url(triage_id: str) -> str:
     return f"{_dashboard_base()}/mail/{triage_id}"
 
@@ -385,10 +396,20 @@ def _age_hours(received_at: str) -> float:
         return 999.0
 
 
+def is_loopware_miss_due(pl: dict[str, Any] | None) -> bool:
+    """ループウェアの見落とし画面で「要対応だった」とされ、まだ Slack に出し直していない。"""
+    pl = pl if isinstance(pl, dict) else {}
+    return bool(pl.get("loopware_miss")) and not pl.get("slack_ma_miss_posted_at")
+
+
 def score_row(row: dict[str, Any]) -> tuple[int, list[str]]:
     """対応優先度スコア（高いほど先に通知）。reasons は dry-run 用。"""
     score = 0
     reasons: list[str] = []
+    if is_loopware_miss_due(row.get("payload")):
+        # 松野さんが「出すべきだった」と判断したもの → 先頭に出す
+        score += 100
+        reasons.append("loopware:miss")
     pri = str(row.get("priority") or "").lower()
     kind = str(row.get("kind") or "").lower()
     lane = str(row.get("lane") or "").lower()
@@ -464,6 +485,11 @@ def rank_candidates(rows: list[dict[str, Any]], *, limit: int) -> list[dict[str,
     enriched: list[dict[str, Any]] = []
     for row in rows:
         sc, reasons = score_row(row)
+        # ルール帳（116 learned_rules.md）の boost / demote
+        delta = int(row.get("_rule_delta") or 0)
+        if delta:
+            sc += delta
+            reasons = [*reasons, f"rules:{delta:+d}"]
         summary = extract_summary(row)
         item = dict(row)
         item["_score"] = sc
@@ -764,7 +790,9 @@ def build_compact_payload(
                     f"*From:* `{from_short}` · score=`{score}`\n"
                     f"*要旨:* {summary}\n"
                     f"{material_line}"
-                    f"<{detail}|本文の詳細（Dashboard）> · {draft_note}"
+                    f"<{detail}|本文の詳細（Dashboard）> · "
+                    + (f"<{loopware_url(tid)}|ループウェアで見る> · " if _loopware_links_on() else "")
+                    + f"{draft_note}"
                 ),
             },
         },
@@ -1073,16 +1101,41 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         .limit(pool)
         .execute()
     )
+    rows_all: list[dict[str, Any]] = list(r.data or [])
+    # 見落としで「要対応だった」と戻されたものは古くても拾う
+    try:
+        miss = (
+            sb.table("triage_items")
+            .select(
+                "id,status,subject,draft_text,original_body,from_email,partner,"
+                "account,lane,kind,summary,payload,received_at,priority,"
+                "gmail_message_id"
+            )
+            .eq("status", "pending")
+            .eq("payload->>loopware_miss", "true")
+            .limit(20)
+            .execute()
+        )
+        seen_ids = {str(x.get("id")) for x in rows_all}
+        rows_all = [x for x in (miss.data or []) if str(x.get("id")) not in seen_ids] + rows_all
+    except Exception as e:
+        print(f"# loopware miss load soft-fail: {e}", file=sys.stderr)
     from jarvis_kurashift_re_inquiry_channel import is_mail_action_excluded
+    from jarvis_learned_rules import apply_to_row, load_rulebook
     from jarvis_mail_human import looks_human_mail
 
+    book = load_rulebook("116")
+    for w in book.warnings:
+        print(f"# learned_rules 116: {w}", file=sys.stderr)
+    rule_hidden = 0
     pool_rows: list[dict[str, Any]] = []
     muted_n = 0
     skipped_vendor = 0
     skipped_skim = 0
     skipped_posted = 0
     skipped_self = 0
-    for row in r.data or []:
+    loopware_miss_n = 0
+    for row in rows_all:
         tid = str(row.get("id") or "")
         if tid.startswith("re-vendor-"):
             skipped_vendor += 1
@@ -1097,6 +1150,11 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
             body=str(row.get("original_body") or ""),
         ):
             skipped_self += 1
+            continue
+        # 見落とし → 仕分け・ミュート・投稿済みの判定を通さず1回だけ出し直す
+        if is_loopware_miss_due(pl):
+            loopware_miss_n += 1
+            pool_rows.append(row)
             continue
         kind = str(row.get("kind") or "").lower()
         lane = str(row.get("lane") or "").lower()
@@ -1139,6 +1197,12 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         if is_muted(mute, str(row.get("from_email") or "")):
             muted_n += 1
             continue
+        ap = apply_to_row(book, row)
+        if ap.hidden:
+            rule_hidden += 1
+            continue
+        if ap.rule_ids:
+            row = {**row, "_rule_delta": ap.delta, "_applied_rules": ap.rule_ids}
         if pl.get("slack_ma_posted_at") and not os.environ.get(
             "JARVIS_MAIL_ACTION_REPOST"
         ):
@@ -1153,10 +1217,13 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         "pool": len(pool_rows),
         "ranked": len(ranked),
         "muted": muted_n,
+        "rule_hidden": rule_hidden,
+        "rules": len(book.confirmed) + len(book.exceptions),
         "vendor_skip": skipped_vendor,
         "skim_skip": skipped_skim,
         "self_skip": skipped_self,
         "already_posted": skipped_posted,
+        "loopware_miss": loopware_miss_n,
         "content_dupes": content_dupes,
         "mute_entries": len(mute.get("entries") or {}),
         "top_scores": [
@@ -1164,6 +1231,7 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
                 "id": str(x.get("id")),
                 "score": x.get("_score"),
                 "reasons": x.get("_score_reasons"),
+                "applied_rules": x.get("_applied_rules") or [],
                 "dedupe": content_dedupe_key(x),
             }
             for x in ranked
@@ -1297,9 +1365,17 @@ def _stamp_posted_payload(
     digest_channel: str | None,
     digest_ts: str | None,
     sibling_of: str | None = None,
+    applied_rules: list[str] | None = None,
 ) -> dict[str, Any]:
     out = dict(pl)
+    if is_loopware_miss_due(pl):
+        out["slack_ma_miss_posted_at"] = now_iso()
     out["slack_ma_posted_at"] = now_iso()
+    # 効かせたルール番号（DB トリガーが判断ログへ写す。効いたかを週次で数える）
+    if applied_rules:
+        out["applied_rules"] = list(applied_rules)
+    else:
+        out.pop("applied_rules", None)
     out["slack_ma_digest"] = {
         "at": now_iso(),
         "score": score,
@@ -1331,6 +1407,7 @@ def mark_posted(
     digest_channel: str | None = None,
     digest_ts: str | None = None,
     gmail_message_id: str | None = None,
+    applied_rules: list[str] | None = None,
 ) -> None:
     """投稿済み印。同一 gmail_message_id の姉妹行（gha-* 二重など）も一緒に印付け。"""
     try:
@@ -1354,6 +1431,7 @@ def mark_posted(
             slack_ts=slack_ts,
             digest_channel=digest_channel,
             digest_ts=digest_ts,
+            applied_rules=applied_rules,
         )
         sb.table("triage_items").update(
             {"payload": pl, "updated_at": now_iso()}
@@ -1386,6 +1464,7 @@ def mark_posted(
                 digest_channel=digest_channel,
                 digest_ts=digest_ts,
                 sibling_of=tid,
+                applied_rules=applied_rules,
             )
             sb.table("triage_items").update(
                 {"payload": stamped, "updated_at": now_iso()}
@@ -1556,6 +1635,7 @@ def main() -> int:
                 digest_channel=digest_ch,
                 digest_ts=digest_ts,
                 gmail_message_id=str(row.get("gmail_message_id") or "") or None,
+                applied_rules=list(row.get("_applied_rules") or []) or None,
             )
 
     # Slack に出した＝目を通す動線に載せたので Gmail 既読（物件取込と同型）

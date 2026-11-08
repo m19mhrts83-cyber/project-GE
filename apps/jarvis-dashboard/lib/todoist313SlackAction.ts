@@ -4,16 +4,18 @@
  */
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
+import { logOwnerDecision } from "@/lib/ownerDecisionLog";
 import {
   closeTodoistTaskById,
   rescheduleTodoistTaskById,
 } from "@/lib/todoistTasks";
 
-export type Todoist313Action = "close" | "reschedule";
+export type Todoist313Action = "close" | "reschedule" | "drop";
 
 export const T313_ACTION_IDS = {
   close: "todoist_313_close",
   reschedule: "todoist_313_reschedule",
+  drop: "todoist_313_drop",
 } as const;
 
 /** 署名候補（優先順）。Cloud は TODOIST のみ、Vercel は PROPERTY_GATE 優先になりがち。 */
@@ -69,10 +71,11 @@ export function parseT313Action(
   const a = (raw || "").trim().toLowerCase();
   if (a === "close" || a === "done" || a === "complete") return "close";
   if (a === "reschedule" || a === "due" || a === "defer") return "reschedule";
+  if (a === "drop" || a === "cancel" || a === "abandon") return "drop";
   return null;
 }
 
-/** value: t313:close:{task_id} | t313:reschedule:{task_id}:{YYYY-MM-DD} */
+/** value: t313:close:{id} | t313:reschedule:{id}:{due} | t313:drop:{id} */
 export function parseT313ButtonValue(value: string): {
   action: Todoist313Action;
   taskId: string;
@@ -82,6 +85,10 @@ export function parseT313ButtonValue(value: string): {
   const close = s.match(/^t313:close:([a-zA-Z0-9_-]{6,64})$/i);
   if (close && isTodoistTaskId(close[1])) {
     return { action: "close", taskId: close[1] };
+  }
+  const drop = s.match(/^t313:drop:([a-zA-Z0-9_-]{6,64})$/i);
+  if (drop && isTodoistTaskId(drop[1])) {
+    return { action: "drop", taskId: drop[1] };
   }
   const rs = s.match(
     /^t313:reschedule:([a-zA-Z0-9_-]{6,64}):(\d{4}-\d{2}-\d{2})$/i,
@@ -147,6 +154,9 @@ export function t313ActionUrl(
   if (action === "reschedule") {
     return `${base}/api/g/t313/reschedule/${encodeURIComponent(taskId)}?due=${encodeURIComponent(due || "")}&s=${s}`;
   }
+  if (action === "drop") {
+    return `${base}/api/g/t313/drop/${encodeURIComponent(taskId)}?s=${s}`;
+  }
   return `${base}/api/g/t313/close/${encodeURIComponent(taskId)}?s=${s}`;
 }
 
@@ -191,19 +201,38 @@ export async function applyT313Action(opts: {
     (process.env.TODOIST_313_AUTHOR || "").trim() || "FRIDAY";
   const markN = opts.n != null ? String(opts.n) : "";
 
-  if (opts.action === "close") {
-    const comment =
-      `【${author}】タスク完了したよ（松野確認OK）\n` +
-      `サマリ: 313 Slack${opts.source === "slack_button" ? "ボタン" : "リンク"} — 完了` +
-      (markN ? ` ✅${markN}` : "") +
-      `\nアウトプット:\n- [該当タスク](https://app.todoist.com/app/task/${id})\n`;
+  if (opts.action === "close" || opts.action === "drop") {
+    const isDrop = opts.action === "drop";
+    const comment = isDrop
+      ? `【${author}】タスク完了したよ（やめる）\n` +
+        `サマリ: 313 Slack${opts.source === "slack_button" ? "ボタン" : "リンク"} — やめる（物理削除なし）` +
+        (markN ? ` #${markN}` : "") +
+        `\nアウトプット:\n- [該当タスク](https://app.todoist.com/app/task/${id})\n`
+      : `【${author}】タスク完了したよ（松野確認OK）\n` +
+        `サマリ: 313 Slack${opts.source === "slack_button" ? "ボタン" : "リンク"} — 済んだ` +
+        (markN ? ` ✅${markN}` : "") +
+        `\nアウトプット:\n- [該当タスク](https://app.todoist.com/app/task/${id})\n`;
     const r = await closeTodoistTaskById(id, comment);
     if (!r.ok) return { ok: false, message: r.error };
+    await logOwnerDecision({
+      surface: "todoist_313",
+      action: isDrop ? "drop" : "close",
+      source: opts.source,
+      employee: "313",
+      targetType: "todoist_task",
+      targetId: id,
+      note: isDrop ? "やめる（完了＋コメント）" : null,
+      payload: {
+        kind: "cleanup",
+        n: opts.n ?? null,
+        reason_tags: isDrop ? ["やめる"] : ["済んだ"],
+      },
+    });
     return {
       ok: true,
       message:
-        `完了しました` +
-        (markN ? `（✅${markN}）` : "") +
+        (isDrop ? "やめるとして完了しました" : "済んだとして完了しました") +
+        (markN ? `（#${markN}）` : "") +
         `\nhttps://app.todoist.com/app/task/${id}`,
     };
   }
@@ -221,6 +250,21 @@ export async function applyT313Action(opts: {
     `アウトプット:\n- [該当タスク](https://app.todoist.com/app/task/${id})\n`;
   const r = await rescheduleTodoistTaskById(id, due, comment);
   if (!r.ok) return { ok: false, message: r.error };
+  await logOwnerDecision({
+    surface: "todoist_313",
+    action: "reschedule",
+    source: opts.source,
+    employee: "313",
+    targetType: "todoist_task",
+    targetId: id,
+    note: `due=${due}`,
+    payload: {
+      kind: "cleanup",
+      n: opts.n ?? null,
+      suggested_due: due,
+      reason_tags: ["いつ・優先"],
+    },
+  });
   return {
     ok: true,
     message:

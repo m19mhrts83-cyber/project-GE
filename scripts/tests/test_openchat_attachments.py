@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'line_unofficial_poc'))
-from openchat_attachments import Queue,capture
+from openchat_attachments import Queue,capture,source_context
 spec=importlib.util.spec_from_file_location('attachment_worker',ROOT/'scripts/jarvis_openchat_attachments.py')
 w=importlib.util.module_from_spec(spec);spec.loader.exec_module(w)
 
@@ -30,6 +30,46 @@ class AttachmentsTest(unittest.TestCase):
     def add(self,mid='1',ct=14,**kw):return self.q.enqueue(room_id='mroom',message_id=mid,content_type=ct,**kw)
     def row(self,ident):return dict(self.q.db.execute('SELECT * FROM jobs WHERE id=?',(ident,)).fetchone())
     def pdf(self,j,p,limit):p.write_bytes(b'%PDF-1.7\nfixture')
+
+    def test_source_context_keeps_only_original_time_caption_and_explicit_labels(self):
+        msg={'createdTime':1793925000000,'text':'修繕の見積','contentMetadata':{'URL':'secret'},'from':'member-id'}
+        ctx=source_context(msg,lambda m,k,f:m.get(k),route_id='r',chat_title='修繕')
+        self.assertIn('posted_at',ctx);self.assertEqual(ctx['caption'],'修繕の見積')
+        self.assertNotIn('secret',json.dumps(ctx));self.assertNotIn('member-id',json.dumps(ctx))
+        self.assertNotIn('posted_at',source_context({'createdTime':1},lambda m,k,f:m.get(k)))
+
+    def test_saved_metadata_enrichment_does_not_redownload_or_guess_dates(self):
+        ident=self.add(context={'caption':'見積資料'})
+        w.process(self.q,self.s,self.pdf,max_file=1024)
+        self.assertEqual(self.row(ident)['metadata_dirty'],0)
+        self.add(context={'chat_title':'修繕相談'})
+        self.assertEqual(self.row(ident)['state'],'saved');self.assertEqual(self.row(ident)['metadata_dirty'],1)
+        self.assertEqual(w.sync_source_metadata(self.q,self.s),1)
+        self.assertEqual(self.s.uploads,1);self.assertEqual(self.row(ident)['metadata_dirty'],0)
+        ctx=json.loads(self.row(ident)['source_context'])
+        self.assertEqual(ctx,{'caption':'見積資料','chat_title':'修繕相談'});self.assertNotIn('posted_at',ctx)
+
+    def test_late_filename_enrichment_keeps_saved_media_without_redownload(self):
+        ident=self.add(ct=1)
+        w.process(self.q,self.s,self.pdf,max_file=1024)
+        self.add(ct=1,metadata={'fileName':'../../見積写真.jpg'})
+        self.assertEqual(self.row(ident)['filename'],'見積写真.jpg')
+        self.assertEqual(self.row(ident)['state'],'saved')
+        self.assertEqual(self.row(ident)['metadata_dirty'],1)
+        self.assertEqual(w.sync_source_metadata(self.q,self.s),1)
+        self.assertEqual(self.s.uploads,1)
+        self.assertEqual(self.row(ident)['metadata_dirty'],0)
+        for meta in ({},{'FILE_NAME':'image'},{'FILE_NAME':'different.jpg'}):
+            self.add(ct=1,metadata=meta)
+            self.assertEqual(self.row(ident)['filename'],'見積写真.jpg')
+            self.assertEqual(self.row(ident)['metadata_dirty'],0)
+
+    def test_metadata_sync_failure_keeps_original_saved_and_retryable(self):
+        ident=self.add();w.process(self.q,self.s,self.pdf,max_file=1024)
+        self.add(context={'chat_title':'new'})
+        with patch.object(self.s,'metadata',side_effect=RuntimeError('unavailable')):
+            with self.assertRaises(RuntimeError):w.sync_source_metadata(self.q,self.s)
+        self.assertEqual(self.row(ident)['state'],'saved');self.assertEqual(self.row(ident)['metadata_dirty'],1)
 
     def test_queue_dedup_is_independent_of_thread_route_and_does_not_store_raw_metadata(self):
         ident=self.add(metadata={'FILE_NAME':'../../report.pdf','url':'https://example/?secret=never-store'})

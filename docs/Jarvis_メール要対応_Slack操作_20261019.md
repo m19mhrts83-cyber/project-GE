@@ -38,7 +38,7 @@
 | 操作 | 意味 |
 |---|---|
 | **返信する** | 草案モーダル（または URL フォーム）→ Gmail 送信。カードは「送信済み」に置換 |
-| **見送り** | 返信不要として閉じる。**Slack カードはチャットから削除**（振り返り不要）。同一バッチのダイジェストも残件更新／残0なら削除。同一 From が閾値回続くと以降の Slack 通知からも除外 |
+| **見送り** | 返信不要として閉じる。Slack ボタンからは **カードを1行に縮め、理由タグ（宣伝・通知／対応済み／今は不要／迷う）を任意で出す**（2026-11-08）。「迷う」は判断ログで `hesitated`（NG に混ぜない）。同一バッチのダイジェストは残件更新／残0なら削除。URL ボタン・Dashboard からは従来どおりカード削除 |
 | **Todoist追加** | メール返信以外の手配（電話・ポータル・折り返し等）。カードは「登録済」に置換。ダイジェストは残件更新／残0なら削除 |
 
 ### 返信モーダル（2026-10-28）
@@ -94,7 +94,7 @@ Gmail では返せないため、`kind=chat` のカードは **「返信済み�
 - 会話ミュートと送信者ミュートは別。再掲ノイズは **送信者スコープ**が効く
 - ミュートは **削除しない**（可逆・スキップ Inbox 相当）
 - 狭い鍵（`from:addr`）を優先。ドメイン一括は誤爆しやすいので当面しない
-- 閾値を越えたら通知除外（既定 **2 回**連続見送り）
+- 閾値（既定 **2 回**連続見送り）に届いても **黙ってミュートしない**（2026-11-08 松野さん判断）。Slack の見送り後カードで「◯回目です。次からも出さない？」→ `今回だけ`（数え直し）／`この送り手は出さない`（ミュート＋残 pending を閉じる）。答えは `owner_decisions`（surface=`triage_rule`）に残る
 - **返信する／Todoist追加**で連続カウント（streak）をリセット。`muted` の解除は明示 unmute のみ
 
 実装: `sync_meta` キー `mail_action_skip_mute`（JSON 文字列）。閾値は `JARVIS_MAIL_ACTION_MUTE_THRESHOLD`（既定 2）。
@@ -155,3 +155,9 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - 業者返信同型: `docs/KURASHIFT_業者返信_Slack操作_20261019.md`（516）
 - GenMail レーン推定: `scripts/jarvis_todoist_genmail_propose.py`
 - 要フォロー: Todoist `[要フォロー][night_triage]`
+## 判断ログ（owner_decisions）への足し込み（2026-11-08）
+
+- 状態変化（sent / skipped / todoist …）は `triage_items` のトリガーが1行残す
+- 返信送信時は `payload.slack_ma_action` に `edit_ratio`（0=そのまま〜1=書き直し）・`decide_ms`（モーダルを開いてから送るまで）・`assist`（誤字脱字チェック／見直し／資料検索の回数）・`draft_source` を入れる → トリガーが owner_decisions.payload に写す
+- 理由タグは後から最新の判断行の `payload.reason_tags` に付く（`lib/maDecisionLog.ts`）
+- 判断後のカードに「✓ 判断ログに記録（今週N件）」を出す（月曜 0:00 JST 起点、surface=triage*）

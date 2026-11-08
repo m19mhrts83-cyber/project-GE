@@ -103,3 +103,45 @@ test('wrong origins and unauthenticated requests cannot call upstream', async ()
   assert.equal((await handler(request({ operation: 'index' }, '', 'https://attacker.example'))).status, 403);
   assert.equal((await handler(request({ operation: 'index' }))).status, 401);
 });
+
+test('LINE delivery uses exact source IDs, bounded pages and only validated private objects', async () => {
+  let stored={id,bucket:'openchat-attachments',storage_path:'objects/'+'c'.repeat(64)};
+  const calls=[];
+  const handler=createHandler(cfg,async(url,options)=>{
+    if(url===cfg.statusUrl)return response({user_id:'12',status:'approved',role:'user'});
+    calls.push(new URL(url));
+    if(url.includes('/rest/v1/'))return response([stored]);
+    assert.equal(JSON.parse(options.body).expiresIn,60);
+    return response({signedURL:'/object/sign/openchat-attachments/'+stored.storage_path+'?token=temporary'});
+  },()=>now);
+  const token=await issueSession('12',cfg.sessionSecret,now);
+  let res=await handler(request({operation:'list',source:'openchat',source_log_id:'oc_'+id},token));
+  assert.equal(res.status,200);
+  assert.equal(calls[0].pathname,'/rest/v1/openchat_member_attachments');
+  assert.equal(calls[0].searchParams.get('source_log_id'),'eq.oc_'+id);
+  assert.ok(calls[0].searchParams.get('select').includes('source_log_id'));
+  res=await handler(request({operation:'open',source:'openchat',attachment_id:id,storage_path:'../other'},token));
+  assert.equal(res.status,200);assert.match((await res.json()).url,/\/openchat-attachments\/objects\//);
+  stored={...stored,bucket:'community-attachments'};
+  assert.equal((await handler(request({operation:'open',source:'openchat',attachment_id:id},token))).status,500);
+  stored={...stored,bucket:'openchat-attachments',storage_path:'objects/../outside'};
+  assert.equal((await handler(request({operation:'open',source:'openchat',attachment_id:id},token))).status,500);
+  assert.equal((await handler(request({operation:'list',source:'openchat',source_log_id:'oc_123'},token))).status,400);
+  assert.equal((await handler(request({operation:'index',source:'arbitrary-table'},token))).status,400);
+});
+
+test('LINE attachment delivery rechecks every role and its active parent login',async()=>{
+  const parent='d'.repeat(64), token=await issueSession('12',cfg.sessionSecret,now,parent);
+  for(const [status,role,active,expected] of [
+    ['approved','user',true,200],['approved','admin',true,200],['approved','master_admin',true,200],
+    ['pending','user',true,403],['withdrawn','user',true,403],['approved','unknown',true,403],
+    ['approved','user',false,401]
+  ]){
+    const handler=createHandler({...cfg,requireParentSession:true},async(url,options)=>{
+      if(url===cfg.statusUrl){assert.equal(JSON.parse(options.body).session_ref,parent);return response({user_id:'12',status,role,session_active:active});}
+      return response([]);
+    },()=>now);
+    assert.equal((await handler(request({operation:'index',source:'openchat',user_id:'another'},token))).status,expected);
+    assert.equal((await handler(request({operation:'index',source:'openchat'},''))).status,401);
+  }
+});

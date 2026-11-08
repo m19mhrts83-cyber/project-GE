@@ -17,6 +17,9 @@ Claude Code / Cursor（Jarvis）/ Codex / GenCode / Grok Bot など、**どの�
 | [`43_Claude Code 受け渡し`](43_Claude_Code参加_受け渡し_20261023.md) | Claude Code 参加・三層受け渡し |
 | [`49_共通ルール`](49_共通ルール_AI使用量と入力_20261024.md) | **音声入力（Typeless）の誤記前提・文字起こしはスクリプト・PDFの元MD・「聞く」はコスパの良い順・読む量を減らす・Todoist の記録と名乗り・相手への依頼は「こちらでやること／お願いすること」を分ける（R8）** |
 | [`52_議事録のまとめ方`](52_議事録のまとめ方_20261029.md) | **Notion に残す議事録はすべてこの型で仕上げてから載せる**（結論・決定・ToDo表が先頭、話者は実名、全文はリンク、A4 1枚目安）。残す前の了承・チャットは3行要約＋宿題は維持 |
+| [`53_4ツール共通再開`](53_Codex_Claude_Cursor共通再開_20261101.md) | **「Codexなどの作業の続きをして」でClaude Code／Cursorが再開するための人向け入口・両宛て共有・Slack／Todoistの使い分け** |
+| [`55_Banto_Grok連携運用`](55_Banto_Grok連携運用_20261107.md) | **番頭さん（Banto/Muse）とホーク（Grok）の役割、監視・完了確認・権限境界、試験運用中の未確定事項** |
+| [`54_Grok×番頭相互補完`](54_Grok_番頭Banto相互補完_20261107.md) | **Grok Bot＝攻め／番頭（Banto・Muse）＝守り・先回り。指摘〜解決確認・省コスト・権限。Jarvisは二重巡回しない** |
 | [`48_読まなくてよいMD一覧`](48_読まなくてよいMD一覧_20261024.md) | 名指し時だけ開く MD（AI 使用量の節約） |
 | 家ルール例 | [`config/claude_code_home_CLAUDE.example.md`](../../config/claude_code_home_CLAUDE.example.md) → `~/.claude/CLAUDE.md` |
 
@@ -66,16 +69,22 @@ Drive `★AIエージェントチーム` へも写す（`--no-drive` でオフ�
 
 ## 報告・対外
 
-Slack `#report` / `#consult` / `#ops`。外に出す・金・削除は人の了承。詳細は各社員 `CLAUDE.md`。
+神大家の個別有償業務は、共通ルール49のR9に従い、事前見積もり・承認と作業中の実績／残工数／超過見通しを記録する。Miss Lemon・Jarvis・FRIDAY・Codex共通。工数表示は本人用JARVIS Dashboardの内部管理であり、運営へ請求する新規開発案件ではない。
+
+Slack `#report` / `#consult` / `#ops`。外に出す・金・削除は人の了承。詳細は各社員 `CLAUDE.md`。  
+完了報告は `#ai-hub` に「変更内容／テスト結果／未完了／次の推奨」。番頭さん（Banto／Muse）のスレ返信は松野さんの FB と同じ扱いで拾う。投稿の重複・誤判定の防止は [`56_`](./56_Slack運用ルール追補_番頭さん参加と投稿品質_20261107.md)。
+
+番頭さん（Banto/Muse）とホーク（Grok）の連携では、[`55_Banto_Grok連携運用`](55_Banto_Grok連携運用_20261107.md)を参照する。Slackの設計共有だけで新しい自動化・権限を有効化した扱いにしない。Todoistへのホークの直接書き込みは11/7に個別承認された範囲として記録し、他の外部操作・権限拡大へ一般化しない。
 
 ## 他ツール共有（必須）
 
-Codexからのローカル引き継ぎは `/Users/matsunomasaharu2/git-repos/agent-handoff/`。Claude Codeは `to_MissLemon/`、Cursorは `to_Jarvis/` のpendingを起動・再開時に確認する。別worktreeでも同じ絶対パスを参照。手順・権限・正本の扱いは [51_ローカル受け渡し](51_ローカル受け渡し_20261026.md)。
+Codexからのローカル引き継ぎは `/Users/matsunomasaharu2/git-repos/agent-handoff/`。Claude Codeは `to_MissLemon/`、Cursorは `to_Jarvis/` のpendingを起動・再開時に確認する。松野さんの「Codexなどの作業の続きをして」は、現在の案件に一致するメモ、正本、実ファイルを確認して続行する合図。両ツールで把握が必要な案件は、同じ `handoff_group_id` の短い入口を両宛てに置き、詳細は案件の正本だけを更新する。別worktreeでも同じ絶対パスを参照。手順・権限・正本の扱いは [51_ローカル受け渡し](51_ローカル受け渡し_20261026.md)、人向け入口は [53_共通再開](53_Codex_Claude_Cursor共通再開_20261101.md)。
 
 新機能・運用変更は **チャットだけで終わらせない**。担当社員 `CLAUDE.md`・`docs/運用コマンド一覧.md`・必要なら Grok paste／B1 を同じ作業で更新する。  
 Cursor／Jarvis の正本ルール: `.cursor/rules/jarvis-multi-agent-share.mdc`。  
 **FRIDAY／Jarvis／AI社員の書き出し1節（どの ch・末尾型）**: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](./38_Slack書き出し_FRIDAY_Jarvis_20261018.md)  
-**スマホレイアウト（草案・行長／空行／過去見栄えFB）**: [`41_Slackスマホレイアウト_草案_20261022.md`](./41_Slackスマホレイアウト_草案_20261022.md)
+**スマホレイアウト（草案・行長／空行／過去見栄えFB）**: [`41_Slackスマホレイアウト_草案_20261022.md`](./41_Slackスマホレイアウト_草案_20261022.md)  
+**Slack 運用追補（番頭さん参加・共通運用改訂・重複／誤判定の防止）**: [`56_Slack運用ルール追補_番頭さん参加と投稿品質_20261107.md`](./56_Slack運用ルール追補_番頭さん参加と投稿品質_20261107.md)
 
 ### Slack 書き出し（必須・2026-10-18）
 

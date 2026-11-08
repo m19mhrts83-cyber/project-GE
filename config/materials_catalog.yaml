@@ -1,5 +1,5 @@
 version: 1
-updated: '2026-10-26'
+updated: '2026-11-07'
 pages_base: https://m19mhrts83-cyber.github.io/project-GE/docs
 lanes:
 - id: self
@@ -188,6 +188,16 @@ items:
   title: 2026-10-04 Day2 実践編（資料PDF）
   url: https://drive.google.com/file/d/1jlXVsJIQ2UjyPRTlgoDocj8su8GnqpKu/view
   note: Luma iketomo261004
+- id: iketomo-202611-loopware
+  lane: iketomo
+  title: 2026-11 ループウェア（Day1+Day2）
+  url: https://drive.google.com/drive/folders/1UrfAzlxQDVkQBkIeyGNWmWZ1RYAjNHsr
+  note: admin 240_いけとも/2026-11_ループウェア。Day1済・Day2は後日
+- id: iketomo-20261107-day1
+  lane: iketomo
+  title: 2026-11-07 ループウェア Day1（Notion）
+  url: https://www.notion.so/411f6bbe5a76814b91cef54cd0e97c67
+  note: Luma iketomo261107。録画・HTML/PDF・ミニツール・メーカー
 - id: iketomo-notion-archive
   lane: iketomo
   title: Notion いけともアーカイブ（DX互助会）

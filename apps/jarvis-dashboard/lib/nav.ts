@@ -1,6 +1,12 @@
 /** サイドバー／⌘K 共通のナビ定義 */
 
-export type NavItem = { href: string; label: string; external?: boolean };
+export type NavItem = {
+  href: string;
+  label: string;
+  external?: boolean;
+  /** components/Icon の名前（Personal Board の線アイコン） */
+  icon?: string;
+};
 export type NavGroup = { title: string; items: NavItem[] };
 
 /** 別アプリ。ダッシュボード内に /trade は置かない */
@@ -12,6 +18,12 @@ export const TRADE_DESK_URL =
 
 export const KURASHIFT_URL = TRADE_DESK_URL;
 
+/** 312/313 判断 UI（別アプリ。ダッシュにルートを足さない） */
+export const LOOPWARE_URL =
+  process.env.NEXT_PUBLIC_LOOPWARE_URL ||
+  process.env.JARVIS_LOOPWARE_URL ||
+  "https://jarvis-loopware.vercel.app";
+
 /**
  * B+A: グループ見出し＋分かりやすい名前。
  * ホームはサイドバー最上段に固定（「見る」より前。他項目をホームより上に差し込まない）。
@@ -21,60 +33,62 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "見る",
     items: [
-      { href: "/queue", label: "処理キュー" },
-      { href: "/partner", label: "パートナー" },
-      { href: "/general", label: "その他メール" },
-      { href: "/openchat", label: "神大家オプチャ" },
-      { href: "/situation", label: "状況ウォッチ" },
-      { href: "/archive", label: "処理済み" },
+      { href: "/queue", label: "処理キュー", icon: "queue" },
+      { href: "/partner", label: "パートナー", icon: "partner" },
+      { href: "/general", label: "その他メール", icon: "mail" },
+      { href: "/openchat", label: "神大家オプチャ", icon: "chat" },
+      { href: "/situation", label: "状況ウォッチ", icon: "watch" },
+      { href: "/archive", label: "処理済み", icon: "archive" },
     ],
   },
   {
     title: "タスク",
     items: [
-      { href: "/kamiooya", label: "神大家運営" },
-      { href: "/kanji", label: "飲み会幹事" },
-      { href: "/glucon", label: "グルコン報告" },
-      { href: "/properties", label: "所有物件" },
-      { href: "/kodate", label: "戸建て購入" },
-      { href: "/ai-raimo", label: "AI推進・Raimo" },
-      { href: "/kazoku", label: "家族タスク" },
+      { href: "/kamiooya", label: "神大家運営", icon: "users" },
+      { href: "/kanji", label: "飲み会幹事", icon: "beer" },
+      { href: "/glucon", label: "グルコン報告", icon: "file" },
+      { href: "/properties", label: "所有物件", icon: "building" },
+      { href: "/kodate", label: "戸建て購入", icon: "house" },
+      { href: "/ai-raimo", label: "AI推進・Raimo", icon: "ai" },
+      { href: "/kazoku", label: "家族タスク", icon: "heart" },
     ],
   },
   {
     title: "調べる・作る",
     items: [
-      { href: "/materials", label: "資料ハブ" },
-      { href: "/kiso-transcripts", label: "基礎講座・文字起こし" },
-      { href: "/apps", label: "アプリ・プロンプト集" },
-      { href: "/agent-team", label: "AIエージェントチーム" },
-      { href: "/notebooklm", label: "NotebookLM" },
+      { href: "/materials", label: "資料ハブ", icon: "folder" },
+      { href: "/kiso-transcripts", label: "基礎講座・文字起こし", icon: "book" },
+      { href: "/purchase-compare", label: "購入比較", icon: "cart" },
+      { href: LOOPWARE_URL, label: "ループウェア（312/313）", external: true, icon: "grid" },
+      { href: "/apps", label: "アプリ・プロンプト集", icon: "grid" },
+      { href: "/agent-team", label: "AIエージェントチーム", icon: "bolt" },
+      { href: "/notebooklm", label: "NotebookLM", icon: "book" },
     ],
   },
   {
     title: "お金",
     items: [
-      { href: "/zaim", label: "Zaim Watch" },
-      { href: KURASHIFT_URL, label: "KURASHIFT", external: true },
-      { href: "/etc", label: "ETC" },
-      { href: "/vpoint", label: "Vポイント" },
-      { href: "/yen", label: "円動向" },
-      { href: "/rent-step", label: "家賃ステップ" },
-      { href: "/metrics", label: "収支・数値" },
-      { href: "/billing", label: "サブスク・課金" },
+      { href: "/zaim", label: "Zaim Watch", icon: "wallet" },
+      { href: KURASHIFT_URL, label: "KURASHIFT", external: true, icon: "pie" },
+      { href: "/etc", label: "ETC", icon: "car" },
+      { href: "/vpoint", label: "Vポイント", icon: "gift" },
+      { href: "/yen", label: "円動向", icon: "yen" },
+      { href: "/rent-step", label: "家賃ステップ", icon: "trend" },
+      { href: "/metrics", label: "収支・数値", icon: "chart" },
+      { href: "/billing", label: "サブスク・課金", icon: "card" },
     ],
   },
   {
     title: "からだ",
     items: [
-      { href: "/quiet-edge", label: "Quiet Edge" },
-      { href: "/performance/work", label: "仕事" },
-      { href: "/performance/move", label: "運動" },
+      { href: "/quiet-edge", label: "Quiet Edge", icon: "moon" },
+      { href: "/performance/work", label: "仕事", icon: "briefcase" },
+      { href: "/performance/move", label: "運動", icon: "run" },
     ],
   },
 ];
 
-export const HOME_NAV: NavItem = { href: "/", label: "ホーム" };
+export const HOME_NAV: NavItem = { href: "/", label: "ホーム", icon: "home" };
 
 export function flatNavItems(): NavItem[] {
   return [HOME_NAV, ...NAV_GROUPS.flatMap((g) => g.items)];

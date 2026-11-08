@@ -399,7 +399,7 @@ agents:
     schedule: "GHA平日16:00＋Mac朝/夕補給"
     note: "運用確認（2026-10-15）。格上げ=週1健全×連続2週→運用。実行=Grok／見守り=516"
   '611':
-    name: リソース制約要約係
+    name: リソース制約・配車係
     path: 600_リソース・家計室/611_リソース制約要約係
     flowforge_id: flow_azD9MyV6Lk3Pn63YMzf9uIFo
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_azD9MyV6Lk3Pn63YMzf9uIFo
@@ -408,7 +408,7 @@ agents:
     mixup_kind: mac_twin
     grok_counterpart: resource
     builder_tag: 〔Grok:R〕
-    note: AI使用状況把握＋レビュー連動で社員頻度の減増を提案（本番変更は人確認後）。813と連携
+    note: 全エージェントの使用量を見て「この作業はこのエージェントで」の割り振り案を#consultに出す（2026-11-05 に813を統合。実装の指示は松野）。flow.md参照
     trigger: 時間＋逼迫
     tool_assigned: jarvis
     tool_fit: A
@@ -601,9 +601,9 @@ agents:
     path: 800_俯瞰UI・投影更新室/813_代行指揮枠切替係
     flowforge_id: flow_whqVaN6KcGoUZnFpJKJjL7jN
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_whqVaN6KcGoUZnFpJKJjL7jN
-    status: 候補
+    status: 廃止（611へ統合）
     report: ops
-    note: 枠切れ代行チェーン＋611の頻度コントロール案を承認経由で反映。Jarvisは候補外で俯瞰
+    note: 【統合済み・廃止】2026-11-05 に611「リソース制約・配車係」へ統合。固定の代行チェーンは持たず、使用量で割り振る。flow.mdは611を参照
     trigger: 枠切れ
     tool_assigned: gencode
     tool_fit: C

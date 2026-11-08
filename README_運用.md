@@ -1,5 +1,7 @@
 # project-GE 一本化：Git 運用メモ
 
+**フォルダ地図（人間向け正本）**: [`docs/リポジトリ構成_地図_20261108.md`](docs/リポジトリ構成_地図_20261108.md)
+
 ## 構成（2025年3月〜）
 
 - **1 つの Git リポジトリ** = `~/git-repos`（ルートに `.git` がある）
@@ -10,6 +12,7 @@
   - `500_obsidian/` … 500 Obsidian
   - `300_ai/` … 300 AIリスキリング講座
   - `ProgramCode/` … プログラムコード（Alfred・Excel/PDF変換等）
+  - ほか `apps/` · `scripts/` · `docs/` 等 → 地図 MD を参照
 
 ## 日々の運用
 

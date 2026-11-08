@@ -62,6 +62,14 @@ export async function middleware(request: NextRequest) {
   if (path === "/api/inquiry-send-failover") {
     return NextResponse.next({ request });
   }
+  // FlowForge 読取プロキシ／MCP（FLOWFORGE_READ_PROXY_KEY。ChatGPT Plugin／カスタムMCP）
+  if (
+    path === "/api/flowforge/resolve" ||
+    path === "/api/flowforge/mcp" ||
+    path.startsWith("/api/flowforge/share/")
+  ) {
+    return NextResponse.next({ request });
+  }
   const isAuth = path.startsWith("/login") || path.startsWith("/auth");
   if (!user && !isAuth) {
     const url = request.nextUrl.clone();

@@ -1,4 +1,5 @@
 import Shell from "@/components/Shell";
+import Icon from "@/components/Icon";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import JobFailBanner from "@/components/JobFailBanner";
 import { createClient } from "@/lib/supabase/server";
@@ -472,43 +473,40 @@ export default async function HomePage() {
   return (
     <Shell active="/" email={user?.email ?? null}>
       <p className="page-kicker">HOME · HQ</p>
-      <h1>KURASHIFT</h1>
+      <h1 className="hq-title">今週の暮らしと資産</h1>
       <p className="sub">
-        全体俯瞰。①資産・②ライフプラン／税・③事業（不動産賃貸・MQ）のサマリーと、その週の収支・銀行残高。詳細は各レーンへ。
+        いまやること → ①資産・②ライフプラン／税・③事業のサマリー → その週の収支・銀行残高。詳細は各レーンへ。
       </p>
 
-      <div
-        className="card"
-        style={{
-          marginTop: 12,
-          borderColor:
-            next.level === "warn" ? "var(--danger, #b45309)" : undefined,
-        }}
-      >
-        <header>
-          <span className="lvl">いまやること</span>
-          <strong>{next.label}</strong>
-        </header>
+      <div className={`card hq-focus${next.level === "warn" ? " is-warn" : ""}`}>
+        <span className="pb-ficon" aria-hidden>
+          <Icon name={next.level === "warn" ? "alert" : "decide"} size={22} />
+        </span>
+        <div className="hq-focus-body">
+          <div className="pb-eyebrow">いまやること</div>
+          <strong className="hq-focus-title">{next.label}</strong>
+        </div>
         {next.href !== "/" ? (
-          <p style={{ marginTop: 8 }}>
-            <a className="btn primary" href={next.href}>
-              開く →
-            </a>
-          </p>
+          <a className="btn primary hq-focus-btn" href={next.href}>
+            開く <Icon name="arrow" size={16} />
+          </a>
         ) : null}
       </div>
 
       <JobFailBanner failed={failBannerItems} sendingStuck={sendingStuckItems} />
 
-      <div className="card" style={{ marginTop: 12 }}>
-        <header>
+      <details className="card hq-fresh">
+        <summary>
           <span className="lvl">データの鮮度</span>
           <strong>
             {weeklyAt
               ? `最終週次メタ ${weeklyAt}`
               : "週次メタ未取得（Mac 週次後に表示）"}
           </strong>
-        </header>
+          <span className={`hq-fresh-state${fails.length > 0 ? " is-bad" : ""}`}>
+            {fails.length > 0 ? `⚠ 失敗 ${fails.length}` : "✓ エラーなし"}
+          </span>
+        </summary>
         <p className="meta" style={{ marginTop: 6 }}>
           week={weeklySummary?.iso_week ?? "—"} · ok=
           {weeklySummary?.ok ?? "—"} · error={weeklySummary?.error ?? "—"} ·
@@ -544,7 +542,7 @@ export default async function HomePage() {
             ⚠️ キュー滞留 {stalled} 件（30分超）→ <a href="/jobs">ジョブ</a>
           </p>
         ) : null}
-      </div>
+      </details>
 
       <div
         className="card"
@@ -604,7 +602,7 @@ export default async function HomePage() {
 
       <h2 style={{ marginTop: 8, fontSize: "1.05rem" }}>3本の柱</h2>
       <div className="grid">
-        <article className="card">
+        <article className="card hq-pillar">
           <header>
             <span className="lvl">① 資産運用</span>
             <strong>{fmtYen(total)}</strong>
@@ -640,7 +638,7 @@ export default async function HomePage() {
           ) : null}
           <a href="/portfolio">資産の詳細 →</a>
         </article>
-        <article className="card">
+        <article className="card hq-pillar">
           <header>
             <span className="lvl">② 計画・実績</span>
             <strong
@@ -722,7 +720,7 @@ export default async function HomePage() {
           {" · "}
           <a href="/tax">確定申告 →</a>
         </article>
-        <article className="card">
+        <article className="card hq-pillar">
           <header>
             <span className="lvl">③ 事業</span>
             <strong>
