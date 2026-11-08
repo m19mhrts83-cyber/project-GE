@@ -90,12 +90,27 @@ function sweep(map, windowMs, now) {
   }
 }
 
-function clientIp(req) {
-  const xf = req.headers['x-forwarded-for'];
-  const first = String(Array.isArray(xf) ? xf[0] : xf || '')
+// 回数制限の鍵にする IP。利用者が自由に書けるヘッダーは信じない。
+// - Vercel 上：プラットフォームが付ける x-vercel-forwarded-for → x-real-ip → x-forwarded-for の先頭
+// - 手元（dev-server）：ヘッダーは見ず、実際の接続元だけを使う
+function firstHop(v) {
+  return String(Array.isArray(v) ? v[0] : v || '')
     .split(',')[0]
     .trim();
-  return first || (req.socket && req.socket.remoteAddress) || 'unknown';
+}
+function clientIp(req) {
+  const socketIp = (req.socket && req.socket.remoteAddress) || '';
+  if (process.env.VERCEL) {
+    const h = req.headers;
+    return (
+      firstHop(h['x-vercel-forwarded-for']) ||
+      firstHop(h['x-real-ip']) ||
+      firstHop(h['x-forwarded-for']) ||
+      socketIp ||
+      'unknown'
+    );
+  }
+  return socketIp || 'unknown';
 }
 
 // 長さが違っても落ちないよう、SHA-256のハッシュ同士を比べる
