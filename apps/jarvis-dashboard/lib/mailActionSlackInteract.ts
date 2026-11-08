@@ -3,7 +3,6 @@
  */
 import {
   applyMailActionSlack,
-  deleteSlackMaMessage,
   fetchMailActionTriage,
   isMailActionTriageId,
   guessMailReplyTo,
@@ -25,6 +24,16 @@ import {
   type MaterialCandidate,
 } from "@/lib/materialFileSearch";
 import { extractMaterialRequests } from "@/lib/materialRequest";
+import {
+  MA_REASON_TAGS,
+  loggedLine,
+  maSkipFollowupBlocks,
+  parseMaMuteValue,
+  parseMaReasonValue,
+  type MaReasonTag,
+} from "@/lib/maDecisionBlocks";
+import { decideSenderMute, tagSkipReason, weekDecisionCount } from "@/lib/maDecisionLog";
+import { isMuteAskPending } from "@/lib/mailActionSkipMute";
 
 export const MA_ACTION_IDS = {
   reply: "mail_action_reply",
@@ -39,7 +48,18 @@ export type MaModalMeta = {
   id: string;
   channel?: string;
   message_ts?: string;
+  /** モーダルを開いた時刻（ms）。判断ログの「決めるまでの時間」 */
+  o?: number;
+  /** 誤字脱字チェック／指示で見直し／資料を探す を押した回数 */
+  pr?: number;
+  rv?: number;
+  ff?: number;
 };
+
+/** 判断ログに渡す、モーダルで測ったこと */
+export function maTimingFromMeta(meta: MaModalMeta) {
+  return { openedAt: meta.o, proofread: meta.pr, revise: meta.rv, findFiles: meta.ff };
+}
 
 /** value: ma:reply|skip|todoist|done:{triage_id} */
 export function parseMaButtonValue(
@@ -63,10 +83,15 @@ export function parseMaModalMeta(raw: string): MaModalMeta | null {
     const j = JSON.parse(s) as Record<string, unknown>;
     const id = String(j.id || "").trim();
     if (!isMailActionTriageId(id)) return null;
+    const num = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : undefined);
     return {
       id,
       channel: String(j.channel || "").trim() || undefined,
       message_ts: String(j.message_ts || j.ts || "").trim() || undefined,
+      o: num(j.o),
+      pr: num(j.pr),
+      rv: num(j.rv),
+      ff: num(j.ff),
     };
   } catch {
     return null;
@@ -353,9 +378,10 @@ async function openReplyModal(opts: {
   messageTs?: string;
   /** 本文が空なので、開いた後に下書きを作る */
   composing?: boolean;
+  openedAt?: number;
 }): Promise<{ ok: boolean; error?: string; viewId?: string }> {
   const view = buildReplyView({
-    meta: { id: opts.triageId, channel: opts.channelId, message_ts: opts.messageTs },
+    meta: { id: opts.triageId, channel: opts.channelId, message_ts: opts.messageTs, o: opts.openedAt || Date.now() },
     who: opts.who,
     inbound: opts.inbound,
     state: { ...EMPTY_STATE, body: opts.draft, to: opts.to, account: opts.account },
@@ -487,6 +513,14 @@ export async function handleMaModalAction(opts: {
 }): Promise<{ run: () => Promise<void> } | { error: string }> {
   const ctx = await loadModalCtx(opts.payload);
   if ("error" in ctx) return ctx;
+  // 押した回数を private_metadata に持ち回り、送信時に判断ログへ
+  const counter =
+    opts.actionId === MA_MODAL_ACTION_IDS.proofread
+      ? "pr"
+      : opts.actionId === MA_MODAL_ACTION_IDS.revise
+        ? "rv"
+        : "ff";
+  ctx.meta = { ...ctx.meta, [counter]: (ctx.meta[counter] || 0) + 1 };
   const { bot, viewId, state, version } = ctx;
   const update = (view: Record<string, unknown>) =>
     slackApi(bot, "views.update", { view_id: viewId, view });
@@ -668,6 +702,7 @@ export async function prepareMaModalSubmitWithFiles(
         attachments: refs,
         channelId: ctx.meta.channel,
         messageTs: ctx.meta.message_ts,
+        timing: maTimingFromMeta(ctx.meta),
       });
       const view = result.ok
         ? {
@@ -696,6 +731,7 @@ export async function handleMaModalSubmit(opts: {
   bodyBlockId?: string;
   channelId?: string;
   messageTs?: string;
+  timing?: ReturnType<typeof maTimingFromMeta>;
 }): Promise<{
   ok: boolean;
   text: string;
@@ -714,6 +750,7 @@ export async function handleMaModalSubmit(opts: {
     account: opts.account,
     attachments: opts.attachments,
     source: "slack_modal",
+    timing: opts.timing,
   });
   if (!result.ok) {
     const onTo = /宛先/.test(result.message);
@@ -737,7 +774,10 @@ export async function handleMaModalSubmit(opts: {
         channel: opts.channelId,
         ts: opts.messageTs,
         text: `✅ ${result.message}`,
-        blocks: maDoneBlocks("返信を送信しました", result.message, true),
+        blocks: withLoggedLine(
+          maDoneBlocks("返信を送信しました", result.message, true),
+          await weekDecisionCount(),
+        ),
       }),
     });
   }
@@ -772,7 +812,9 @@ export async function handleMaBlockAction(opts: {
       const to = guessMailReplyTo(row);
       const account = normalizeMailAccount(row.account) || "estate";
       const composing = !String(row.draft_text || "").trim() && Boolean(inbound.trim());
+      const openedAt = Date.now();
       const opened = await openReplyModal({
+        openedAt,
         token: bot,
         triggerId,
         triageId,
@@ -790,7 +832,7 @@ export async function handleMaBlockAction(opts: {
         if (!composing || !viewId) {
           return { kind: "modal_opened", text: "返信モーダルを開きました" };
         }
-        const meta = { id: triageId, channel: channelId, message_ts: messageTs };
+        const meta = { id: triageId, channel: channelId, message_ts: messageTs, o: openedAt };
         const materials = extractMaterialRequests(inbound);
         return {
           kind: "modal_opened",
@@ -849,18 +891,24 @@ export async function handleMaBlockAction(opts: {
 
   const result = await applyMailActionSlack(triageId, action, {
     source: "slack_block_actions",
+    keepCard: Boolean(channelId && messageTs),
   });
 
-  // 見送り成功 → カードをチャットから削除（残す必要なし）
+  // 見送り成功 → カードを1行に縮め、理由タグ（任意）と送り手の確認を出す
   if (action === "skip" && result.ok) {
-    const deletedNow = await deleteSlackMaMessage({
-      channel: channelId,
-      ts: messageTs,
-    });
+    if (!channelId || !messageTs) {
+      return { kind: "delete", text: result.message, slack_deleted: result.slack_deleted };
+    }
+    const row = await fetchMailActionTriage(triageId);
     return {
-      kind: "delete",
+      kind: "replace",
       text: result.message,
-      slack_deleted: deletedNow || result.slack_deleted,
+      blocks: maSkipFollowupBlocks({
+        id: triageId,
+        who: String(row?.partner || row?.from_email || ""),
+        weekCount: await weekDecisionCount(),
+        askMute: result.mute_ask || null,
+      }) as ReturnType<typeof maDoneBlocks>,
     };
   }
 
@@ -875,6 +923,57 @@ export async function handleMaBlockAction(opts: {
   return {
     kind: result.ok ? "replace" : "error",
     text: result.message,
-    blocks: maDoneBlocks(title, result.message, result.ok),
+    blocks: result.ok
+      ? withLoggedLine(maDoneBlocks(title, result.message, true), await weekDecisionCount())
+      : maDoneBlocks(title, result.message, false),
   };
+}
+
+function withLoggedLine(blocks: ReturnType<typeof maDoneBlocks>, weekCount: number | null) {
+  return [
+    ...blocks,
+    { type: "context", elements: [{ type: "mrkdwn", text: loggedLine(weekCount) }] },
+  ] as unknown as ReturnType<typeof maDoneBlocks>;
+}
+
+/**
+ * 見送り後のカードで押された理由タグ／送り手の確認。
+ * 返すブロックで元カードを置き換える。
+ */
+export async function handleMaFollowupAction(
+  value: string,
+): Promise<{ text: string; blocks: Array<Record<string, unknown>> } | null> {
+  const reason = parseMaReasonValue(value);
+  if (reason) {
+    const tagged = await tagSkipReason(reason.id, reason.tag);
+    const ask = tagged.fromEmail ? await isMuteAskPending(tagged.fromEmail) : { pending: false, skips: 0 };
+    return {
+      text: `見送りの理由: ${reason.tag}`,
+      blocks: maSkipFollowupBlocks({
+        id: reason.id,
+        who: tagged.who,
+        weekCount: await weekDecisionCount(),
+        tagged: reason.tag,
+        askMute: ask.pending ? { skips: ask.skips } : null,
+      }),
+    };
+  }
+  const mute = parseMaMuteValue(value);
+  if (mute) {
+    const res = await decideSenderMute(mute.id, mute.choice);
+    const row = await fetchMailActionTriage(mute.id);
+    const tags = (row?.payload as Record<string, unknown> | null)?.skip_reason_tags;
+    const tag = Array.isArray(tags) && tags.length ? (String(tags[0]) as MaReasonTag) : null;
+    return {
+      text: res.ok ? "送り手の扱いを記録しました" : "送り手の扱いを記録できませんでした",
+      blocks: maSkipFollowupBlocks({
+        id: mute.id,
+        who: res.who,
+        weekCount: await weekDecisionCount(),
+        tagged: tag && tag in MA_REASON_TAGS ? tag : null,
+        muteDone: res.ok ? mute.choice : null,
+      }),
+    };
+  }
+  return null;
 }

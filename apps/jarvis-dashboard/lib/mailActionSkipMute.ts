@@ -11,6 +11,10 @@ export const DEFAULT_MUTE_THRESHOLD = 2;
 export type MuteEntry = {
   skips: number;
   muted: boolean;
+  /** しきい値に届き、Slack で確認待ち */
+  ask_pending?: boolean;
+  /** 松野さんが「この送り手は出さない」を選んだ時刻 */
+  confirmed_at?: string;
   last_at?: string;
   last_subject?: string;
 };
@@ -136,25 +140,59 @@ async function saveMuteRegistry(reg: MuteRegistry): Promise<void> {
   );
 }
 
-/** 見送り連続 streak → 送信者ミュート（Slack / Dashboard 共有）。 */
+/**
+ * 見送りを数える。しきい値に届いても黙ってミュートはしない（2026-11-08 松野さん判断）。
+ * 代わりに ask=true を返し、Slack で「次からも？」と確認してから confirmMailSenderMute で決める。
+ * muted は確認済みのものだけ true。
+ */
 export async function recordMailSkipLearn(
   fromEmail: string,
   subject: string,
-): Promise<{ muted: boolean; skips: number; key: string | null }> {
+): Promise<{ muted: boolean; skips: number; key: string | null; ask: boolean }> {
   const key = muteKeyFromEmail(fromEmail);
-  if (!key) return { muted: false, skips: 0, key: null };
+  if (!key) return { muted: false, skips: 0, key: null, ask: false };
   const reg = await loadMuteRegistry();
   const prev = reg.entries[key] || { skips: 0, muted: false };
   const skips = (prev.skips || 0) + 1;
-  const muted = skips >= reg.threshold || Boolean(prev.muted);
+  const muted = Boolean(prev.muted);
+  const ask = !muted && skips >= reg.threshold;
   reg.entries[key] = {
+    ...prev,
     skips,
     muted,
+    ask_pending: ask || undefined,
     last_at: new Date().toISOString(),
     last_subject: (subject || "").slice(0, 120),
   };
   await saveMuteRegistry(reg);
-  return { muted, skips, key };
+  return { muted, skips, key, ask };
+}
+
+/** 「次からも？」への答え。partner = 次から出さない／once = 今回だけ（数え直す） */
+export async function confirmMailSenderMute(
+  fromEmail: string,
+  choice: "once" | "partner",
+): Promise<{ key: string | null; muted: boolean }> {
+  const key = muteKeyFromEmail(fromEmail);
+  if (!key) return { key: null, muted: false };
+  const reg = await loadMuteRegistry();
+  const prev = reg.entries[key] || { skips: 0, muted: false };
+  const now = new Date().toISOString();
+  reg.entries[key] =
+    choice === "partner"
+      ? { ...prev, muted: true, ask_pending: undefined, confirmed_at: now, last_at: now }
+      : { ...prev, skips: 0, ask_pending: undefined, last_at: now };
+  await saveMuteRegistry(reg);
+  return { key, muted: choice === "partner" };
+}
+
+/** 確認待ちのままか（理由タグを押した後もカードに確認を残すため） */
+export async function isMuteAskPending(fromEmail: string): Promise<{ pending: boolean; skips: number }> {
+  const key = muteKeyFromEmail(fromEmail);
+  if (!key) return { pending: false, skips: 0 };
+  const reg = await loadMuteRegistry();
+  const ent = reg.entries[key];
+  return { pending: Boolean(ent?.ask_pending && !ent.muted), skips: ent?.skips || 0 };
 }
 
 /** 返信／Todoist 成功時に連続カウントをリセット（muted は維持）。 */
