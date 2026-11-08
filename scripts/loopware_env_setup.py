@@ -33,6 +33,7 @@ ENV_FILE = REPO / ".env.jarvis_private"
 SUPABASE_REF = "idkdqneutpvkhxhpjtgc"
 DEFAULT_TEAM = "team_NJph8Tc5cSqw7rZSrPOQMp00"
 DEFAULT_LOOPWARE_PROJECT = "prj_D6sckfsTtBzuO1kNEERuXCQ1nL8w"
+DEFAULT_DASHBOARD_PROJECT = "prj_3rP2c8CCYIhRFyECBycV8Y3gFluG"  # jarvis-dashboard
 
 LOOPWARE_KEYS = (
     "LOOPWARE_ACCESS_KEY",
@@ -106,8 +107,9 @@ def dashboard_project_id(env: dict[str, str]) -> str:
         return pid
     pj = REPO / "apps/jarvis-dashboard/.vercel/project.json"
     if pj.is_file():
-        return str(json.loads(pj.read_text(encoding="utf-8")).get("projectId") or "")
-    return ""
+        pid = str(json.loads(pj.read_text(encoding="utf-8")).get("projectId") or "")
+    # .vercel/project.json が無い Mac でも飛ばさない
+    return pid or DEFAULT_DASHBOARD_PROJECT
 
 
 def run_sql(path: Path, token: str) -> list:
