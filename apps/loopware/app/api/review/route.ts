@@ -35,10 +35,10 @@ export async function GET(req: Request) {
         title: (topics[d.topic_id] || "").split("\n")[0].slice(0, 80),
         choice: d.choice,
         reasons: d.reason_tags || [],
-        note: d.free_note || "",
+        note: String(d.free_note || "").replace(/^【次も同じに】/, ""),
         before: d.before_text || "",
         after: d.after_text || "",
-        scope: "once",
+        scope: String(d.free_note || "").startsWith("【次も同じに】") ? "rule" : "once",
       }),
     );
 
