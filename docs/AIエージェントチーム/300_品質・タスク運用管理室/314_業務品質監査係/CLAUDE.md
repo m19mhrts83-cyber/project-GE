@@ -99,6 +99,13 @@ Claude デスクトップが閉じていると 9:30 の回は次の起動時に�
 
 判断の記録と Todoist の実処置は別もの。Loopware の 313 画面は記録だけで、完了・期日変更・コメントは 313 の Slack ボタン／CLI が行う（`payload.todoist_applied=false`）。
 
+### Loopware への候補公開とルール帳
+
+`--loopware` は機械で束ねたルール候補（最大3件）・効いたルール・残っている理由を週次 MD に加え、候補を Loopware「今週の学び」に置く。`--improvement-logs` は各社員の改善ログを更新し、`--obsidian-dir` は週報を保存する。
+
+AI が要るのは `needs_ai`（言い回し）の候補だけ。差分を読んで文言を1行にし、ルール帳 `learned_rules.md` の `## 仮説` に置く。その他は機械の結果を使う。ルール帳を直し先の第一候補とし、Loopware で松野さんが「採用」したルールを `scripts/jarvis_loopware_apply_rules.py --commit` で `## 確定ルール`（最大10行）へ反映する。効果は `payload.applied_rules` で確認する。
+
+
 AI 使用量の節約: 機械チェックで済む事実は集め直さない。要確認 0 件かつ仕組みのコミットが 0 件なら、MD に「変更なし・問題なし」と1行書いて終える。
 
 ## 7. レビュー MD の型

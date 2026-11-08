@@ -14,6 +14,7 @@
   python scripts/jarvis_owner_decisions_weekly.py --days 14 --out output/x.md
   python scripts/jarvis_owner_decisions_weekly.py --mark-reviewed # 読んだ行に review_week を付ける
   python scripts/jarvis_owner_decisions_weekly.py --ledger <314>/output/improvements.md
+  python scripts/jarvis_owner_decisions_weekly.py --loopware --improvement-logs --obsidian-dir <dir>
 
 DB は読むだけ（--mark-reviewed のときだけ review_week を書く）。秘密の値は出さない。
 """
@@ -28,6 +29,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 JST = ZoneInfo("Asia/Tokyo")
 
@@ -64,22 +67,37 @@ ACTION_LABEL = {
     "use": "案をそのまま",
     "edit_use": "案を直して",
     "none_of_above": "どれも違う",
+    # 迷った・未判断は NG（見送り）に混ぜない（2026-11-08 松野さん）
+    "hesitated": "迷った",
+    "unseen": "未判断",
+    "rule_accept": "送り手ルール採用",
+    "rule_once": "今回だけ",
 }
 NEGATIVE = {"skipped", "dismiss", "skip", "none_of_above"}
 
 # 提案に対する松野さんの判断を3つに分ける（週次比較の物差し）
-#   承認 = 提案どおり／修正 = 提案を直して使った・別の扱いにした／見送り = 提案を採らなかった
-# sent は edited で 承認／修正 に分ける。ここに無い action は「その他」。
 VERDICT = {
-    "create": "承認", "close": "承認", "merge": "承認", "adopt": "承認", "use": "承認",
-    "done": "承認",
+    "create": "承認", "close": "承認", "merge": "承認", "adopt": "承認", "use": "承認", "done": "承認",
     "edit_use": "修正", "reschedule": "修正", "drop": "修正",
     "skipped": "見送り", "dismiss": "見送り", "skip": "見送り", "none_of_above": "見送り",
     "snoozed": "見送り",
 }
 VERDICTS = ("承認", "修正", "見送り")
-# 改善台帳で使える指標名
 METRICS = ("件数", "承認率", "修正率", "見送り率")
+REASON_LABEL = {
+    "promo": "宣伝・通知", "handled": "対応済み", "notnow": "今は不要", "hesitate": "迷う",
+    "no_reply": "回答不要", "self_or_grok": "自分発信・Grok部長", "not_important": "そもそも重要でない",
+    "other": "その他", "area": "エリア外", "yield": "利回り不足", "price": "価格",
+    "age_structure": "築年・構造", "loan": "融資が付きにくい", "no_time": "時間がない",
+    "unsure": "迷った", "need_info": "情報が足りない", "waiting": "誰かの返事待ち",
+}
+
+def reason_text(row: dict[str, Any]) -> str:
+    tags = (row.get("payload") or {}).get("reason_tags") or []
+    parts = [REASON_LABEL.get(str(t), str(t)) for t in tags]
+    if row.get("note"):
+        parts.append(str(row["note"]))
+    return "・".join(parts)
 
 
 def employee_of(row: dict[str, Any]) -> str:
@@ -328,7 +346,7 @@ def summarize(
             tags = reason_tags_of(r)
             ex.append(
                 f"- 見送り: {r.get('partner') or ''}｜{(r.get('subject') or '')[:50]}"
-                + (f"（理由: {r.get('note')}）" if r.get("note") else "")
+                + (f"（理由: {reason_text(r)}）" if reason_text(r) else "")
                 + (f"［{'・'.join(tags)}］" if tags else "")
                 + f" {ref_of(r)}"
             )
@@ -461,24 +479,49 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--mark-reviewed", action="store_true", help="読んだ行に review_week を付ける")
     ap.add_argument(
         "--ledger",
-        default=str(
-            Path(__file__).resolve().parents[1]
-            / "docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/output/improvements.md"
-        ),
+        default=str(Path(__file__).resolve().parents[1] / "docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/output/improvements.md"),
         help="改善台帳（効果測定に使う）",
     )
+    ap.add_argument("--loopware", action="store_true", help="ループウェアの節・候補・改善ログを追加し、候補をLoopwareに置く")
+    ap.add_argument("--obsidian-dir", help="松野さん用の週報を <dir>/YYYY-Www.md に書く")
+    ap.add_argument("--improvement-logs", action="store_true", help="各社員フォルダの logs/改善ログ.md に今週の行を足す")
     args = ap.parse_args(argv)
 
     until = datetime.now(JST)
     since = until - timedelta(days=args.days)
+    week = until.strftime("%G-W%V")
     sb = client()
     both, errors = fetch_all_sources(sb, since - timedelta(days=args.days))
     rows, prev_rows = split_weeks(both, since=since)
     ledger_path = Path(args.ledger)
     ledger = parse_ledger(ledger_path.read_text(encoding="utf-8")) if ledger_path.exists() else []
-    md = summarize(
-        rows, since=since, until=until, prev_rows=prev_rows, ledger=ledger, read_errors=errors
-    )
+    md = summarize(rows, since=since, until=until, prev_rows=prev_rows, ledger=ledger, read_errors=errors)
+    if args.loopware or args.obsidian_dir or args.improvement_logs:
+        import jarvis_loopware_weekly as lw
+
+        lw.attach_from_email(sb, rows)
+        cands = lw.hypotheses(rows, rejected=lw.rejected_ids(sb))
+        if args.loopware:
+            md += lw.sections(rows, cands)
+            lw.publish_candidates(sb, cands, week=week)
+        if args.obsidian_dir:
+            d = Path(args.obsidian_dir).expanduser()
+            d.mkdir(parents=True, exist_ok=True)
+            note_path = d / f"{week}.md"
+            note_path.write_text(lw.obsidian_note(rows, cands, week=week), encoding="utf-8")
+            print(f"# wrote {note_path}", file=sys.stderr)
+        if args.improvement_logs:
+            import jarvis_learned_rules as lr
+
+            for emp, lines in lw.improvement_lines(rows, week=week).items():
+                book = lr.rulebook_path(emp)
+                if not book or not lines:
+                    continue
+                log = book.parent / "logs" / "改善ログ.md"
+                log.parent.mkdir(parents=True, exist_ok=True)
+                head = "" if log.exists() else "# 改善ログ（ループウェア）\n\n直したこと・効いたか。314 が土曜に足す。\n\n"
+                with log.open("a", encoding="utf-8") as f:
+                    f.write(head + "\n".join(lines) + "\n")
     if args.out:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.out).write_text(md, encoding="utf-8")
@@ -486,12 +529,8 @@ def main(argv: list[str] | None = None) -> int:
     else:
         sys.stdout.write(md)
     if args.mark_reviewed and rows:
-        week = until.strftime("%G-W%V")
         # review_week は owner_decisions にだけある（task_loop は読むだけ）
-        ids = [
-            r["id"] for r in rows
-            if r.get("_table", "owner_decisions") == "owner_decisions" and not r.get("review_week")
-        ]
+        ids = [r["id"] for r in rows if r.get("_table", "owner_decisions") == "owner_decisions" and not r.get("review_week")]
         for i in range(0, len(ids), 200):
             sb.table("owner_decisions").update({"review_week": week}).in_("id", ids[i : i + 200]).execute()
         print(f"# marked review_week={week} rows={len(ids)}", file=sys.stderr)

@@ -838,7 +838,27 @@ def build_judge_prompt(c: dict[str, Any]) -> str:
 """
 
 
-def build_draft_prompt(c: dict[str, Any], judge: dict[str, Any]) -> str:
+def draft_rule_lines(c: dict[str, Any]) -> list[tuple[str, str]]:
+    """211 のルール帳（learned_rules.md）の言い回しルールのうち、この相手に当たるもの"""
+    try:
+        from jarvis_learned_rules import load_rulebook, rewrite_lines
+
+        row = {
+            "partner": c.get("partner_name") or c.get("partner") or "",
+            "from_email": c.get("from_email") or "",
+            "subject": c.get("subject") or "",
+            "lane": c.get("lane") or "partner",
+            "channel": c.get("channel") or "",
+        }
+        return rewrite_lines(load_rulebook("211"), row)
+    except Exception as e:  # noqa: BLE001 — 下書きは止めない
+        print(f"  # learned_rules 211 skip: {e}", file=sys.stderr)
+        return []
+
+
+def build_draft_prompt(
+    c: dict[str, Any], judge: dict[str, Any], rules: list[tuple[str, str]] | None = None
+) -> str:
     channel = (c.get("channel") or "Gmail").strip() or "Gmail"
     media = {
         "Gmail": "メール",
@@ -853,6 +873,8 @@ def build_draft_prompt(c: dict[str, Any], judge: dict[str, Any]) -> str:
     line_hint = ""
     if channel == "LINE":
         line_hint = "- LINE 向け: 短め（目安200〜400字）。絵文字は相手のトーンに合わせ最小限。\n"
+    # 松野さんが採用した言い回し（211 ルール帳。最大10行）
+    learned = "".join(f"- {text}\n" for _rid, text in (rules or [])[:10])
     return f"""あなたは株式会社リビングサポート松の代表・松野真治です。パートナーへの返信（{media}）下書きを書いてください。
 
 ルール:
@@ -862,7 +884,7 @@ def build_draft_prompt(c: dict[str, Any], judge: dict[str, Any]) -> str:
 - 勝手な約束・金額・日付を捏造しない。文脈にないことは書かない。不明点は確認の一文にする。
 - 件名行は書かない。本文のみ。
 - 「Re:」や引用は付けない。
-{line_hint}
+{line_hint}{learned}
 パートナー: {c['partner_name']}
 チャネル: {media}
 件名（参考）: {c.get('subject') or ''}
@@ -1357,7 +1379,8 @@ def process_candidates(
             time.sleep(sleep_s)
             continue
 
-        draft_prompt = build_draft_prompt(c, judge)
+        draft_rules = draft_rule_lines(c)
+        draft_prompt = build_draft_prompt(c, judge, draft_rules)
         draft_gemini = ""
         draft_cursor = ""
         draft_text = ""
@@ -1392,6 +1415,7 @@ def process_candidates(
                     "draft_text": draft_text,
                     "draft_gemini": draft_gemini,
                     "draft_cursor": draft_cursor,
+                    "draft_rules": [rid for rid, _t in draft_rules] or None,
                     "status": "pending",
                     "engine": "compare" if compare else engine,
                 },

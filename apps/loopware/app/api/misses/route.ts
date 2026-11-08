@@ -1,11 +1,26 @@
 import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import path from "path";
+import { serviceClient } from "@/lib/supabase";
+import { loadMisses } from "@/lib/misses";
 
 export const runtime = "nodejs";
 
-/** Mac 上の miss_scan state を読む（Cloud では空＝シード）。 */
-export async function GET() {
+/**
+ * 見落とし候補。
+ * ?surface=triage → メールの仕分けが出さなかったもの（Supabase）
+ * それ以外 → 312 の Mac 上の miss_scan state を読む（Cloud では空＝シード）
+ */
+export async function GET(req: Request) {
+  if (new URL(req.url).searchParams.get("surface") === "triage") {
+    const sb = serviceClient();
+    if (!sb) return NextResponse.json({ ok: true, persisted: false, candidates: [] });
+    try {
+      return NextResponse.json({ ok: true, persisted: true, candidates: await loadMisses(sb) }, { headers: { "cache-control": "private, no-store" } });
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    }
+  }
   const home = process.env.HOME || "";
   const candidates = [
     path.join(home, "git-repos/.jarvis_state/todoist_312_miss_scan.json"),
