@@ -17,6 +17,60 @@ export default function HubPage() {
 
       <FocusCard />
 
+      <div className="eyebrow">メール</div>
+      <Link className="glass nav-card" href="/desk?surface=triage">
+        <span className="ico">
+          <Icon name="check" size={22} />
+        </span>
+        <span className="txt">
+          <strong>判断デスク</strong>
+          <span className="meta">1件ずつ。返信／見送る／ToDo／迷う</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+      <Link className="glass nav-card" href="/desk?surface=triage&view=left">
+        <span className="ico">
+          <Icon name="clock" size={22} />
+        </span>
+        <span className="txt">
+          <strong>残り・次の一手</strong>
+          <span className="meta">迷った・見ていないものに次の一手。良い／違う</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+      <Link className="glass nav-card" href="/misses?surface=triage">
+        <span className="ico">
+          <Icon name="warn" size={22} />
+        </span>
+        <span className="txt">
+          <strong>見落とし</strong>
+          <span className="meta">仕分けが出さなかったもの。要対応だった？</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
+      <Link className="glass nav-card" href="/rules">
+        <span className="ico">
+          <Icon name="thumb" size={22} />
+        </span>
+        <span className="txt">
+          <strong>今週の学び</strong>
+          <span className="meta">判断から見つけたルール候補。採用／今回だけ／違う</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
+      <Link className="glass nav-card" href="/zaim">
+        <span className="ico">
+          <Icon name="check" size={22} />
+        </span>
+        <span className="txt">
+          <strong>Zaim の見直し</strong>
+          <span className="meta">学習で直した費目。正しい／違う</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
       <div className="eyebrow">IN ／ OUT</div>
       <Link className="glass nav-card" href="/312">
         <span className="ico">

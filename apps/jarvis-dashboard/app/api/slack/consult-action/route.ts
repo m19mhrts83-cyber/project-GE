@@ -18,6 +18,8 @@ import {
 import {
   extractMaModalState,
   handleMaBlockAction,
+  handleMaFollowupAction,
+  maTimingFromMeta,
   handleMaModalAction,
   handleMaModalSubmit,
   isMaModalAction,
@@ -214,6 +216,7 @@ export async function POST(request: NextRequest) {
           bodyBlockId,
           channelId: meta.channel,
           messageTs: meta.message_ts,
+          timing: maTimingFromMeta(meta),
         });
         if (!result.ok) {
           return NextResponse.json({
@@ -362,6 +365,16 @@ export async function POST(request: NextRequest) {
         text: result.text,
         blocks: result.blocks,
       };
+      if (responseUrl) {
+        await postResponseUrl(responseUrl, body);
+      }
+      return NextResponse.json(body);
+    }
+
+    // 見送り後の理由タグ／「次からも？」の答え
+    const followup = await handleMaFollowupAction(value);
+    if (followup) {
+      const body = { replace_original: true, text: followup.text, blocks: followup.blocks };
       if (responseUrl) {
         await postResponseUrl(responseUrl, body);
       }

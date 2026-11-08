@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --port 3004",
     "lint": "next lint",
-    "test": "node --experimental-strip-types --test tests/*.test.ts"
+    "test": "node --experimental-strip-types --test tests/*.test.ts tests/*.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
