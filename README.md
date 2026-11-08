@@ -65,25 +65,17 @@ npx http-server -p 8000
 
 ## リポジトリ構成
 
-```
-.
-├── index.html        # ルート直下の不動産賃貸管理会社検索サイト
-├── style.css         # ルートアプリのスタイルシート
-├── app.js            # ルートアプリの検索ロジック
-├── apps/             # 公開・運用向けのWebアプリ群
-├── docs/             # GitHub Pagesで公開する資料・スライド
-├── 215_kamiooya/     # 神・大家さん倶楽部関連の業務資料・自動化スクリプト
-├── 300_ai/           # AI活用に関する資料・検証メモ
-├── 500_obsidian/     # Obsidian運用に関する資料
-├── dx_kyouyuu/       # DX互助会の共有資料・ナレッジ
-├── line_unofficial_poc/ # LINE連携の検証コード
-├── scripts/          # リポジトリ運用用の補助スクリプト
-└── README.md         # このファイル
-```
+**地図（正本）**: [`docs/リポジトリ構成_地図_20261108.md`](docs/リポジトリ構成_地図_20261108.md)  
+一本化・Git 運用: [`README_運用.md`](README_運用.md)
 
-このREADMEの起動手順は、リポジトリルート直下の `index.html` / `style.css` / `app.js` で構成される静的Webアプリを対象にしています。
+| 区分 | 主なパス |
+|------|----------|
+| 公開アプリ | `apps/*` · ルート `index.html` / `shuhen-*` |
+| Jarvis 基盤 | `scripts/` · `config/` · `launchd/` |
+| ドメイン | `215_kamiooya/` · `dx_kyouyuu/` · `line_unofficial_poc/` |
+| エージェント | `docs/AIエージェントチーム/` |
 
-`apps/kamiooya-qa-web/` など個別アプリの詳細は、各ディレクトリ内のREADMEを参照してください。
+この README の起動手順は、ルート直下の静的 Web アプリ（`index.html` / `style.css` / `app.js`）向けです。個別アプリは各 `apps/*/README.md` を参照。
 
 ## 技術スタック
 
