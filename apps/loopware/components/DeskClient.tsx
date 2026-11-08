@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
 import LogJar, { type Bead } from "./LogJar";
+import VoicePanel from "./VoicePanel";
 import { MAIL_REASON_TAGS, STAY_REASON_TAGS, type WeekTally } from "@/lib/decisionContract";
 import { agoLabel, type DeskCard, type DeskChoice } from "@/lib/deskCore";
 
@@ -365,6 +366,13 @@ export default function DeskClient() {
             </div>
           ) : null}
         </article>
+      ) : null}
+
+      {card && phase.k === "card" ? (
+        <VoicePanel
+          target={{ id: card.id, subject: card.subject, line: selLine }}
+          onSaved={() => setBeads((b) => [...b, "note"])}
+        />
       ) : null}
 
       {phase.k === "reason" ? (
