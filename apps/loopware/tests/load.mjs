@@ -10,6 +10,7 @@ export function loadLib(name) {
   }).outputText;
   const exports = {};
   vm.runInNewContext(code, {
+    URLSearchParams,
     exports, Date, Math, RegExp, Array, Object, Number, String, Set, Map, JSON,
     crypto: globalThis.crypto, TextEncoder, btoa, Uint8Array,
   });

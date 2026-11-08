@@ -801,3 +801,9 @@ kbd { font-family: var(--font-mono); font-size: 10px; border: 1px solid currentC
 
 /* KURASHIFT から開いたとき（?from=kurashift） */
 :root[data-app="kurashift"] { --accent: #c9a24a; --accent-soft: #2b2410; --on-accent: #10140f; --surface-0: #0b120e; --surface-1: #111b15; --surface-2: #18251d; --line: #24352a; }
+
+/* 残り・次の一手 */
+.left-card { padding: 16px; display: grid; gap: 10px; }
+.left-subject { font-size: 16px; font-weight: 700; line-height: 23px; }
+.next-step { border-left: 2px solid var(--accent); padding: 4px 0 4px 12px; display: grid; gap: 2px; }
+.next-step p { margin: 0; font-weight: 600; }

@@ -37,6 +37,8 @@ export type DeskCard = {
   appliedRules: string[];
   postedToSlack: boolean;
   hesitatedAt: string | null;
+  /** 迷ったときに選ばれた「残っている理由」 */
+  stayReason: string | null;
 };
 
 /** デスクのボタン。返信は Jarvis の返信画面で送る（ここでは送らない） */
@@ -110,6 +112,7 @@ export function toCard(r: TriageRow): DeskCard {
     appliedRules: Array.from(new Set([...rules, ...draftRules])),
     postedToSlack: Boolean(pl.slack_ma_posted_at),
     hesitatedAt: typeof pl.loopware_hesitated_at === "string" ? pl.loopware_hesitated_at : null,
+    stayReason: typeof pl.loopware_stay_reason === "string" ? pl.loopware_stay_reason : null,
   };
 }
 
@@ -146,4 +149,51 @@ export function agoLabel(iso: string | null, now: Date = new Date()): string {
   const h = Math.round(m / 60);
   if (h < 48) return `${h}時間前`;
   return `${Math.round(h / 24)}日前`;
+}
+
+// ---------------------------------------------------------------- 残り案件（view=left）
+
+/** 残りに出すか: 迷ったもの、または届いてから 24 時間たって未判断のもの */
+export function isLeftover(c: DeskCard, now: Date = new Date()): boolean {
+  if (c.hesitatedAt) return true;
+  if (!c.receivedAt) return false;
+  const t = Date.parse(c.receivedAt);
+  return Number.isFinite(t) && now.getTime() - t >= 24 * 3600_000;
+}
+
+export type NextEffect = "snooze3" | "todo" | "skip" | "reply";
+export type NextStep = { id: string; text: string; effect: NextEffect; why: string };
+
+function ageHours(c: DeskCard, now: Date): number {
+  const t = c.receivedAt ? Date.parse(c.receivedAt) : NaN;
+  return Number.isFinite(t) ? (now.getTime() - t) / 3600_000 : 0;
+}
+
+/**
+ * 次の一手（型で決める。AI は使わない）。良い→そのとおりに動かす／違う→記録して理由を聞く。
+ * 型の id は週次で「どの型が当たるか」を数えるのに使う。
+ */
+export function nextStepFor(c: DeskCard, now: Date = new Date()): NextStep {
+  const h = ageHours(c, now);
+  if (c.stayReason === "waiting") {
+    return { id: "wait_snooze3", effect: "snooze3", text: "返事待ちなので、3日後にもう一度出します", why: "誰かの返事待ち" };
+  }
+  if (c.stayReason === "no_time") {
+    return { id: "notime_todo", effect: "todo", text: "ToDo に入れて、時間のあるときに返します", why: "時間がない" };
+  }
+  if (c.stayReason === "need_info") {
+    return c.draftLines.length
+      ? { id: "needinfo_reply", effect: "reply", text: "返信画面を開いて、確認の一文を足して返します", why: "情報が足りない" }
+      : { id: "needinfo_todo", effect: "todo", text: "調べることを ToDo に入れます", why: "情報が足りない" };
+  }
+  if (!c.postedToSlack && (c.score ?? 0) < 30 && h >= 72) {
+    return { id: "old_low_skip", effect: "skip", text: "3日以上たっていて優先度も低いので、見送ってよいですか", why: `${Math.round(h / 24)}日前・点数が低い` };
+  }
+  if (c.draftLines.length && c.lane === "partner") {
+    return { id: "draft_reply", effect: "reply", text: "下書きがあるので、そのまま返信画面で送ります", why: "下書きあり" };
+  }
+  if (h >= 24 * 7) {
+    return { id: "week_skip", effect: "skip", text: "1週間以上残っています。見送ってよいですか", why: "7日以上" };
+  }
+  return { id: "default_todo", effect: "todo", text: "ToDo に入れて、ここからは外します", why: "迷ったまま" };
 }

@@ -203,7 +203,10 @@ export default function DeskClient() {
 
   const tag = useCallback(
     async (key: string, choice: DeskChoice, tagKey: string) => {
-      const body = choice === "hesitate" ? { idemKey: key, stayReason: tagKey } : { idemKey: key, reasonTags: [tagKey] };
+      const body =
+        choice === "hesitate"
+          ? { idemKey: key, itemId: card?.id, stayReason: tagKey }
+          : { idemKey: key, reasonTags: [tagKey] };
       next();
       try {
         const r = await post("/api/desk/tag", body);
@@ -213,7 +216,7 @@ export default function DeskClient() {
         setPending(readQueue().length);
       }
     },
-    [next],
+    [next, card],
   );
 
   // 理由は任意。5 秒で次へ
