@@ -21,6 +21,7 @@ export default function SaveSheet({
   onClose,
   onUndo,
   closeLabel = "閉じる",
+  added = 1,
 }: {
   rec: DecisionRecord;
   decisionLabel: string;
@@ -30,6 +31,7 @@ export default function SaveSheet({
   onClose: () => void;
   onUndo?: () => void;
   closeLabel?: string;
+  added?: number;
 }) {
   // いけともさんの「モーション」資料と同じ作り方：章の経過時間 t から毎フレーム状態を決める。
 // CSS の delay に任せないので、スキップ・動きを減らす設定でも完成形に飛べる。
@@ -77,7 +79,7 @@ export default function SaveSheet({
   // 件数は ease-out（1-(1-x)^3）で増える。章の経過時間から計算
   const x = done ? 1 : Math.max(0, Math.min(1, (t - T_COUNT) / 500));
   const eased = 1 - Math.pow(1 - x, 3);
-  const shown = Math.round(total - 1 + eased);
+  const shown = Math.round(total - added + eased * added);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -126,7 +128,7 @@ export default function SaveSheet({
             {shown}
             <small> 件</small>
           </span>
-          <span className={`count-plus mono ${at(T_COUNT) ? "in" : ""}`}>+1</span>
+          <span className={`count-plus mono ${at(T_COUNT) ? "in" : ""}`}>+{added}</span>
         </div>
 
         <ol className="log-stack" aria-label="ログの積み上がり">

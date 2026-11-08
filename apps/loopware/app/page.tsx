@@ -24,7 +24,7 @@ export default function HubPage() {
         </span>
         <span className="txt">
           <strong>312 入口</strong>
-          <span className="meta">何を拾うか。追記／別作成／登録しない</span>
+          <span className="meta">いろんなソースから提案を仕分ける。採る／見送る／保留</span>
         </span>
         <Icon name="next" size={18} />
       </Link>

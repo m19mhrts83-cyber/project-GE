@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import Icon from "@/components/Icon";
 import TaskDedupeClient from "@/components/TaskDedupeClient";
-import MissesClient from "@/components/MissesClient";
+import ProposeClient from "@/components/ProposeClient";
 
 export default async function Page312({
   searchParams,
@@ -32,12 +32,12 @@ export default async function Page312({
           className={tab === "misses" ? "active" : ""}
           href="/312?tab=misses"
         >
-          漏れ確認
+          提案を仕分ける
         </Link>
       </div>
       <Suspense fallback={<p className="meta">読み込み中…</p>}>
         {tab === "misses" ? (
-          <MissesClient />
+          <ProposeClient />
         ) : (
           <TaskDedupeClient initialTopicId={topicId} />
         )}
