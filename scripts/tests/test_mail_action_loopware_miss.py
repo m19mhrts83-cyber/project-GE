@@ -34,6 +34,15 @@ class LoopwareMissTests(unittest.TestCase):
         self.assertTrue(out.get("slack_ma_miss_posted_at"))
         self.assertFalse(ma.is_loopware_miss_due(out))
 
+    def test_loopware_link_is_signed_relay(self):
+        import os
+        os.environ["MAIL_ACTION_TOKEN"] = "k"
+        os.environ["JARVIS_DASHBOARD_URL"] = "https://dash.example"
+        u = ma.loopware_url("abc-123456")
+        self.assertTrue(u.startswith("https://dash.example/api/g/lw/abc-123456?s="))
+        self.assertNotIn("nosig", u)
+        self.assertNotEqual(ma.ma_sig("abc-123456", "loopware"), ma.ma_sig("abc-123456", "reply"))
+
 
 if __name__ == "__main__":
     unittest.main()
