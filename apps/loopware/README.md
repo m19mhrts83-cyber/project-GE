@@ -24,6 +24,21 @@ npm run dev   # http://127.0.0.1:3004
 
 iPhone は **Chrome** 前提。
 
+## 入場（鍵）
+
+- Vercel の jarvis-loopware に `LOOPWARE_ACCESS_KEY` を設定する（判断デスクには件名・相手名が出るため）
+- 端末ごとに1回 `/login` で鍵を入れる → 180日有効の Cookie
+- Slack からのリンクは `?t=<期限>.<署名>`（7日有効。`lib/access.ts` の `linkToken`）でそのまま入れる
+- 鍵が未設定の本番では、従来の `/` `/312` `/313` だけ開き、新しい画面と `/api/log` は止める
+
+## 判断ログの書き込み（契約 v1）
+
+- 契約: `lib/decisionContract.ts`（正本。`apps/jarvis-dashboard/lib/decisionContract.ts` は写し）
+- 書き込み: `POST /api/log` に `{ decision }` または `{ decisions: [...] }`（最大50件。端末で溜めた分の再送用）
+- 今週の粒: `GET /api/log?surface=triage` → 採った／見送った／迷った／未判断…の件数
+- 同じ判断の再送は `payload.idem_key` で1行にまとまる（索引: `20261108_owner_decisions_idem_key.sql`）
+- テスト: `npm test`（契約・鍵）、`python3 -m unittest scripts/tests/test_decision_contract.py`（写しの一致・Python 経路）
+
 ## データ
 
 - 端末: localStorage `loopware_v1`
@@ -36,6 +51,7 @@ SQL Editor または CLI で:
 1. `apps/jarvis-dashboard/supabase/migrations/20261107_owner_decisions.sql`（未適用なら）
 2. `apps/jarvis-dashboard/supabase/migrations/20261107_task_loop.sql`
 3. `apps/jarvis-dashboard/supabase/migrations/20261107_owner_decisions_loopware_payload.sql`
+4. `apps/jarvis-dashboard/supabase/migrations/20261108_owner_decisions_idem_key.sql`（二重記録防止。未適用でも先に重複を確かめてから入れるので動く）
 
 （MCP 権限が無い環境では Dashboard SQL で手動適用。）
 
