@@ -8,7 +8,7 @@
 import { createServiceClient } from "@/lib/supabase/admin";
 
 export type OwnerDecision = {
-  surface: "todoist_312" | "todoist_313" | "s9";
+  surface: "todoist_312" | "todoist_313" | "s9" | "triage_rule";
   action: string;
   source?: string;
   employee?: string;

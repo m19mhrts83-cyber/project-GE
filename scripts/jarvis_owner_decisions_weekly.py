@@ -50,8 +50,27 @@ ACTION_LABEL = {
     "reschedule": "延期",
     "adopt": "採用",
     "skip": "見送り",
+    # 迷った・未判断は NG（見送り）に混ぜない（2026-11-08 松野さん）
+    "hesitated": "迷った",
+    "unseen": "未判断",
+    "rule_accept": "送り手ルール採用",
+    "rule_once": "今回だけ",
 }
 NEGATIVE = {"skipped", "dismiss", "skip"}
+REASON_LABEL = {
+    "promo": "宣伝・通知",
+    "handled": "対応済み",
+    "notnow": "今は不要",
+    "hesitate": "迷う",
+}
+
+
+def reason_text(row: dict[str, Any]) -> str:
+    tags = (row.get("payload") or {}).get("reason_tags") or []
+    parts = [REASON_LABEL.get(str(t), str(t)) for t in tags]
+    if row.get("note"):
+        parts.append(str(row["note"]))
+    return "・".join(parts)
 
 
 def employee_of(row: dict[str, Any]) -> str:
@@ -132,7 +151,7 @@ def summarize(rows: list[dict[str, Any]], *, since: datetime, until: datetime) -
         for r in [r for r in rs if r.get("action") in NEGATIVE][:5]:
             ex.append(
                 f"- 見送り: {r.get('partner') or ''}｜{(r.get('subject') or '')[:50]}"
-                + (f"（理由: {r.get('note')}）" if r.get("note") else "")
+                + (f"（理由: {reason_text(r)}）" if reason_text(r) else "")
             )
         if ex:
             details += ["", f"## {EMPLOYEE_LABEL.get(emp, emp)}", *ex]

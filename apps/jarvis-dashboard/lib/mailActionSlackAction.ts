@@ -17,6 +17,7 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import { isSelfEmail, parseEmailAddr } from "@/lib/selfEmails";
 import { extractMaterialRequests } from "@/lib/materialRequest";
 import { closeTodoistTaskById, createTodoistTask } from "@/lib/todoistTasks";
+import { editRatio } from "@/lib/maDecisionBlocks";
 
 /** done = LINE／Chatwork などアプリ側で返信済み（送信はしない） */
 export type MailActionSlackAction = "reply" | "skip" | "todoist" | "done";
@@ -221,6 +222,8 @@ export type MaApplyResult = {
   todoist_url?: string;
   muted?: boolean;
   muted_siblings_skipped?: number;
+  /** 見送りがしきい値に届いた（Slack で「次からも？」と聞く） */
+  mute_ask?: { skips: number };
   slack_deleted?: boolean;
   digest_deleted?: boolean;
   digest_updated?: boolean;
@@ -507,6 +510,10 @@ export async function applyMailActionSlack(
     account?: string;
     /** 添付する資料（モーダルで選んだ OneDrive / Google Drive のファイル） */
     attachments?: Array<{ s: MaterialSource; id: string }>;
+    /** 見送り後もカードを残す（Slack で理由タグを出すため） */
+    keepCard?: boolean;
+    /** 返信モーダルで測ったこと（判断ログ用） */
+    timing?: { openedAt?: number; proofread?: number; revise?: number; findFiles?: number };
   },
 ): Promise<MaApplyResult> {
   const row = await fetchMailActionTriage(id);
@@ -588,11 +595,13 @@ export async function applyMailActionSlack(
       : learn.key
         ? ` · 見送りカウント ${learn.skips}`
         : "";
-    // チャット上からカードを消す（振り返り不要）
-    const slackDeleted = await deleteSlackMaMessage({
-      channel: String(payload.slack_ma_channel || ""),
-      ts: String(payload.slack_ma_ts || ""),
-    });
+    // チャット上からカードを消す（振り返り不要）。Slack ボタンからは理由タグのため残す
+    const slackDeleted = opts?.keepCard
+      ? false
+      : await deleteSlackMaMessage({
+          channel: String(payload.slack_ma_channel || ""),
+          ts: String(payload.slack_ma_ts || ""),
+        });
     // 同一バッチのダイジェスト: 残 pending で更新／0件なら削除
     const digestSync = await syncDigestFromPayload(payload);
     revalidateMailActionPaths();
@@ -602,6 +611,7 @@ export async function applyMailActionSlack(
       status: "skipped",
       muted: learn.muted,
       muted_siblings_skipped: siblings || undefined,
+      mute_ask: learn.ask ? { skips: learn.skips } : undefined,
       slack_deleted: slackDeleted,
       ...digestSync,
     };
@@ -760,7 +770,25 @@ export async function applyMailActionSlack(
     payload.gmail_sent_account = sent.account;
     payload.sent_to = to;
     if (attachments.length) payload.sent_attachments = attachments.map((a) => a.filename);
-    payload.slack_ma_action = { action: "reply", at: now, source };
+    const t = opts?.timing;
+    const assist = t
+      ? Object.fromEntries(
+          Object.entries({ proofread: t.proofread, revise: t.revise, find_files: t.findFiles }).filter(
+            ([, v]) => Number(v) > 0,
+          ),
+        )
+      : {};
+    payload.slack_ma_action = {
+      action: "reply",
+      at: now,
+      source,
+      // 判断ログ用（owner_decisions.payload にトリガーが写す）
+      edit_ratio: editRatio(row.draft_text, body),
+      draft_source: payload.draft_source || undefined,
+      decide_ms:
+        t?.openedAt && Date.now() > t.openedAt ? Date.now() - t.openedAt : undefined,
+      assist: Object.keys(assist).length ? assist : undefined,
+    };
     delete payload.last_send_error;
     const { error } = await sb
       .from("triage_items")
