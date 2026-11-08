@@ -21,7 +21,7 @@ SOURCES = ("slack", "loopware", "dashboard", "kurashift", "script")
 _OUTCOME = {
     **dict.fromkeys(
         ["sent", "replied", "todo", "adopt", "accept", "good", "rule_accept", "next_good",
-         "create", "done", "close", "drop"], "take"),
+         "create", "done", "close", "drop", "merge"], "take"),
     **dict.fromkeys(["skipped", "reject", "wrong", "rule_reject", "next_wrong", "dismiss", "skip"], "ng"),
     "hesitated": "hesitate",
     "unseen": "none",
