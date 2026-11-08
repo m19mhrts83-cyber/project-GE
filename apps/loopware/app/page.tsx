@@ -60,6 +60,17 @@ export default function HubPage() {
         <Icon name="next" size={18} />
       </Link>
 
+      <Link className="glass nav-card" href="/zaim">
+        <span className="ico">
+          <Icon name="check" size={22} />
+        </span>
+        <span className="txt">
+          <strong>Zaim の見直し</strong>
+          <span className="meta">学習で直した費目。正しい／違う</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
       <div className="eyebrow">IN ／ OUT</div>
       <Link className="glass nav-card" href="/312">
         <span className="ico">

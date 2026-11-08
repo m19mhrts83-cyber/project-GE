@@ -14,4 +14,6 @@ PY="${JARVIS_PYTHON:-/Users/matsunomasaharu2/selenium_env/venv/bin/python}"
 mkdir -p "$REPO_DIR/.jarvis_state/loopware"
 "$PY" "$REPO_DIR/scripts/jarvis_loopware_weekly.py" --publish \
   > "$REPO_DIR/.jarvis_state/loopware/weekly.md" 2>> "$REPO_DIR/.jarvis_state/loopware/weekly.err" || true
+# 見張りファイルも更新（315 鮮度監視が weekly.published_at を見る）
+"$PY" "$REPO_DIR/scripts/jarvis_loopware_status.py" >> "$REPO_DIR/.jarvis_state/loopware/weekly.err" 2>&1 || true
 exec "$PY" "$REPO_DIR/scripts/jarvis_weekly_review_314.py" --post
