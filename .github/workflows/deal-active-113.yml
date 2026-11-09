@@ -4,13 +4,13 @@ name: 113 deal-active sync (KURASHIFT -> Slack)
 # KURASHIFT で内見候補以上の案件を #deal-active に1案件1スレッドで写す。
 # flow: docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/flow.md
 #
-# 当面は手動起動のみ（既定はドライラン）。松野さんの許可が出たら
-# 毎朝 07:30 JST（22:30 UTC 前日）の schedule を有効にする（月曜は「どうしますか？」カードも出る）。
+# 毎朝 07:30 JST（22:30 UTC 前日）に本番実行（月曜は「どうしますか？」カードも出る）。
+# 2026-11-09 初回本投稿のあと定時化。手動起動は既定ドライラン。
 # ボタンは jarvis-dashboard /api/slack/consult-action が受ける（署名秘密は Vercel 側と同じ値）。
-#   schedule:
-#     - cron: "30 22 * * *"
 
 on:
+  schedule:
+    - cron: "30 22 * * *"
   workflow_dispatch:
     inputs:
       apply:
@@ -67,7 +67,7 @@ jobs:
           PROPERTY_GATE_ACTION_TOKEN: ${{ secrets.PROPERTY_GATE_ACTION_TOKEN }}
           ASK: ${{ github.event.inputs.ask || 'auto' }}
           LINK_MANUAL: ${{ github.event.inputs.link_manual || 'false' }}
-          APPLY: ${{ github.event.inputs.apply || 'false' }}
+          APPLY: ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.apply || 'false' }}
           DEAL_ID: ${{ github.event.inputs.deal_id || '' }}
           MAX_POSTS: ${{ github.event.inputs.max_posts || '10' }}
         run: |
