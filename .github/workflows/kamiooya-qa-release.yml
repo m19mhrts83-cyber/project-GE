@@ -32,6 +32,7 @@ jobs:
     env:
       PROJECT_REF: mwubzgefkkjjbingrmqu
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_KAMIOOYA || secrets.SUPABASE_ACCESS_TOKEN }}
+      HAS_KAMIOOYA_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_KAMIOOYA != '' }}
       MIGRATIONS: ${{ github.event.inputs.migrations }}
       FUNCTIONS: ${{ github.event.inputs.functions }}
     defaults:
@@ -55,7 +56,15 @@ jobs:
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
             "https://api.supabase.com/v1/projects/${PROJECT_REF}")
           echo "project access: HTTP ${code}"
-          [[ "$code" == "200" ]] || { echo "::error::このトークンでは Q&A プロジェクトを操作できません"; exit 1; }
+          if [[ "$code" != "200" ]]; then
+            if [[ "${HAS_KAMIOOYA_TOKEN}" != "true" ]]; then
+              # 2026-11-06 の2回の失敗はこれ（共通トークンは Q&A プロジェクトの持ち主でない → 403）
+              echo "::error::secrets.SUPABASE_ACCESS_TOKEN_KAMIOOYA が未登録です。Q&A プロジェクトを持つアカウントで Supabase のアクセストークンを作り、リポの Actions secret に登録してください（共通の SUPABASE_ACCESS_TOKEN では HTTP ${code}）"
+            else
+              echo "::error::SUPABASE_ACCESS_TOKEN_KAMIOOYA では Q&A プロジェクトを操作できません（HTTP ${code}）。期限切れ・別アカウントのトークンでないか確認してください"
+            fi
+            exit 1
+          fi
 
       - name: Apply migrations
         if: ${{ github.event.inputs.migrations != '' }}
