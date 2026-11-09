@@ -335,6 +335,27 @@ def build(tasks: list[dict[str, Any]], kind: str | None, rep: dict[str, Any],
     return {"items": items, "text": render(items, usage, period)}
 
 
+QUEUE_DIR = REPO / ".jarvis_state" / "dispatch_queue"
+
+
+def queue_record(did: str, items: list[dict[str, Any]]) -> dict[str, Any]:
+    """317 の ✅ 起動（jarvis_dispatch_launch.py）が読む形。"""
+    rows = []
+    for i, it in enumerate(items, 1):
+        t, d = it["task"], it["decision"]
+        rows.append({"no": i, "title": t.get("title"), "path": t.get("path"), "request": t.get("request", ""),
+                     "kind": it["kind"], "agent": d.get("agent"), "mode": d["mode"], "notes": it["notes"],
+                     "empty": it["empty"], "request_text": request_text(t, d)})
+    return {"id": did, "created_at": datetime.now(JST).isoformat(), "items": rows}
+
+
+def save_queue(did: str, items: list[dict[str, Any]]) -> Path:
+    QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+    p = QUEUE_DIR / f"{did}.json"
+    p.write_text(json.dumps(queue_record(did, items), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return p
+
+
 def write_out(text: str, title: str) -> Path:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     slug = re.sub(r"[^\w一-龥ぁ-んァ-ン]+", "_", title)[:40].strip("_") or "task"
@@ -354,12 +375,15 @@ def main() -> int:
         ap.error("--task か --title が要る")
     tasks = [read_task(Path(p)) for p in args.task] + [{"title": t, "text": t} for t in args.title]
     res = build(tasks, args.kind, load_usage())
-    out = write_out(res["text"], tasks[0].get("title") or "task")
-    print(res["text"])
+    did = datetime.now(JST).strftime("%Y%m%d-%H%M")
+    text = res["text"] + f"\n\n配車ID: {did}（✅ で全件了承、または「1と3OK、2はCodexで」とスレッドに返信）"
+    out = write_out(text, tasks[0].get("title") or "task")
+    print(text)
     print(f"# 書き出し: {out}", file=sys.stderr)
     if args.post:
+        save_queue(did, res["items"])
         r = subprocess.run([sys.executable, str(REPO / "scripts" / "jarvis_slack_webhook_post.py"),
-                            "--channel", "consult", "--username", "611 配車係", "--text", res["text"]])
+                            "--channel", "consult", "--username", "611 配車係", "--text", text])
         return r.returncode
     return 0
 
