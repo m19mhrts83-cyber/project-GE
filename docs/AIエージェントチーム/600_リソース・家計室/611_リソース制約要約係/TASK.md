@@ -52,7 +52,8 @@
 - テスト: `python3 -m unittest scripts/tests/test_ai_usage_weekly.py` → 4件 OK
 - 2026-11-09 Supabase 確認: 使用量テーブルは無し。新テーブルは作らず既存 `metrics`（metric/entity/recorded_at 一意）＋`sync_meta` に載せる形に変更（スキーマ変更なし）
 - 2026-11-09 Cursor 自動取得を追加（`scripts/jarvis_cursor_usage_fetch.py`、314 runner に相乗り、失敗しても手入力値を残す。テスト4件）。手入力: Claude 7%・Cursor 37%/1%・Grok Bot 96%
-- 未了: Cursor 取得用プロファイルへの初回ログイン（松野さん、マージ後に `--login`）、週次 runner への `--push` の可否（未了承）、ChatGPT・Genspark の％の取り方
+- 2026-11-09 夜: Playwright のブラウザは Google ログインで「安全でない」と弾かれたため、普通の Chrome を専用プロフィール（`.jarvis_state/cursor_usage_chrome/`）＋リモートデバッグで起動して読む方式に変更
+- 未了: Cursor 取得用プロフィールへの初回ログイン（松野さん、マージ後に `--login`）、週次 runner への `--push` の可否（未了承）、ChatGPT・Genspark の％の取り方
 
 ---
 
