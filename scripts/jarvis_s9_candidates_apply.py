@@ -37,6 +37,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jarvis_bucho_bridge_lib import STATE_DIR, folder, list_queue_files  # noqa: E402
 import jarvis_s9_slack_blocks as s9blocks  # noqa: E402
+import jarvis_slack_signal as sig  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 JST = ZoneInfo("Asia/Tokyo")
@@ -231,6 +232,10 @@ def build_report(
     names = "・".join(r["name"] for r in added[:5]) or "なし"
     lines = [
         "【報告】S9 管理会社開拓・候補取り込み",
+        sig.head_line(
+            "green" if added else "yellow",
+            "取り込みました" if added else "新しく追加できた社はありません",
+        ),
         f"台帳に追加 {len(added)}社: {names}",
         f"重複で除外 {dups}／#consult で判断 {consult}",
     ]
