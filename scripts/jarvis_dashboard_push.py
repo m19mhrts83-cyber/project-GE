@@ -112,7 +112,7 @@ def push_triage(sb) -> int:
     items = data.get("items") or []
     # Web で閉じた行（sent/skipped/snoozed/done）を Mac push で pending に戻さない。
     # Web で保存した draft_text / payload メタも潰さない。
-    PROTECTED = {"sent", "skipped", "snoozed", "done"}
+    PROTECTED = {"sent", "skipped", "snoozed", "done", "todoist"}
     KEEP_PAYLOAD = (
         "sent_at",
         "gmail_sent_id",

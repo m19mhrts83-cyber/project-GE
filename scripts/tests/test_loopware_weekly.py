@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import re
 import unittest
 from pathlib import Path
 
@@ -94,8 +95,37 @@ class OwnerCommentTests(unittest.TestCase):
         self.assertNotIn("あなたのひとこと", lw.sections(rows[1:], []))
 
 
+class OptionTests(unittest.TestCase):
+    def test_hide_has_alternatives_that_parse(self):
+        c = {"id": "C00000001", "kind": "hide", "key": "info@chat-work.com",
+             "rule_line": "hide | from:info@chat-work.com | scope=partner", "text": "出さない"}
+        opts = lw.options_for(c)
+        self.assertEqual([o["id"] for o in opts], ["main", "demote", "domain"])
+        for o in opts:
+            rule, err = lr.parse_rule_line(f"- R116-009 | {o['rule_line']} | v1 2026-11-09 | {o['text']}", "confirmed")
+            self.assertIsNone(err, o)
+            self.assertIsNotNone(rule)
+
+    def test_free_mail_domain_is_not_offered(self):
+        c = {"id": "C00000002", "kind": "hide", "key": "a@gmail.com", "rule_line": "hide | from:a@gmail.com", "text": ""}
+        self.assertEqual([o["id"] for o in lw.options_for(c)], ["main", "demote"])
+
+    def test_note_on_verdict_is_listed(self):
+        rows = [{"id": 3, "surface": "rule_review", "action": "rule_accept", "target_id": "C1234abcd",
+                 "note": "請求書だけは出して", "payload": {"candidate_id": "C1234abcd", "text": "後回し", "option_label": "出すが後回し"}}]
+        self.assertIn("[C1234abcd]（採用・出すが後回し） 後回し → 「請求書だけは出して」", lw.sections(rows, []))
+
+
 class ApplyTests(unittest.TestCase):
-    BOOK = (REPO / "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/learned_rules.md").read_text(encoding="utf-8")
+    # 本物のルール帳の形を使い、すでに入っている確定ルールは外して空の状態から試す
+    BOOK = re.sub(
+        r"^- R116-\d+ .*$",
+        ap.PLACEHOLDER,
+        (REPO / "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/learned_rules.md").read_text(encoding="utf-8"),
+        count=1,
+        flags=re.M,
+    )
+    BOOK = re.sub(r"^- R116-\d+ .*\n", "", BOOK, flags=re.M)
 
     def test_add_then_remove(self):
         t1, rid = ap.add_rule(self.BOOK, employee="116", rule_line="hide | from:a@x.jp | scope=partner",

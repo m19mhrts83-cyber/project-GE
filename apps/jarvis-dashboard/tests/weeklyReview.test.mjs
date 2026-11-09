@@ -97,3 +97,23 @@ test('ルールの効き・前週比の表記', () => {
   assert.equal(m.pct(m.rate(1, 4)), '25%');
   assert.equal(m.pct(m.rate(1, 0)), '—');
 });
+
+test('候補の選択肢（効かせ方）と、判断に添えたひとこと', () => {
+  const m = load();
+  const base = { id: 'C1234abcd', kind: 'hide', employee: '116', key: 'a@x.jp', rule_line: 'hide | from:a@x.jp', text: '出さない', why: 'w', evidence: [], status: 'candidate' };
+  const old = m.candidateOptions(base);
+  assert.equal(old.length, 1);
+  assert.equal(old[0].rule_line, 'hide | from:a@x.jp');
+  const withOpts = m.candidateOptions({ ...base, options: [
+    { id: 'main', label: '出さない', rule_line: 'hide | from:a@x.jp', text: '出さない' },
+    { id: 'demote', label: '出すが後回し', rule_line: 'demote-20 | from:a@x.jp', text: '後回し' },
+    { id: 'BAD id', label: 'x', rule_line: 'x', text: 'x' },
+  ] });
+  assert.equal(JSON.stringify(withOpts.map((o) => o.id)), JSON.stringify(['main', 'demote']));
+  const st = m.candidateStates([
+    { id: 11, decided_at: '2026-11-09T00:00:00Z', surface: 'rule_review', action: 'rule_accept', note: '請求書だけは出して', payload: { candidate_id: 'C1234abcd', option_label: '出すが後回し' } },
+  ]);
+  assert.equal(st.get('C1234abcd').decided, 'rule_accept');
+  assert.equal(st.get('C1234abcd').option, '出すが後回し');
+  assert.equal(JSON.stringify(st.get('C1234abcd').comments), JSON.stringify(['請求書だけは出して']));
+});

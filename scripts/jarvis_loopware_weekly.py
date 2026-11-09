@@ -172,7 +172,45 @@ def hypotheses(rows: list[dict[str, Any]], *, rejected: set[str] | None = None) 
     out.sort(key=lambda c: -c["score"])
     for c in out:
         c["status"] = "hypothesis" if small else "candidate"
+        c["options"] = options_for(c)
     return out[:MAX_CANDIDATES]
+
+
+FREE_MAIL = {"gmail.com", "yahoo.co.jp", "icloud.com", "outlook.com", "hotmail.com", "outlook.jp", "me.com", "docomo.ne.jp", "ezweb.ne.jp", "softbank.ne.jp"}
+
+
+def options_for(c: dict[str, Any]) -> list[dict[str, str]]:
+    """候補ごとの「どう効かせるか」の選択肢。最初が既定（今の rule_line）。
+    どれも jarvis_learned_rules.py が読める書き方だけにする（効き目 hide/demote/boost/keep/rewrite）"""
+    k, key = c.get("kind"), str(c.get("key") or "")
+    first = {"id": "main", "label": "", "rule_line": c.get("rule_line") or "", "text": c.get("text") or ""}
+    if k == "hide":
+        first["label"] = "出さない"
+        opts = [first, {
+            "id": "demote",
+            "label": "出すが後回し",
+            "rule_line": f"demote-20 | from:{key} | scope=partner",
+            "text": f"{key} からのメールは出しますが、並びを下げて後回しにします（見送り寄り）",
+        }]
+        dom = key.split("@", 1)[1] if "@" in key else ""
+        if dom and dom not in FREE_MAIL:
+            opts.append({
+                "id": "domain",
+                "label": f"@{dom} ごと出さない",
+                "rule_line": f"hide | from:@{dom} | scope=partner",
+                "text": f"@{dom} から届くメールは、送り手に関係なく出しません",
+            })
+        return opts
+    if k == "keep":
+        first["label"] = "必ず出す"
+        return [first, {
+            "id": "boost",
+            "label": "必ず出して上の方に",
+            "rule_line": f"boost+20 | from:{key}",
+            "text": f"{key} は必ず出し、並びも上げます（見落とし防止）",
+        }]
+    first["label"] = "このとおり"
+    return [first]
 
 
 def rule_effects(rows: list[dict[str, Any]]) -> dict[str, Counter]:
@@ -220,11 +258,13 @@ def owner_comments(rows: list[dict[str, Any]]) -> list[str]:
     """ルール候補への「直してひとこと」（ダッシュボード /review・loopware）。314 が修正案に反映する"""
     out = []
     for r in rows:
-        if r.get("surface") != "rule_review" or r.get("action") != "comment" or not r.get("note"):
+        if r.get("surface") != "rule_review" or not r.get("note"):
             continue
         pl = _pl(r)
         about = pl.get("text") or pl.get("rule_line") or pl.get("candidate_id") or r.get("target_id")
-        out.append(f"- [{pl.get('candidate_id') or r.get('target_id')}] {about} → 「{str(r['note'])[:300]}」")
+        verb = {"rule_accept": "採用", "rule_once": "今回だけ", "rule_reject": "違う"}.get(str(r.get("action")), "")
+        head = f"（{verb}{'・' + str(pl['option_label']) if pl.get('option_label') else ''}）" if verb else ""
+        out.append(f"- [{pl.get('candidate_id') or r.get('target_id')}]{head} {about} → 「{str(r['note'])[:300]}」")
     return out
 
 

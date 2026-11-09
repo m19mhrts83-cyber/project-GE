@@ -11,7 +11,7 @@ loopware で「採用」したものだけを ## 確定ルール に足す（1�
 
 ## 確定ルール
 
-（最大10行。まだありません）
+- R116-001 | hide | from:info@chat-work.com | scope=partner | v1 2026-11-09 | 根拠 34,35,36 | info@chat-work.com からのメールは、次から判断デスクにも Slack にも出しません
 
 ## 仮説
 
