@@ -1,0 +1,14 @@
+【引継ぎ更新】713 DX教育・チャッピー
+要ボス：なし
+
+ミスレモン宛て。初回は全体像から入力へ。
+Markdown・3R・音声入力を扱います。
+
+8枚・30分の原稿08／構成09を用意。
+メール・Gmail API・拡張導入は後続へ。
+
+正本：planning/dx-course-beginner/TASK.md
+受取口：to_MissLemon／DX講座
+
+次：新原稿のレビューとNotebookLM資料化。
+Webは旧版のまま。受領・公開は未完了。

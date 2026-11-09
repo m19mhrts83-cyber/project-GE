@@ -1,0 +1,119 @@
+{
+  "checked_at": "2026-11-04 07:20 JST",
+  "source_md_count": 10,
+  "items": [
+    {
+      "source": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/00_このノートのソース一覧.md",
+      "drive": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分/00_このノートのソース一覧.md",
+      "sha256": "c953e06701701ad44d068b06e6027ff3d1aab75679e527f190a3afbbaf1cb301",
+      "byte_match": true
+    },
+    {
+      "source": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/01_月30分_全体メニュー_ソース.md",
+      "drive": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分/01_月30分_全体メニュー_ソース.md",
+      "sha256": "604c12e9b9d5198c44842e9d3a9fb45baa280b75686cb14cf43351fd6a54ec7c",
+      "byte_match": true
+    },
+    {
+      "source": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/02_第01回_受信メールと返信_ソース.md",
+      "drive": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分/02_第01回_受信メールと返信_ソース.md",
+      "sha256": "992ac5d663ec62dc8ae7653e5c4f984255a62c10d5643dd25a63e02b335bdb56",
+      "byte_match": true
+    },
+    {
+      "source": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/03_第01回_スライド構成案.md",
+      "drive": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分/03_第01回_スライド構成案.md",
+      "sha256": "f76ebbe947c2a6693ca9af2514bf3d0ac2b8b58fb753103bc555c80ac9ca08c5",
+      "byte_match": true
+    },
+    {
+      "source": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/04_Studio生成指示.md",
+      "drive": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分/04_Studio生成指示.md",
+      "sha256": "238899ba8bf96b97cfa17ea7b831080135cf2d41892fa51577d27662b130e1b0",
+      "byte_match": true
+    },
+    {
+      "source": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/05_参考資料と確認範囲.md",
+      "drive": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分/05_参考資料と確認範囲.md",
+      "sha256": "87e9a69c98abbb4918c51b0ef562eae4ab36d911046cf3df478281d5106bf1a0",
+      "byte_match": true
+    },
+    {
+      "source": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/06_制作と公開の手順.md",
+      "drive": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分/06_制作と公開の手順.md",
+      "sha256": "f9e86bca884c97d67773d89450c42b88ae0eecfc7f2b30f42c348256182c604c",
+      "byte_match": true
+    },
+    {
+      "source": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/07_Gmail_APIとCursor拡張_補足.md",
+      "drive": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分/07_Gmail_APIとCursor拡張_補足.md",
+      "sha256": "43e0dd1b428c0371408399538e06233f50bf7d0f52535967bc86bdd84a92bd82",
+      "byte_match": true
+    },
+    {
+      "source": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/08_第01回_全体像とインプット_ソース.md",
+      "drive": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分/08_第01回_全体像とインプット_ソース.md",
+      "sha256": "735db93a2f49e665247e8c6300648a5d84386fdacbdbbfe65e6f27f31e50f614",
+      "byte_match": true
+    },
+    {
+      "source": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/09_第01回_30分構成と生成指示.md",
+      "drive": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分/09_第01回_30分構成と生成指示.md",
+      "sha256": "10185b936091846c0e0fd543289a2443097af77434db8e682011a54f6a165a7a",
+      "byte_match": true
+    },
+    {
+      "source": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/初回導入ワーク.md",
+      "drive": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分/教材/初回導入ワーク.md",
+      "sha256": "a564163cebcabfc94bcccdbf04325e13ec584f71a02e1fd9703c24ffe9614738",
+      "byte_match": true
+    }
+  ],
+  "slide_ranges_minutes": [
+    [
+      0,
+      2
+    ],
+    [
+      2,
+      7
+    ],
+    [
+      7,
+      8
+    ],
+    [
+      8,
+      12
+    ],
+    [
+      12,
+      16
+    ],
+    [
+      16,
+      21
+    ],
+    [
+      21,
+      28
+    ],
+    [
+      28,
+      30
+    ]
+  ],
+  "total_minutes": 30,
+  "three_r": "Role / Reference / Request",
+  "notebooklm_generation": "未実施",
+  "web_intro_update": "未実施",
+  "published": "未実施",
+  "recipient_status": "pending",
+  "slack_update": {
+    "at": "2026-11-04 07:19:25 JST",
+    "ts": "1793744365.211039",
+    "url": "https://aiwsnetwork.slack.com/archives/C0CA3M5SNNS/p1793744365211039",
+    "webhook": "HTTP 200 ok",
+    "connector_readback": true
+  }
+}

@@ -4,13 +4,14 @@
 容量・詳細リンクの正本は admin Drive [`240_いけとも`](https://drive.google.com/drive/folders/1UrfAzlxQDVkQBkIeyGNWmWZ1RYAjNHsr)。  
 Jarvis ダッシュボード: [/materials](https://jarvis-dashboard-amber.vercel.app/materials)（レーン「いけともWS」）
 
-更新: 2026-11-07
+更新: 2026-11-09
 
 ## 受講済みセミナー
 
 | 日付 | セミナー | Drive（参照一覧） | 主なリンク |
 |---|---|---|---|
 | 2026-11-07 | ループウェア Day1 基礎編 | [`2026-11_ループウェア/`](https://drive.google.com/drive/folders/1UrfAzlxQDVkQBkIeyGNWmWZ1RYAjNHsr)（admin `240_いけとも` 内） | [動画](https://youtu.be/sPyBpJKks8w) · [資料HTML](https://superslide-share.frontier.monster/s/ssm_share_MKKbgJQD7O5eGzVn76T4FxN6f3_9S8j8-lwjIqvbzyU) · [資料PDF](https://superslide-share.frontier.monster/p/ssm_pdf_iphecQ5sS9_aeCJMnX8b6H5nBNKvOy8YqtHWO7CMN8U) · [Luma](https://luma.com/iketomo261107) · [Notion](https://www.notion.so/411f6bbe5a76814b91cef54cd0e97c67) |
+| 2026-11-08 | ループウェア Day2 実践編 | 同上 `2026-11-08_Day2_実践編/` | [動画](https://youtu.be/_kiZp432skU) · [資料HTML](https://superslide-share.frontier.monster/s/ssm_share_fint00gpyXArvqMhUSgN5q6fuKM0UN6Sp82fppz5QII) · [資料PDF](https://superslide-share.frontier.monster/p/ssm_pdf_2lYFhxpznascam3wX1U33-E-DTzNUSr-ibdM64vwDhU) · [動く図](https://claude.ai/artifact/SrqHHt7QudFYTiTd9xcQGL) · [Luma](https://luma.com/iketomo261108) |
 | 2026-02-14 | 資料・ツール制作ハンズオン | [フォルダ](https://drive.google.com/drive/folders/1DWZ1V9_Muix2I_rSGb3P5iqJgEYiRV29) / [00_参照一覧](https://drive.google.com/file/d/1lieR306osuCxV7f5JM4y4GhKxvDNt88c/view) | [動画](https://www.youtube.com/watch?v=jwkZBI-T5Vk) · [資料](https://bit.ly/4qAEQYq) |
 | 2026-02-28 | AIでExcelの面倒作業を“1クリック化” | [フォルダ](https://drive.google.com/drive/folders/1oUhNh9yJ7YDIW-zPmsmxRhd5HlAHAGMm) / [00_参照一覧](https://drive.google.com/file/d/1JrrjbKfjOO5xy5HQoGA_thrYCJTGiZqw/view) | [動画](https://youtu.be/uaWoe9ggxnE) · [資料](https://drive.google.com/file/d/1lli3B7R3e0o6xgF9Ob6PCPtZaUsVKO4z/view) · Notionメモ |
 | 2026-03-11 | Google AI Studioで自分専用ツール制作 | [フォルダ](https://drive.google.com/drive/folders/1TrR94bLgY6k4Z-XzUtHa3KjwEGv1gVlE) / [00_参照一覧](https://drive.google.com/file/d/1hJn5OYMPsakvsD6ub3b7OfTo5bAQ3ZjP/view) | [資料](https://bit.ly/4ltjQCi) · [Luma](https://luma.com/iketomo260311) · Notionメモ |

@@ -1,0 +1,195 @@
+{
+  "checked_at": "2026-11-04T06:58:07+09:00",
+  "workspace": "/Users/matsunomasaharu2/git-repos",
+  "branch": "main",
+  "head": "7256a5ab4203cc24458390a8d93d4e2c5f9fdea0",
+  "target_git_status": "M docs/index.html\n?? docs/DX互助会_初心者教育プラン_20261103/\n?? docs/dx-beginner/",
+  "diff_check_exit": 0,
+  "preview": {
+    "url": "http://127.0.0.1:8873/index.html",
+    "http_status": null,
+    "note": "一時プレビューは未応答。再開時は必要なら起動する"
+  },
+  "drive_folder": "/Users/matsunomasaharu2/Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/200_NoteBookLM/17_東海DX_初心者AI実践_月30分",
+  "drive_sources": [
+    {
+      "name": "00_このノートのソース一覧.md",
+      "drive_exists": true,
+      "same_bytes": true
+    },
+    {
+      "name": "01_月30分_全体メニュー_ソース.md",
+      "drive_exists": true,
+      "same_bytes": true
+    },
+    {
+      "name": "02_第01回_受信メールと返信_ソース.md",
+      "drive_exists": true,
+      "same_bytes": true
+    },
+    {
+      "name": "03_第01回_スライド構成案.md",
+      "drive_exists": true,
+      "same_bytes": true
+    },
+    {
+      "name": "04_Studio生成指示.md",
+      "drive_exists": true,
+      "same_bytes": true
+    },
+    {
+      "name": "05_参考資料と確認範囲.md",
+      "drive_exists": true,
+      "same_bytes": true
+    },
+    {
+      "name": "06_制作と公開の手順.md",
+      "drive_exists": true,
+      "same_bytes": true
+    },
+    {
+      "name": "07_Gmail_APIとCursor拡張_補足.md",
+      "drive_exists": true,
+      "same_bytes": true
+    }
+  ],
+  "files": [
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/index.html",
+      "bytes": 5470,
+      "sha256": "6066d77f6b32db6191edeb09024ffd65756d2094c865f102ed02628981d4bd6f"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/dx-beginner/01-work.md",
+      "bytes": 6812,
+      "sha256": "9249a7f77161aacc6c11993c2774a89bfdab9600d0859dd5a2b6e315ad64ea19"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/dx-beginner/01.html",
+      "bytes": 8804,
+      "sha256": "202984eda88502fdaadd94a25ea0780ab6e322c49f4a357ba9ff1178f073af81"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/dx-beginner/curriculum.md",
+      "bytes": 9767,
+      "sha256": "c6f99540e36a7a87787345b999cbb55ddd533d33f0c8d67fd67aac0a6fecf9fd"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/dx-beginner/index.html",
+      "bytes": 12741,
+      "sha256": "794ea4c19aa410b145cf9796432a48c6a068a8723a3f64e2bbbf0c296b6cd933"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/dx-beginner/samples/受信メール一覧_練習.xlsx",
+      "bytes": 4439,
+      "sha256": "3a81997260eaa4f1a12dcb7d81e2b18903dc39bd6686268edac1e5b9c4deb39a"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/dx-beginner/samples/受信確認メモ.md",
+      "bytes": 974,
+      "sha256": "27f12b30b7ec0d8dee3b867455d5a08bd35678a544ba5a7ae483b5a79071214c"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/dx-beginner/samples/返信下書き係.md",
+      "bytes": 950,
+      "sha256": "4c8a31bd4f07e36e368062dba341b75e1dc7d73ff002581eebd9ddc8b899f633"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/dx-beginner/setup.md",
+      "bytes": 5869,
+      "sha256": "d6f2f88e14705e9b2efed3a5f196986c4fa492648a55bcca3097f2cc986a9684"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/dx-beginner/style.css",
+      "bytes": 3270,
+      "sha256": "f8011616fbe9cdfb2048f7c0efdeff0e9f6571178a2f4f5330f4740a359947ba"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/00_このノートのソース一覧.md",
+      "bytes": 2767,
+      "sha256": "a8ca442196e206b7f1d908d17aeab87660086762af547abed0790264e5129298"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/01_月30分_全体メニュー_ソース.md",
+      "bytes": 9767,
+      "sha256": "c6f99540e36a7a87787345b999cbb55ddd533d33f0c8d67fd67aac0a6fecf9fd"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/02_第01回_受信メールと返信_ソース.md",
+      "bytes": 6812,
+      "sha256": "9249a7f77161aacc6c11993c2774a89bfdab9600d0859dd5a2b6e315ad64ea19"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/03_第01回_スライド構成案.md",
+      "bytes": 1293,
+      "sha256": "f9802e7498df6cb30490f2e5d5784063411e7c555dc6250b4a489585cf909fb3"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/04_Studio生成指示.md",
+      "bytes": 2587,
+      "sha256": "5dfac7d9ceabbc3c7d007caf4757bb54f735b58cd8c8bbb07e56e880ebd8cc4b"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/05_参考資料と確認範囲.md",
+      "bytes": 2232,
+      "sha256": "6bf66922c7fb0e668a54f8cfe0c2bb5b5feb208a5d924f5815635658830c33cc"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/06_制作と公開の手順.md",
+      "bytes": 2652,
+      "sha256": "d62364c7b935a320115035983402206f28fcbf808a366d62cf82c2fd4fe3dd18"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/NotebookLM投入/07_Gmail_APIとCursor拡張_補足.md",
+      "bytes": 5869,
+      "sha256": "d6f2f88e14705e9b2efed3a5f196986c4fa492648a55bcca3097f2cc986a9684"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/初回ワークシート.md",
+      "bytes": 6812,
+      "sha256": "9249a7f77161aacc6c11993c2774a89bfdab9600d0859dd5a2b6e315ad64ea19"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/初回教材/README.md",
+      "bytes": 512,
+      "sha256": "754bc0113a12140f9ef58201d4ee947e3b068d79051da711b47a588c4370dfd3"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/初回教材/入力例.md",
+      "bytes": 694,
+      "sha256": "dd3f46f6cf045dcf7eb739eb6fe15d8d8defe8db8d932714d995ae958513601a"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/初回教材/案内下書き係.md",
+      "bytes": 1303,
+      "sha256": "d4f369ee584669728a5fd450802dd98ba993bb936813ccfa88148314fb243fe0"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/初回教材/案内見本.html",
+      "bytes": 1800,
+      "sha256": "cfd55c2c516c87376cb54dc4c4b29dd6e22a8c1db195f3a20b5cd8432b24774b"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/初回教材/返信下書き係.md",
+      "bytes": 950,
+      "sha256": "4c8a31bd4f07e36e368062dba341b75e1dc7d73ff002581eebd9ddc8b899f633"
+    },
+    {
+      "path": "/Users/matsunomasaharu2/git-repos/docs/DX互助会_初心者教育プラン_20261103/教育プラン.md",
+      "bytes": 24235,
+      "sha256": "c054fa1a2700262bd7100d0efdb0a04ae8a8124c58394b4e6a000fac21755b79"
+    }
+  ],
+  "handoff": {
+    "prepared_at": "2026-11-04T07:01:56+09:00",
+    "canonical": "/Users/matsunomasaharu2/git-repos/planning/dx-course-beginner/TASK.md",
+    "recipient_memo": "/Users/matsunomasaharu2/git-repos/agent-handoff/to_MissLemon/20261104-0657-chappy-dx-beginner-course.md",
+    "recipient_status": "pending",
+    "slack_channel": "C0CA3M5SNNS",
+    "webhook_http_status": 200,
+    "message_ts": "1793743257.726669",
+    "message_readback_verified": true,
+    "slack_url": "https://aiwsnetwork.slack.com/archives/C0CA3M5SNNS/p1793743257726669",
+    "accepted_by_recipient": false
+  }
+}

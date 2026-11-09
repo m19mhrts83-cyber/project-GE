@@ -1,0 +1,30 @@
+{
+  "checked_at": "2026-11-04 07:22 JST",
+  "changed_sources": [
+    {
+      "file": "05_参考資料と確認範囲.md",
+      "sha256": "f96f64ef4c59119b930c317a3068200581725d1a29f6b3ea9a445dcc5d7ea9b9",
+      "drive_match": true
+    },
+    {
+      "file": "08_第01回_全体像とインプット_ソース.md",
+      "sha256": "9bf615813f2cb4416a9d4455cb1ed6911c062b4eaacd7a62068d35c1adb664df",
+      "drive_match": true
+    },
+    {
+      "file": "09_第01回_30分構成と生成指示.md",
+      "sha256": "c6084f30ba684ac3bcc8ce886fe56bf1bea98b7c08cded7af7e59fecc5a831a3",
+      "drive_match": true
+    }
+  ],
+  "slides": 8,
+  "minutes": 30,
+  "official_sources": [
+    "https://www.typeless.com/",
+    "https://www.typeless.com/help/quickstart/history-and-dictionary",
+    "https://www.typeless.com/help/quickstart/personalization"
+  ],
+  "verified": "公式機能説明とDrive一致。実機検証なし",
+  "recipient_status": "pending",
+  "slack": "前回通知を維持。今回の小補足は同じ受取メモと正本に追記"
+}
