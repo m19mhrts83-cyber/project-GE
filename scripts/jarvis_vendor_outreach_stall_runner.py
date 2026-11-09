@@ -26,6 +26,7 @@ from zoneinfo import ZoneInfo
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
+import jarvis_slack_signal as sig  # noqa: E402
 from jarvis_bucho_bridge_lib import (  # noqa: E402
     folder,
     list_queue_files,
@@ -144,8 +145,20 @@ S2_STALE_REFILL_COOLDOWN_HOURS = 24
 # mark が平日2日以上空いたら #ops 見守り。上書き: state / env JARVIS_VENDOR_STALE_MARK_BUSINESS_DAYS
 STALE_MARK_BUSINESS_DAYS_DEFAULT = 2
 
+# --- 緑・黄・赤の基準（2026-11-09 松野さん「516が止まっていると毎回来る」見直し）---
+# 実績: S2 は週1〜2回のまとめ送信（直近5週で週9件ほど）、S9 は約2週に1回、S4 は送信なしの探索中心。
+# 毎日送る前提の「平日2日で停滞」は実態に合わず誤通知になっていたため、レーンごとに置き直した。
+#   green  = 回っている / yellow = 遅れ気味（週次まとめに出す。通知はしない）/ red = 松野さんの判断が要る
+HEALTH_RULES: dict[str, dict[str, Any]] = {
+    # gap = 最後の contacted からの平日数
+    "s2": {"min_7d": 5, "yellow_gap": 5, "red_gap": 8},
+    "s9": {"min_7d": None, "yellow_gap": 10, "red_gap": 15},
+    "s4": {"min_7d": None, "yellow_gap": None, "red_gap": None},  # 送信なし。キューと生存確認で見る
+}
 
-def stale_marks_threshold_days(state: dict[str, Any] | None = None) -> int:
+
+def stale_marks_threshold_days(state: dict[str, Any] | None = None) -> int | None:
+    """上書き指定（env / state）があればその平日数。無ければ None＝レーン別の既定（HEALTH_RULES）。"""
     raw = (os.environ.get("JARVIS_VENDOR_STALE_MARK_BUSINESS_DAYS") or "").strip()
     if not raw and isinstance(state, dict):
         raw = str(state.get("stale_marks_business_days") or "").strip()
@@ -156,7 +169,67 @@ def stale_marks_threshold_days(state: dict[str, Any] | None = None) -> int:
                 return n
         except ValueError:
             pass
-    return STALE_MARK_BUSINESS_DAYS_DEFAULT
+    return None
+
+
+def contacted_within(vendors: list[Any], days: int, *, today: date | None = None) -> int:
+    """直近 days 日（今日を含む）に contacted/replied になった件数。"""
+    today = today or date.today()
+    n = 0
+    for v in vendors:
+        if not isinstance(v, dict):
+            continue
+        if str(v.get("status") or "") not in {"contacted", "replied"}:
+            continue
+        try:
+            d = date.fromisoformat(str(v.get("contacted_at") or "")[:10])
+        except ValueError:
+            continue
+        if 0 <= (today - d).days < days:
+            n += 1
+    return n
+
+
+def health_rating(
+    lane: str,
+    q: dict[str, Any],
+    *,
+    bridge_ok: bool = True,
+    today: date | None = None,
+) -> tuple[str, str]:
+    """(green|yellow|red, 理由)。通知は red のみ、yellow は週次まとめに出す。"""
+    rule = HEALTH_RULES.get(lane) or HEALTH_RULES["s2"]
+    today = today or date.today()
+    if not bridge_ok:
+        return "red", "Mac／Drive につながっていません"
+    if lane == "s2" and q.get("needs_refill"):
+        return "red", "送信できる候補が足りません"
+    gap: int | None = None
+    lc = q.get("last_contacted")
+    if lc:
+        try:
+            gap = business_days_between(date.fromisoformat(str(lc)), today)
+        except ValueError:
+            gap = None
+    reasons: list[str] = []
+    level = "green"
+    if rule["red_gap"] is not None and gap is not None and gap >= rule["red_gap"]:
+        return "red", f"最後の送信から平日{gap}日（{rule['red_gap']}日で要対応）"
+    if rule["yellow_gap"] is not None and gap is not None and gap > rule["yellow_gap"]:
+        level = "yellow"
+        reasons.append(f"最後の送信から平日{gap}日（目安{rule['yellow_gap']}日以内）")
+    min7 = rule.get("min_7d")
+    n7 = q.get("contacted_7d")
+    if min7 is not None and n7 is not None and n7 < min7:
+        level = "yellow"
+        reasons.append(f"直近7日の送信 {n7}件（目安{min7}件以上）")
+    if q.get("needs_refill"):
+        level = "yellow"
+        reasons.append("候補の補充待ち")
+    if lane == "s2" and (q.get("contacted_today") or 0) == 0 and gap is None:
+        level = "yellow"
+        reasons.append("送信履歴なし")
+    return level, "／".join(reasons)
 
 
 def now_jst() -> datetime:
@@ -311,6 +384,7 @@ def assess_s2() -> dict[str, Any]:
         "needs_refill": len(pending) < daily,
         "followup": count_followup(vendors),
         "contacted_today": contacted_today(vendors),
+        "contacted_7d": contacted_within(vendors, 7),
         "last_contacted": (
             last_contacted_date(vendors).isoformat()
             if last_contacted_date(vendors)
@@ -380,6 +454,7 @@ def assess_s9() -> dict[str, Any]:
         "needs_refill": len(items) < daily or focus_ready < daily,
         "followup": count_followup(vendors),
         "contacted_today": contacted_today(vendors),
+        "contacted_7d": contacted_within(vendors, 7),
         "last_contacted": (
             last_contacted_date(vendors).isoformat()
             if last_contacted_date(vendors)
@@ -418,6 +493,7 @@ def assess_s4() -> dict[str, Any]:
         "needs_refill": alive_queue < daily and pending_n < daily,
         "followup": count_followup(vendors),
         "contacted_today": contacted_today(vendors),
+        "contacted_7d": contacted_within(vendors, 7),
         "last_contacted": (
             last_contacted_date(vendors).isoformat()
             if last_contacted_date(vendors)
@@ -722,7 +798,8 @@ def push_sync_meta(key: str, summary: dict[str, Any], *, dry_run: bool) -> None:
 
 
 OPS_ALERT_META_KEY = "vendor_outreach_ops_alert"
-OPS_ALERT_COOLDOWN_HOURS = 20
+# 🔴 は同じ状態で毎日鳴らさない（3日に1回まで）
+OPS_ALERT_COOLDOWN_HOURS = 72
 
 
 def _sb_client():
@@ -785,26 +862,32 @@ def shared_ops_alert_recent(lane: str, shared: dict[str, str]) -> bool:
 
 
 def stale_marks_reason(
-    q: dict[str, Any], *, threshold_days: int | None = None
+    q: dict[str, Any], *, threshold_days: int | None = None, lane: str | None = None
 ) -> str:
-    """mark 停滞の理由文（ops クールダウンとは独立）。空なら停滞なし。
+    """送信停滞の理由文（空なら停滞なし）。補給・再開キックの起点に使う（通知は health_rating の red のみ）。
 
-    threshold（既定2平日＝日次運用）を超えたら見守り対象。
+    threshold_days 指定（env/state の上書き）があれば「その平日数以上」。
+    無ければレーン別の目安（HEALTH_RULES.yellow_gap）を「超えたら」。送信しないレーン(S4)は常に空。
     """
-    thr = (
-        threshold_days
-        if threshold_days is not None
-        else STALE_MARK_BUSINESS_DAYS_DEFAULT
-    )
+    rule = HEALTH_RULES.get(lane or "") if lane else None
+    if threshold_days is not None:
+        thr, strict = threshold_days, False
+    elif rule is not None:
+        if rule["yellow_gap"] is None:
+            return ""
+        thr, strict = int(rule["yellow_gap"]), True
+    else:
+        thr, strict = STALE_MARK_BUSINESS_DAYS_DEFAULT, False
     last_c = q.get("last_contacted")
     if last_c:
         try:
             lc = date.fromisoformat(str(last_c))
             gap = business_days_between(lc, date.today())
-            if gap >= thr and int(q.get("contacted_today") or 0) == 0:
+            over = gap > thr if strict else gap >= thr
+            if over and int(q.get("contacted_today") or 0) == 0:
                 return (
                     f"最終 contacted から平日{gap}日"
-                    f"（閾値{thr}平日）・本日 mark なし（{last_c}）"
+                    f"（目安{thr}平日）・本日 mark なし（{last_c}）"
                 )
         except ValueError:
             return ""
@@ -820,25 +903,23 @@ def should_ops_alert(
     bridge_ok: bool,
     skip_refill: bool = False,
     threshold_days: int | None = None,
+    lane: str = "s2",
 ) -> tuple[bool, str]:
-    reasons: list[str] = []
-    if not bridge_ok and not skip_refill:
-        reasons.append("Mac/Drive ブリッジ未接続（outbox 書けず）")
-    if skip_refill and q.get("needs_refill"):
-        reasons.append("GHA見守り · キュー不足 · Mac補給待ち")
-    stale = stale_marks_reason(q, threshold_days=threshold_days)
-    if stale:
-        reasons.append(stale)
-
+    """#ops に出すのは 🔴（松野さんの判断・対応が要るとき）だけ。🟡 は週次まとめに出す。"""
+    health, reason = health_rating(lane, q, bridge_ok=bridge_ok or skip_refill)
+    if threshold_days is not None:
+        # 上書き指定（運用で閾値を締めたいとき）は従来どおり停滞も通知対象にする
+        stale = stale_marks_reason(q, threshold_days=threshold_days, lane=lane)
+        if stale:
+            health, reason = "red", stale
+    if health != "red":
+        return False, ""
     last_ops = parse_iso(lst.get("last_ops_alert_at"))
     if last_ops and (datetime.now(timezone.utc) - last_ops) < timedelta(
         hours=OPS_ALERT_COOLDOWN_HOURS
     ):
-        # Slack 連投は抑止するが、呼び出し側の stall_status 判定では stale を別途見る
         return False, ""
-    if not reasons:
-        return False, ""
-    return True, "; ".join(reasons)
+    return True, reason
 
 
 def _slim_vendor_for_kick(v: dict[str, Any]) -> dict[str, Any]:
@@ -1180,7 +1261,7 @@ def run_lane(
     )
 
     thr = stale_marks_threshold_days(state)
-    stale_reason = stale_marks_reason(q, threshold_days=thr)
+    stale_reason = stale_marks_reason(q, threshold_days=thr, lane=lane)
     is_stale = bool(stale_reason)
     weekly_due = lane == "s2" and s2_weekly_rollover_due(lst.get("last_refill_at"))
     held_before = held_ids(lst)
@@ -1340,13 +1421,23 @@ def run_lane(
         bridge_ok=bridge_ok,
         skip_refill=skip_refill,
         threshold_days=thr,
+        lane=lane,
+    )
+    health, health_reason = health_rating(
+        lane, q, bridge_ok=bridge_ok or skip_refill
     )
     if refill_result and not refill_result.get("ok") and not refill_result.get("skipped"):
-        ops_needed = True
-        ops_reason = ops_reason or str(refill_result.get("error") or "refill failed")
-    if not bridge_ok and (needs_refill or needs_send_resume) and not skip_refill:
-        ops_needed = True
-        ops_reason = ops_reason or "Mac未接続・補給スキップ"
+        # 補給の書き込み失敗は自動では直らないので 🔴（通知は下のクールダウンに従う）
+        health = "red"
+        health_reason = str(refill_result.get("error") or "補給に失敗しました")
+        last_ops = parse_iso(lst.get("last_ops_alert_at"))
+        if not (
+            last_ops
+            and (datetime.now(timezone.utc) - last_ops)
+            < timedelta(hours=OPS_ALERT_COOLDOWN_HOURS)
+        ):
+            ops_needed = True
+            ops_reason = ops_reason or health_reason
 
     # stall_status は ops クールダウンと独立（クールダウン中に ok と誤表示しない）
     stall_status = "ok"
@@ -1362,6 +1453,8 @@ def run_lane(
         "day": now_jst().strftime("%Y-%m-%d"),
         "lane": lane,
         "stall_status": stall_status,
+        "health": health,
+        "health_reason": health_reason,
         "phase": q.get("phase"),
         "daily_limit": q["daily_limit"],
         "queue_ready": q["queue_ready"],
@@ -1369,7 +1462,9 @@ def run_lane(
         "followup": q["followup"],
         "contacted_today": q["contacted_today"],
         "last_contacted": q["last_contacted"],
-        "stale_marks_business_days": thr,
+        "stale_marks_business_days": thr
+        if thr is not None
+        else (HEALTH_RULES.get(lane) or {}).get("yellow_gap"),
         "last_refill_at": lst.get("last_refill_at"),
         "last_sync_at": lst.get("last_sync_at"),
         "bridge_ok": bridge_ok,
@@ -1397,6 +1492,8 @@ def run_lane(
         "ops_needed": ops_needed,
         "ops_reason": ops_reason,
         "stall_status": stall_status,
+        "health": health,
+        "health_reason": health_reason,
         "archived": archived,
         "url": cfg["url"],
         "lst": lst,
@@ -1438,9 +1535,10 @@ def _week_period_label(state: dict[str, Any]) -> str:
 
 
 def all_lanes_healthy(results: list[dict[str, Any]]) -> bool:
+    """全レーンが 🟢（後方互換）。"""
     if not results:
         return False
-    return all(r.get("stall_status") == "ok" and not r.get("ops_needed") for r in results)
+    return all(r.get("health", "green") == "green" for r in results)
 
 
 def should_post_weekly_report(
@@ -1449,11 +1547,12 @@ def should_post_weekly_report(
     *,
     force: bool = False,
 ) -> tuple[bool, str]:
-    """healthy なときだけ週次 #report。月曜 or 最終から7日以上。"""
+    """週次 #report は色（🟢🟡🔴）に関わらず出す。月曜 or 最終から7日以上。
+
+    以前は全レーン正常のときだけ出していたため、止まって見える週ほど報告が消えていた。
+    """
     if force:
         return True, "force"
-    if not all_lanes_healthy(results):
-        return False, "not_healthy（異常は #ops のみ）"
     today = now_jst().date()
     last_raw = (
         state.get("last_weekly_report_at")
@@ -1481,46 +1580,36 @@ def should_post_weekly_report(
 def build_support_weekly_report(
     results: list[dict[str, Any]], *, state: dict[str, Any] | None = None
 ) -> str:
-    """Grokサポート見守り・週次サマリ（レーン擬似表）。"""
+    """Grokサポート見守り・週次まとめ。先頭に全体の色、レーンごとに色と一言。"""
     st = state or {}
     period = _week_period_label(st)
+    overall = sig.worst(r.get("health", "none") for r in results)
     lines = [
         "[516 業者開拓フォロー] *Grokサポート見守り｜業者開拓*",
-        "発信: 516 業者開拓フォロー（開拓の送信・文案は Grok S2/S4/S9）。",
+        sig.head_line(overall),
         f"期間: {period}",
         "",
     ]
     for r in results:
         q = r["q"]
         by = q.get("by_status") or {}
-        refill = r.get("refill") or {}
-        if refill.get("skipped"):
-            refill_line = f"skip({refill.get('reason') or '—'})"
-        elif refill.get("ok"):
-            refill_line = f"ok vendors={refill.get('vendors')}"
-        else:
-            refill_line = f"fail:{refill.get('error') or '—'}"
-        sync_line = (
-            "OK"
-            if r.get("sync_ok") is True
-            else ("失敗" if r.get("sync_ok") is False else "—")
-        )
-        status_ja = _stall_status_ja(str(r.get("stall_status") or ""))
+        health = str(r.get("health") or "none")
+        why = str(r.get("health_reason") or "").strip()
+        head = f"{sig.icon(health)} {format_lane_heading(r)}  {sig.LABEL_JA.get(health, '')}"
+        lines.append(head)
+        if why:
+            lines.append(f"・{why}")
         lines.extend(
             [
-                f"{format_lane_heading(r)}  状態: {status_ja}",
-                f"・接触 {q.get('contacted_today', 0)}／"
-                f"キュー残 {q.get('pending_discovered', 0)}"
-                f"（先頭{q.get('queue_ready', 0)}/枠{q.get('daily_limit', 0)}）／"
-                f"要フォロー {q.get('followup', 0)}",
+                f"・直近7日の送信 {q.get('contacted_7d', 0)}件／"
+                f"最終 {_short_date(q.get('last_contacted'))}／要フォロー {q.get('followup', 0)}",
                 f"・未送{by.get('pending', 0)}／探索{by.get('discovered', 0)}／"
                 f"済{by.get('contacted', 0)}／返信{by.get('replied', 0)}",
-                f"・refill {refill_line} · sync {sync_line}",
                 f"・<{r['url']}|UIを開く>",
                 "",
             ]
         )
-    lines.append("次: 異常時は #ops。詳細は KURASHIFT 各レーン。")
+    lines.append("次: 🔴 だけ #ops に出ます。🟡 はこのまとめで見てください。")
     return "\n".join(lines).rstrip()
 
 
@@ -1570,6 +1659,7 @@ def build_ops_alert(r: dict[str, Any]) -> str:
     return "\n".join(
         [
             f"【ops】516 業者開拓フォロー｜{label}",
+            sig.head_line("red", "要対応"),
             what,
             f"キュー {q.get('pending_discovered')}（送信可能 {q.get('queue_ready')}）",
             f"次: {remedy}",
