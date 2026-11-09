@@ -57,3 +57,12 @@ test('parseRevise: コードブロックつきでも読める・壊れていれ�
 test('commentsNote', () => {
   assert.equal(d.commentsNote([{ quote: 'ここ', text: '直す' }, { quote: '', text: '全体' }]), '「ここ」→ 直す / 全体');
 });
+
+test('paragraphs: 空行を飛ばし、元の位置を保つ', () => {
+  const t = '一行目\n\n二行目です\n三行目';
+  const ps = d.paragraphs(t);
+  assert.equal(ps.length, 3);
+  for (const p of ps) assert.equal(t.slice(p.start, p.end), p.text);
+  assert.equal(ps[d.paragraphAt(ps, t.indexOf('二'))].text, '二行目です');
+  assert.equal(d.paragraphAt(ps, 4), -1);
+});

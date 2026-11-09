@@ -10,12 +10,49 @@ export type DiffOp = "eq" | "ins" | "del";
 export type DiffSeg = { op: DiffOp; text: string };
 
 export type DraftComment = {
+  id?: string; // 1件ずつ記録するときの番号（判断ログの idem_key に使う）
   quote: string; // 選んだ箇所（空なら全体へのひとこと）
   start: number | null;
   end: number | null;
   text: string; // ダメ出し（声を文字にしたもの、または入力）
   via: "voice" | "typed";
+  /** どうやって箇所を決めたか: 文字を選んだ / 段落を押した / 話している間に画面の真ん中にあった段落 / 全体 */
+  target?: "selection" | "paragraph" | "viewport" | "whole";
+  version?: string; // どの版へのダメ出しか
+  at?: string;
+  t_start?: number; // 話し始め（ms, epoch）
+  t_end?: number;
 };
+
+export type ReviseRequest = {
+  status: "queued" | "running" | "done" | "error";
+  base: string; // どの版を直すか
+  comments: DraftComment[];
+  requested_at: string;
+  started_at?: string;
+  finished_at?: string;
+  error?: string;
+  engine?: string; // cursor（Mac・定額）
+};
+
+export type Paragraph = { index: number; start: number; end: number; text: string };
+
+/** 段落（行）に分ける。空行は段落にしない。start/end は全文での位置 */
+export function paragraphs(text: string): Paragraph[] {
+  const out: Paragraph[] = [];
+  let pos = 0;
+  for (const line of text.split("\n")) {
+    if (line.trim()) out.push({ index: out.length, start: pos, end: pos + line.length, text: line });
+    pos += line.length + 1;
+  }
+  return out;
+}
+
+/** 位置がどの段落に入るか（なければ -1） */
+export function paragraphAt(paras: Paragraph[], offset: number): number {
+  for (const p of paras) if (offset >= p.start && offset <= p.end) return p.index;
+  return -1;
+}
 
 export type DraftVersion = {
   label: string;

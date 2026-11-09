@@ -25,7 +25,7 @@
   # 下書きを書く前に読む（採用済みルール・参照例・最近の直し）
   python scripts/jarvis_draft_decision_log.py context --recipient 今村さん
 
-  # 下書きを Nody の「下書きを直す」に置く → 松野さんが箇所を選んで声でダメ出し → AI が直す → 差分
+  # 下書きを Nody の「下書きを直す」に置く → 松野さんが箇所ごとに声でダメ出し → まとめて Mac の Cursor が直す → 差分
   #   画面で版が進むたびに判断ログ（draft_review）が自動で残る。--sql は INSERT 文だけ出す
   python scripts/jarvis_draft_decision_log.py push --case 20261109_完了報告 --recipient 今村さん \
     --channel chatwork --file draft.txt

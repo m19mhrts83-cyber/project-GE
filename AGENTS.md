@@ -22,7 +22,7 @@ Notion に議事録を残すときは、Genspark 等の要約をそのまま貼�
 
 運営・パートナー・LINE など、松野さんに見せる返信／報告の下書きは次の順で作る。
 1. 書く前に `python scripts/jarvis_draft_decision_log.py context --recipient <宛先>` で採用済みルールと最近の直しを読み、沿っているかを一言添えて見せる。
-2. 下書きは `push` で Nody の「下書きを直す」（/drafts）にも置ける。松野さんが箇所を選んで声でダメ出し → AI が直す → 差分で確認。版が進むたびに判断ログ（owner_decisions・surface=draft_review）が自動で残る。確定後は `pull --id` で受け取る。
+2. 下書きは `push` で Nody の「下書きを直す」（/drafts）にも置ける。松野さんが箇所（段落タップ・範囲選択・画面中央の段落）ごとに声でダメ出し → その場で1件ずつ判断ログ（owner_decisions・surface=draft_review, action=comment）に残る → 「まとめて直す」で Mac の Cursor（定額。`scripts/jarvis_draft_revise_worker.py`、`launchd/cursor_revise_worker_runner.sh` が45秒ごと）が新しい版を作る → 差分で確認。版ごとの直しも判断ログに残る。従量課金の AI API は使わない。確定後は `pull --id` で受け取る。
 3. チャットで直しを受けたときは、版ごとに `log` で記録する。理由が分からない直しは推測で埋めず、`--reason` を省いて質問として残す。
 ルールにするかは松野さんが決める（土曜の週次で候補 → Nody の「今週の学び」で採用 → 211 の learned_rules.md）。エージェントが勝手にルール化しない。
 
