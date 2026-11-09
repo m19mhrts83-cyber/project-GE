@@ -69,8 +69,15 @@ iPhone は **Chrome** 前提。
 
 ## データ
 
-- 端末: localStorage `loopware_v1`
-- サーバ: 312 → `task_loop_*`／313 → `owner_decisions`
+- 端末: localStorage `loopware_v1`（保存シートに「共有DB／端末のみ」を出す）
+- サーバ: 312 → `task_loop_*`／313 → `owner_decisions`（`lib/decideStore.ts`）
+  - 保存に失敗したら API は `persisted:false` を返し、保存シートは「端末のみ」と出す（不明な応答も成功扱いにしない）
+  - 312 は同じ話題（topic_text）の topic を使い回し、同じ判断の送り直しは行を増やさない。判断を変えたら前の判断を `history` に積む
+  - 313 は1判断1行。同じタスク・同じ判断を10分以内に送り直したら増やさない
+  - 313 画面は**判断の記録だけ**。Todoist の完了・期日変更・コメントは 313 の Slack ボタン／CLI
+- 週1回 314 が `scripts/jarvis_owner_decisions_weekly.py` で両方の表を読む
+
+テスト: `npm test`（偽の Supabase で保存成功・失敗・送り直し・判断の変更を確認。ネットワーク不要）
 
 ### Supabase（jarvis-dashboard PJ）へ適用する順
 

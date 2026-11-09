@@ -4,11 +4,17 @@
 社員ごとに「提案に対して松野さんがどう判断したか」を数え、
 直して送った例・見送った例を並べて、プロンプトやコードの直しどころを見つける。
 
+読む表（どちらも読むだけ）:
+  - owner_decisions                    triage・Slack の 312/313・S9・Loopware 313
+  - task_loop_topics / task_loop_decisions   Loopware 312（扱いを決める・拾い漏れ）
+出すもの: 今週と前週の 承認／修正／見送り（件数・母数・率）、理由タグの共通パターン
+（2件以上だけ。根拠 ID つき）、改善台帳（output/improvements.md）の効果測定。
+
   python scripts/jarvis_owner_decisions_weekly.py                 # 直近7日を標準出力へ（Markdown）
   python scripts/jarvis_owner_decisions_weekly.py --days 14 --out output/x.md
   python scripts/jarvis_owner_decisions_weekly.py --mark-reviewed # 読んだ行に review_week を付ける
+  python scripts/jarvis_owner_decisions_weekly.py --ledger <314>/output/improvements.md
   python scripts/jarvis_owner_decisions_weekly.py --loopware --improvement-logs --obsidian-dir <dir>
-                                                                  # ループウェアの節・候補・改善ログ・週報
 
 DB は読むだけ（--mark-reviewed のときだけ review_week を書く）。秘密の値は出さない。
 """
@@ -42,6 +48,8 @@ EMPLOYEE_LABEL = {
     "312": "312 Todoist起票整理係",
     "313": "313 完了候補確認係",
     "S9": "S9 管理会社 採用／見送り",
+    "312L": "312 Todoist起票整理係（Loopware）",
+    "313L": "313 完了候補確認係（Loopware）",
 }
 ACTION_LABEL = {
     "sent": "送った",
@@ -54,34 +62,35 @@ ACTION_LABEL = {
     "reschedule": "延期",
     "adopt": "採用",
     "skip": "見送り",
+    "drop": "やめる",
+    "merge": "寄せて完了",
+    "use": "案をそのまま",
+    "edit_use": "案を直して",
+    "none_of_above": "どれも違う",
     # 迷った・未判断は NG（見送り）に混ぜない（2026-11-08 松野さん）
     "hesitated": "迷った",
     "unseen": "未判断",
     "rule_accept": "送り手ルール採用",
     "rule_once": "今回だけ",
 }
-NEGATIVE = {"skipped", "dismiss", "skip"}
-REASON_LABEL = {
-    "promo": "宣伝・通知",
-    "handled": "対応済み",
-    "notnow": "今は不要",
-    "hesitate": "迷う",
-    # 契約 v1（apps/loopware/lib/decisionContract.ts）
-    "no_reply": "回答不要",
-    "self_or_grok": "自分発信・Grok部長",
-    "not_important": "そもそも重要でない",
-    "other": "その他",
-    "area": "エリア外",
-    "yield": "利回り不足",
-    "price": "価格",
-    "age_structure": "築年・構造",
-    "loan": "融資が付きにくい",
-    "no_time": "時間がない",
-    "unsure": "迷った",
-    "need_info": "情報が足りない",
-    "waiting": "誰かの返事待ち",
-}
+NEGATIVE = {"skipped", "dismiss", "skip", "none_of_above"}
 
+# 提案に対する松野さんの判断を3つに分ける（週次比較の物差し）
+VERDICT = {
+    "create": "承認", "close": "承認", "merge": "承認", "adopt": "承認", "use": "承認", "done": "承認",
+    "edit_use": "修正", "reschedule": "修正", "drop": "修正",
+    "skipped": "見送り", "dismiss": "見送り", "skip": "見送り", "none_of_above": "見送り",
+    "snoozed": "見送り",
+}
+VERDICTS = ("承認", "修正", "見送り")
+METRICS = ("件数", "承認率", "修正率", "見送り率")
+REASON_LABEL = {
+    "promo": "宣伝・通知", "handled": "対応済み", "notnow": "今は不要", "hesitate": "迷う",
+    "no_reply": "回答不要", "self_or_grok": "自分発信・Grok部長", "not_important": "そもそも重要でない",
+    "other": "その他", "area": "エリア外", "yield": "利回り不足", "price": "価格",
+    "age_structure": "築年・構造", "loan": "融資が付きにくい", "no_time": "時間がない",
+    "unsure": "迷った", "need_info": "情報が足りない", "waiting": "誰かの返事待ち",
+}
 
 def reason_text(row: dict[str, Any]) -> str:
     tags = (row.get("payload") or {}).get("reason_tags") or []
@@ -92,9 +101,13 @@ def reason_text(row: dict[str, Any]) -> str:
 
 
 def employee_of(row: dict[str, Any]) -> str:
+    payload = row.get("payload") or {}
+    if row.get("surface") == "loopware_312":
+        return "312L"
+    if row.get("surface") == "todoist_313" and payload.get("kind") == "loopware":
+        return "313L"
     if row.get("employee"):
         return str(row["employee"])
-    payload = row.get("payload") or {}
     if "slack_vr_action" in payload:
         return "vendor"
     return LANE_EMPLOYEE.get(str(row.get("lane") or ""), str(row.get("lane") or "other"))
@@ -119,7 +132,170 @@ def short_diff(before: str, after: str, limit: int = 14) -> str:
     return "\n".join(lines)
 
 
-def summarize(rows: list[dict[str, Any]], *, since: datetime, until: datetime) -> str:
+def verdict_of(row: dict[str, Any]) -> str:
+    act = str(row.get("action") or "")
+    if act == "sent":
+        return "修正" if row.get("edited") else "承認"
+    return VERDICT.get(act, "その他")
+
+
+def reason_tags_of(row: dict[str, Any]) -> list[str]:
+    tags = row.get("reason_tags")
+    if tags is None:
+        tags = (row.get("payload") or {}).get("reason_tags")
+    return [str(t) for t in (tags or []) if str(t).strip()]
+
+
+def ref_of(row: dict[str, Any]) -> str:
+    """根拠 ID（判断ログの行 ID ＋ Todoist ID があれば）。"""
+    ref = f"#{row.get('id')}"
+    if row.get("target_type") == "todoist_task" and row.get("target_id") not in (None, "", "-"):
+        ref += f"(todoist {row['target_id']})"
+    return ref
+
+
+def metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    n = len(rows)
+    c = Counter(verdict_of(r) for r in rows)
+    out: dict[str, Any] = {"件数": n}
+    for v in VERDICTS:
+        out[f"{v}数"] = c[v]
+        out[f"{v}率"] = (c[v] / n) if n else None
+    return out
+
+
+def _pct(x: float | None) -> str:
+    return "-" if x is None else f"{x:.0%}"
+
+
+def _delta(cur: float | None, prev: float | None) -> str:
+    if cur is None or prev is None:
+        return ""
+    d = round((cur - prev) * 100)
+    return f"（前週比 {d:+d}pt）" if d else "（前週と同じ）"
+
+
+def comparison_table(cur: list[dict[str, Any]], prev: list[dict[str, Any]]) -> list[str]:
+    by_c: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    by_p: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for r in cur:
+        by_c[employee_of(r)].append(r)
+    for r in prev:
+        by_p[employee_of(r)].append(r)
+    emps = sorted(set(by_c) | set(by_p), key=lambda e: (-len(by_c.get(e, [])), e))
+    lines = [
+        "## 今週と前週（承認／修正／見送り）",
+        "",
+        "承認＝提案どおり、修正＝直して使った・別の扱い（延期・やめる）、見送り＝提案を採らなかった（どれも違う・後でを含む）。",
+        "",
+        "| 社員 | 今週 件数 | 承認 | 修正 | 見送り | 前週 件数 | 前週 承認／修正／見送り |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for e in emps:
+        mc, mp = metrics(by_c.get(e, [])), metrics(by_p.get(e, []))
+        cells = []
+        for v in VERDICTS:
+            cells.append(
+                f"{mc[v + '数']}/{mc['件数']} {_pct(mc[v + '率'])}{_delta(mc[v + '率'], mp[v + '率'])}"
+            )
+        prev_cells = "／".join(_pct(mp[v + "率"]) for v in VERDICTS) if mp["件数"] else "-"
+        lines.append(
+            f"| {EMPLOYEE_LABEL.get(e, e)} | {mc['件数']} | {' | '.join(cells)} | {mp['件数']} | {prev_cells} |"
+        )
+    if not emps:
+        lines.append("| （なし） | 0 | - | - | - | 0 | - |")
+    return lines
+
+
+def pattern_section(rows: list[dict[str, Any]]) -> list[str]:
+    """理由タグ・見送り理由の共通パターン。2件以上だけ候補にし、1件は一般化しない。"""
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for r in rows:
+        if verdict_of(r) == "承認":
+            continue
+        keys = reason_tags_of(r) or ([str(r["note"]).strip()[:40]] if r.get("note") else [])
+        for k in keys:
+            groups[(employee_of(r), k)].append(r)
+    common = sorted(
+        ((k, v) for k, v in groups.items() if len(v) >= 2), key=lambda kv: -len(kv[1])
+    )
+    single = [(k, v) for k, v in groups.items() if len(v) == 1]
+    lines = ["## 共通パターン（同じ理由が2件以上）", ""]
+    if common:
+        lines += ["| 社員 | 理由 | 件数 | 判断の内訳 | 根拠 ID |", "|---|---|---|---|---|"]
+        for (emp, tag), rs in common:
+            vc = Counter(verdict_of(r) for r in rs)
+            refs = " ".join(ref_of(r) for r in rs[:8]) + (" …" if len(rs) > 8 else "")
+            lines.append(
+                f"| {EMPLOYEE_LABEL.get(emp, emp)} | {tag} | {len(rs)} | "
+                f"{'・'.join(f'{k} {n}' for k, n in vc.most_common())} | {refs} |"
+            )
+        lines += [
+            "",
+            "→ 314 はここから改善候補を最大3件、「コード条件分岐／プロンプト／運用ルール／松野判断が必要」に分けて"
+            " output/improvements.md に足す。",
+        ]
+    else:
+        lines.append("- なし（改善候補にする材料はまだ無い）")
+    if single:
+        lines += [
+            "",
+            f"1件だけの理由 {len(single)} 種（一般化しない。来週以降に重なったら候補）: "
+            + "、".join(f"{t}{ref_of(v[0])}" for (_e, t), v in single[:10]),
+        ]
+    return lines
+
+
+def parse_ledger(text: str) -> list[dict[str, str]]:
+    """improvements.md の表（| ID | 状態 | 社員 | 指標 | 改善前 | … |）を読む。"""
+    rows: list[dict[str, str]] = []
+    header: list[str] | None = None
+    for ln in text.splitlines():
+        if not ln.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in ln.strip().strip("|").split("|")]
+        if header is None:
+            if "ID" in cells and "状態" in cells:
+                header = cells
+            continue
+        if set("".join(cells)) <= set("-: "):
+            continue
+        rows.append(dict(zip(header, cells)))
+    return rows
+
+
+def ledger_section(ledger: list[dict[str, str]], cur: list[dict[str, Any]]) -> list[str]:
+    """実装済みの改善について、指標の今の値を改善前と並べる（効果測定）。"""
+    by_emp: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for r in cur:
+        by_emp[employee_of(r)].append(r)
+    targets = [x for x in ledger if x.get("状態") in ("実装済", "効果測定中")]
+    lines = ["## 前回までの改善の効果（output/improvements.md）", ""]
+    if not targets:
+        lines.append("- 効果を測る改善はまだ無い（状態が「実装済」「効果測定中」の行が無い）")
+        return lines
+    lines += ["| ID | 社員 | 指標 | 改善前 | 今週 | 母数 |", "|---|---|---|---|---|---|"]
+    for x in targets:
+        emp, met = x.get("社員", ""), x.get("指標", "")
+        m = metrics(by_emp.get(emp, []))
+        now = m.get(met)
+        now_s = str(now) if met == "件数" else _pct(now)
+        lines.append(
+            f"| {x.get('ID', '')} | {EMPLOYEE_LABEL.get(emp, emp)} | {met} | {x.get('改善前', '')} | {now_s} | {m['件数']} |"
+        )
+    lines += ["", "→ 効果が無い（または逆に悪化）なら、原因と再改善案を週次レビューの「提案」に書く。"]
+    return lines
+
+
+def summarize(
+    rows: list[dict[str, Any]],
+    *,
+    since: datetime,
+    until: datetime,
+    prev_rows: list[dict[str, Any]] | None = None,
+    ledger: list[dict[str, str]] | None = None,
+    read_errors: list[str] | None = None,
+) -> str:
     by_emp: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for r in rows:
         by_emp[employee_of(r)].append(r)
@@ -127,7 +303,7 @@ def summarize(rows: list[dict[str, Any]], *, since: datetime, until: datetime) -
     out: list[str] = [
         f"# 松野さんの判断ログ 週次まとめ（{since:%Y-%m-%d}〜{until:%Y-%m-%d}）",
         "",
-        f"- 判断の件数: {len(rows)} 件（owner_decisions）",
+        f"- 判断の件数: {len(rows)} 件（owner_decisions＋task_loop）",
         "- 見方: 見送りが多い社員＝提案の出しすぎ（判定・閾値）、"
         "直して送るが多い社員＝下書きのプロンプト、を直す候補",
         "",
@@ -167,17 +343,27 @@ def summarize(rows: list[dict[str, Any]], *, since: datetime, until: datetime) -
                 + "\n```"
             )
         for r in [r for r in rs if r.get("action") in NEGATIVE][:5]:
+            tags = reason_tags_of(r)
             ex.append(
                 f"- 見送り: {r.get('partner') or ''}｜{(r.get('subject') or '')[:50]}"
                 + (f"（理由: {reason_text(r)}）" if reason_text(r) else "")
+                + (f"［{'・'.join(tags)}］" if tags else "")
+                + f" {ref_of(r)}"
             )
         if ex:
             details += ["", f"## {EMPLOYEE_LABEL.get(emp, emp)}", *ex]
 
     src = Counter(str(r.get("source") or "-") for r in rows)
     out += ["", "経路: " + "・".join(f"{k} {v}" for k, v in src.most_common())]
+    tables = Counter(str(r.get("_table") or "owner_decisions") for r in rows)
+    out += ["読んだ表: " + "・".join(f"{k} {v}" for k, v in tables.most_common())]
+    for e in read_errors or []:
+        out += [f"- ⚠ 読めなかった: {e}（この表の判断は数に入っていない）"]
     if not rows:
         out += ["", "今週は判断ログがありません（直す材料なし）。"]
+    out += ["", *comparison_table(rows, prev_rows or [])]
+    out += ["", *pattern_section(rows)]
+    out += ["", *ledger_section(ledger or [], rows)]
     return "\n".join(out + details) + "\n"
 
 
@@ -191,15 +377,15 @@ def client():
     return create_client(url, key)
 
 
-def fetch(sb, since: datetime) -> list[dict[str, Any]]:
+def _fetch_all(sb, table: str, time_col: str, since: datetime) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     start = 0
     while True:
         r = (
-            sb.table("owner_decisions")
+            sb.table(table)
             .select("*")
-            .gte("decided_at", since.isoformat())
-            .order("decided_at")
+            .gte(time_col, since.isoformat())
+            .order(time_col)
             .range(start, start + 999)
             .execute()
         )
@@ -210,14 +396,94 @@ def fetch(sb, since: datetime) -> list[dict[str, Any]]:
         start += 1000
 
 
+def fetch(sb, since: datetime) -> list[dict[str, Any]]:
+    return _fetch_all(sb, "owner_decisions", "decided_at", since)
+
+
+def task_loop_rows(
+    decisions: list[dict[str, Any]], topics: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Loopware 312（task_loop_decisions）を owner_decisions と同じ形にそろえる。"""
+    out: list[dict[str, Any]] = []
+    for d in decisions:
+        t = topics.get(str(d.get("topic_id"))) or {}
+        tids = t.get("todoist_task_ids") or []
+        out.append(
+            {
+                "id": f"tl:{str(d.get('id'))[:8]}",
+                "_table": "task_loop",
+                "decided_at": d.get("updated_at") or d.get("created_at"),
+                "surface": "loopware_312",
+                "action": d.get("choice"),
+                "source": d.get("decided_via") or "app",
+                "employee": "312",
+                "target_type": "todoist_task" if tids else "task_loop_topic",
+                "target_id": (tids[0] if tids else str(d.get("topic_id"))[:8]),
+                "subject": (t.get("topic_text") or "")[:80],
+                "ai_proposal": d.get("before_text"),
+                "final_text": d.get("final_text") or d.get("after_text"),
+                "edited": d.get("choice") == "edit_use",
+                "note": d.get("free_note"),
+                "reason_tags": d.get("reason_tags") or [],
+                "payload": {"history_n": len(d.get("history") or [])},
+            }
+        )
+    return out
+
+
+def fetch_task_loop(sb, since: datetime) -> list[dict[str, Any]]:
+    decisions = _fetch_all(sb, "task_loop_decisions", "updated_at", since)
+    ids = sorted({str(d.get("topic_id")) for d in decisions if d.get("topic_id")})
+    topics: dict[str, dict[str, Any]] = {}
+    for i in range(0, len(ids), 200):
+        r = sb.table("task_loop_topics").select("*").in_("id", ids[i : i + 200]).execute()
+        for t in r.data or []:
+            topics[str(t["id"])] = t
+    return task_loop_rows(decisions, topics)
+
+
+def fetch_all_sources(sb, since: datetime) -> tuple[list[dict[str, Any]], list[str]]:
+    """両方の表を読む。片方が読めなくても止めず、読めなかったことを残す。"""
+    rows: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for name, fn in (("owner_decisions", fetch), ("task_loop", fetch_task_loop)):
+        try:
+            rows.extend(fn(sb, since))
+        except Exception as exc:  # noqa: BLE001 — 表が無い・権限なしなど
+            errors.append(f"{name}: {str(exc)[:120]}")
+    rows.sort(key=lambda r: str(r.get("decided_at") or ""))
+    return rows, errors
+
+
+def split_weeks(
+    rows: list[dict[str, Any]], *, since: datetime
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    cur, prev = [], []
+    for r in rows:
+        raw = str(r.get("decided_at") or "")
+        try:
+            at = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            cur.append(r)
+            continue
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=JST)
+        (cur if at >= since else prev).append(r)
+    return cur, prev
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--days", type=int, default=7)
     ap.add_argument("--out", help="Markdown の書き出し先（省略時は標準出力）")
     ap.add_argument("--mark-reviewed", action="store_true", help="読んだ行に review_week を付ける")
-    ap.add_argument("--loopware", action="store_true",
-                    help="ループウェアの節（ルール候補・効いたルール・残っている理由）を足し、候補を loopware に置く")
-    ap.add_argument("--obsidian-dir", help="松野さん用の週報を <dir>/YYYY-Www.md に書く（例: Obsidian の 01_Journaling/判断ログ）")
+    ap.add_argument(
+        "--ledger",
+        default=str(Path(__file__).resolve().parents[1] / "docs/AIエージェントチーム/300_品質・タスク運用管理室/314_業務品質監査係/output/improvements.md"),
+        help="改善台帳（効果測定に使う）",
+    )
+    ap.add_argument("--loopware", action="store_true", help="ループウェアの節・候補・改善ログを追加し、候補をLoopwareに置く")
+    ap.add_argument("--obsidian-dir", help="松野さん用の週報を <dir>/YYYY-Www.md に書く")
     ap.add_argument("--improvement-logs", action="store_true", help="各社員フォルダの logs/改善ログ.md に今週の行を足す")
     args = ap.parse_args(argv)
 
@@ -225,8 +491,11 @@ def main(argv: list[str] | None = None) -> int:
     since = until - timedelta(days=args.days)
     week = until.strftime("%G-W%V")
     sb = client()
-    rows = fetch(sb, since)
-    md = summarize(rows, since=since, until=until)
+    both, errors = fetch_all_sources(sb, since - timedelta(days=args.days))
+    rows, prev_rows = split_weeks(both, since=since)
+    ledger_path = Path(args.ledger)
+    ledger = parse_ledger(ledger_path.read_text(encoding="utf-8")) if ledger_path.exists() else []
+    md = summarize(rows, since=since, until=until, prev_rows=prev_rows, ledger=ledger, read_errors=errors)
     if args.loopware or args.obsidian_dir or args.improvement_logs:
         import jarvis_loopware_weekly as lw
 
@@ -238,8 +507,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.obsidian_dir:
             d = Path(args.obsidian_dir).expanduser()
             d.mkdir(parents=True, exist_ok=True)
-            (d / f"{week}.md").write_text(lw.obsidian_note(rows, cands, week=week), encoding="utf-8")
-            print(f"# wrote {d / f'{week}.md'}", file=sys.stderr)
+            note_path = d / f"{week}.md"
+            note_path.write_text(lw.obsidian_note(rows, cands, week=week), encoding="utf-8")
+            print(f"# wrote {note_path}", file=sys.stderr)
         if args.improvement_logs:
             import jarvis_learned_rules as lr
 
@@ -259,7 +529,8 @@ def main(argv: list[str] | None = None) -> int:
     else:
         sys.stdout.write(md)
     if args.mark_reviewed and rows:
-        ids = [r["id"] for r in rows if not r.get("review_week")]
+        # review_week は owner_decisions にだけある（task_loop は読むだけ）
+        ids = [r["id"] for r in rows if r.get("_table", "owner_decisions") == "owner_decisions" and not r.get("review_week")]
         for i in range(0, len(ids), 200):
             sb.table("owner_decisions").update({"review_week": week}).in_("id", ids[i : i + 200]).execute()
         print(f"# marked review_week={week} rows={len(ids)}", file=sys.stderr)

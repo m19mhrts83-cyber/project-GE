@@ -246,7 +246,7 @@ export default function ProposeClient() {
           }).then((x) => x.json().catch(() => null)),
         ),
       );
-      const ok = results.every((j) => j && j.persisted !== false);
+      const ok = results.every((j) => j && j.persisted === true);
       setSaved((c) => (c ? { ...c, status: ok ? "server" : "local" } : c));
     } catch {
       setSaved((c) => (c ? { ...c, status: "local" } : c));

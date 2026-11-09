@@ -94,7 +94,7 @@ export default function CleanupClient({
         }),
       });
       const j = (await res.json().catch(() => null)) as { persisted?: boolean } | null;
-      setSaved((c) => (c ? { ...c, status: j?.persisted === false ? "local" : "server" } : c));
+      setSaved((c) => (c ? { ...c, status: j?.persisted ? "server" : "local" } : c));
     } catch {
       setSaved((c) => (c ? { ...c, status: "local" } : c));
     }
@@ -304,9 +304,9 @@ export default function CleanupClient({
 }
 
 const ACTS = [
-  { id: "close", label: "済んだ", desc: "Todoist を完了にして記録", icon: "check", color: "var(--positive)" },
-  { id: "reschedule", label: "いつ・優先", desc: "期日を動かす。外すことも選べる", icon: "calendar", color: "var(--accent)" },
-  { id: "drop", label: "やめる", desc: "完了にして、やめた理由をコメント", icon: "trash", color: "var(--alert)" },
+  { id: "close", label: "済んだ", desc: "終わっていると判断（Todoist の完了は Slack／CLI で）", icon: "check", color: "var(--positive)" },
+  { id: "reschedule", label: "いつ・優先", desc: "期日を動かすと判断（外すことも選べる）", icon: "calendar", color: "var(--accent)" },
+  { id: "drop", label: "やめる", desc: "やめると判断（完了とコメントは Slack／CLI で）", icon: "trash", color: "var(--alert)" },
 ] as const;
 
 function ymd(plusDays: number) {
