@@ -12,8 +12,9 @@ set +a
 PY="${JARVIS_PYTHON:-/Users/matsunomasaharu2/selenium_env/venv/bin/python}"
 # 611 Cursor 使用量の自動取得（非公開 API。失敗しても 0 で返り、手入力値が残る）
 "$PY" "$REPO_DIR/scripts/jarvis_cursor_usage_fetch.py" >/dev/null || echo "611 cursor_usage_fetch failed" >&2
-# 611 AI 使用量の週次集計（相乗り。失敗しても 314 は止めない。Supabase へは写さない＝--push なし）
-"$PY" "$REPO_DIR/scripts/jarvis_ai_usage_weekly.py" >/dev/null || echo "611 ai_usage_weekly failed" >&2
+# 611 AI 使用量の週次集計（相乗り。失敗しても 314 は止めない）
+# --push: 個人 jarvis-dashboard の既存 metrics／sync_meta(ai_usage_weekly) に書く（2026-11-09 松野さん了承）
+"$PY" "$REPO_DIR/scripts/jarvis_ai_usage_weekly.py" --push >/dev/null || echo "611 ai_usage_weekly failed" >&2
 # ループウェア: 判断ログを機械で束ね、ルール候補（最大3件）を loopware「今週の学び」に置く（AI なし・失敗しても続ける）
 mkdir -p "$REPO_DIR/.jarvis_state/loopware"
 "$PY" "$REPO_DIR/scripts/jarvis_loopware_weekly.py" --publish \
