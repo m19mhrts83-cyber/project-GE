@@ -295,6 +295,12 @@ class LifecycleTests(unittest.TestCase):
 
 
 class LinkManualTests(unittest.TestCase):
+    def test_price_narrows_match(self):
+        a = deal("viewing") | {"id": "a", "price_man": 400}
+        b = deal("viewing") | {"id": "b", "price_man": 980}
+        self.assertEqual([d["id"] for d in m.match_manual({"match": ["西吉田"]}, [a, b])], ["a", "b"])
+        self.assertEqual([d["id"] for d in m.match_manual({"match": ["西吉田"], "price_man": 400}, [a, b])], ["a"])
+
     def test_config_matches_real_file(self):
         import yaml
 
