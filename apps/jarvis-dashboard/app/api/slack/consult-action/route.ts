@@ -36,6 +36,7 @@ import { parseT312ButtonValue } from "@/lib/todoist312SlackAction";
 import { handleT312BlockAction } from "@/lib/todoist312SlackInteract";
 import { parseS9ButtonValue } from "@/lib/s9SlackAction";
 import { handleS9BlockAction } from "@/lib/s9SlackInteract";
+import { handleD113BlockAction } from "@/lib/dealActive113SlackInteract";
 
 export const runtime = "nodejs";
 // 返信モーダルの誤字脱字チェック／見直し（Gemini）を応答後に走らせる
@@ -54,6 +55,7 @@ export const maxDuration = 60;
  * 313 URL: /api/g/t313/close|reschedule/{task_id}?s=…
  * 312 URL: /api/g/t312/create|dismiss/{n}?p=&s=…
  * S9 URL:  /api/g/s9/adopt|skip/{n}?p=&s=…
+ * 113 #deal-active: value d113:{continue|hold|pass|done}:{deal_id}:{sig}（Bot ボタンのみ）
  */
 
 function verifySlackSignature(
@@ -316,6 +318,32 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           response_type: "ephemeral",
           text: result.text,
+        });
+      }
+      const body = {
+        replace_original: true,
+        text: result.text,
+        blocks: result.blocks,
+      };
+      if (responseUrl) {
+        await postResponseUrl(responseUrl, body);
+      }
+      return NextResponse.json(body);
+    }
+
+    if (String(value || "").startsWith("d113:")) {
+      const userObj = (payload.user || {}) as Record<string, unknown>;
+      const result = await handleD113BlockAction({
+        value,
+        blocks: Array.isArray(messageObj.blocks)
+          ? (messageObj.blocks as Array<Record<string, unknown>>)
+          : [],
+        userId: String(userObj.id || ""),
+      });
+      if (!result || result.kind === "error") {
+        return NextResponse.json({
+          response_type: "ephemeral",
+          text: result ? result.text : "ボタンの署名が確認できませんでした",
         });
       }
       const body = {
