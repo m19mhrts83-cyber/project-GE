@@ -8,8 +8,9 @@
                 5時間枠／週次枠に当たった記録。プランの使用％は無い（手入力欄あり）
   Codex       : ~/.codex/sessions/**/*.jsonl（＋archived_sessions）… token_count
                 イベントの累計トークンと、5時間枠・週次枠の使用％（rate_limits）
-取れないもの（手入力）:
-  Cursor      : 既存 .jarvis_state/cursor_usage_watch.json（目視％）をそのまま読む
+取れないもの（手入力）／別スクリプト:
+  Cursor      : .jarvis_state/cursor_usage_watch.json を読む。値は jarvis_cursor_usage_fetch.py が
+                ログイン済みブラウザから自動で入れる（失敗時は目視の手入力値のまま）
   GenCode     : 手入力欄（.jarvis_state/ai_usage_manual.json）
   ChatGPT モード: 手入力欄（同上）。チャットはローカルログが無い
 
@@ -308,6 +309,11 @@ def save_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _max_pct(*vals: Any) -> float | None:
+    nums = [float(v) for v in vals if isinstance(v, (int, float))]
+    return max(nums) if nums else None
+
+
 def collect_cursor() -> dict[str, Any]:
     st = load_json(CURSOR_PATH)
     if not st:
@@ -321,8 +327,15 @@ def collect_cursor() -> dict[str, Any]:
     return {
         "source": "manual", "available": True,
         "plan": st.get("plan"),
-        "pct": st.get("other_models_pct_used"),
+        # Pro の枠は Cursor Models（auto）と Other（API）の2本。逼迫している方で見る
+        "pct": _max_pct(st.get("cursor_models_pct_used"), st.get("other_models_pct_used")),
         "cursor_models_pct": st.get("cursor_models_pct_used"),
+        "other_models_pct": st.get("other_models_pct_used"),
+        "total_pct": st.get("total_pct_used"),
+        "grok_bot_weekly_pct": st.get("grok_bot_weekly_pct"),
+        "grok_bot_resets_at": st.get("grok_bot_resets_at"),
+        "fetch_source": st.get("fetch_source") or "manual",
+        "auto_fetched_at": st.get("auto_fetched_at"),
         "updated_at": st.get("updated_at"),
         "level": st.get("level"), "verdict": st.get("verdict"),
     }
@@ -374,9 +387,17 @@ def build_rows(rep: dict[str, Any]) -> list[dict[str, Any]]:
          "volume": f"{cx.get('turns', 0)}ターン・出力{cx.get('tokens', {}).get('output', 0):,}tok"
          if cx.get("available") else "—",
          "hits": None},
-        {"tool": "Cursor（ジャービス）", "auto": "取れない（目視％を手入力）",
-         "pct": cu.get("pct"), "pct_src": "手入力" if cu.get("pct") is not None else "—",
+        {"tool": "Cursor（ジャービス）", "auto": "取れる（ログイン済みブラウザ）／失敗時は手入力",
+         "pct": cu.get("pct"),
+         "pct_src": ("自動" if cu.get("fetch_source") == "auto" else "手入力")
+         if cu.get("pct") is not None else "—",
          "volume": "—", "hits": None},
+        {"tool": "Grok Bot（Cursor 内・週次）", "auto": "取れる（ログイン済みブラウザ）",
+         "pct": cu.get("grok_bot_weekly_pct"),
+         "pct_src": ("自動" if cu.get("fetch_source") == "auto" else "手入力")
+         if cu.get("grok_bot_weekly_pct") is not None else "—",
+         "volume": f"リセット {cu.get('grok_bot_resets_at')}" if cu.get("grok_bot_resets_at") else "—",
+         "hits": None},
         {"tool": "GenCode（フライデー）", "auto": "取れない（手入力）",
          "pct": t["gencode"].get("pct"), "pct_src": "手入力" if t["gencode"].get("pct") is not None else "—",
          "volume": "—", "hits": None},
@@ -440,7 +461,7 @@ def save_copy(rep: dict[str, Any]) -> None:
 
 
 TOOL_ENTITY = {"claude_code": "claude_code", "codex": "codex", "cursor": "cursor",
-               "gencode": "gencode", "chatgpt_mode": "chatgpt_mode"}
+               "gencode": "gencode", "chatgpt_mode": "chatgpt_mode", "grok_bot": "grok_bot"}
 
 
 def metric_rows(rep: dict[str, Any]) -> list[dict[str, Any]]:
@@ -458,10 +479,11 @@ def metric_rows(rep: dict[str, Any]) -> list[dict[str, Any]]:
     pcts = {
         "claude_code": (t["claude_plan"].get("pct"), "manual"),
         "codex": (((t["codex"].get("limits_latest") or {}).get("weekly") or {}).get("used_pct"), "local_log"),
-        "cursor": (t["cursor"].get("pct"), "manual"),
+        "cursor": (t["cursor"].get("pct"), t["cursor"].get("fetch_source") or "manual"),
         "gencode": (t["gencode"].get("pct"), "manual"),
         "chatgpt_mode": (t["chatgpt_mode"].get("pct"), "manual"),
     }
+    pcts["grok_bot"] = (t["cursor"].get("grok_bot_weekly_pct"), t["cursor"].get("fetch_source") or "manual")
     for tool, (pct, src) in pcts.items():
         add("ai_usage_weekly_pct", TOOL_ENTITY[tool], pct, "pct", {"source": src})
     cx, cl = t["codex"], t["claude_code"]
