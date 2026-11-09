@@ -5,7 +5,8 @@ name: 113 deal-active sync (KURASHIFT -> Slack)
 # flow: docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/flow.md
 #
 # 当面は手動起動のみ（既定はドライラン）。松野さんの許可が出たら
-# 毎朝 07:30 JST（22:30 UTC 前日）の schedule を有効にする。
+# 毎朝 07:30 JST（22:30 UTC 前日）の schedule を有効にする（月曜は「どうしますか？」カードも出る）。
+# ボタンは jarvis-dashboard /api/slack/consult-action が受ける（署名秘密は Vercel 側と同じ値）。
 #   schedule:
 #     - cron: "30 22 * * *"
 
@@ -25,6 +26,17 @@ on:
         description: "1回で新しく立てるスレッドの上限"
         required: false
         default: "10"
+      link_manual:
+        description: "手で立てたスレッドを案件に結びつける（config/deal_active_113_manual.yaml）"
+        required: false
+        type: boolean
+        default: false
+      ask:
+        description: "「どうしますか？」カード（auto=月曜のみ）"
+        required: false
+        type: choice
+        options: [auto, always, never]
+        default: auto
 
 concurrency:
   group: deal-active-113
@@ -44,19 +56,24 @@ jobs:
           python-version: "3.11"
 
       - name: Install deps
-        run: pip install -q supabase
+        run: pip install -q supabase pyyaml
 
       - name: Sync KURASHIFT -> #deal-active
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          DEAL_ACTIVE_113_ACTION_TOKEN: ${{ secrets.DEAL_ACTIVE_113_ACTION_TOKEN }}
+          PROPERTY_GATE_ACTION_TOKEN: ${{ secrets.PROPERTY_GATE_ACTION_TOKEN }}
+          ASK: ${{ github.event.inputs.ask || 'auto' }}
+          LINK_MANUAL: ${{ github.event.inputs.link_manual || 'false' }}
           APPLY: ${{ github.event.inputs.apply || 'false' }}
           DEAL_ID: ${{ github.event.inputs.deal_id || '' }}
           MAX_POSTS: ${{ github.event.inputs.max_posts || '10' }}
         run: |
           set -euo pipefail
-          ARGS=(--max-posts "$MAX_POSTS")
+          ARGS=(--max-posts "$MAX_POSTS" --ask "$ASK")
           if [[ "$APPLY" == "true" ]]; then ARGS+=(--apply); fi
           if [[ -n "$DEAL_ID" ]]; then ARGS+=(--deal-id "$DEAL_ID"); fi
+          if [[ "$LINK_MANUAL" == "true" ]]; then ARGS+=(--link-manual); fi
           python scripts/kurashift_deal_active_113.py "${ARGS[@]}"

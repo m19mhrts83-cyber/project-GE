@@ -69,3 +69,5 @@ Slack `#deal-active` を KURASHIFT の写しとして棚卸しする係（2026-1
 | 2026-10-09 | ビルダー構成に合わせ候補フォルダ作成（ID 113） |
 | 2026-11-05 | #deal-active 棚卸し＋KURASHIFT連携を担当に決定。flow.md に4点の型を記入 |
 | 2026-11-06 | 実装①: `scripts/kurashift_deal_active_113.py`＋GHA `deal-active-113.yml`（手動・既定ドライラン） |
+| 2026-11-07 | 実装②: 月曜の「どうしますか？」カード（続ける／保留／見送り／完了）＋ consult-action の `d113:` 受け口 |
+| 2026-11-09 | 実装③: クローズ表示→7日後削除（Bot の投稿のみ）・休眠・手作業スレッドの紐付け（`config/deal_active_113_manual.yaml`） |
