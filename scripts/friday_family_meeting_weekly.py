@@ -672,6 +672,12 @@ FAILURE_RULES: tuple[tuple[str, str, str, bool], ...] = (
         True,
     ),
     (
+        r"クレジット|(?i:insufficient[ _-]?credit|out of credit|credits? (?:exhausted|balance))",
+        "Genspark のクレジット不足（gsk は API 利用扱いで残高を使う）",
+        "松野さん: Genspark のクレジットを補充（またはプラン確認）→再実行",
+        True,
+    ),
+    (
         r"HTTP 401|token rejected|invalid or expired|gsk login|unknown command 'meeting'",
         "Genspark の認証切れ",
         "松野さん: Mac で `gsk login` → 再実行",

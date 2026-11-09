@@ -79,6 +79,12 @@ class TestFailureHandoff(unittest.TestCase):
         self.assertTrue(info["human"])
         self.assertIn("gsk login", info["action"])
 
+    def test_credit_shortage_needs_human(self) -> None:
+        for err in ("gsk meeting 失敗: クレジット不足です", "gsk meeting 失敗: Insufficient credits"):
+            info = f.classify_failure(err, date(2026, 11, 8))
+            self.assertIn("クレジット不足", info["cause"])
+            self.assertTrue(info["human"])
+
     def test_page_missing_needs_human(self) -> None:
         info = f.classify_failure(ERR_1025, date(2026, 10, 25))
         self.assertTrue(info["human"])
