@@ -25,6 +25,14 @@ npm run dev   # http://127.0.0.1:3004
 - `/313?task=<todoist_id>` 片付ける
 - `/312?tab=misses` 提案を仕分ける（いろんなソースの候補を 採る／見送る／保留 → コメント → 最後に選ばなかった理由）
 
+## 312 の本物のお題（collect／reflect）
+
+- `scripts/jarvis_todoist_312_collect.py`（`.github/workflows/todoist-312-collect.yml`）
+  - collect（月・水・金 20:30 JST）: Slack の松野さんの発言から『起こり』を拾い、`task_loop_topics`（source_kind=slack, status=open）と3案を入れて #consult に「Nody で開く」
+  - reflect（30分ごと）: 「既存タスクへ追記」「別タスクを作る」を選んだものだけ Todoist へ反映し `reflected_todoist_id` に記録
+- 画面: `/312` は `/api/topics`（鍵が要る）の本物のお題を見本の前に並べる。決めると status=decided
+- 試す: `python3 scripts/jarvis_todoist_312_collect.py --dry-run --hours 240`
+
 ## 毎日の仕分け → 週1のレビュー → Slack
 
 - **毎日**：ハブの「今日の仕分け」（`/312?tab=misses`）を仕分けて保存すると、その日は完了。判断ログが溜まる（お題は日付ごと。前の日の判断はログとして残る）
