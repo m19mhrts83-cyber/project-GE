@@ -1212,7 +1212,9 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
 
     keys = [content_dedupe_key(r) for r in pool_rows]
     content_dupes = max(0, len(keys) - len(set(keys)))
-    ranked = rank_candidates(pool_rows, limit=limit)
+    ranked_all = rank_candidates(pool_rows, limit=limit + near_miss_n())
+    ranked = ranked_all[:limit]
+    near = ranked_all[limit:]
     stats = {
         "pool": len(pool_rows),
         "ranked": len(ranked),
@@ -1236,8 +1238,65 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
             }
             for x in ranked
         ],
+        # 枠に入らなかった次点。ループウェア /misses に「惜しくも出なかった」として出す
+        "near_miss": [
+            {
+                "id": str(x.get("id")),
+                "score": x.get("_score"),
+                "reasons": x.get("_score_reasons"),
+                "rank": limit + i,
+            }
+            for i, x in enumerate(near, 1)
+        ],
     }
     return ranked, stats
+
+
+NEAR_MISS_DEFAULT = 3
+
+
+def near_miss_n() -> int:
+    """次点として印を付ける件数（JARVIS_MAIL_ACTION_NEAR_MISS、0 で止める）"""
+    try:
+        return max(0, int(os.environ.get("JARVIS_MAIL_ACTION_NEAR_MISS") or NEAR_MISS_DEFAULT))
+    except ValueError:
+        return NEAR_MISS_DEFAULT
+
+
+def near_miss_stamp(
+    pl: dict[str, Any] | None, *, score: Any, reasons: Any, rank: Any, at: str
+) -> dict[str, Any] | None:
+    """次点の印。Slack に出たもの・判断済み・既に印ありは付けない（None）。"""
+    p = pl if isinstance(pl, dict) else {}
+    if p.get("slack_ma_posted_at") or p.get("loopware_miss_judged_at") or p.get("slack_ma_near_miss"):
+        return None
+    out = dict(p)
+    out["slack_ma_near_miss"] = {"at": at, "score": score, "reasons": reasons, "rank": rank}
+    return out
+
+
+def mark_near_miss(sb: Any, items: list[dict[str, Any]]) -> int:
+    n = 0
+    for it in items:
+        tid = str(it.get("id") or "")
+        if not tid:
+            continue
+        try:
+            r = sb.table("triage_items").select("id,payload,status").eq("id", tid).limit(1).execute()
+            row = (r.data or [None])[0]
+            if not row or row.get("status") != "pending":
+                continue
+            out = near_miss_stamp(
+                row.get("payload"), score=it.get("score"), reasons=it.get("reasons"),
+                rank=it.get("rank"), at=now_iso(),
+            )
+            if out is None:
+                continue
+            sb.table("triage_items").update({"payload": out}).eq("id", tid).execute()
+            n += 1
+        except Exception as e:  # noqa: BLE001 — soft-fail
+            print(f"# near miss skip {tid}: {e}", file=sys.stderr)
+    return n
 
 
 # ---- 後回し（Todoist）にした返信の拾い直し（2026-10-28） ----
@@ -1637,6 +1696,11 @@ def main() -> int:
                 gmail_message_id=str(row.get("gmail_message_id") or "") or None,
                 applied_rules=list(row.get("_applied_rules") or []) or None,
             )
+
+    near_marked = 0
+    if sb is not None and not args.dry_run and stats.get("near_miss"):
+        near_marked = mark_near_miss(sb, list(stats.get("near_miss") or []))
+        print(f"# near_miss marked={near_marked}")
 
     # Slack に出した＝目を通す動線に載せたので Gmail 既読（物件取込と同型）
     if args.dry_run:

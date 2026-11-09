@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { agoLabel, type DeskCard } from "@/lib/deskCore";
 
 /** 見落とし（/misses?surface=triage）。仕分けが出さなかったものを、要対応だった／出さなくてよい で判断する */
-type MissCard = DeskCard & { why: "auto_skip" | "not_surfaced" };
+type MissCard = DeskCard & { why: "auto_skip" | "not_surfaced" | "near_miss" };
 
 const WHY: Record<MissCard["why"], string> = {
   auto_skip: "同じ送り手を2回見送ったので自動で見送り",
   not_surfaced: "Slack に出ないまま2日たった",
+  near_miss: "Slack の枠に惜しくも入らなかった（次点）",
 };
 
 function uid(): string {
