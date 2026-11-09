@@ -44,11 +44,24 @@ export default function TaskDedupeClient({
     status: SaveStatus;
   } | null>(null);
   const voice = useVoiceLog("312");
+  // 本物のお題（312 collect が Slack から拾ったもの）。見本の前に並べる
+  const [live, setLive] = useState<SeedTopic[]>([]);
+  const allTopics = useMemo(() => [...live, ...SEED_TOPICS_312], [live]);
   const [sel, setSel] = useState<number | null>(1);
   const [rate, setRate] = useState<Record<number, "good" | "bad" | null>>({});
 
   useEffect(() => {
     setResults(loadStore().decisions.filter((d) => d.agentId === "312"));
+    fetch("/api/topics")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { topics?: SeedTopic[] } | null) => {
+        const list = j?.topics || [];
+        setLive(list);
+        // URL でお題を指定していなければ、本物の1件目から始める
+        if (list.length && !topicFromUrl) setTopicId(list[0].id);
+      })
+      .catch(() => setLive([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -56,14 +69,15 @@ export default function TaskDedupeClient({
   }, [topicFromUrl]);
 
   useEffect(() => {
-    setSel(1);
+    // ★推しの案があれば最初から選んでおく（見本は案1）
+    setSel(allTopics.find((t) => t.id === topicId)?.starred ?? 1);
     setRate({});
     setEditIndex(null);
     setMsg("");
-  }, [topicId]);
+  }, [topicId, allTopics]);
 
   const topic: SeedTopic | null = useMemo(() => {
-    const found = SEED_TOPICS_312.find((t) => t.id === topicId);
+    const found = allTopics.find((t) => t.id === topicId);
     if (found) return found;
     if (topicId === "custom") {
       return {
@@ -77,8 +91,8 @@ export default function TaskDedupeClient({
         ],
       };
     }
-    return SEED_TOPICS_312[0];
-  }, [topicId, customText]);
+    return allTopics[0];
+  }, [topicId, customText, allTopics]);
 
   function toggleTag(t: string) {
     setTags((prev) =>
@@ -111,7 +125,15 @@ export default function TaskDedupeClient({
     };
     upsertDecision(rec);
     setResults(loadStore().decisions.filter((d) => d.agentId === "312"));
-    setMsg(choice === "none_of_above" ? "「どれも違う」を記録した" : choice === "hold" ? "保留として記録した" : `案${chosenIndex}で記録した`);
+    const chosenLabel = topic.proposals.find((p) => p.index === chosenIndex)?.label || "";
+    const toTodoist = topic.dbId && /既存タスクへ追記|別タスクを作る/.test(chosenLabel) && choice !== "hold" && choice !== "none_of_above";
+    setMsg(
+      choice === "none_of_above"
+        ? "「どれも違う」を記録した"
+        : choice === "hold"
+          ? "保留として記録した"
+          : `案${chosenIndex}で記録した${toTodoist ? "（30分以内に Todoist へ反映）" : ""}`,
+    );
     setEditIndex(null);
     const label =
       choice === "none_of_above"
@@ -148,7 +170,8 @@ export default function TaskDedupeClient({
         body: JSON.stringify({
           agentId: "312",
           topicText: topic.topicText,
-          seedId: topic.id,
+          seedId: topic.dbId ? undefined : topic.id,
+          topicDbId: topic.dbId,
           proposals: topic.proposals,
           decision: rec,
         }),
@@ -163,12 +186,12 @@ export default function TaskDedupeClient({
   if (!topic) return null;
 
   const doneRec = results.find((r) => r.topicId === topic.id);
-  const doneIdx = topicIndexOf(SEED_TOPICS_312, topic.id);
+  const doneIdx = topicIndexOf(allTopics, topic.id);
   const decidedProposal = doneRec?.chosenIndex
     ? topic.proposals.find((p) => p.index === doneRec.chosenIndex)
     : undefined;
 
-  const nextPending = SEED_TOPICS_312.find(
+  const nextPending = allTopics.find(
     (t) => t.id !== topic.id && !results.some((r) => r.topicId === t.id),
   );
 
@@ -204,7 +227,7 @@ export default function TaskDedupeClient({
         />
       ) : null}
       <div className="tabs">
-        {SEED_TOPICS_312.map((t) => {
+        {allTopics.map((t) => {
           const done = results.some((r) => r.topicId === t.id);
           return (
             <button
@@ -232,7 +255,7 @@ export default function TaskDedupeClient({
           お題
           {doneIdx >= 0 ? (
             <small className="mono">
-              {doneIdx + 1} / {SEED_TOPICS_312.length}
+              {doneIdx + 1} / {allTopics.length}
             </small>
           ) : null}
         </div>
@@ -244,7 +267,16 @@ export default function TaskDedupeClient({
             onChange={(e) => setCustomText(e.target.value)}
           />
         ) : (
-          <p>{topic.topicText}</p>
+          <>
+            <p>{topic.topicText}</p>
+            {topic.sourceRef ? (
+              <a className="meta" href={topic.sourceRef} target="_blank" rel="noreferrer">
+                元の発言を Slack で開く
+              </a>
+            ) : (
+              <small className="meta">見本のお題</small>
+            )}
+          </>
         )}
       </div>
 
