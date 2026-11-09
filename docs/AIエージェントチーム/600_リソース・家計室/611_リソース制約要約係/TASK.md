@@ -50,7 +50,8 @@
 - `scripts/jarvis_ai_usage_weekly.py` を追加（LLM なし）。直近7日のドライランで Codex 週次 63%、Claude 枠到達3回を確認
 - 週次は 314 の土曜 runner に相乗り（失敗しても 314 は止めない）。Supabase へは未送信
 - テスト: `python3 -m unittest scripts/tests/test_ai_usage_weekly.py` → 4件 OK
-- 未了（松野さん判断）: 新テーブル `ai_usage_weekly` 案、`--push` の可否、手入力の担当
+- 2026-11-09 Supabase 確認: 使用量テーブルは無し。新テーブルは作らず既存 `metrics`（metric/entity/recorded_at 一意）＋`sync_meta` に載せる形に変更（スキーマ変更なし）
+- 未了（松野さん判断）: 週次 runner への `--push` の可否、手入力の担当
 
 ---
 
