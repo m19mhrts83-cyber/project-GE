@@ -11,6 +11,8 @@
   4. Studio で週次インフォグラフィックを生成（当該週議事録のみ参照）
   5. Notion 当日ページ末尾へ「インフォ → 議事録要約」の順で挿入
   6. Slack #report（成功）／#ops（失敗）
+     人の手当てが要る失敗・月曜 retry でも直らない失敗は #ai-hub へ【要手当て】
+     （番頭さんが解決確認、ホークが Todoist 起票。docs/…/715_家族会議週次係/CLAUDE.md §4）
 
 ページの複製・アジェンダ編集はしない（松野さん担当）。
 再実行しても二重挿入しない（見出しで判定）。使用量制限などで失敗したら
@@ -607,6 +609,14 @@ def insert_into_notion(
     inserted = 0
     if blocks and not dry_run:
         inserted = nops.append_blocks(page["id"], blocks)
+        # 入ったつもりで入っていない、を拾う（見出し2つを読み直す）
+        missing = [
+            h for h in (info_heading, minutes_heading) if not nops.has_heading(page["id"], h)
+        ]
+        if missing:
+            raise RuntimeError(
+                "Notion 挿入後の確認で見出しが見つかりません: " + "、".join(missing)
+            )
     return {
         "page_id": page["id"],
         "page_title": page["title"],
@@ -644,6 +654,140 @@ def slack(channel: str, text: str) -> None:
         )
     except Exception as e:
         print(f"# slack soft-fail: {e}", file=sys.stderr)
+
+
+# --------------------------------------------------------------------------
+# 失敗の分類と引き継ぎ（#ai-hub【要手当て】）
+# --------------------------------------------------------------------------
+# (正規表現, 原因, 誰が・何を, 人の手当てが要るか)
+# 人の手当てが要るもの（ページ未作成・認証切れ・録音なし）は月曜 retry でも直らないので
+# 初回失敗の時点で #ai-hub へ出す。それ以外は月曜 retry でも失敗したら出す。
+FAILURE_RULES: tuple[tuple[str, str, str, bool], ...] = (
+    (
+        r"のページがありません",
+        "Notion の当日ページが未作成",
+        "松野さん: 前週ページを複製して日付を {slash} に → 再実行",
+        True,
+    ),
+    (
+        r"HTTP 401|token rejected|invalid or expired|gsk login|unknown command 'meeting'",
+        "Genspark の認証切れ",
+        "松野さん: Mac で `gsk login` → 再実行",
+        True,
+    ),
+    (
+        r"会議が見つかりません|会議 ID を特定できません",
+        "Genspark に当日の家族会議の録音が見つからない",
+        "松野さん: 録音の有無を確認。あれば会議IDを添えて再実行（--meeting-id）",
+        True,
+    ),
+    (
+        r"NotebookLM source",
+        "NotebookLM へのソース追加が失敗（画面変化かログイン切れ）",
+        "Jarvis / Miss Lemon: Mac で NotebookLM のログインと add_source を確認",
+        False,
+    ),
+    (
+        r"Studio|インフォ",
+        "インフォグラフィックの生成が失敗（枠切れ等）",
+        "Jarvis / Miss Lemon: 枠の回復を待って再実行。続くなら Studio 手順を確認",
+        False,
+    ),
+    (
+        r"Notion|HTTP \d{3}",
+        "Notion への書き込みが失敗",
+        "Jarvis / Miss Lemon: Notion トークンとページ権限を確認して再実行",
+        False,
+    ),
+)
+
+_NOISE_RE = re.compile(
+    r"^\s*(\[(INFO|WARN|DEBUG)\]|\(node:|\(Use `node|Usage:|Options:|-[-\w]|error: unknown option|$)"
+)
+
+
+def short_error(raw: str, limit: int = 240) -> str:
+    """CLI の長い stderr から意味のある行だけを残す（Slack 本文用）。"""
+    text = str(raw or "").strip()
+    head, sep, rest = text.partition(": ")
+    lines = [ln.strip() for ln in (rest if sep else text).splitlines()]
+    keep = [ln for ln in lines if ln and not _NOISE_RE.match(ln)]
+    # 認証切れの WARN は原因そのものなので残す
+    warn = [ln for ln in lines if "HTTP 401" in ln or "token rejected" in ln]
+    picked = (warn[:1] + keep)[:2] or lines[:1]
+    out = " / ".join(dict.fromkeys(picked))
+    if sep:
+        out = f"{head}: {out}"
+    return out[:limit]
+
+
+def classify_failure(err: str, target: Date) -> dict[str, Any]:
+    slash = f"({target.year:04d}/{target.month:02d}/{target.day:02d})"
+    for pattern, cause, action, human in FAILURE_RULES:
+        if re.search(pattern, err or ""):
+            return {"cause": cause, "action": action.format(slash=slash), "human": human}
+    return {
+        "cause": "原因不明の失敗",
+        "action": "Jarvis / Miss Lemon: Mac のログを確認して手当て",
+        "human": False,
+    }
+
+
+def _progress_line(ent: dict[str, Any]) -> str:
+    def mark(v: Any) -> str:
+        return "済" if v else "未"
+
+    md_ok = bool(ent.get("md_path")) and Path(str(ent.get("md_path"))).is_file()
+    return (
+        f"議事録MD {mark(md_ok)} → NLMソース {mark(ent.get('source_added'))}"
+        f" → インフォ {mark(ent.get('infographic_png'))} → Notion {mark(ent.get('notion_inserted'))}"
+    )
+
+
+def report_failure(target: Date, err: str, *, retry: bool, stopped: bool = False) -> None:
+    """#ops へ短く出し、必要なら #ai-hub へ【要手当て】を1回だけ出す。"""
+    iso = target.isoformat()
+    state = load_state()
+    ent = entry_for(state, iso)
+    info = classify_failure(err, target)
+    short = short_error(err)
+    rerun = f"scripts/friday_family_meeting_weekly.py --date {iso}"
+
+    kind = "停止" if stopped else "失敗"
+    if info["human"] or retry:
+        next_line = f"- 次: {info['action']}（#ai-hub に【要手当て】）"
+    else:
+        next_line = "- 次: 月曜07:00 自動リトライ（直らなければ #ai-hub に【要手当て】）"
+    slack(
+        "ops",
+        f"【ops】715 家族会議週次 {iso} {kind}\n"
+        + (f"- 会議: {ent.get('meeting_title')}\n" if ent.get("meeting_title") else "")
+        + f"- 原因: {info['cause']}\n"
+        f"- エラー: {short}\n"
+        f"- 進み: {_progress_line(ent)}\n"
+        f"{next_line}",
+    )
+
+    escalate = info["human"] or retry
+    done_causes = ent.get("escalated_causes") or []
+    if escalate and info["cause"] not in done_causes:
+        slack(
+            "hub",
+            f"【要手当て】715 家族会議週次 {iso} — Notion へ議事録・インフォが入っていません\n"
+            f"- 原因: {info['cause']}\n"
+            f"- 進み: {_progress_line(ent)}\n"
+            f"- 次: {info['action']}\n"
+            f"- 再実行: `{rerun}`（済んだ段は飛ばす・二重挿入しない）\n"
+            f"- 番頭さん: 次の巡回で #report に【報告】715 {iso} が出たかを見て、このスレで解決確認\n"
+            f"- ホーク: 朝の確認で Todoist（AIエージェントチーム）へ起票。完了は #report の成功報告を根拠に",
+        )
+        ent["escalated_causes"] = [*done_causes, info["cause"]]
+        ent["escalated_at"] = datetime.now(timezone.utc).isoformat()
+    ent["status"] = "pending"
+    ent["error"] = short
+    ent["cause"] = info["cause"]
+    ent["updated_at"] = datetime.now(timezone.utc).isoformat()
+    save_state(state)
 
 
 # --------------------------------------------------------------------------
@@ -757,23 +901,18 @@ def run(args: argparse.Namespace) -> int:
             f"- 挿入: インフォ{'済' if not result['have_info'] else '既存'} → 議事録{'済' if not result['have_minutes'] else '既存'}"
             f"（{result['inserted']} blocks）\n"
             f"- 補正: {'、'.join(corrections) if corrections else 'なし'}\n"
-            f"- 次回: 日曜21:30 自動",
+            + (
+                f"- 解決: #ai-hub【要手当て】（{'、'.join(ent.get('escalated_causes') or [])}）\n"
+                if ent.get("escalated_causes")
+                else ""
+            )
+            + "- 次回: 日曜21:30 自動",
         )
         print(f"# done page={result['page_url']} blocks={result['inserted']}", file=sys.stderr)
         return 0
     except Exception as e:
-        ent["status"] = "pending"
-        ent["error"] = str(e)
-        ent["updated_at"] = datetime.now(timezone.utc).isoformat()
         save_state(state)
-        slack(
-            "ops",
-            f"【ops】715 家族会議週次 {iso} 失敗\n"
-            f"- 会議: {shaped.get('title')}（{mid}）\n"
-            f"- エラー: {str(e)[:400]}\n"
-            f"- 済: source={bool(ent.get('source_added'))} infographic={bool(ent.get('infographic_png'))}\n"
-            f"- 次: 月曜07:00 自動リトライ → だめなら FRIDAY が手当て",
-        )
+        report_failure(target, str(e), retry=args.retry)
         print(f"# FAILED: {e}", file=sys.stderr)
         return 1
 
@@ -796,16 +935,14 @@ def main(argv: list[str] | None = None) -> int:
             if "既に実行中" in msg:
                 return 0
             target = parse_date(args.date)
-            slack("ops", f"【ops】715 家族会議週次 {target.isoformat()} 停止\n- 理由: {msg[:400]}")
+            if not args.dry_run:
+                report_failure(target, msg, retry=args.retry, stopped=True)
             print(f"# STOP: {msg}", file=sys.stderr)
             return 1
         except Exception as e:  # noqa: BLE001
             target = parse_date(args.date)
-            slack(
-                "ops",
-                f"【ops】715 家族会議週次 {target.isoformat()} 失敗\n"
-                f"- エラー: {str(e)[:400]}\n- 次: 月曜07:00 自動リトライ → だめなら FRIDAY 手当て",
-            )
+            if not args.dry_run:
+                report_failure(target, str(e), retry=args.retry)
             print(f"# FAILED: {e}", file=sys.stderr)
             return 1
 
