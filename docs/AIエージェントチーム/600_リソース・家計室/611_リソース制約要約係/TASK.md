@@ -5,7 +5,7 @@
 | task_id | 611-impl-1 |
 | agent_id | 611 |
 | executor | 実装は全エージェントの使用量を見て決める（2026-11-05 訂正）。ミスレモン（Claude Code）でも Codex でも可。ローカルログの確認は Mac 上で動かす必要がある |
-| status | queued |
+| status | review（2026-11-06 ミスレモン実装。下書き PR・松野さんの判断待ち） |
 | 依頼者 | 松野さん（2026-11-05 に「611の実装を渡す」を選択） |
 
 ## 依頼
@@ -44,13 +44,21 @@
 
 ## 検証結果
 
-（実装した側が記入）
+2026-11-06 ミスレモン（Claude Code、Mac 上で実行）。詳細: [`output/20261106_実装1_使用量集計の結果.md`](output/20261106_実装1_使用量集計の結果.md)
+
+- 取れる: Claude Code（トークン・枠到達。％は無し）、Codex（トークン＋5時間／週次％）。取れない＝手入力: Cursor・GenCode・ChatGPT モード（Claude の％も手入力欄あり）
+- `scripts/jarvis_ai_usage_weekly.py` を追加（LLM なし）。直近7日のドライランで Codex 週次 63%、Claude 枠到達3回を確認
+- 週次は 314 の土曜 runner に相乗り（失敗しても 314 は止めない）。Supabase へは未送信
+- テスト: `python3 -m unittest scripts/tests/test_ai_usage_weekly.py` → 4件 OK
+- 2026-11-09 Supabase 確認: 使用量テーブルは無し。新テーブルは作らず既存 `metrics`（metric/entity/recorded_at 一意）＋`sync_meta` に載せる形に変更（スキーマ変更なし）
+- 2026-11-09 Cursor 自動取得を追加（`scripts/jarvis_cursor_usage_fetch.py`、314 runner に相乗り、失敗しても手入力値を残す。テスト4件）。手入力: Claude 7%・Cursor 37%/1%・Grok Bot 96%
+- 未了: Cursor 取得用プロファイルへの初回ログイン（松野さん、マージ後に `--login`）、週次 runner への `--push` の可否（未了承）、ChatGPT・Genspark の％の取り方
 
 ---
 
 ## 以前の完了タスクの記録（2026-11-01）
 
-以下は `ai-usage-management-20261101` の調査完了記録です。上の `611-impl-1`（2026-11-05に依頼された実装・queued）とは別タスクとして保持します。調査の完了を、新しい実装の完了として扱わないでください。
+以下は `ai-usage-management-20261101` の調査完了記録です。上の `611-impl-1` とは別タスクとして保持します。
 
 ### TASK — 611 リソース制約要約係
 
@@ -77,7 +85,6 @@ Codex、Claude Code、Cursor、Gensparkの本人契約、請求／補充日、�
 - 社員outputに一次確認記録、CLAUDE.mdに参照を追加。
 - 契約／課金／リセット権／本番頻度は未変更。
 - 未確認: Codex月額更新日・実請求額、Cursorの税等、Genspark次回年額。本人へCodex更新日を確認中。
-- 調査保存終了: 2026-11-01T10:08:06+09:00
 
 #### 追加質問への対応 2026-11-01T10:11:58+09:00
 

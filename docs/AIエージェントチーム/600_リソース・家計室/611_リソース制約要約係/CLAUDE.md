@@ -87,3 +87,5 @@ ID: **611**。〔Grok:Resource〕ミックス。報告先: Slack `#ops`（判断
 | 2026-10-09 | Phase D スタブ |
 | 2026-10-10 | 使用状況把握＋レビュー連動の頻度コントロールを役割に追加 |
 | 2026-11-01 | 本人契約・使用量を4サービスで一次確認。詳細は `output/20261101_AI使用量管理_本人条件確認.md` とObsidian正本。請求日／月間補充／週次／短期枠を区別し、Genspark Standard無料枠をGenCode用に数えない。課金・起動頻度・代行チェーンは未変更 |
+| 2026-11-06 | 実装 第1弾: `scripts/jarvis_ai_usage_weekly.py`（Claude Code・Codex はローカルログ、Cursor・GenCode・ChatGPT は手入力）。314 の土曜 runner に相乗り。Supabase は案のみ（`output/20261106_実装1_使用量集計の結果.md`） |
+| 2026-11-09 | Supabase は新テーブルを作らず既存 `metrics`／`sync_meta` に載せる形へ（`--push` は未了承で未使用）。Cursor の自動取得 `scripts/jarvis_cursor_usage_fetch.py` を追加（ログイン済みブラウザ・非公開 API・失敗しても止めない）。Grok Bot 週次％も表に追加 |
