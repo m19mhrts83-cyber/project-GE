@@ -7,7 +7,7 @@ cursor.com のダッシュボードが裏で呼ぶ JSON（非公開）を、普�
 自動操作フラグ付きのブラウザは Google ログインで弾かれるため、Chrome 本体を
 リモートデバッグポート付きで起動し、そこへ接続して読むだけにする。
 
-  初回だけ（Chrome が開くので松野さんが手でログイン）:
+  初回だけ（Chrome が開くので松野さんが手でログインし、終わったら Chrome を閉じる）:
     ~/selenium_env/venv/bin/python scripts/jarvis_cursor_usage_fetch.py --login
   週次（314 の土曜 runner から。画面は出ない）:
     ~/selenium_env/venv/bin/python scripts/jarvis_cursor_usage_fetch.py
@@ -163,8 +163,9 @@ def _free_port() -> int:
         return sk.getsockname()[1]
 
 
-def chrome_args(port: int, headless: bool, profile: Path = PROFILE_DIR) -> list[str]:
+def chrome_args(port: int, headless: bool, profile: Path | None = None) -> list[str]:
     """普通の Chrome を専用プロフィールで。--enable-automation は付けない。"""
+    profile = profile or PROFILE_DIR
     args = [CHROME_BIN, f"--user-data-dir={profile}", f"--remote-debugging-port={port}",
             "--remote-debugging-address=127.0.0.1", "--no-first-run", "--no-default-browser-check"]
     if headless:
@@ -251,13 +252,32 @@ def fetch_raw(headless: bool, wait_login_sec: int = 0) -> dict[str, Any]:
                 proc.kill()
 
 
+def login_and_wait(wait_sec: int = 600) -> None:
+    """画面ありの Chrome を開き、松野さんがログインして Chrome を閉じるまで待つだけ。
+    こちらからは接続も読み取りもしない（ログイン中に固まらないように）。閉じれば Chrome が Cookie を保存する。"""
+    if not Path(CHROME_BIN).exists():
+        raise FileNotFoundError("Google Chrome が見つからない")
+    PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    args = [a for a in chrome_args(_free_port(), headless=False) if not a.startswith("--remote-debugging")]
+    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print("# Chrome で Cursor にログインしてください（GitHub でログインしたアカウント）。"
+          f"ログインできたら Chrome を閉じてください（⌘Q）。最大 {wait_sec // 60} 分待ちます", file=sys.stderr)
+    try:
+        proc.wait(timeout=wait_sec)
+    except subprocess.TimeoutExpired:
+        proc.terminate()
+        proc.wait(timeout=20)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Cursor 使用量の自動取得（非公開 API・失敗しても 0）")
     ap.add_argument("--login", action="store_true", help="画面を出してログインを待つ（初回だけ）")
     ap.add_argument("--dry-run", action="store_true", help="state を書かない")
     args = ap.parse_args()
     try:
-        raw = fetch_raw(headless=not args.login, wait_login_sec=600 if args.login else 0)
+        if args.login:
+            login_and_wait()
+        raw = fetch_raw(headless=True)
     except Exception as e:  # ブラウザ起動失敗など
         print(f"# cursor fetch skip: {type(e).__name__}", file=sys.stderr)
         if not args.dry_run:
