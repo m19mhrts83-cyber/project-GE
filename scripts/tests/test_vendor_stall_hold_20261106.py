@@ -113,6 +113,10 @@ class S2BatchTests(unittest.TestCase):
         self.assertEqual(runner.s2_next_batch_id(lst, now), "2026-W45")
 
 
+# 現在日時を固定（last_refill_at=2026-11-01 を「今週（W45）」とみなす。実行日に依存させない）
+FROZEN_NOW = datetime(2026, 11, 6, 23, 0, tzinfo=JST)
+
+
 class S2StaleUsesBatchTests(unittest.TestCase):
     """S2 停滞時は send_resume ではなく追加バッチを書く。"""
 
@@ -137,8 +141,7 @@ class S2StaleUsesBatchTests(unittest.TestCase):
              mock.patch.object(runner, "push_sync_meta"), \
              mock.patch.object(runner, "pending_vendors", return_value=[]), \
              mock.patch.object(runner, "business_days_between", return_value=3), \
-             mock.patch.object(runner, "now_jst", return_value=datetime(2026, 11, 4, 12, 0, tzinfo=ZoneInfo("Asia/Tokyo"))):
-            # 実時計だと翌週以降は週替わり扱いになり -r2 にならないので時刻を固定する
+             mock.patch.object(runner, "now_jst", return_value=FROZEN_NOW):
             r = runner.run_lane(
                 "s2", dry=False, force_refill=False, skip_sync=True, skip_refill=False,
                 state=state, inbox_hits=[], archive_inbox=False,
