@@ -11,6 +11,12 @@ export type SeedTopic = {
   title: string;
   topicText: string;
   proposals: Proposal[];
+  /** 共有DBのお題（312 collect が入れた本物）。見本には無い */
+  dbId?: string;
+  /** 元の発言（Slack パーマリンク） */
+  sourceRef?: string;
+  /** ★推しの案番号 */
+  starred?: number;
 };
 
 export const REASON_TAGS_312 = [

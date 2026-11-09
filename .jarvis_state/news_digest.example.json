@@ -1,0 +1,10 @@
+{
+  "disabled": false,
+  "feeds": {
+    "cursor_friday": { "enabled": true },
+    "ai_weekly": { "enabled": true },
+    "space_defense_daily": { "enabled": true },
+    "defense_mgr": { "enabled": true }
+  },
+  "notes": "JARVIS_NEWS_DIGEST_DISABLE=1 でも停止可。投稿本線は Banto（Muse）の #report Webhook。"
+}

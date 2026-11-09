@@ -19,6 +19,7 @@ Claude Code / Cursor（Jarvis）/ Codex / GenCode / Grok Bot など、**どの�
 | [`52_議事録のまとめ方`](52_議事録のまとめ方_20261029.md) | **Notion に残す議事録はすべてこの型で仕上げてから載せる**（結論・決定・ToDo表が先頭、話者は実名、全文はリンク、A4 1枚目安）。残す前の了承・チャットは3行要約＋宿題は維持 |
 | [`53_4ツール共通再開`](53_Codex_Claude_Cursor共通再開_20261101.md) | **「Codexなどの作業の続きをして」でClaude Code／Cursorが再開するための人向け入口・両宛て共有・Slack／Todoistの使い分け** |
 | [`55_Banto_Grok連携運用`](55_Banto_Grok連携運用_20261107.md) | **番頭さん（Banto/Muse）とホーク（Grok）の役割、監視・完了確認・権限境界、試験運用中の未確定事項** |
+| [`57_ニュース配信_Webhook評価`](57_ニュース配信_Webhook評価_20261108.md) | **本人向けニュース4本：Bantoが#report Webhook投稿、Jarvisが👍👎回収** |
 | [`54_Grok×番頭相互補完`](54_Grok_番頭Banto相互補完_20261107.md) | **Grok Bot＝攻め／番頭（Banto・Muse）＝守り・先回り。指摘〜解決確認・省コスト・権限。Jarvisは二重巡回しない** |
 | [`48_読まなくてよいMD一覧`](48_読まなくてよいMD一覧_20261024.md) | 名指し時だけ開く MD（AI 使用量の節約） |
 | 家ルール例 | [`config/claude_code_home_CLAUDE.example.md`](../../config/claude_code_home_CLAUDE.example.md) → `~/.claude/CLAUDE.md` |

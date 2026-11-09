@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """611 Cursor 使用量の自動取得（ログイン済みブラウザ・ルールのみ）。
 
-cursor.com のダッシュボードが裏で呼ぶ JSON（非公開）を、専用のブラウザプロファイル
-（.jarvis_state/cursor_usage_profile/、Git 管理外）から読み、％だけを
-.jarvis_state/cursor_usage_watch.json に反映する。
+cursor.com のダッシュボードが裏で呼ぶ JSON（非公開）を、普通の Google Chrome を
+専用プロフィール（.jarvis_state/cursor_usage_chrome/、Git 管理外）で起動して読み、
+％だけを .jarvis_state/cursor_usage_watch.json に反映する。
+自動操作フラグ付きのブラウザは Google ログインで弾かれるため、Chrome 本体を
+リモートデバッグポート付きで起動し、そこへ接続して読むだけにする。
 
-  初回だけ（画面が開くので松野さんがログイン）:
+  初回だけ（Chrome が開くので松野さんが手でログイン）:
     ~/selenium_env/venv/bin/python scripts/jarvis_cursor_usage_fetch.py --login
   週次（314 の土曜 runner から。画面は出ない）:
     ~/selenium_env/venv/bin/python scripts/jarvis_cursor_usage_fetch.py
@@ -19,7 +21,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import socket
+import subprocess
 import sys
+import time
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -28,7 +35,9 @@ from zoneinfo import ZoneInfo
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 STATE_PATH = REPO / ".jarvis_state" / "cursor_usage_watch.json"
-PROFILE_DIR = REPO / ".jarvis_state" / "cursor_usage_profile"
+PROFILE_DIR = REPO / ".jarvis_state" / "cursor_usage_chrome"
+CHROME_BIN = os.environ.get(
+    "JARVIS_CHROME_BIN", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 DASHBOARD_URL = "https://cursor.com/dashboard/spending"
 
 # ページ内の fetch で読む（同一オリジンなので Cookie はブラウザが付ける。こちらでは触らない）
@@ -145,25 +154,80 @@ def save_state(state: dict[str, Any]) -> None:
     STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _free_port() -> int:
+    with socket.socket() as sk:
+        sk.bind(("127.0.0.1", 0))
+        return sk.getsockname()[1]
+
+
+def chrome_args(port: int, headless: bool, profile: Path = PROFILE_DIR) -> list[str]:
+    """普通の Chrome を専用プロフィールで。--enable-automation は付けない。"""
+    args = [CHROME_BIN, f"--user-data-dir={profile}", f"--remote-debugging-port={port}",
+            "--remote-debugging-address=127.0.0.1", "--no-first-run", "--no-default-browser-check"]
+    if headless:
+        args.append("--headless=new")
+    args.append(DASHBOARD_URL)
+    return args
+
+
+def _wait_cdp(port: int, timeout: float = 30) -> bool:
+    end = time.time() + timeout
+    while time.time() < end:
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=2):
+                return True
+        except OSError:
+            time.sleep(0.5)
+    return False
+
+
+def _poll_pages(ctx) -> dict[str, Any] | None:
+    """cursor.com を開いているタブの中で読む（ログイン画面中は読まない）。"""
+    for pg in ctx.pages:
+        url = pg.url or ""
+        if url.startswith("https://cursor.com/") and "/login" not in url:
+            try:
+                return pg.evaluate(FETCH_JS)
+            except Exception:
+                continue
+    return None
+
+
 def fetch_raw(headless: bool, wait_login_sec: int = 0) -> dict[str, Any]:
     from playwright.sync_api import sync_playwright
 
+    if not Path(CHROME_BIN).exists():
+        raise FileNotFoundError("Google Chrome が見つからない")
     PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-    with sync_playwright() as p:
-        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=headless)
-        try:
-            page = ctx.pages[0] if ctx.pages else ctx.new_page()
-            page.goto(DASHBOARD_URL, wait_until="domcontentloaded", timeout=60_000)
-            raw = page.evaluate(FETCH_JS)
-            waited = 0
-            while wait_login_sec and statuses(raw)["summary"] != 200 and waited < wait_login_sec:
-                page.wait_for_timeout(5_000)
-                waited += 5
-                if "cursor.com/dashboard" in page.url:
-                    raw = page.evaluate(FETCH_JS)
+    port = _free_port()
+    proc = subprocess.Popen(chrome_args(port, headless), stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL)
+    try:
+        if not _wait_cdp(port):
+            raise TimeoutError("Chrome のデバッグポートに繋がらない")
+        with sync_playwright() as p:
+            browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+            ctx = browser.contexts[0]
+            deadline = time.time() + max(wait_login_sec, 20)
+            raw: dict[str, Any] = {"summary": {"status": 0}, "grok": {"status": 0}}
+            if wait_login_sec:
+                print("# Chrome でCursor にログインしてください（GitHub でログインしたアカウント）。"
+                      f"最大 {wait_login_sec // 60} 分待ちます", file=sys.stderr)
+            while time.time() < deadline:
+                got = _poll_pages(ctx)
+                if got:
+                    raw = got
+                    if statuses(raw)["summary"] == 200:
+                        break
+                time.sleep(3)
+            browser.close()
             return raw
-        finally:
-            ctx.close()
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
 
 def main() -> int:
@@ -172,7 +236,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="state を書かない")
     args = ap.parse_args()
     try:
-        raw = fetch_raw(headless=not args.login, wait_login_sec=300 if args.login else 0)
+        raw = fetch_raw(headless=not args.login, wait_login_sec=600 if args.login else 0)
     except Exception as e:  # ブラウザ起動失敗など
         print(f"# cursor fetch skip: {type(e).__name__}", file=sys.stderr)
         if not args.dry_run:

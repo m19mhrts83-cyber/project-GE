@@ -60,6 +60,13 @@ function fakeSb(fail: Record<string, string> = {}) {
           select: () => ({ single: api.single }),
         };
       },
+      update: (patch: Row) => ({
+        eq: (k: string, v: unknown) => {
+          if (fail[table]) return Promise.resolve({ error: { message: fail[table] } });
+          for (const y of db[table]) if (y[k] === v) Object.assign(y, patch);
+          return Promise.resolve({ error: null });
+        },
+      }),
       upsert: (r: Row | Row[], o?: { onConflict?: string }) => {
         if (fail[table]) return Promise.resolve({ error: { message: fail[table] } });
         const keys = (o?.onConflict || "id").split(",");
@@ -118,6 +125,43 @@ test("312: 判断を変えたら1行のまま、前の判断は history に残�
   const h = row.history as Row[];
   assert.equal(h.length, 1);
   assert.equal(h[0].choice, "use");
+});
+
+test("312 本物のお題: id で引き、3案は上書きせず、決めたら status=decided", async () => {
+  const { sb, db } = fakeSb();
+  db.task_loop_topics.push({ id: "t-live", agent_id: "312", topic_text: "[Slack] 315健全化", status: "open", source_kind: "slack" });
+  db.task_loop_proposals.push({ id: "p1", topic_id: "t-live", proposal_index: 3, label: "別タスクを作る", body: "タイトル：315健全化", prompt_version: "rule-v1" });
+  const r = await persistDecision(sb, {
+    agentId: "312",
+    topicDbId: "t-live",
+    topicText: "（画面の文と違っても id で引く）",
+    proposals: [{ index: 3, label: "別タスクを作る", body: "上書きしない" }],
+    decision: { choice: "use", chosenIndex: 3, finalText: "タイトル：315健全化", decidedVia: "app" },
+  });
+  assert.equal(r.persisted, true);
+  assert.equal(r.topicId, "t-live");
+  assert.equal(db.task_loop_topics.length, 1);
+  assert.equal(db.task_loop_topics[0].status, "decided");
+  assert.equal(db.task_loop_proposals[0].body, "タイトル：315健全化");
+  assert.equal(db.task_loop_proposals[0].prompt_version, "rule-v1");
+  assert.equal(db.task_loop_decisions[0].reflected_todoist_id, null);
+});
+
+test("312 本物のお題: 見つからない id は persisted:false", async () => {
+  const { sb } = fakeSb();
+  const r = await persistDecision(sb, { agentId: "312", topicDbId: "nope", decision: { choice: "use", chosenIndex: 1 } });
+  assert.equal(r.persisted, false);
+});
+
+test("312: 反映済みの Todoist id は決め直しても残し、「反映しない」印は空に戻す", async () => {
+  const { sb, db } = fakeSb();
+  await persistDecision(sb, d312("use", 1));
+  db.task_loop_decisions[0].reflected_todoist_id = "-";
+  await persistDecision(sb, d312("use", 3));
+  assert.equal(db.task_loop_decisions[0].reflected_todoist_id, null);
+  db.task_loop_decisions[0].reflected_todoist_id = "todo-123";
+  await persistDecision(sb, d312("edit_use", 3));
+  assert.equal(db.task_loop_decisions[0].reflected_todoist_id, "todo-123");
 });
 
 test("312: 書き込み失敗は persisted:false（成功に見せない）", async () => {

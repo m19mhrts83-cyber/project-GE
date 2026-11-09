@@ -13,6 +13,8 @@ export type DecideBody = {
   agentId?: string;
   topicText?: string;
   seedId?: string;
+  /** 312 collect が入れた本物のお題の id（あれば topic_text で探さない） */
+  topicDbId?: string;
   proposals?: { index: number; label: string; body: string }[];
   decision?: {
     choice: string;
@@ -112,17 +114,17 @@ async function decide312(
   const d = body.decision!;
   const topicText = body.topicText || body.seedId || "";
 
+  // 本物のお題（312 collect）は id で引く。3案は collect が入れたものを正本にし、上書きしない
+  const live = Boolean(body.topicDbId);
   // 同じ話題は topic を使い回す（送り直しで topic が増えないように）
-  const { data: found, error: fErr } = await sb
-    .from("task_loop_topics")
-    .select("id")
-    .eq("agent_id", "312")
-    .eq("topic_text", topicText)
-    .order("created_at", { ascending: false })
-    .limit(1);
+  const findQ = sb.from("task_loop_topics").select("id").eq("agent_id", "312");
+  const { data: found, error: fErr } = await (live
+    ? findQ.eq("id", body.topicDbId!).limit(1)
+    : findQ.eq("topic_text", topicText).order("created_at", { ascending: false }).limit(1));
   if (fErr) return { ok: true, persisted: false, reason: fErr.message };
 
   let topicId = ((found || [])[0] as { id: string } | undefined)?.id;
+  if (live && !topicId) return { ok: true, persisted: false, reason: "topic not found" };
   if (!topicId) {
     const { data: topic, error: tErr } = await sb
       .from("task_loop_topics")
@@ -140,7 +142,7 @@ async function decide312(
     topicId = (topic as { id: string }).id;
   }
 
-  const props = body.proposals || [];
+  const props = live ? [] : body.proposals || [];
   if (props.length) {
     const { error: pErr } = await sb.from("task_loop_proposals").upsert(
       props.map((p) => ({
@@ -205,11 +207,24 @@ async function decide312(
       : []),
   ];
 
+  // Todoist への反映（312 reflect）: 実際に作った／追記した id は残す（二重に作らない）。
+  // 「反映しない」印（"-"）は決め直したら空に戻し、新しい判断でもう一度見てもらう
+  const prevReflected = (prev?.reflected_todoist_id as string | null | undefined) ?? null;
+  const reflected = prevReflected && prevReflected !== "-" ? prevReflected : null;
+
   const { error: dErr } = await sb.from("task_loop_decisions").upsert(
-    { ...next, history, updated_at: now.toISOString() },
+    { ...next, reflected_todoist_id: reflected, history, updated_at: now.toISOString() },
     { onConflict: "topic_id" },
   );
   if (dErr) return { ok: true, persisted: false, reason: dErr.message, topicId };
+  if (live) {
+    const status = next.choice === "hold" ? "open" : "decided";
+    const { error: sErr } = await sb
+      .from("task_loop_topics")
+      .update({ status, updated_at: now.toISOString() })
+      .eq("id", topicId);
+    if (sErr) return { ok: true, persisted: false, reason: sErr.message, topicId };
+  }
   return { ok: true, persisted: true, via: "task_loop", topicId };
 }
 
