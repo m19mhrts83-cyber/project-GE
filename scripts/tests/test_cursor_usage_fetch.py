@@ -46,6 +46,14 @@ class CursorFetchTests(unittest.TestCase):
     def test_changed_shape_is_safe(self):
         self.assertEqual(f.parse_usage({"summary": {"status": 200, "json": {"x": 1}}}), {})
 
+    def test_chrome_launch_is_plain_chrome_with_own_profile(self):
+        args = f.chrome_args(9333, headless=False, profile=Path("/tmp/p"))
+        self.assertIn("--user-data-dir=/tmp/p", args)
+        self.assertIn("--remote-debugging-port=9333", args)
+        self.assertNotIn("--enable-automation", " ".join(args))
+        self.assertNotIn("--headless=new", args)
+        self.assertIn("--headless=new", f.chrome_args(9333, headless=True))
+
 
 if __name__ == "__main__":
     unittest.main()
