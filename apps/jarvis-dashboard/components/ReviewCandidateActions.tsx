@@ -13,10 +13,10 @@ const LABEL: Record<string, string> = {
 };
 
 const TOAST: Record<Verdict, string> = {
-  accept: "採用しました。ルール帳への反映は次の反映処理で入ります",
+  accept: "採用しました。土曜の314がルール帳に反映します",
   once: "今回だけにしました（ルールにはしません）",
   reject: "違うにしました。この候補は8週間出しません",
-  comment: "ひとことを残しました。次の週次分析で読みます",
+  comment: "ひとことを残しました。土曜の314が修正案に反映します",
 };
 
 function newKey(id: string): string {

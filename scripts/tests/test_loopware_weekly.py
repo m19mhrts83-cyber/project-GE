@@ -81,6 +81,19 @@ class HypothesesTests(unittest.TestCase):
         self.assertTrue(any("R116-002" in x for x in imp["116"]))
 
 
+class OwnerCommentTests(unittest.TestCase):
+    def test_comment_is_listed_for_314(self):
+        rows = [
+            {"id": 1, "surface": "rule_review", "action": "comment", "target_id": "C1234abcd",
+             "note": "請求書だけ見送り", "payload": {"candidate_id": "C1234abcd", "text": "a@x.jp を出さない"}},
+            {"id": 2, "surface": "rule_review", "action": "rule_once", "target_id": "C1234abcd", "payload": {}},
+        ]
+        md = lw.sections(rows, [])
+        self.assertIn("あなたのひとこと", md)
+        self.assertIn("[C1234abcd] a@x.jp を出さない → 「請求書だけ見送り」", md)
+        self.assertNotIn("あなたのひとこと", lw.sections(rows[1:], []))
+
+
 class ApplyTests(unittest.TestCase):
     BOOK = (REPO / "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/learned_rules.md").read_text(encoding="utf-8")
 
