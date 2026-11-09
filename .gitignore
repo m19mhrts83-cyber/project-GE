@@ -205,3 +205,5 @@ outputs/
 # ローカルの入れ子クローン・CLI一時ファイル（2026-11-09）
 .wt-*/
 supabase/.temp/
+# 611 配車案の下書き（dry-run の出力）
+.jarvis_state/dispatch_suggestions/
