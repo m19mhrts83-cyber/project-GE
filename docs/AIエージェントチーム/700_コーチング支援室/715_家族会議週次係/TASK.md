@@ -38,4 +38,5 @@ export PATH="$HOME/.local/bin:$HOME/.genspark-tool-cli/bin:$PATH"
 
 - Notion ページ未作成 → 松野さんに前週複製を依頼（自動では複製しない）
 - 会議特定が曖昧 → `--meeting-id` で指定
-- Studio 枠切れ → 月曜07:00 `--retry` → だめなら FRIDAY 手当て
+- Studio 枠切れ → 月曜07:00 `--retry` → だめなら `#ai-hub`【要手当て】（Jarvis / Miss Lemon が手当て）
+- Genspark 認証切れ → `#ai-hub`【要手当て】→ 松野さんが Mac で `gsk login`
