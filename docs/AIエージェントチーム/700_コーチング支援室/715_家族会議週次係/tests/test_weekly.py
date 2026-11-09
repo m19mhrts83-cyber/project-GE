@@ -127,6 +127,8 @@ class TestReportFailure(unittest.TestCase):
         self.assertEqual(self.channels(), ["ops", "hub", "ops"])
         hub = self.posts[1][1]
         self.assertIn("【要手当て】715 家族会議週次 2026-11-08", hub)
+        self.assertIn("715＝家族会議週次係", hub)
+        self.assertIn("715＝家族会議週次係", self.posts[0][1])
         self.assertIn("番頭さん", hub)
         self.assertIn("ホーク", hub)
         state = f.load_state()["dates"]["2026-11-08"]
