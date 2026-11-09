@@ -5,7 +5,8 @@
 flow: docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/flow.md
 
 この実装①でやること（flow のステップ 1〜5）:
-  1. 対象を読む: status が viewing / offer / loan、または summary_json.pursue のフォロー中
+  1. 対象を読む: offer / loan、内見依頼中以降の viewing、summary_json.pursue のフォロー中、既にスレッドがある案件
+     （step 無し・内見候補の viewing は物件メール照合の自動昇格なので写さない。2026-11-09 ドライランで 1000 件超）
   2. 「最後に動いた日」= deal_events / 台帳 comm_items（comm_links target_type=deal）/ updated_at の最新
   3. 未掲載 → 親メッセージを投稿し、ts を summary_json.slack_deal_active に保存
   4. 段階が変わった → 親メッセージを書き換え、スレッドに経緯を1行
@@ -109,11 +110,30 @@ def is_pursued(deal: dict[str, Any]) -> bool:
     return isinstance(sj.get("pursue_at"), str) and bool(sj.get("pursue_at"))
 
 
+# 松野さんが自分で進めた印のある内見段階。step 無し / candidate は物件メール照合が
+# match_score で自動昇格させたもの（2026-11-09 時点で 1000 件超）なので写さない。
+VIEWING_MOVED_STEPS = ("requested", "scheduled", "done")
+
+
+def is_mirrored(deal: dict[str, Any]) -> bool:
+    """既に #deal-active にスレッドがあり、まだ閉じていない。"""
+    st = sj_of(deal).get(SJ_KEY)
+    return isinstance(st, dict) and bool(st.get("ts")) and st.get("state") != "closed"
+
+
 def is_target(deal: dict[str, Any]) -> bool:
     status = str(deal.get("status") or "")
-    if status in TARGET_STATUSES:
+    if status in ("passed", "purchased"):
+        return False
+    if status in ("offer", "loan"):
         return True
-    return status == "info" and is_pursued(deal)
+    if is_pursued(deal) or is_mirrored(deal):
+        return True
+    if status == "viewing":
+        v = sj_of(deal).get("viewing")
+        v = v if isinstance(v, dict) else {}
+        return v.get("step") in VIEWING_MOVED_STEPS or bool(v.get("verdict"))
+    return False
 
 
 def stage_key(deal: dict[str, Any]) -> str:
@@ -535,16 +555,38 @@ class Slack:
         return [m for m in (j.get("messages") or []) if m.get("ts") != ts] if j.get("ok") else []
 
 
-def fetch_deals(sb: Any) -> list[dict[str, Any]]:
+PAGE = 1000  # PostgREST の1回の上限
+
+
+def _fetch_status(sb: Any, statuses: list[str]) -> list[dict[str, Any]]:
     cols = "id, title, status, area, price_man, yield_pct, updated_at, created_at, summary_json"
     rows: list[dict[str, Any]] = []
-    rows += (
-        sb.table("kurashift_re_deals").select(cols).in_("status", list(TARGET_STATUSES)).execute().data
-        or []
-    )
-    info = sb.table("kurashift_re_deals").select(cols).eq("status", "info").execute().data or []
-    rows += [d for d in info if is_pursued(d)]
-    return [d for d in rows if is_target(d)]
+    start = 0
+    while True:
+        page = (
+            sb.table("kurashift_re_deals").select(cols).in_("status", statuses)
+            .order("id").range(start, start + PAGE - 1).execute().data
+            or []
+        )
+        rows += page
+        if len(page) < PAGE:
+            return rows
+        start += PAGE
+
+
+def fetch_candidates(sb: Any) -> list[dict[str, Any]]:
+    """内見段階以降（自動昇格を含む）と、フォロー中の info。手作業スレッドの紐付けに使う。"""
+    rows = _fetch_status(sb, list(TARGET_STATUSES))
+    rows += [d for d in _fetch_status(sb, ["info"]) if is_pursued(d) or is_mirrored(d)]
+    return rows
+
+
+def fetch_deals(sb: Any) -> list[dict[str, Any]]:
+    rows = fetch_candidates(sb)
+    out = [d for d in rows if is_target(d)]
+    skipped = sum(1 for d in rows if str(d.get("status")) == "viewing" and not is_target(d))
+    print(f"113 targets: {len(out)}（自動の内見候補 {skipped} 件は対象外）")
+    return out
 
 
 def fetch_event_times(sb: Any, deal_id: str) -> list[str]:
@@ -744,7 +786,7 @@ def run_link_manual(sb: Any, *, today: dt.date, apply: bool, path: str = MANUAL_
 
     with open(path, encoding="utf-8") as f:
         entries = (yaml.safe_load(f) or {}).get("threads") or []
-    deals = fetch_deals(sb)
+    deals = fetch_candidates(sb)
     counts = {"linked": 0, "already": 0, "unmatched": 0, "ambiguous": 0}
     for e in entries:
         if e.get("skip"):

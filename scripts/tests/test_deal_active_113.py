@@ -52,6 +52,9 @@ class FakeTable:
     def limit(self, *_a):
         return self
 
+    def range(self, *_a):
+        return self
+
     def update(self, payload):
         self.payload = payload
         return self
@@ -106,7 +109,12 @@ class FakeSlack:
 
 class TargetTests(unittest.TestCase):
     def test_statuses(self):
-        self.assertTrue(m.is_target(deal("viewing")))
+        self.assertFalse(m.is_target(deal("viewing")))  # 自動昇格の内見候補は写さない
+        self.assertFalse(m.is_target(deal("viewing", viewing={"step": "candidate"})))
+        self.assertTrue(m.is_target(deal("viewing", viewing={"step": "requested"})))
+        self.assertTrue(m.is_target(deal("viewing", viewing={"verdict": "go"})))
+        self.assertTrue(m.is_target(deal("viewing", slack_deal_active={"ts": "1.2", "state": "active"})))
+        self.assertFalse(m.is_target(deal("viewing", slack_deal_active={"ts": "1.2", "state": "closed"})))
         self.assertTrue(m.is_target(deal("offer")))
         self.assertTrue(m.is_target(deal("loan")))
         self.assertFalse(m.is_target(deal("info")))
@@ -176,7 +184,7 @@ class PlanTests(unittest.TestCase):
 
 class RunTests(unittest.TestCase):
     def test_apply_saves_ts_without_touching_updated_at(self):
-        sb = FakeSB([deal("viewing"), deal("passed") | {"id": "d2"}])
+        sb = FakeSB([deal("viewing", viewing={"step": "requested"}), deal("passed") | {"id": "d2"}])
         slack = FakeSlack()
         c = m.run(sb, slack, today=TODAY, apply=True, only=None)
         self.assertEqual(c["posted"], 1)
@@ -186,12 +194,12 @@ class RunTests(unittest.TestCase):
         self.assertEqual(payload["summary_json"]["slack_deal_active"]["ts"], "111.222")
 
     def test_dry_run_writes_nothing(self):
-        sb = FakeSB([deal("viewing")])
+        sb = FakeSB([deal("viewing", viewing={"step": "requested"})])
         m.run(sb, FakeSlack(), today=TODAY, apply=False, only=None)
         self.assertEqual(sb.updates, [])
 
     def test_max_posts_defers(self):
-        sb = FakeSB([deal("viewing") | {"id": f"d{i}"} for i in range(3)])
+        sb = FakeSB([deal("viewing", viewing={"step": "requested"}) | {"id": f"d{i}"} for i in range(3)])
         c = m.run(sb, FakeSlack(), today=TODAY, apply=False, only=None, max_posts=2)
         self.assertEqual(c["posted"], 2)
         self.assertEqual(c["deferred"], 1)
