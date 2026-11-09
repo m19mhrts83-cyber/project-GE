@@ -544,6 +544,10 @@ def build_message(
     return "\n".join(lines)
 
 
+# 315 の判定・投稿を最後に変えた日。判定や投稿の中身を変えたら更新する（7日間は🟢も出る）
+QUIET_GREEN_SINCE = "2026-10-27"
+
+
 def post_slack(channel: str, text: str) -> int:
     py = _python()
     code, out = _run(
@@ -556,6 +560,9 @@ def post_slack(channel: str, text: str) -> int:
             "315 連携健全性",
             "--text",
             text,
+            # 便りがないのが良い便り（2026-11-10 松野さん）。最終変更から7日を過ぎた🟢は出さない
+            "--quiet-green-after",
+            QUIET_GREEN_SINCE,
         ],
         timeout=60,
     )
