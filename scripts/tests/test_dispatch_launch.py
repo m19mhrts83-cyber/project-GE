@@ -67,6 +67,15 @@ class PlanTests(unittest.TestCase):
         self.assertEqual([(a["no"], a["do"], a.get("agent")) for a in acts],
                          [(2, "launch", "codex"), (3, "launch", "claude_code")])
 
+    def test_fixed_is_not_launched_unless_reassigned(self):
+        fixed = {**IMPL, "title": "314 週次レビュー", "mode": "fixed"}
+        r = rec(fixed, fixed)
+        ok = {1: {"ok": True, "agent": None}, 2: {"ok": True, "agent": "codex"}}
+        acts = {a["no"]: a for a in L.plan(r, ok, {}, running=0)}
+        self.assertEqual(acts[1]["do"], "skip")     # 定期で動くので二重起動しない
+        self.assertIn("固定", acts[1]["why"])
+        self.assertEqual(acts[2]["do"], "launch")   # 「2はCodexで」と明示されたら起動
+
     def test_unapproved_is_ignored(self):
         self.assertEqual(L.plan(rec(IMPL), {}, {}, running=0), [])
 

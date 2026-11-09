@@ -67,6 +67,10 @@ class DispatchTests(unittest.TestCase):
             self.assertEqual(it["decision"]["mode"], "fixed")
             self.assertEqual(it["decision"]["agent"], "claude_code")
             self.assertIn("固定", it["decision"]["reason"])
+            res = d.build([task_md(t, "# TASK — 314 業務品質監査係\n\n| agent_id | 314 |\n| status | queued |\n\n## 依頼\n\n今週のレビュー\n")],
+                          None, rep(), NOW)
+            self.assertIn("✅ でも起動しない", res["text"])
+            self.assertNotIn("そのまま貼る依頼文", res["text"])
 
     # 4. 対外送信の注意
     def test_external_send_note(self):
