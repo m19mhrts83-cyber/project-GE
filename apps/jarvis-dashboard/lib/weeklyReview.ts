@@ -41,7 +41,20 @@ export type RuleCandidate = {
   evidence: (number | string)[];
   status: "hypothesis" | "candidate" | string;
   needs_ai?: boolean;
+  /** どう効かせるかの選択肢（先頭が既定）。古い候補には無いので candidateOptions() で補う */
+  options?: CandidateOption[];
 };
+
+export type CandidateOption = { id: string; label: string; rule_line: string; text: string };
+
+/** 候補の選択肢。週次分析が出していなければ、候補そのものを1つの選択肢にする */
+export function candidateOptions(c: RuleCandidate): CandidateOption[] {
+  const opts = (Array.isArray(c.options) ? c.options : []).filter(
+    (o) => o && typeof o.id === "string" && /^[a-z_]{1,20}$/.test(o.id) && typeof o.text === "string",
+  );
+  if (opts.length) return opts.map((o) => ({ ...o, label: o.label || "このとおり", rule_line: String(o.rule_line || "") }));
+  return [{ id: "main", label: "このとおり", rule_line: c.rule_line, text: c.text }];
+}
 
 export const EMPLOYEE_LABEL: Record<string, string> = {
   "111": "111 パートナー連絡整理",
@@ -229,7 +242,7 @@ export function parseCandidates(value: unknown): { week: string | null; at: stri
   }
 }
 
-export type CandidateState = { decided: string | null; comments: string[] };
+export type CandidateState = { decided: string | null; option: string | null; comments: string[] };
 
 /** ルール候補ごとの、これまでの判断（採用／今回だけ／違う）とひとこと */
 export function candidateStates(reviews: DecisionLite[]): Map<string, CandidateState> {
@@ -238,9 +251,12 @@ export function candidateStates(reviews: DecisionLite[]): Map<string, CandidateS
   for (const r of sorted) {
     const id = String(pl(r).candidate_id || "");
     if (!id) continue;
-    const s = m.get(id) || { decided: null, comments: [] };
-    if (["rule_accept", "rule_once", "rule_reject"].includes(r.action)) s.decided = r.action;
-    if (r.action === "comment" && r.note) s.comments.push(String(r.note));
+    const s = m.get(id) || { decided: null, option: null, comments: [] };
+    if (["rule_accept", "rule_once", "rule_reject"].includes(r.action)) {
+      s.decided = r.action;
+      s.option = r.action === "rule_accept" && pl(r).option_label ? String(pl(r).option_label) : null;
+    }
+    if (r.note) s.comments.push(String(r.note));
     m.set(id, s);
   }
   return m;
