@@ -503,6 +503,12 @@ export default function DraftReviewClient({ id }: { id: string }) {
             <textarea
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && typed.trim()) {
+                  e.preventDefault();
+                  addTyped();
+                }
+              }}
               placeholder={speech.supported ? "マイクで話す（区切るごとに1件ずつ残ります）か、ここに書く" : "ここにダメ出しを書く（このブラウザは音声入力に未対応）"}
               rows={2}
             />
@@ -510,7 +516,7 @@ export default function DraftReviewClient({ id }: { id: string }) {
           {speech.error ? <div className="warn">{speech.error}</div> : null}
           <div className="btn-row">
             <button onClick={addTyped} disabled={!typed.trim()}>
-              書いて追加
+              書いて追加<span className="dr-kbd">⌘/Ctrl+Enter</span>
             </button>
             <button className="primary" onClick={reviseAll} disabled={!!busy || working || !pending.length}>
               まとめて直す{pending.length ? `（${pending.length}件）` : ""}

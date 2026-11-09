@@ -1927,3 +1927,15 @@ kbd { font-family: var(--font-mono); font-size: 10px; border: 1px solid currentC
 .dr-status { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .dr-status.error { color: var(--alert); }
 .dr-status.queued, .dr-status.running { color: var(--accent); }
+
+/* ---- 下書きを直す: PC では本文を左、ダメ出し欄を右に固定 ---- */
+.dr-kbd { display: none; margin-left: 6px; font-size: 11px; opacity: 0.6; }
+@media (min-width: 1024px) {
+  main:has(.list.dr) { max-width: 1160px; }
+  .list.dr { display: grid; grid-template-columns: minmax(0, 1fr) 380px; column-gap: 20px; align-items: start; }
+  .list.dr > * { grid-column: 1; }
+  .list.dr > .dr-dock { grid-column: 2; grid-row: 1 / span 8; position: sticky; top: 16px; bottom: auto; }
+  .list.dr > .dr-dock textarea { min-height: 120px; }
+  .dr-kbd { display: inline; }
+  .dr-paras { font-size: 16px; line-height: 1.9; }
+}
