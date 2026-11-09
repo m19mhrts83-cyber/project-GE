@@ -26,6 +26,11 @@ on:
         description: "1回で新しく立てるスレッドの上限"
         required: false
         default: "10"
+      link_manual:
+        description: "手で立てたスレッドを案件に結びつける（config/deal_active_113_manual.yaml）"
+        required: false
+        type: boolean
+        default: false
       ask:
         description: "「どうしますか？」カード（auto=月曜のみ）"
         required: false
@@ -51,7 +56,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install deps
-        run: pip install -q supabase
+        run: pip install -q supabase pyyaml
 
       - name: Sync KURASHIFT -> #deal-active
         env:
@@ -61,6 +66,7 @@ jobs:
           DEAL_ACTIVE_113_ACTION_TOKEN: ${{ secrets.DEAL_ACTIVE_113_ACTION_TOKEN }}
           PROPERTY_GATE_ACTION_TOKEN: ${{ secrets.PROPERTY_GATE_ACTION_TOKEN }}
           ASK: ${{ github.event.inputs.ask || 'auto' }}
+          LINK_MANUAL: ${{ github.event.inputs.link_manual || 'false' }}
           APPLY: ${{ github.event.inputs.apply || 'false' }}
           DEAL_ID: ${{ github.event.inputs.deal_id || '' }}
           MAX_POSTS: ${{ github.event.inputs.max_posts || '10' }}
@@ -69,4 +75,5 @@ jobs:
           ARGS=(--max-posts "$MAX_POSTS" --ask "$ASK")
           if [[ "$APPLY" == "true" ]]; then ARGS+=(--apply); fi
           if [[ -n "$DEAL_ID" ]]; then ARGS+=(--deal-id "$DEAL_ID"); fi
+          if [[ "$LINK_MANUAL" == "true" ]]; then ARGS+=(--link-manual); fi
           python scripts/kurashift_deal_active_113.py "${ARGS[@]}"

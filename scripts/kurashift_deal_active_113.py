@@ -238,14 +238,23 @@ def plan_actions(
         return []
     key = stage_key(deal)
     moved_day = moved.astimezone(JST).date().isoformat() if moved else today.isoformat()
+    user_owned = st.get("posted_by") == "user"  # 手で立てたスレッド。Bot は親を書き換えられない
     acts: list[dict[str, Any]] = []
     if not st.get("ts"):
         acts.append({"kind": "post"})
     elif st.get("stage_key") != key:
-        acts.append({"kind": "update"})
+        if not user_owned:
+            acts.append({"kind": "update"})
         acts.append(
             {"kind": "reply", "text": f"{today.month}/{today.day} {stage_label(deal)}になりました"}
         )
+    elif st.get("state") == "dormant" and st.get("last_moved_at") != moved_day:
+        # 休眠中に動きがあった → 親を通常表示に戻す
+        if not user_owned:
+            acts.append({"kind": "update"})
+        acts.append({"kind": "reply", "text": f"{today.month}/{today.day} 動きがあったので休眠を解きました"})
+    elif should_go_dormant(st, today):
+        acts.append({"kind": "dormant", "user_owned": user_owned})
     vd = viewing_date(deal)
     tomorrow = (today + dt.timedelta(days=1)).isoformat()
     if (
@@ -257,6 +266,60 @@ def plan_actions(
     if not acts and st.get("last_moved_at") == moved_day:
         return []
     acts.append({"kind": "save", "stage_key": key, "last_moved_at": moved_day})
+    return acts
+
+
+DORMANT_ASKS = 2
+DORMANT_IDLE_DAYS = 30
+DELETE_AFTER_DAYS = 7
+
+
+def should_go_dormant(st: dict[str, Any], today: dt.date) -> bool:
+    """「どうしますか？」に2回答えがなく、30日動きがない。KURASHIFT の status は変えない。"""
+    if st.get("state") not in ("needs_check",):
+        return False
+    if int(st.get("asked_count") or 0) < DORMANT_ASKS:
+        return False
+    try:
+        moved = dt.date.fromisoformat(str(st.get("last_moved_at"))[:10])
+    except ValueError:
+        return False
+    return (today - moved).days >= DORMANT_IDLE_DAYS
+
+
+def build_parent_dormant(deal: dict[str, Any]) -> dict[str, Any]:
+    url = deal_url(str(deal["id"]))
+    text = f"💤 *{title_line(deal)}*　休眠（2回お聞きして返事がなく30日動きなし）\n<{url}|KURASHIFT で開く> · 動きがあれば自動で戻ります"
+    return {"text": f"休眠: {title_line(deal)}", "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": text}}]}
+
+
+def build_parent_closed(deal: dict[str, Any], st: dict[str, Any]) -> dict[str, Any]:
+    reason = "見送り" if st.get("closed_reason") == "pass" else "完了"
+    closed = str(st.get("closed_at") or "")
+    try:
+        gone = (dt.date.fromisoformat(closed) + dt.timedelta(days=DELETE_AFTER_DAYS)).isoformat()
+    except ValueError:
+        gone = "—"
+    text = f"~{title_line(deal)}~\nクローズ（{reason}・{closed}）。{gone} にこのスレッドは消えます。KURASHIFT には残ります。"
+    return {"text": f"クローズ: {title_line(deal)}", "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": text}}]}
+
+
+def plan_closed(deal: dict[str, Any], today: dt.date) -> list[str]:
+    """ボタンで閉じた案件: 表示を「クローズ」にし、7日後に消す。手で立てたスレッドは消さない。"""
+    st = sj_of(deal).get(SJ_KEY)
+    if not isinstance(st, dict) or st.get("state") != "closed" or not st.get("ts"):
+        return []
+    if st.get("deleted_at"):
+        return []
+    acts = []
+    if not st.get("closed_shown"):
+        acts.append("show_closed")
+    try:
+        due = dt.date.fromisoformat(str(st.get("closed_at"))[:10]) + dt.timedelta(days=DELETE_AFTER_DAYS)
+    except ValueError:
+        return acts
+    if today >= due and st.get("posted_by") != "user":
+        acts.append("delete")
     return acts
 
 
@@ -283,6 +346,9 @@ def next_state(
                     new["state"] = "active"
         if a["kind"] == "checklist":
             new["checklist_sent_for"] = a["date"]
+        if a["kind"] == "dormant":
+            new["state"] = "dormant"
+            new["dormant_at"] = today.isoformat()
     new["synced_at"] = today.isoformat()
     return new
 
@@ -451,6 +517,23 @@ class Slack:
     def update(self, ts: str, payload: dict[str, Any]) -> None:
         self._call("chat.update", {"ts": ts, **payload})
 
+    def delete(self, ts: str) -> None:
+        body = {"ts": ts}
+        if self.dry_run:
+            print(f"# dry-run chat.delete ts={ts}")
+            return
+        self._call("chat.delete", body)
+
+    def replies(self, ts: str) -> list[dict[str, Any]]:
+        """スレッド内の返信（Bot 自身のものだけ消すために使う）。"""
+        if self.dry_run:
+            return []
+        url = f"https://slack.com/api/conversations.replies?channel={self.channel}&ts={ts}&limit=200"
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {self.token}"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            j = json.loads(resp.read().decode("utf-8", errors="replace"))
+        return [m for m in (j.get("messages") or []) if m.get("ts") != ts] if j.get("ok") else []
+
 
 def fetch_deals(sb: Any) -> list[dict[str, Any]]:
     cols = "id, title, status, area, price_man, yield_pct, updated_at, created_at, summary_json"
@@ -533,7 +616,7 @@ def run(
     only: str | None,
     max_posts: int = 10,
 ) -> dict[str, int]:
-    counts = {"target": 0, "posted": 0, "updated": 0, "checklist": 0, "saved": 0, "deferred": 0, "error": 0}
+    counts = {"target": 0, "posted": 0, "updated": 0, "checklist": 0, "saved": 0, "deferred": 0, "dormant": 0, "missing": 0, "error": 0}
     for deal in fetch_deals(sb):
         if only and str(deal["id"]) != only:
             continue
@@ -562,6 +645,12 @@ def run(
                 elif k == "checklist":
                     slack.post({"text": build_checklist(deal)}, thread_ts=str(ts))
                     counts["checklist"] += 1
+                elif k == "dormant":
+                    if a.get("user_owned"):
+                        slack.post({"text": "💤 休眠にしました（2回お聞きして返事がなく30日動きなし）。動きがあれば戻ります。"}, thread_ts=str(ts))
+                    else:
+                        slack.update(str(ts), build_parent_dormant(deal))
+                    counts["dormant"] = counts.get("dormant", 0) + 1
             new = next_state(st, acts, ts=None if ts == "dry-run" else ts, today=today)
             if apply:
                 save_state(sb, deal, new)
@@ -569,8 +658,125 @@ def run(
                 print(f"# dry-run save {did}: {json.dumps(new, ensure_ascii=False)}")
             counts["saved"] += 1
         except Exception as e:  # 1件の失敗で全体を止めない
+            if "message_not_found" in str(e):
+                # Slack で手で消された。KURASHIFT は変えず、聞くだけ（#consult は実装④で）
+                counts["missing"] = counts.get("missing", 0) + 1
+                if apply:
+                    save_state(sb, deal, {**st, "state": "missing", "missing_at": today.isoformat()})
+                print(f"⚠️ {did}: 親メッセージが消されています（KURASHIFT も見送りにするかは松野さん判断）")
+                continue
             counts["error"] += 1
             print(f"❌ {did}: {e}", file=sys.stderr)
+    return counts
+
+
+def fetch_closed(sb: Any) -> list[dict[str, Any]]:
+    cols = "id, title, status, area, price_man, yield_pct, updated_at, summary_json"
+    return (
+        sb.table("kurashift_re_deals")
+        .select(cols)
+        .filter("summary_json->slack_deal_active->>state", "eq", "closed")
+        .execute()
+        .data
+        or []
+    )
+
+
+def run_closed(sb: Any, slack: "Slack", *, today: dt.date, apply: bool) -> dict[str, int]:
+    counts = {"closed_shown": 0, "deleted": 0, "error": 0}
+    for deal in fetch_closed(sb):
+        st = dict(sj_of(deal).get(SJ_KEY) or {})
+        acts = plan_closed(deal, today)
+        if not acts:
+            continue
+        ts = str(st["ts"])
+        try:
+            for k in acts:
+                if k == "show_closed":
+                    if st.get("posted_by") == "user":
+                        slack.post({"text": build_parent_closed(deal, st)["text"]}, thread_ts=ts)
+                    else:
+                        slack.update(ts, build_parent_closed(deal, st))
+                    st["closed_shown"] = True
+                    counts["closed_shown"] += 1
+                elif k == "delete":
+                    for r in slack.replies(ts):
+                        if r.get("bot_id"):
+                            try:
+                                slack.delete(str(r["ts"]))
+                            except Exception:
+                                pass  # 人の返信は Bot では消せない（残る）
+                    slack.delete(ts)
+                    st["deleted_at"] = today.isoformat()
+                    counts["deleted"] += 1
+            if apply:
+                save_state(sb, deal, st)
+            else:
+                print(f"# dry-run closed-save {deal['id']}: {json.dumps(st, ensure_ascii=False)}")
+        except Exception as e:
+            counts["error"] += 1
+            print(f"❌ closed {deal['id']}: {e}", file=sys.stderr)
+    return counts
+
+
+# ------------------------------------------------------------------ 手で立てたスレッドの紐付け
+
+MANUAL_LINKS = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "deal_active_113_manual.yaml"
+)
+
+
+def match_manual(entry: dict[str, Any], deals: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    keys = [str(k) for k in (entry.get("match") or []) if str(k).strip()]
+    if not keys:
+        return []
+    out = []
+    for d in deals:
+        blob = f"{d.get('title') or ''} {d.get('area') or ''}"
+        if all(k in blob for k in keys):
+            out.append(d)
+    return out
+
+
+def run_link_manual(sb: Any, *, today: dt.date, apply: bool, path: str = MANUAL_LINKS) -> dict[str, int]:
+    """config の手作業スレッドを KURASHIFT の案件に結びつける。1件に決まったものだけ。"""
+    import yaml  # noqa: PLC0415
+
+    with open(path, encoding="utf-8") as f:
+        entries = (yaml.safe_load(f) or {}).get("threads") or []
+    deals = fetch_deals(sb)
+    counts = {"linked": 0, "already": 0, "unmatched": 0, "ambiguous": 0}
+    for e in entries:
+        if e.get("skip"):
+            continue
+        hits = match_manual(e, deals)
+        if len(hits) != 1:
+            key = "unmatched" if not hits else "ambiguous"
+            counts[key] += 1
+            print(f"⚠️ {e.get('label')}: {key}（候補 {len(hits)} 件）")
+            continue
+        d = hits[0]
+        st = sj_of(d).get(SJ_KEY) or {}
+        if st.get("ts"):
+            counts["already"] += 1
+            continue
+        new = {
+            "channel": DEAL_ACTIVE_CHANNEL,
+            "ts": str(e["ts"]),
+            "posted_by": "user",
+            "state": "active",
+            "stage_key": stage_key(d),
+            "last_moved_at": str(e.get("posted_at") or today.isoformat()),
+            "next_check_at": today.isoformat(),  # 次の「どうしますか？」に載せる
+            "asked_count": 0,
+            "closed_at": None,
+            "linked_at": today.isoformat(),
+        }
+        if apply:
+            save_state(sb, d, new)
+        else:
+            print(f"# dry-run link {e.get('label')} -> {d['id']}: {json.dumps(new, ensure_ascii=False)}")
+        counts["linked"] += 1
     return counts
 
 
@@ -585,6 +791,7 @@ def main(argv: list[str] | None = None) -> int:
         default="auto",
         help="「どうしますか？」カード: auto=月曜のみ / always / never",
     )
+    ap.add_argument("--link-manual", action="store_true", help="config の手作業スレッドを案件に結びつけてから同期する")
     ap.add_argument("--today", help="基準日 YYYY-MM-DD（試し用）")
     args = ap.parse_args(argv)
 
@@ -594,6 +801,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     channel = (os.environ.get("DEAL_ACTIVE_CHANNEL") or DEAL_ACTIVE_CHANNEL).strip()
     today = dt.date.fromisoformat(args.today) if args.today else dt.datetime.now(JST).date()
+
+    if args.link_manual:
+        lc = run_link_manual(sb_client(), today=today, apply=args.apply)
+        print("113 link-manual: " + " ".join(f"{k}={v}" for k, v in lc.items()))
 
     counts = run(
         sb_client(),
@@ -606,6 +817,9 @@ def main(argv: list[str] | None = None) -> int:
     mode = "apply" if args.apply else "dry-run"
     print(f"113 deal-active {mode} {today}: " + " ".join(f"{k}={v}" for k, v in counts.items()))
     err = counts["error"]
+    cc = run_closed(sb_client(), Slack(token, channel, dry_run=not args.apply), today=today, apply=args.apply)
+    print("113 closed: " + " ".join(f"{k}={v}" for k, v in cc.items()))
+    err += cc["error"]
     if args.ask == "always" or (args.ask == "auto" and today.weekday() == 0):
         secret = action_secret() or ("dry-run-secret" if not args.apply else "")
         if not secret:

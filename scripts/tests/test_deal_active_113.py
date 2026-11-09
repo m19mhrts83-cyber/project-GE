@@ -45,6 +45,10 @@ class FakeTable:
     def order(self, *_a, **_k):
         return self
 
+    def filter(self, col, op, val):
+        self.filters.append(("json", col, val))
+        return self
+
     def limit(self, *_a):
         return self
 
@@ -64,6 +68,9 @@ class FakeTable:
         if self.name == "kurashift_re_deals":
             rows = self.sb.deals
             for kind, col, val in self.filters:
+                if kind == "json":  # summary_json->slack_deal_active->>state
+                    rows = [x for x in rows if ((x.get("summary_json") or {}).get("slack_deal_active") or {}).get("state") == val]
+                    continue
                 rows = [x for x in rows if (x.get(col) in val if kind == "in" else x.get(col) == val)]
             r.data = rows
         else:
@@ -89,6 +96,12 @@ class FakeSlack:
 
     def update(self, ts, payload):
         self.calls.append(("update", ts, payload))
+
+    def delete(self, ts):
+        self.calls.append(("delete", ts, None))
+
+    def replies(self, ts):
+        return [{"ts": "r1", "bot_id": "B1"}, {"ts": "r2", "user": "U1"}]
 
 
 class TargetTests(unittest.TestCase):
@@ -226,6 +239,80 @@ class AskTests(unittest.TestCase):
         self.assertEqual(c["asked"], 1)
         self.assertEqual(len(slack.calls), 1)
         self.assertEqual(len(sb.updates), 1)
+
+
+class LifecycleTests(unittest.TestCase):
+    def test_dormant_after_two_asks_and_30_days(self):
+        st = {"ts": "1", "stage_key": "viewing:candidate", "state": "needs_check", "asked_count": 2, "last_moved_at": "2026-10-01"}
+        moved = m.parse_ts("2026-10-01T10:00:00+09:00")
+        kinds = [a["kind"] for a in m.plan_actions(deal(slack_deal_active=st), today=TODAY, moved=moved)]
+        self.assertIn("dormant", kinds)
+        st1 = dict(st, asked_count=1)
+        kinds1 = [a["kind"] for a in m.plan_actions(deal(slack_deal_active=st1), today=TODAY, moved=moved)]
+        self.assertNotIn("dormant", kinds1)
+
+    def test_dormant_wakes_on_move(self):
+        st = {"ts": "1", "stage_key": "viewing:candidate", "state": "dormant", "last_moved_at": "2026-10-01"}
+        acts = m.plan_actions(deal(slack_deal_active=st), today=TODAY, moved=m.parse_ts("2026-11-05T10:00:00+09:00"))
+        self.assertEqual([a["kind"] for a in acts][:2], ["update", "reply"])
+        self.assertEqual(m.next_state(st, acts, ts=None, today=TODAY)["state"], "active")
+
+    def test_user_owned_thread_is_never_rewritten(self):
+        st = {"ts": "1", "stage_key": "viewing:candidate", "posted_by": "user"}
+        d = deal(viewing={"step": "scheduled"}, slack_deal_active=st)
+        kinds = [a["kind"] for a in m.plan_actions(d, today=TODAY, moved=None)]
+        self.assertNotIn("update", kinds)
+        self.assertIn("reply", kinds)
+
+    def test_closed_shows_then_deletes_after_7_days(self):
+        st = {"ts": "1", "state": "closed", "closed_at": "2026-11-01", "closed_reason": "pass"}
+        self.assertEqual(m.plan_closed(deal(slack_deal_active=st), dt.date(2026, 11, 2)), ["show_closed"])
+        st2 = dict(st, closed_shown=True)
+        self.assertEqual(m.plan_closed(deal(slack_deal_active=st2), dt.date(2026, 11, 7)), [])
+        self.assertEqual(m.plan_closed(deal(slack_deal_active=st2), dt.date(2026, 11, 8)), ["delete"])
+        self.assertEqual(m.plan_closed(deal(slack_deal_active=dict(st2, deleted_at="2026-11-08")), dt.date(2026, 11, 9)), [])
+
+    def test_user_owned_closed_is_kept(self):
+        st = {"ts": "1", "state": "closed", "closed_at": "2026-11-01", "closed_shown": True, "posted_by": "user"}
+        self.assertEqual(m.plan_closed(deal(slack_deal_active=st), dt.date(2026, 11, 20)), [])
+
+    def test_run_closed_deletes_only_bot_messages(self):
+        st = {"ts": "1", "state": "closed", "closed_at": "2026-10-01", "closed_shown": True}
+        sb = FakeSB([deal("passed", slack_deal_active=st)])
+        slack = FakeSlack()
+        c = m.run_closed(sb, slack, today=TODAY, apply=True)
+        self.assertEqual(c["deleted"], 1)
+        self.assertEqual([x[1] for x in slack.calls if x[0] == "delete"], ["r1", "1"])
+        self.assertEqual(sb.updates[0][1]["summary_json"]["slack_deal_active"]["deleted_at"], TODAY.isoformat())
+
+
+class LinkManualTests(unittest.TestCase):
+    def test_config_matches_real_file(self):
+        import yaml
+
+        with open(m.MANUAL_LINKS, encoding="utf-8") as f:
+            entries = yaml.safe_load(f)["threads"]
+        for e in entries:
+            self.assertRegex(str(e["ts"]), r"^\d{10}\.\d{6}$")
+
+    def test_link_only_unique_match(self):
+        import tempfile, os
+
+        cfg = "threads:\n  - {label: a, ts: '1.1', match: ['西吉田']}\n  - {label: b, ts: '2.2', match: ['市']}\n  - {label: c, ts: '3.3', skip: true}\n"
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False, encoding="utf-8") as f:
+            f.write(cfg)
+        try:
+            d1 = deal("viewing") | {"id": "d1", "title": "瀬戸市西吉田町 戸建"}
+            d2 = deal("viewing") | {"id": "d2", "title": "碧南市幸町 戸建"}
+            sb = FakeSB([d1, d2])
+            c = m.run_link_manual(sb, today=TODAY, apply=True, path=f.name)
+        finally:
+            os.unlink(f.name)
+        self.assertEqual(c["linked"], 1)
+        self.assertEqual(c["ambiguous"], 1)
+        st = sb.updates[0][1]["summary_json"]["slack_deal_active"]
+        self.assertEqual(st["posted_by"], "user")
+        self.assertEqual(st["next_check_at"], TODAY.isoformat())
 
 
 if __name__ == "__main__":
