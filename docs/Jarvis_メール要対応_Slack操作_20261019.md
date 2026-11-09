@@ -161,3 +161,11 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - 返信送信時は `payload.slack_ma_action` に `edit_ratio`（0=そのまま〜1=書き直し）・`decide_ms`（モーダルを開いてから送るまで）・`assist`（誤字脱字チェック／見直し／資料検索の回数）・`draft_source` を入れる → トリガーが owner_decisions.payload に写す
 - 理由タグは後から最新の判断行の `payload.reason_tags` に付く（`lib/maDecisionLog.ts`）
 - 判断後のカードに「✓ 判断ログに記録（今週N件）」を出す（月曜 0:00 JST 起点、surface=triage*）
+
+## 未判断（unseen）と次点（near miss）（2026-11-09）
+
+- 平日 21:00 JST に `jarvis-mail-action-unseen.yml` → `scripts/jarvis_mail_action_unseen.py`。Slack に出して 6 時間以上たっても何も押されていない pending を、owner_decisions に `action=unseen`（outcome=none）で1件ずつ残す。NG（skipped）には混ぜない
+  - 1回出したら1回だけ数える（`payload.slack_ma_unseen_at` / `slack_ma_unseen_count`）。出し直したらその回の分をもう1回
+  - 理由は聞かない。週次レビューで「未判断N件、理由を1つだけ」聞く材料
+- 投稿のとき、枠（既定5件）に惜しくも入らなかった次点 3 件に `payload.slack_ma_near_miss`（score・理由・順位）を付ける（`JARVIS_MAIL_ACTION_NEAR_MISS=0` で止める）
+  - ループウェア `/misses?surface=triage` に「惜しくも入らなかった（次点）」として当日から出る。判断は surface=`triage_miss`（wrong=要対応だった／good=出さなくてよい）

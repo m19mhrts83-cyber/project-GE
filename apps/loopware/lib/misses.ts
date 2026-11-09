@@ -3,11 +3,12 @@
  * 本当は要対応だったものを拾い直す。判断は surface=triage_miss で残す。
  *   - 送り手の自動見送り（同じ送り手を2回見送った → 以後自動で見送り）
  *   - Slack に出なかったまま 2 日たった未判断
+ *   - Slack の枠に惜しくも入らなかった次点（投稿スクリプトが slack_ma_near_miss を付ける。当日から出す）
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toCard, type DeskCard, type TriageRow } from "@/lib/deskCore";
 
-export type MissCard = DeskCard & { why: "auto_skip" | "not_surfaced" };
+export type MissCard = DeskCard & { why: "auto_skip" | "not_surfaced" | "near_miss" };
 
 const COLS =
   "id,status,subject,partner,from_email,lane,kind,summary,draft_text,original_body,received_at,priority,payload,updated_at";
@@ -32,6 +33,10 @@ export async function loadMisses(sb: SupabaseClient, limit = 20): Promise<MissCa
   for (const r of (pend.data || []) as TriageRow[]) {
     const pl = obj(r.payload);
     if (pl.slack_ma_posted_at || pl.loopware_miss_judged_at || pl.loopware_hesitated_at) continue;
+    if (pl.slack_ma_near_miss) {
+      out.push({ ...toCard(r), why: "near_miss" });
+      continue;
+    }
     const t = Date.parse(String(r.received_at || ""));
     if (!Number.isFinite(t) || t > twoDays) continue;
     out.push({ ...toCard(r), why: "not_surfaced" });
