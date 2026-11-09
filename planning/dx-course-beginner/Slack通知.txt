@@ -1,0 +1,11 @@
+【引継ぎ】713 DX教育・コーデックス
+ミスレモン宛て／要ボス：なし
+
+今村さん向けDX講座の原意・変更・残作業を整理。
+月30分／メール返信・Gmail API・Cursor。
+
+正本：planning/dx-course-beginner/TASK.md
+受取口：to_MissLemon／DX講座
+
+未コミット・未公開。NotebookLM生成は未実施。
+次：正本を確認し、受領記録→教育案レビュー。
