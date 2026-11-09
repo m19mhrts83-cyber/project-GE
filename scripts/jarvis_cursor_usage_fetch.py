@@ -46,7 +46,10 @@ async () => {
   const out = {};
   const get = async (url, opts) => {
     try {
-      const r = await fetch(url, Object.assign({credentials: 'include'}, opts || {}));
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), 10000);  // 1 回 10 秒で打ち切る（ログイン待ちの固まり防止）
+      const r = await fetch(url, Object.assign({credentials: 'include', signal: ac.signal}, opts || {}));
+      clearTimeout(t);
       if (!r.ok) return {status: r.status};
       return {status: r.status, json: await r.json()};
     } catch (e) { return {status: -1}; }
@@ -182,15 +185,19 @@ def _wait_cdp(port: int, timeout: float = 30) -> bool:
 
 
 def _poll_pages(ctx) -> dict[str, Any] | None:
-    """cursor.com を開いているタブの中で読む（ログイン画面中は読まない）。"""
+    """cursor.com を開いているタブの中で読む（ログイン画面中は読まない）。200 のタブを優先。"""
+    last = None
     for pg in ctx.pages:
         url = pg.url or ""
         if url.startswith("https://cursor.com/") and "/login" not in url:
             try:
-                return pg.evaluate(FETCH_JS)
+                got = pg.evaluate(FETCH_JS)
             except Exception:
                 continue
-    return None
+            if statuses(got)["summary"] == 200:
+                return got
+            last = got
+    return last
 
 
 def fetch_raw(headless: bool, wait_login_sec: int = 0) -> dict[str, Any]:
@@ -208,6 +215,12 @@ def fetch_raw(headless: bool, wait_login_sec: int = 0) -> dict[str, Any]:
         with sync_playwright() as p:
             browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
             ctx = browser.contexts[0]
+            if not wait_login_sec:
+                # 画面なしの Chrome は起動引数の URL を開かないことがあるので、自分で開く
+                try:
+                    ctx.new_page().goto(DASHBOARD_URL, wait_until="domcontentloaded", timeout=60_000)
+                except Exception:
+                    pass
             deadline = time.time() + max(wait_login_sec, 20)
             raw: dict[str, Any] = {"summary": {"status": 0}, "grok": {"status": 0}}
             if wait_login_sec:
@@ -220,14 +233,22 @@ def fetch_raw(headless: bool, wait_login_sec: int = 0) -> dict[str, Any]:
                     if statuses(raw)["summary"] == 200:
                         break
                 time.sleep(3)
-            browser.close()
+            # 強制終了だと更新されたログイン Cookie がディスクに書かれず、次回ログアウト扱いになる。
+            # Chrome 自身に閉じさせて保存させる
+            try:
+                browser.new_browser_cdp_session().send("Browser.close")
+            except Exception:
+                pass
             return raw
     finally:
-        proc.terminate()
         try:
-            proc.wait(timeout=10)
+            proc.wait(timeout=20)
         except subprocess.TimeoutExpired:
-            proc.kill()
+            proc.terminate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
 
 
 def main() -> int:
