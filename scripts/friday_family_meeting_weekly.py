@@ -57,6 +57,8 @@ STATE_PATH = REPO / ".jarvis_state" / "friday_family_meeting_weekly.json"
 LOCK_PATH = REPO / ".jarvis_state" / "friday_family_meeting_weekly.lock"
 PY = Path(sys.executable)
 JST = timezone(timedelta(hours=9))
+# Slack 通知で「715」が何の社員か分かるように添える一言
+ROLE_LINE = "715＝家族会議週次係（日曜の家族会議の議事録とインフォを Notion の当日ページに入れる係）"
 
 FAMILY_HINTS = (
     "家族",
@@ -643,7 +645,7 @@ def slack(channel: str, text: str) -> None:
                 "--channel",
                 channel,
                 "--username",
-                "FRIDAY 715",
+                "FRIDAY 715 家族会議週次係",
                 "--text",
                 text,
             ],
@@ -667,6 +669,12 @@ FAILURE_RULES: tuple[tuple[str, str, str, bool], ...] = (
         r"のページがありません",
         "Notion の当日ページが未作成",
         "松野さん: 前週ページを複製して日付を {slash} に → 再実行",
+        True,
+    ),
+    (
+        r"クレジット|(?i:insufficient[ _-]?credit|out of credit|credits? (?:exhausted|balance))",
+        "Genspark のクレジット不足（gsk は API 利用扱いで残高を使う）",
+        "松野さん: Genspark のクレジットを補充（またはプラン確認）→再実行",
         True,
     ),
     (
@@ -760,7 +768,7 @@ def report_failure(target: Date, err: str, *, retry: bool, stopped: bool = False
         next_line = "- 次: 月曜07:00 自動リトライ（直らなければ #ai-hub に【要手当て】）"
     slack(
         "ops",
-        f"【ops】715 家族会議週次 {iso} {kind}\n"
+        f"【ops】715 家族会議週次 {iso} {kind}\n{ROLE_LINE}\n"
         + (f"- 会議: {ent.get('meeting_title')}\n" if ent.get("meeting_title") else "")
         + f"- 原因: {info['cause']}\n"
         f"- エラー: {short}\n"
@@ -774,6 +782,7 @@ def report_failure(target: Date, err: str, *, retry: bool, stopped: bool = False
         slack(
             "hub",
             f"【要手当て】715 家族会議週次 {iso} — Notion へ議事録・インフォが入っていません\n"
+            f"{ROLE_LINE}\n"
             f"- 原因: {info['cause']}\n"
             f"- 進み: {_progress_line(ent)}\n"
             f"- 次: {info['action']}\n"
@@ -895,7 +904,7 @@ def run(args: argparse.Namespace) -> int:
 
         slack(
             "report",
-            f"【報告】715 家族会議週次 {iso}\n"
+            f"【報告】715 家族会議週次 {iso}\n{ROLE_LINE}\n"
             f"- 会議: {shaped.get('title')}（{shaped.get('duration_human')}）\n"
             f"- Notion: {result['page_url']}\n"
             f"- 挿入: インフォ{'済' if not result['have_info'] else '既存'} → 議事録{'済' if not result['have_minutes'] else '既存'}"
