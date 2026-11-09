@@ -15,6 +15,8 @@ set +a
 
 # 下書き見直しキュー
 "$PY" -u "${REPO_DIR}/scripts/jarvis_triage_cursor_revise_worker.py" "$@" || true
+# Nody「下書きを直す」のまとめて直す（声のダメ出し → Cursor で書き直し。従量課金 API は使わない）
+"$PY" -u "${REPO_DIR}/scripts/jarvis_draft_revise_worker.py" "$@" || true
 # タスク／ウォッチ「聞く」の Mac キュー
 "$PY" -u "${REPO_DIR}/scripts/jarvis_card_cursor_ask_worker.py" "$@" || true
 # Ops Fail のローカル修復キュー（Cloud 上限時の受け皿）
