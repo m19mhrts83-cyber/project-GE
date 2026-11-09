@@ -1,6 +1,6 @@
 # 講座テーマ提案ループウェア（試作）: 神大家 Q&A の DB を読み取り専用で集計する。
 # - 必要な列だけ PostgREST で読み、集計して JSON 1件にする（通信量対策）
-# - 結果は公開鍵で暗号化してログに出す。会員の質問文はログに平文で残さない
+# - 結果は公開鍵で暗号化し、暗号文だけをブランチにコミットする（平文はどこにも残さない）
 # - 試作用。運営の了承後に週次化する
 name: course-theme aggregate (prototype)
 
@@ -13,7 +13,7 @@ on:
       - .github/workflows/course-theme-aggregate.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   aggregate:
@@ -37,7 +37,11 @@ jobs:
           openssl enc -aes-256-cbc -pbkdf2 -salt -in r.gz -out r.enc -pass file:k.bin
           openssl pkeyutl -encrypt -pubin -inkey scripts/course_theme/pubkey.pem \
             -pkeyopt rsa_padding_mode:oaep -in k.bin -out k.enc
-          echo "---KEY---"; base64 -w0 k.enc; echo
-          echo "---DATA---"; base64 -w0 r.enc; echo
-          echo "---END---"
+          mkdir -p scripts/course_theme/out
+          mv k.enc r.enc scripts/course_theme/out/
           rm -f resp.json r.gz k.bin
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f scripts/course_theme/out/k.enc scripts/course_theme/out/r.enc
+          git commit -m "course-theme: 暗号化済み集計結果 [skip ci]" || exit 0
+          git push origin HEAD:${GITHUB_REF_NAME}
