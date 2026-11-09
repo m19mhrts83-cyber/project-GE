@@ -772,11 +772,19 @@ def match_manual(entry: dict[str, Any], deals: list[dict[str, Any]]) -> list[dic
     keys = [str(k) for k in (entry.get("match") or []) if str(k).strip()]
     if not keys:
         return []
+    price = entry.get("price_man")
     out = []
     for d in deals:
         blob = f"{d.get('title') or ''} {d.get('area') or ''}"
-        if all(k in blob for k in keys):
-            out.append(d)
+        if not all(k in blob for k in keys):
+            continue
+        if price is not None:
+            try:
+                if abs(float(d.get("price_man") or -1) - float(price)) > 1:
+                    continue
+            except (TypeError, ValueError):
+                continue
+        out.append(d)
     return out
 
 
@@ -791,11 +799,16 @@ def run_link_manual(sb: Any, *, today: dt.date, apply: bool, path: str = MANUAL_
     for e in entries:
         if e.get("skip"):
             continue
-        hits = match_manual(e, deals)
+        hits = [d for d in deals if d.get("id") == e["deal_id"]] if e.get("deal_id") else match_manual(e, deals)
+        if len(hits) > 1 and e.get("pick") == "newest":
+            # 同じ物件の重複登録。作成日時が一番新しい案件に結ぶ（2026-11-09 松野さん）
+            hits = [max(hits, key=lambda d: str(d.get("created_at") or ""))]
         if len(hits) != 1:
             key = "unmatched" if not hits else "ambiguous"
             counts[key] += 1
             print(f"⚠️ {e.get('label')}: {key}（候補 {len(hits)} 件）")
+            for h in hits[:10]:
+                print(f"    - {h.get('id')} {h.get('status')} {h.get('price_man')}万 {str(h.get('title') or '')[:60]}")
             continue
         d = hits[0]
         st = sj_of(d).get(SJ_KEY) or {}
