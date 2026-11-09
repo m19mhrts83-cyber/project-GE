@@ -163,6 +163,8 @@ def plan(record: dict[str, Any], approvals: dict[int, dict[str, Any]], state: di
         base = {"no": n, "key": key, "agent": agent, "item": it}
         if it.get("mode") == "keep":
             actions.append({**base, "do": "skip", "why": "現担当のまま。起動しない"})
+        elif it.get("mode") == "fixed" and not ap.get("agent"):
+            actions.append({**base, "do": "skip", "why": "固定（定期で動く）。二重に動かさないため起動しない"})
         elif is_risky(it):
             actions.append({**base, "do": "reply", "why": "お金・対外送信・本番・削除を含むので自動起動しない。了承待ち",
                             "text": it.get("request_text") or ""})

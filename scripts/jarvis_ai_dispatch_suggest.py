@@ -302,7 +302,9 @@ def render(items: list[dict[str, Any]], usage: dict[str, dict[str, Any]], period
             lines.append("   外した: " + "、".join(d["excluded"]))
         for n in it["notes"]:
             lines.append(f"   注意: {n}")
-        if d["mode"] in ("rule", "fixed") and d.get("agent") and not it["empty"]:
+        if d["mode"] == "fixed":
+            lines.append("   ✅ でも起動しない（定期で動く。臨時に動かすときは番号と担当を返信）")
+        if d["mode"] == "rule" and d.get("agent") and not it["empty"]:
             asks.append(f"{i}. {request_text(t, d)}")
         lines.append("")
     lines.append(f"使用量: {usage_line(usage)}")
@@ -312,7 +314,7 @@ def render(items: list[dict[str, Any]], usage: dict[str, dict[str, Any]], period
         lines.extend(asks)
         lines.append("")
     agents = {it["decision"]["agent"] for it in items
-              if it["decision"]["mode"] in ("rule", "fixed") and it["decision"].get("agent") and not it["empty"]}
+              if it["decision"]["mode"] == "rule" and it["decision"].get("agent") and not it["empty"]}
     if len(agents) == 1:
         nxt = AGENTS[agents.pop()].next_line
     else:
@@ -321,7 +323,7 @@ def render(items: list[dict[str, Any]], usage: dict[str, dict[str, Any]], period
     lines.append("")
     lines.append("担当メモ: 611 のルール判定（LLM なし）。係は指示しない。「1,3 OK」のように番号で返すと楽")
     lines.append("")
-    lines.append("橋渡し: 松野さんが了承した番号だけ、依頼文を担当ツールへ（当面は人が橋）")
+    lines.append("橋渡し: ✅ で全件、番号の返信で一部を了承。Codex・Claude Code・Cursor は自動で起動してドラフト PR で止める。チャッピー・フライデーは上の依頼文を貼る")
     return "\n".join(lines)
 
 
