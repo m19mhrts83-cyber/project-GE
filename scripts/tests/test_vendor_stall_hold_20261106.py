@@ -136,7 +136,9 @@ class S2StaleUsesBatchTests(unittest.TestCase):
              mock.patch.object(runner, "write_send_resume") as resume, \
              mock.patch.object(runner, "push_sync_meta"), \
              mock.patch.object(runner, "pending_vendors", return_value=[]), \
-             mock.patch.object(runner, "business_days_between", return_value=3):
+             mock.patch.object(runner, "business_days_between", return_value=3), \
+             mock.patch.object(runner, "now_jst", return_value=datetime(2026, 11, 4, 12, 0, tzinfo=ZoneInfo("Asia/Tokyo"))):
+            # 実時計だと翌週以降は週替わり扱いになり -r2 にならないので時刻を固定する
             r = runner.run_lane(
                 "s2", dry=False, force_refill=False, skip_sync=True, skip_refill=False,
                 state=state, inbox_hits=[], archive_inbox=False,
