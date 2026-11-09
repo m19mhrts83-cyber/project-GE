@@ -152,7 +152,26 @@ def apply_close(row: dict, author: str) -> None:
     comment = "\n".join(lines)[:1900]
     _api("POST", "/comments", {"task_id": tid, "content": comment})
     _api("POST", f"/tasks/{tid}/close", {})
-    # owner_decisions は API 経路があれば別途。ここでは state に残す
+    try:
+        from jarvis_owner_decision_log import log_owner_decision
+
+        log_owner_decision(
+            surface="todoist_313",
+            action="close",
+            source="done_elsewhere",
+            employee="313",
+            target_type="todoist_task",
+            target_id=tid,
+            subject=str(row.get("title") or "")[:500],
+            note="外で済んだ・検知",
+            payload={
+                "kind": "done_elsewhere",
+                "reason_tags": ["外で済んだ"],
+                "evidence": ev[:5],
+            },
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"  owner_decisions soft-fail: {e}", file=sys.stderr)
     print(f"  closed {tid} {row['title'][:40]}")
 
 

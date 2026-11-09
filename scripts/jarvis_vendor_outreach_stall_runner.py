@@ -130,6 +130,16 @@ REFILL_BODY_RE = re.compile(
 
 REFILL_COOLDOWN_HOURS = 12
 SEND_RESUME_COOLDOWN_HOURS = 6
+# 同じ社を送信再開で N 回渡しても mark が無ければ「保留（人の判断待ち）」として外す。
+# 以前は S9 福島土地（ボス了承待ち）が 6 時間ごとに通算47回、S2 chubu-083〜085（W40 で
+# 処理済み・skip）が繰り返し再投入され、他の社に進めず止まっていた（2026-11-06）。
+OFFER_HOLD_COUNT = 2
+# 保留はこの日数で自動解除して 1 回だけ再挑戦（ボスが了承済みなら Grok が送る）
+OFFER_HOLD_DAYS = 14
+# S2 は週次バッチに一度載せた社を、この日数は次のバッチに入れない（Grok が skip／deferred 済み）
+S2_BATCH_EXCLUDE_DAYS = 28
+# S2: mark 停滞時は「送信再開」ではなく週途中の追加バッチを出す（Grok はバッチの箱からしか送らない）
+S2_STALE_REFILL_COOLDOWN_HOURS = 24
 # 本線は毎日 09:00「不動産Daily · 本日分」（Hawk/部長 2026-10-20）。
 # mark が平日2日以上空いたら #ops 見守り。上書き: state / env JARVIS_VENDOR_STALE_MARK_BUSINESS_DAYS
 STALE_MARK_BUSINESS_DAYS_DEFAULT = 2
@@ -320,7 +330,9 @@ def s9_focus_lane() -> str:
     return (os.environ.get("JARVIS_S9_FOCUS_LANE", "midori_caramel") or "").strip()
 
 
-def s9_sendable_focus(limit: int) -> list[dict[str, Any]]:
+def s9_sendable_focus(
+    limit: int, *, exclude: set[str] | frozenset[str] | None = None
+) -> list[dict[str, Any]]:
     """送信再開・補給で渡す S9 候補。優先レーンのメール／フォームだけ。
 
     以前は balanced（北区と緑区の混在）で先頭を渡していたため、daily=1 だと台帳順の
@@ -328,10 +340,12 @@ def s9_sendable_focus(limit: int) -> list[dict[str, Any]]:
     6時間ごとの送信再開で同じ会社が再投入され続けた（2026-10-27 · 通算6回）。
     """
     lane = s9_focus_lane() or None
+    excl = set(exclude or ())
     return [
         v
-        for v in s9_next_pending(limit=max(limit * 10, 10), lane=lane)
+        for v in s9_next_pending(limit=max(limit * 10, 10) + len(excl), lane=lane)
         if str(v.get("channel") or "") in S9_SENDABLE_CHANNELS
+        and str(v.get("id") or "") not in excl
     ][:limit]
 
 
@@ -508,8 +522,35 @@ def write_outbox_md(
     return {"ok": True, "path": str(path)}
 
 
-def write_s2_refill(*, dry_run: bool) -> dict[str, Any]:
-    payload = build_batch_week_payload(batch_days=7)
+def s2_next_batch_id(lst: dict[str, Any], now: datetime | None = None) -> str:
+    """今週まだバッチが無ければ ISO 週、あれば `-r2` 以降（週途中の追加バッチ）。"""
+    now = now or now_jst()
+    week = now.astimezone(JST).isocalendar()
+    base = f"{week[0]}-W{week[1]:02d}"
+    last_id = str(lst.get("last_batch_id") or "")
+    if not last_id and not s2_weekly_rollover_due(lst.get("last_refill_at"), now):
+        last_id = base  # 記録前の今週バッチ（旧版）が既にある
+    if not last_id.startswith(base):
+        return base
+    m = re.search(r"-r(\d+)$", last_id)
+    return f"{base}-r{(int(m.group(1)) if m else 1) + 1}"
+
+
+def write_s2_refill(
+    *,
+    dry_run: bool,
+    exclude: set[str] | None = None,
+    batch_id: str | None = None,
+) -> dict[str, Any]:
+    payload = build_batch_week_payload(
+        batch_days=7, exclude_ids=exclude, batch_id=batch_id
+    )
+    if not payload.get("vendors"):
+        return {
+            "ok": False,
+            "skipped": True,
+            "reason": "s2_batch: 渡していない送信候補0件（探索・台帳追加が必要）",
+        }
     kickoff = grok_weekly_kickoff(payload)
     kickoff = kickoff.replace(
         "キュー残り0または不足: 松野へ Jarvis で --batch-week --grok-kickoff 再生成を依頼（Instructions §週次バッチ）",
@@ -517,17 +558,24 @@ def write_s2_refill(*, dry_run: bool) -> dict[str, Any]:
         "516／Jarvis の自律 refill（stall runner）を待つ。"
         "2営業日空いたら Slack #ops を確認",
     )
-    body = kickoff + "\n\n" + json.dumps(payload, ensure_ascii=False, indent=2)
     batch_id = str(payload.get("batch_id") or "")
+    if "-r" in batch_id:
+        kickoff = (
+            f"【追加バッチ · {batch_id}】前のバッチは送れる先が尽きたため、"
+            "このバッチに切り替えてください（前のバッチの残り＝skip／deferred は再送不要）。"
+            "前のバッチ・送信再開で渡した社は除いてあります。\n\n" + kickoff
+        )
+    body = kickoff + "\n\n" + json.dumps(payload, ensure_ascii=False, indent=2)
     title = f"S2週次バッチ_{batch_id}_自律refill"
     out = write_outbox_md(action="s2_batch", title=title, body=body, dry_run=dry_run)
     out["batch_id"] = batch_id
     out["vendors"] = len(payload.get("vendors") or [])
+    out["vendor_ids"] = [str(v.get("id") or "") for v in payload.get("vendors") or []]
     return out
 
 
-def write_s9_refill(*, dry_run: bool) -> dict[str, Any]:
-    items = s9_sendable_focus(2)
+def write_s9_refill(*, dry_run: bool, exclude: set[str] | None = None) -> dict[str, Any]:
+    items = s9_sendable_focus(2, exclude=exclude)
     if not items:
         return {
             "ok": False,
@@ -558,6 +606,7 @@ def write_s9_refill(*, dry_run: bool) -> dict[str, Any]:
         dry_run=dry_run,
     )
     out["vendors"] = len(items)
+    out["vendor_ids"] = [str(v.get("id") or "") for v in items]
     out["batch_id"] = f"s9-{date.today().isoformat()}"
     return out
 
@@ -812,7 +861,9 @@ def _slim_vendor_for_kick(v: dict[str, Any]) -> dict[str, Any]:
     return {k: v.get(k) for k in keys if v.get(k) not in (None, "")}
 
 
-def write_send_resume(lane: str, *, dry_run: bool) -> dict[str, Any]:
+def write_send_resume(
+    lane: str, *, dry_run: bool, exclude: set[str] | None = None
+) -> dict[str, Any]:
     """キュー充足なのに mark 停滞 → 本日分だけ送る kickoff（週次バッチの再投下ではない）。"""
     daily = 3
     vendors: list[dict[str, Any]] = []
@@ -821,7 +872,12 @@ def write_send_resume(lane: str, *, dry_run: bool) -> dict[str, Any]:
         data = load_s2()
         settings = data.get("settings") or {}
         _, daily = outreach_phase_settings(settings)
-        vendors = [_slim_vendor_for_kick(v) for v in s2_next_pending(limit=daily)]
+        excl = set(exclude or ())
+        vendors = [
+            _slim_vendor_for_kick(v)
+            for v in s2_next_pending(limit=daily * 4 + len(excl))
+            if str(v.get("id") or "") not in excl
+        ][:daily]
         how = (
             f"本日分 **{daily}社** を定型テンプレで Web／メール送信し、"
             "各社 `--mark ID --status contacted` を報告。"
@@ -833,7 +889,9 @@ def write_send_resume(lane: str, *, dry_run: bool) -> dict[str, Any]:
         daily = int(settings.get("daily_outreach_limit") or 2)
         if daily < 1:
             daily = 1
-        vendors = [_slim_vendor_for_kick(v) for v in s9_sendable_focus(daily)]
+        vendors = [
+            _slim_vendor_for_kick(v) for v in s9_sendable_focus(daily, exclude=exclude)
+        ]
         how = (
             f"本日分 **{daily}社** の事前確認メール（定型）を送信し、"
             "`--mark ID --status contacted` を報告。"
@@ -845,10 +903,12 @@ def write_send_resume(lane: str, *, dry_run: bool) -> dict[str, Any]:
         daily = int(settings.get("daily_outreach_limit") or data.get("daily_limit") or 2)
         if daily < 1:
             daily = 2
+        excl = set(exclude or ())
         vendors = [
             _slim_vendor_for_kick(v)
-            for v in s4_next_for_contact(limit=daily, alive_ok_first=True)
-        ]
+            for v in s4_next_for_contact(limit=daily * 4 + len(excl), alive_ok_first=True)
+            if str(v.get("id") or "") not in excl
+        ][:daily]
         how = (
             f"本日分 **{daily}社**（生存OK優先）へ定型連絡し、"
             "`--mark` を報告。探索レポートだけでは mark にならない。"
@@ -860,7 +920,8 @@ def write_send_resume(lane: str, *, dry_run: bool) -> dict[str, Any]:
         return {
             "ok": False,
             "skipped": True,
-            "reason": "send_resume: 本日候補0件",
+            "reason": "send_resume: 本日候補0件（保留中の社を除くと送る先なし）",
+            "mode": "send_resume",
         }
 
     payload = {
@@ -892,6 +953,7 @@ def write_send_resume(lane: str, *, dry_run: bool) -> dict[str, Any]:
         priority="high",
     )
     out["vendors"] = len(vendors)
+    out["vendor_ids"] = [str(v.get("id") or "") for v in vendors]
     out["batch_id"] = f"{lane}-resume-{date.today().isoformat()}"
     out["mode"] = "send_resume"
     return out
@@ -909,6 +971,185 @@ def s2_weekly_rollover_due(last_refill_at: str | None, now: datetime | None = No
         return True
     cur = (now or now_jst()).astimezone(JST).isocalendar()[:2]
     return last.astimezone(JST).isocalendar()[:2] != cur
+
+
+# ---------------------------------------------------------------------------
+# 渡した社の記録（offers）: 同じ社の再投入ループを止める
+# ---------------------------------------------------------------------------
+
+OFFER_FILE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})_(\d{4})_(S2週次バッチ|S2送信再開|S9送信再開|S9事前確認|S4送信再開)")
+
+
+def lane_offers(lst: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    offers = lst.get("offers")
+    if not isinstance(offers, dict):
+        offers = {}
+        lst["offers"] = offers
+    return offers
+
+
+def record_offers(
+    lst: dict[str, Any],
+    ids: list[str],
+    *,
+    via: str,
+    at: datetime | None = None,
+) -> None:
+    """vendor id を「Grok に渡した」として記録（同じ日の重複は数えない）。"""
+    at = at or datetime.now(timezone.utc)
+    day = at.astimezone(JST).date().isoformat()
+    offers = lane_offers(lst)
+    for vid in ids:
+        if not vid:
+            continue
+        o = offers.get(vid)
+        if not isinstance(o, dict):
+            o = {"count": 0, "days": [], "via": []}
+            offers[vid] = o
+        days = list(o.get("days") or [])
+        if day not in days:
+            days.append(day)
+            o["count"] = int(o.get("count") or 0) + 1
+        o["days"] = days[-10:]
+        vias = list(o.get("via") or [])
+        if via not in vias:
+            vias.append(via)
+        o["via"] = vias[-5:]
+        o["last"] = at.isoformat()
+        o.setdefault("first", at.isoformat())
+
+
+def held_ids(lst: dict[str, Any], *, now: datetime | None = None) -> set[str]:
+    """OFFER_HOLD_COUNT 回以上渡したのに mark が無い社（最終から OFFER_HOLD_DAYS 以内）。
+
+    呼び出し側は pending の社だけを候補にするので、mark 済みの社はここに残っても影響しない。
+    """
+    now = now or datetime.now(timezone.utc)
+    out: set[str] = set()
+    for vid, o in lane_offers(lst).items():
+        if not isinstance(o, dict) or int(o.get("count") or 0) < OFFER_HOLD_COUNT:
+            continue
+        last = parse_iso(o.get("last"))
+        if last and (now - last) < timedelta(days=OFFER_HOLD_DAYS):
+            out.add(vid)
+    return out
+
+
+def s2_batched_ids(lst: dict[str, Any], *, now: datetime | None = None) -> set[str]:
+    """直近 S2_BATCH_EXCLUDE_DAYS 日のバッチ・送信再開で渡した社（次のバッチから外す）。"""
+    now = now or datetime.now(timezone.utc)
+    out: set[str] = set()
+    for vid, o in lane_offers(lst).items():
+        last = parse_iso((o or {}).get("last"))
+        if last and (now - last) < timedelta(days=S2_BATCH_EXCLUDE_DAYS):
+            out.add(vid)
+    return out
+
+
+def _offer_file_ids(path: Path) -> list[str]:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return []
+    i = text.find("{")
+    j = text.rfind("}")
+    if i < 0 or j <= i:
+        return []
+    try:
+        payload = json.loads(text[i : j + 1])
+    except Exception:
+        return []
+    return [
+        str(v.get("id") or "")
+        for v in (payload.get("vendors") or [])
+        if isinstance(v, dict) and v.get("id")
+    ]
+
+
+def seed_offers_from_outbox(state: dict[str, Any], *, dry_run: bool) -> int:
+    """初回だけ、outbox／90_archive に残る過去のバッチ・送信再開 MD から offers を復元。"""
+    if state.get("offers_seeded_at"):
+        return 0
+    dirs: list[Path] = []
+    for getter in (lambda: outbox_dir_for_target("re"), lambda: folder("archive")):
+        try:
+            dirs.append(getter())
+        except Exception:
+            pass
+    if not dirs:
+        return 0
+    n = 0
+    since = (now_jst() - timedelta(days=S2_BATCH_EXCLUDE_DAYS)).date()
+    for d in dirs:
+        try:
+            files = sorted(d.glob("*.md"))
+        except Exception:
+            continue
+        for p in files:
+            m = OFFER_FILE_RE.match(p.name)
+            if not m:
+                continue
+            try:
+                day = date.fromisoformat(m.group(1))
+            except ValueError:
+                continue
+            if day < since:
+                continue
+            kind = m.group(3)
+            lane = kind[:2].lower()
+            hm = m.group(2)
+            at = datetime(day.year, day.month, day.day, int(hm[:2]), int(hm[2:]), tzinfo=JST)
+            ids = _offer_file_ids(p)
+            if not ids:
+                continue
+            via = "batch" if "バッチ" in kind else "send_resume"
+            record_offers(lane_state(state, lane), ids, via=via, at=at)
+            n += 1
+    if not dry_run:
+        state["offers_seeded_at"] = now_iso()
+    print(f"📎 offers seeded from outbox/archive: {n} files")
+    return n
+
+
+def pending_vendors(lane: str, ids: set[str]) -> list[dict[str, Any]]:
+    """ids のうち台帳でまだ pending／discovered の社（mark 済みは除く）。"""
+    if not ids:
+        return []
+    loader = {"s2": load_s2, "s4": load_s4, "s9": load_s9}[lane]
+    try:
+        vendors = loader().get("vendors") or []
+    except Exception:
+        return []
+    return [
+        v
+        for v in vendors
+        if isinstance(v, dict)
+        and str(v.get("id") or "") in ids
+        and str(v.get("status") or "pending") in ("pending", "discovered")
+    ]
+
+
+def build_held_consult(lane: str, vendors: list[dict[str, Any]], lst: dict[str, Any]) -> str:
+    """保留になった社を #consult に 1 回だけ出す（末尾「次の担当」3行）。"""
+    label = LANE_CFG[lane]["label"]
+    offers = lane_offers(lst)
+    lines = [
+        f"【consult】516 業者開拓フォロー｜{label}",
+        "送信再開を出しても送られない社があります。Grok 側で保留中（ボスの了承待ち・送れない窓口など）とみて、再依頼を止めて次の社に進めました。",
+    ]
+    for v in vendors[:5]:
+        vid = str(v.get("id") or "")
+        n = int((offers.get(vid) or {}).get("count") or 0)
+        lines.append(f"・{v.get('name') or vid}（{v.get('channel') or '—'}・渡した回数 {n}）")
+    lines += [
+        "送ってよければ Grok に「送ってよい」と伝える／外すなら台帳で skip に。"
+        f"{OFFER_HOLD_DAYS}日後に1回だけ自動で再依頼します。",
+        f"<{LANE_CFG[lane]['url']}|UIを開く>",
+        "次: 人判断のみ",
+        "担当メモ: 516 は再依頼を止めた。送る／外すの判断はボス",
+        "橋渡し: 了承後は Grok が定型で送信し --mark",
+    ]
+    return "\n".join(lines)
 
 
 def run_lane(
@@ -942,15 +1183,25 @@ def run_lane(
     stale_reason = stale_marks_reason(q, threshold_days=thr)
     is_stale = bool(stale_reason)
     weekly_due = lane == "s2" and s2_weekly_rollover_due(lst.get("last_refill_at"))
+    held_before = held_ids(lst)
+    # S2: Grok は週次バッチの箱からしか送らない（送信再開 MD は「通知のみ」扱い）。
+    # 箱が空になって mark が止まったら、送信再開ではなく渡していない社で追加バッチを出す。
+    s2_stale_refill = False
+    if lane == "s2" and is_stale and not q["needs_refill"] and not force_refill:
+        last_refill = parse_iso(lst.get("last_refill_at"))
+        s2_stale_refill = not last_refill or (
+            datetime.now(timezone.utc) - last_refill
+        ) >= timedelta(hours=S2_STALE_REFILL_COOLDOWN_HOURS)
     needs_refill = bool(
         force_refill
         or q["needs_refill"]
         or weekly_due
+        or s2_stale_refill
         or (archive_inbox and inbox_hits)
     )
-    # キューは足りるが mark 停滞 → 本日送信再開キック（週次 refill とは別）
+    # キューは足りるが mark 停滞 → 本日送信再開キック（S4/S9。S2 は上の追加バッチ）
     needs_send_resume = bool(
-        is_stale and not q["needs_refill"] and not force_refill
+        is_stale and not q["needs_refill"] and not force_refill and lane != "s2"
     )
     refill_result: dict[str, Any] | None = None
     archived: list[str] = []
@@ -988,11 +1239,28 @@ def run_lane(
                     "reason": "Mac未接続・outbox不可",
                 }
             else:
-                refill_result = REFILLERS[lane](dry_run=dry)
+                if lane == "s2":
+                    refill_result = write_s2_refill(
+                        dry_run=dry,
+                        exclude=s2_batched_ids(lst),
+                        batch_id=s2_next_batch_id(lst),
+                    )
+                elif lane == "s9":
+                    refill_result = write_s9_refill(dry_run=dry, exclude=held_before)
+                else:
+                    refill_result = REFILLERS[lane](dry_run=dry)
+                if s2_stale_refill:
+                    refill_result["mode"] = "stale_refill"
                 if refill_result.get("ok") and not dry:
                     lst["last_refill_at"] = now_iso()
+                    record_offers(
+                        lst,
+                        list(refill_result.get("vendor_ids") or []),
+                        via="batch" if lane == "s2" else "refill",
+                    )
                     if lane == "s2":
                         state["last_refill_at"] = lst["last_refill_at"]
+                        lst["last_batch_id"] = refill_result.get("batch_id")
                 if archive_inbox and inbox_hits:
                     archived = archive_inbox_files(inbox_hits, dry_run=dry)
     elif needs_send_resume:
@@ -1020,11 +1288,38 @@ def run_lane(
             }
         else:
             print(f"# {lane} send_resume: {stale_reason}")
-            refill_result = write_send_resume(lane, dry_run=dry)
+            refill_result = write_send_resume(lane, dry_run=dry, exclude=held_before)
             if refill_result.get("ok") and not dry:
                 lst["last_send_resume_at"] = now_iso()
+                record_offers(
+                    lst, list(refill_result.get("vendor_ids") or []), via="send_resume"
+                )
     else:
         refill_result = {"ok": True, "skipped": True, "reason": "queue_ok"}
+
+    # 保留（同じ社を N 回渡しても mark なし）になった社は #consult に 1 回だけ出す
+    held_now = held_ids(lst)
+    held_pending = pending_vendors(lane, held_now)
+    consulted = lst.get("held_consulted")
+    if not isinstance(consulted, dict):
+        consulted = {}
+        lst["held_consulted"] = consulted
+    new_held = [
+        v for v in held_pending if str(v.get("id") or "") not in consulted
+    ]
+    if new_held and not skip_refill:
+        cr = post_slack(
+            channel="consult",
+            text=build_held_consult(lane, new_held, lst),
+            dry_run=dry,
+        )
+        if cr.get("ok") and not dry:
+            for v in new_held:
+                consulted[str(v.get("id") or "")] = now_iso()
+    # 保留が解けた（期限切れ・mark 済み）社は consult 記録も消す
+    for vid in list(consulted):
+        if vid not in held_now:
+            consulted.pop(vid, None)
 
     sync_ok: bool | None = None
     if not skip_sync:
@@ -1105,6 +1400,9 @@ def run_lane(
         "archived": archived,
         "url": cfg["url"],
         "lst": lst,
+        "held_pending": [
+            {"id": v.get("id"), "name": v.get("name")} for v in held_pending
+        ],
     }
 
 
@@ -1251,8 +1549,15 @@ def build_ops_alert(r: dict[str, Any]) -> str:
         remedy = f"Macで `--apply --lane {lane} --force-refill`"
     elif stall == "stale_marks":
         what = f"送信が止まっています（最終 {_short_date(q.get('last_contacted'))}）"
-        if refill.get("mode") == "send_resume" and refill.get("ok") and not refill.get("skipped"):
-            remedy = "再開キック済。Grokが本日分を送信＋`--mark`"
+        held = r.get("held_pending") or []
+        sent_kick = bool(refill.get("ok") and not refill.get("skipped"))
+        if refill.get("mode") == "stale_refill" and sent_kick:
+            remedy = f"追加バッチ {refill.get('batch_id')} を投入済。Grokが送信＋`--mark`"
+        elif refill.get("mode") == "send_resume" and sent_kick:
+            remedy = "次の社で再開キック済。Grokが本日分を送信＋`--mark`"
+        elif held:
+            names = "・".join(str(v.get("name") or v.get("id")) for v in held[:3])
+            remedy = f"判断待ち（{names}）→ #consult で送る／外すを判断"
         else:
             remedy = "Grokが本日分を送信＋`--mark`"
     elif stall == "bridge_down":
@@ -1313,6 +1618,11 @@ def run(*, args: argparse.Namespace) -> int:
     )
     results: list[dict[str, Any]] = []
     shared_alerts: dict[str, str] | None = None
+    if not skip_refill and bridge_available():
+        try:
+            seed_offers_from_outbox(state, dry_run=dry)
+        except Exception as e:
+            print(f"# offers seed soft-fail: {e}", file=sys.stderr)
 
     for i, lane in enumerate(lanes):
         if not LANE_CFG[lane]["list_path"].is_file() and lane != "s2":

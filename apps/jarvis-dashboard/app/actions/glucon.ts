@@ -1552,7 +1552,7 @@ export async function queueGluconPost(
 
   if (error) return { ok: false, error: error.message };
 
-  // Mac 常駐 watch を起こす（3s ポーリング＋Realtime の保険）
+  // Mac 常駐 watch を起こす（Realtime が本線。kick はポーリング〔購読中 30s〕の保険）
   try {
     await supabase.from("sync_meta").upsert(
       {

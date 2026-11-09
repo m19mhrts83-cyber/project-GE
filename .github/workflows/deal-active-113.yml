@@ -1,0 +1,62 @@
+name: 113 deal-active sync (KURASHIFT -> Slack)
+
+# 113 物件買進め確認係 — 実装①
+# KURASHIFT で内見候補以上の案件を #deal-active に1案件1スレッドで写す。
+# flow: docs/AIエージェントチーム/100_連絡・物件動向把握室/113_物件買進め確認係/flow.md
+#
+# 当面は手動起動のみ（既定はドライラン）。松野さんの許可が出たら
+# 毎朝 07:30 JST（22:30 UTC 前日）の schedule を有効にする。
+#   schedule:
+#     - cron: "30 22 * * *"
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Slack に投稿し KURASHIFT に ts を保存する（false=ドライラン）"
+        required: false
+        type: boolean
+        default: false
+      deal_id:
+        description: "1案件だけ処理する（空=全件）"
+        required: false
+        default: ""
+      max_posts:
+        description: "1回で新しく立てるスレッドの上限"
+        required: false
+        default: "10"
+
+concurrency:
+  group: deal-active-113
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -q supabase
+
+      - name: Sync KURASHIFT -> #deal-active
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          APPLY: ${{ github.event.inputs.apply || 'false' }}
+          DEAL_ID: ${{ github.event.inputs.deal_id || '' }}
+          MAX_POSTS: ${{ github.event.inputs.max_posts || '10' }}
+        run: |
+          set -euo pipefail
+          ARGS=(--max-posts "$MAX_POSTS")
+          if [[ "$APPLY" == "true" ]]; then ARGS+=(--apply); fi
+          if [[ -n "$DEAL_ID" ]]; then ARGS+=(--deal-id "$DEAL_ID"); fi
+          python scripts/kurashift_deal_active_113.py "${ARGS[@]}"

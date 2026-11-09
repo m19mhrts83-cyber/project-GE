@@ -187,24 +187,60 @@ def _normalize(line: str) -> str:
     return s[:160]
 
 
-def collect_launchd_logs(since: datetime) -> list[dict[str, Any]]:
+OFFSETS_PATH = OUT_DIR / "log_offsets.json"
+TAIL_BYTES = 2_000_000
+
+
+def _load_offsets(path: Path) -> dict[str, Any]:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def collect_launchd_logs(
+    since: datetime,
+    *,
+    log_root: Path | None = None,
+    offsets_path: Path | None = OFFSETS_PATH,
+    save_offsets: bool = False,
+) -> list[dict[str, Any]]:
+    """launchd ログの繰り返しエラー。
+
+    2026-11-07: 前回の本番実行（--post）で読んだ位置を覚え、**その後に増えた分だけ**数える。
+    以前は今週更新されたファイルの末尾 2MB を全部数えていたため、直した後の古い行まで
+    「今週 ×494」のように載っていた。各エラー文に最後に出たファイルの時刻（last）も付ける。
+    """
+    root = log_root or LOG_ROOT
     rows: list[dict[str, Any]] = []
-    if not LOG_ROOT.is_dir():
+    if not root.is_dir():
         return rows
     cutoff = since.timestamp()
-    for d in sorted(LOG_ROOT.glob("jarvis_*")):
+    offsets = _load_offsets(offsets_path) if offsets_path else {}
+    new_offsets: dict[str, Any] = {}
+    for d in sorted(root.glob("jarvis_*")):
         if not d.is_dir():
             continue
         counter: Counter[str] = Counter()
+        last_seen: dict[str, float] = {}
         for f in d.rglob("*.log"):
             try:
-                if f.stat().st_mtime < cutoff:
+                st = f.stat()
+                key = str(f)
+                if st.st_mtime < cutoff:
+                    if key in offsets:
+                        new_offsets[key] = offsets[key]
                     continue
+                prev = offsets.get(key) or {}
+                start = 0
+                if prev.get("ino") == st.st_ino and 0 <= int(prev.get("size", 0)) <= st.st_size:
+                    start = int(prev["size"])
                 # 大きいログは末尾だけ（週の分には十分）
+                start = max(start, st.st_size - TAIL_BYTES)
                 with f.open("rb") as fh:
-                    fh.seek(0, 2)
-                    fh.seek(max(0, fh.tell() - 2_000_000))
+                    fh.seek(start)
                     text = fh.read().decode("utf-8", errors="replace")
+                new_offsets[key] = {"ino": st.st_ino, "size": st.st_size}
             except OSError:
                 continue
             for ln in text.splitlines():
@@ -212,10 +248,25 @@ def collect_launchd_logs(since: datetime) -> list[dict[str, Any]]:
                 if re.match(r"\s*(Traceback|raise |File \")", ln):
                     continue
                 if ERROR_RE.search(ZERO_COUNT_RE.sub("", ln)):
-                    counter[_normalize(ln)] += 1
+                    m = _normalize(ln)
+                    counter[m] += 1
+                    last_seen[m] = max(last_seen.get(m, 0.0), st.st_mtime)
         top = [(msg, n) for msg, n in counter.most_common(3) if n >= REPEAT_FLAG]
         if top:
-            rows.append({"dir": d.name, "repeated": [{"msg": m, "count": n} for m, n in top]})
+            rows.append({
+                "dir": d.name,
+                "repeated": [
+                    {
+                        "msg": m,
+                        "count": n,
+                        "last": datetime.fromtimestamp(last_seen[m], JST).strftime("%m-%d %H:%M"),
+                    }
+                    for m, n in top
+                ],
+            })
+    if save_offsets and offsets_path:
+        offsets_path.parent.mkdir(parents=True, exist_ok=True)
+        offsets_path.write_text(json.dumps(new_offsets, ensure_ascii=False) + "\n", encoding="utf-8")
     return rows
 
 
@@ -290,7 +341,8 @@ def build_flags(facts: dict[str, Any]) -> list[str]:
     for row in facts["launchd"]:
         # 1 系統 1 行（最多のエラー文）。全文は latest.json
         r = row["repeated"][0]
-        flags.append(f"繰り返しエラー: {row['dir']} ×{r['count']} — {r['msg'][:80]}")
+        last = f"（最後 {r['last']}）" if r.get("last") else ""
+        flags.append(f"繰り返しエラー: {row['dir']} ×{r['count']}{last} — {r['msg'][:80]}")
     for t in facts["tests"]["failed"]:
         flags.append(f"テスト失敗: {t['file']} — {t['tail']}")
     for m in facts["deps_missing"]:
@@ -356,7 +408,9 @@ def main() -> int:
     for key, fn in (
         ("commits", lambda: collect_commits(since)),
         ("gha", lambda: collect_gha(since)),
-        ("launchd", lambda: collect_launchd_logs(since)),
+        # 読んだ位置を覚えるのは本番（--post）だけ。--dry-run は何度流しても同じ件数
+        ("launchd", lambda: collect_launchd_logs(
+            since, save_offsets=bool(args.post and not args.dry_run))),
         ("tests", collect_tests),
         ("deps_missing", collect_workflow_deps),
     ):

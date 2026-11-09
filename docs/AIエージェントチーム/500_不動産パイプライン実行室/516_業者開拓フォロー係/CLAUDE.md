@@ -35,6 +35,8 @@ Grok S系（**S2 / S4 / S9**）の **見守り係**（枯渇検知・Drive補給
   - `no_marks` / stale（最終 contacted から平日2日以上・本日 mark なし）
   - Mac／Drive ブリッジ未接続（outbox 不可）
 
+- 同じ社の再依頼ループ止め（2026-11-06）: 送信再開で同じ社を **2日** 渡しても mark が無ければ保留 → `#consult` に1回、次の社へ。S2 は停滞時に週途中の追加バッチ（`2026-Wxx-r2`）
+
 無効化: `.jarvis_state/vendor_outreach_stall.json` の `"disabled": true` または `JARVIS_VENDOR_OUTREACH_STALL_DISABLE=1`
 
 ## 3. 実行権限
@@ -145,3 +147,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-22 | S2: 日報で送信済みなのに mark 欠落 → Jarvis が `--mark` 後追いで stall=ok。S9 は本日送信待ち。`--mark` の日付は **JST**（UTC 前日ずれ防止） |
 | 2026-10-22 | **禁止**: Grok が対外メール送信中に Jarvis CDP でコンポーザ／クリップボードを触る（ナカジツ誤送）。kick は outbox＋Slack のみ |
 | 2026-10-22 | Slack UI: S2/S4/S9 現状行に **担当役割**を必ず添える（#ops FB） |
+| 2026-11-06 | **S2・S9 停滞の再発防止**。原因: ①S9 福島土地（新テンプレ初回でボス了承待ち）を6時間ごとに通算47回再依頼し、他の社に進めなかった ②S2 は Grok がバッチの箱からしか送らないのに、箱が空（W45 day3〜）でも「送信再開」を出し続け、しかも W40 で処理済みの chubu-083〜085 を毎回先頭で渡していた（skip は --mark されないので台帳は pending のまま）。対策: 渡した社を `lanes.*.offers` に記録し、**2日渡して mark なし→保留**（#consult に1回だけ・14日後に1回再挑戦）して次の社へ／S2 は停滞時に **追加バッチ（`-r2`）**、過去28日に渡した社は除外・フォーム先頭／S9 候補で電話のみの台帳行にメールが見つかれば経路を更新 |
