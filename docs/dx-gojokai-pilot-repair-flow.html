@@ -116,6 +116,9 @@
   .bar { position: fixed; left: 0; right: 0; bottom: 0; height: 6vh; min-height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 3vw; font-size: clamp(11px, 1.2vw, 14px); color: var(--muted); border-top: 1.5px dashed #bbb; background: var(--paper); }
   .bar button { font: inherit; color: var(--ink); background: var(--paper); border: 2px solid var(--line); border-radius: 999px; padding: 0.35em 1.2em; cursor: pointer; }
   .bar button:hover { background: var(--yellow); }
+  .dots { display: flex; gap: 0.5em; align-items: center; }
+  .dots button { width: 1.6em; height: 1.6em; padding: 0; border-radius: 50%; font-size: 0.9em; line-height: 1; }
+  .dots button.on { background: var(--yellow); border-color: var(--ink); }
   .bar .btns { display: flex; gap: 0.6em; }
 
   @media (max-width: 760px) {
@@ -237,7 +240,7 @@
 
 <div class="bar">
   <span id="pos">1 / 2</span>
-  <span>← → キー・スペース・クリックで進めます</span>
+  <span class="dots" id="dots" aria-label="手順へ移動"></span>
   <span class="btns"><button id="prev" type="button">◀ 前へ</button><button id="next" type="button">次へ ▶</button></span>
 </div>
 
@@ -287,7 +290,22 @@
     if (state.s === 0 && state.t >= 1) typeSource();
     if (state.s === 0 && state.t < 1 && !typing) { src.innerHTML = typed ? srcHtml() : ''; }
     var total = Number(slides[state.s].getAttribute('data-steps'));
+    buildDots(total);
     pos.textContent = (state.s + 1) + ' / ' + slides.length + '　手順 ' + state.t + ' / ' + total;
+  }
+
+  var dotsEl = document.getElementById('dots'), dotsFor = -1;
+  function buildDots(total) {
+    if (dotsFor !== state.s) {
+      dotsFor = state.s; dotsEl.innerHTML = '';
+      for (var n = 0; n <= total; n++) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.textContent = n; b.title = '手順' + n + 'へ移動';
+        b.addEventListener('click', (function (k) { return function (e) { e.stopPropagation(); state.t = k; render(); }; })(n));
+        dotsEl.appendChild(b);
+      }
+    }
+    Array.prototype.forEach.call(dotsEl.children, function (b, i) { b.classList.toggle('on', i === state.t); });
   }
 
   function next() {
