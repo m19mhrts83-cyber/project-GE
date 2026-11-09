@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
+import VoiceDock, { CommentList } from "./VoiceDock";
+import { useVoiceLog } from "./useVoiceLog";
+import SaveSheet, { type SaveLine, type SaveStatus } from "./SaveSheet";
 import { REASON_TAGS_313 } from "@/lib/seed312";
 import {
   formatDecisionMd,
@@ -31,6 +34,14 @@ export default function CleanupClient({
   const [tags, setTags] = useState<string[]>([]);
   const [results, setResults] = useState<DecisionRecord[]>([]);
   const [msg, setMsg] = useState("");
+  const [saved, setSaved] = useState<{
+    rec: DecisionRecord;
+    label: string;
+    lines: SaveLine[];
+    total: number;
+    status: SaveStatus;
+  } | null>(null);
+  const voice = useVoiceLog("313");
   const [act, setAct] = useState<"close" | "reschedule" | "drop">("close");
 
   useEffect(() => {
@@ -58,8 +69,20 @@ export default function CleanupClient({
     upsertDecision(rec);
     setResults(loadStore().decisions.filter((d) => d.agentId === "313"));
     setMsg(`記録した：${ACTS.find((a) => a.id === choice)?.label ?? choice}`);
+    const label = ACTS.find((a) => a.id === choice)?.label ?? choice;
+    const lines: SaveLine[] = [
+      { k: "decision", v: `${label}：${title || tid}` },
+      { k: "reason", v: tags.join("・") || "選ぶだけで保存（理由は任意）" },
+      { k: "note", v: note || "一言なし" },
+    ];
+    if (choice === "reschedule") lines.push({ k: "due", v: due || "期日を外す" });
+    {
+      const n = voice.forTarget(`task-${taskId || "manual"}`).length;
+      lines.push({ k: "voice", v: n ? `音声・文字コメント ${n}件（ログへ）` : "音声コメントなし" });
+    }
+    setSaved({ rec, label, lines, total: loadStore().decisions.length, status: "pending" });
     try {
-      await fetch("/api/decide", {
+      const res = await fetch("/api/decide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -70,8 +93,10 @@ export default function CleanupClient({
           todoistTaskId: taskId || null,
         }),
       });
+      const j = (await res.json().catch(() => null)) as { persisted?: boolean } | null;
+      setSaved((c) => (c ? { ...c, status: j?.persisted === false ? "local" : "server" } : c));
     } catch {
-      /* ok */
+      setSaved((c) => (c ? { ...c, status: "local" } : c));
     }
   }
 
@@ -79,6 +104,16 @@ export default function CleanupClient({
 
   return (
     <div>
+      {saved ? (
+        <SaveSheet
+          rec={saved.rec}
+          decisionLabel={saved.label}
+          lines={saved.lines}
+          total={saved.total}
+          status={saved.status}
+          onClose={() => setSaved(null)}
+        />
+      ) : null}
       <div className="seg" style={{ marginBottom: 14 }}>
         <a
           href="?tab=cleanup"
@@ -104,7 +139,7 @@ export default function CleanupClient({
 
       {tab === "cleanup" ? (
         <>
-          <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="card" data-tid={`task-${taskId || "manual"}`} data-tlabel={title || "このタスク"} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div className="eyebrow" style={{ margin: 0 }}>TASK</div>
             <input
               type="text"
@@ -114,6 +149,7 @@ export default function CleanupClient({
               placeholder="タスク名"
               aria-label="タスク名"
             />
+            <CommentList comments={voice.forTarget(`task-${taskId || "manual"}`)} onDelete={voice.remove} onMove={voice.reassign} />
             <div className="btn-row">
               {taskId ? (
                 <span className="chip-task mono">id {taskId}</span>
@@ -243,6 +279,9 @@ export default function CleanupClient({
       {tab === "cleanup" ? (
         <div className="bar">
           <div className="bar-in">
+            <VoiceDock
+              onComment={voice.add}
+            />
             {msg ? (
               <div className="ok-line" role="status">
                 <Icon name="check" size={16} stroke={2.6} />
