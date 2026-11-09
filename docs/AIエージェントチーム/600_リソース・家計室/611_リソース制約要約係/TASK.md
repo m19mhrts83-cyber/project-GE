@@ -51,7 +51,7 @@
 - 週次は 314 の土曜 runner に相乗り（失敗しても 314 は止めない）。Supabase へは未送信
 - テスト: `python3 -m unittest scripts/tests/test_ai_usage_weekly.py` → 4件 OK
 - 2026-11-09 Supabase 確認: 使用量テーブルは無し。新テーブルは作らず既存 `metrics`（metric/entity/recorded_at 一意）＋`sync_meta` に載せる形に変更（スキーマ変更なし）
-- 2026-11-09 Cursor 自動取得を追加（`scripts/jarvis_cursor_usage_fetch.py`、314 runner に相乗り、失敗しても手入力値を残す。テスト4件）。手入力: Claude 7%・Cursor 37%/1%・Grok Bot 96%
+- 2026-11-09 Cursor 自動取得を追加（`scripts/jarvis_cursor_usage_fetch.py`、314 runner に相乗り、失敗しても手入力値を残す。テスト4件）。手入力: Claude 7%・Cursor 37%/1%・Grok Bot 96%（誤り。正は使用 3.6%＝残り 96.4%）
 - 2026-11-09 夜: Playwright のブラウザは Google ログインで「安全でない」と弾かれたため、普通の Chrome を専用プロフィール（`.jarvis_state/cursor_usage_chrome/`）＋リモートデバッグで起動して読む方式に変更
 - 未了: Cursor 取得用プロフィールへの初回ログイン（松野さん、マージ後に `--login`）、（2026-11-09 了承済み: 週次 runner に `--push` を付けた）、ChatGPT・Genspark の％の取り方
 
@@ -90,3 +90,4 @@ Codex、Claude Code、Cursor、Gensparkの本人契約、請求／補充日、�
 #### 追加質問への対応 2026-11-01T10:11:58+09:00
 
 Codexの月額更新日を本人請求画面で11/25と特定。Claude週次回復は契約開始日と独立、Codex曜日変更は未確認。主担当曜日を分ける案を正本へ追記。課金変更・リセット権使用は行わず。
+- 2026-11-10 訂正: Grok Bot 週次は使用 3.6% が正（自動取得と一致）。GenCode はクレジット切れ（残り 0）→ 手入力欄 `gencode` に 100%＋メモで記録。次の土曜の週次で Supabase にも入る
