@@ -6,6 +6,12 @@ Secrets (`.env.jarvis_private`):
   / DEAL_ACTIVE（#deal-active）
 未設定チャンネルは REPORT にフォールバック（本文先頭に 【#consult】等を付ける）。
 
+状態の色（2026-11-10 松野さん・共通ルール18）: 本文に「判定:」行が無ければ、2行目に
+「判定: 🟢／🟡／🔴 …」を自動で入れる（jarvis_slack_signal.py）。--signal で明示、
+JARVIS_SLACK_SIGNAL_DISABLE=1 で付けない。推定: 本文の🔴🟡🟢行の一番悪い色 →
+【相談】【ops】【要手当て】などの札や #consult は🔴 → #ops は失敗の語があれば🔴 → それ以外🟢。
+運用系は --quiet-green-after <立ち上げ・変更日> を付けると、7日を過ぎた🟢は投稿しない。
+
 FB スレ案内フッタは既定オフ（2026-10-25）。付けるなら JARVIS_SLACK_FB_FOOTER_ENABLE=1。
 --no-fb-footer / JARVIS_SLACK_FB_FOOTER_DISABLE=1 は常にオフ。
 """
@@ -24,6 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jarvis_slack_report_fb_lib import append_fb_footer  # noqa: E402
+import jarvis_slack_signal as sig  # noqa: E402
 
 # 論理名 → 正規キー
 _CHANNEL_ALIASES = {
@@ -56,6 +63,70 @@ DEDUPE_TTL_DEFAULT = 1800
 DEDUPE_PATH = (
     Path(__file__).resolve().parents[1] / ".jarvis_state" / "slack_webhook_dedupe.json"
 )
+
+
+# 先頭行の札 → 色。札が無ければ本文の印やチャンネルで決める
+_RED_TAGS = ("【相談】", "【要手当て】", "【ops】", "【要判断】", "【失敗】")
+_FAIL_WORDS = ("失敗", "❌", "エラー")
+_ITEM_ICONS = {"🔴": "red", "🟡": "yellow", "🟢": "green"}
+QUIET_GREEN_DAYS = 7
+
+
+def existing_signal(text: str) -> str | None:
+    """本文に「判定:」行があればその色。無ければ None。"""
+    for ln in (text or "").splitlines()[:6]:
+        ln = ln.strip()
+        if ln.startswith("判定:"):
+            for ic, lv in _ITEM_ICONS.items():
+                if ic in ln:
+                    return lv
+            return "none"
+    return None
+
+
+def guess_signal(text: str, channel: str) -> str | None:
+    """色を推定する。hub／deal（AI間・案件板）は付けない（None）。"""
+    if channel not in ("report", "consult", "ops"):
+        return None
+    lines = (text or "").strip().splitlines()
+    first = lines[0] if lines else ""
+    marks = [lv for ln in lines[1:] for ic, lv in _ITEM_ICONS.items() if ln.lstrip().startswith(ic)]
+    if marks:
+        return sig.worst(marks)
+    if any(t in first for t in _RED_TAGS) or "失敗" in first:
+        return "red"
+    if channel == "consult":
+        return "red"
+    if channel == "ops" and any(w in (text or "") for w in _FAIL_WORDS):
+        return "red"
+    return "green"
+
+
+def ensure_signal(text: str, channel: str, level: str | None = None) -> str:
+    """「判定:」行が無ければ2行目に入れる。既にあれば触らない。"""
+    if os.environ.get("JARVIS_SLACK_SIGNAL_DISABLE") == "1" or not text:
+        return text
+    if existing_signal(text) is not None:
+        return text
+    lv = level or guess_signal(text, channel)
+    if not lv:
+        return text
+    head, sep, rest = text.partition("\n")
+    return f"{head}\n{sig.head_line(lv)}" + (f"\n{rest}" if sep else "")
+
+
+def quiet_green(text: str, since: str | None, today: str | None = None) -> bool:
+    """便りがないのが良い便り（2026-11-10 松野さん）。
+    立ち上げ・変更日 since から 7 日を過ぎた 🟢 は投稿しない。"""
+    if not since or existing_signal(text) != "green":
+        return False
+    from datetime import date, timedelta
+    try:
+        start = date.fromisoformat(since)
+    except ValueError:
+        return False
+    now = date.fromisoformat(today) if today else date.today()
+    return now >= start + timedelta(days=QUIET_GREEN_DAYS)
 
 
 def _dedupe_ttl() -> int:
@@ -172,6 +243,18 @@ def main() -> int:
         help="report/consult 末尾の FB スレ案内を付けない",
     )
     ap.add_argument(
+        "--signal",
+        choices=["green", "yellow", "red", "none", "off"],
+        default=None,
+        help="状態の色を明示（既定は札とチャンネルから推定。off で付けない）",
+    )
+    ap.add_argument(
+        "--quiet-green-after",
+        metavar="YYYY-MM-DD",
+        default=None,
+        help="運用系の立ち上げ・変更日。そこから7日を過ぎた 🟢 は投稿しない（便りがないのが良い便り）",
+    )
+    ap.add_argument(
         "--allow-duplicate",
         action="store_true",
         help="同一本文でも直近投稿を無視して再投稿する（既定は TTL 内スキップ）",
@@ -191,6 +274,11 @@ def main() -> int:
         return 2
 
     text = args.text
+    if args.signal != "off":
+        text = ensure_signal(text, requested, args.signal)
+    if quiet_green(text, args.quiet_green_after):
+        print(f"⏭ 🟢 安定稼働（{args.quiet_green_after} から7日超）のため投稿しない")
+        return 0
     if fallback and requested != resolved:
         text = f"【#{display}】\n{text}"
     # FB 案内は論理チャンネル（requested）基準。fallback で #report に落ちても consult なら付ける
