@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nody｜判断がログになる流れ（モーション）</title>
+<style>
+/* Personal Board / Jarvis テーマ */
+:root{--s0:#070b12;--s1:#0e1520;--s2:#16202e;--line:#1f2b3b;--ink:#e6eef8;--mut:#8a9ab0;--acc:#38d1ff;--accs:#0b2a3a;--foc:#ffb547;--focs:#2e2109;--pos:#4fe0a6;--alert:#ff7d6e;--on:#061019;
+--sans:"Inter","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,"SF Mono",monospace}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--s0);color:var(--ink);font-family:var(--sans);overflow:hidden}
+#frame{position:fixed;inset:0;display:flex;flex-direction:column}
+#stagewrap{flex:1;position:relative;overflow:hidden}
+#stage{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:center;overflow:hidden;
+ background:radial-gradient(700px 420px at 85% -60px,rgba(56,209,255,.2),transparent 70%),radial-gradient(600px 400px at -5% 60%,rgba(255,181,71,.09),transparent 70%),var(--s0)}
+#stage::before{content:"";position:absolute;inset:0 0 auto 0;height:260px;background-image:linear-gradient(rgba(56,209,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(56,209,255,.06) 1px,transparent 1px);background-size:36px 36px;-webkit-mask-image:linear-gradient(#000,transparent);mask-image:linear-gradient(#000,transparent)}
+.mono{font-family:var(--mono)}
+.scene{position:absolute;inset:0;padding:64px 80px;opacity:0;visibility:hidden;transition:opacity .45s}
+.scene.on{opacity:1;visibility:visible}
+.scene.out{opacity:0;visibility:visible}
+.eyebrow{font-family:var(--mono);font-size:16px;font-weight:600;letter-spacing:.14em;color:var(--acc)}
+h2{margin:8px 0 0;font-size:46px;line-height:1.25;font-weight:800;letter-spacing:-.01em}
+.sub{margin-top:10px;font-size:22px;line-height:1.6;color:var(--mut)}
+/* 出現（t が data-at を超えたら .in） */
+[data-at]{opacity:0;transform:translateY(22px);transition:opacity .5s ease-out,transform .6s cubic-bezier(.2,.8,.2,1)}
+[data-at][data-fx=left]{transform:translateX(-60px)}
+[data-at][data-fx=right]{transform:translateX(60px)}
+[data-at][data-fx=pop]{transform:scale(.7)}
+[data-at][data-fx=none]{transform:none}
+[data-at].in{opacity:1;transform:none}
+.glass{background:rgba(14,21,32,.82);border:1px solid var(--line);border-radius:16px;box-shadow:0 0 0 1px rgba(56,209,255,.04),0 16px 40px rgba(0,0,0,.4)}
+.badge{display:inline-block;font-family:var(--mono);font-size:14px;font-weight:600;padding:3px 10px;border-radius:8px;background:var(--accs);color:var(--acc)}
+/* 1 提案 */
+.src{position:absolute;width:360px;padding:18px 20px}
+.src p{margin:8px 0 0;font-size:20px;line-height:1.5;color:var(--mut)}
+.arrow{position:absolute;font-size:44px;color:var(--acc)}
+.task{position:absolute;left:760px;top:250px;width:440px;padding:22px 24px;border-color:var(--acc)}
+.task .t{font-size:26px;font-weight:800;margin:6px 0 10px}
+.chip{display:inline-block;padding:4px 12px;border-radius:8px;background:var(--s2);font-size:16px;margin-right:8px}
+.ai{margin-top:12px;padding:8px 12px;border:1px dashed var(--line);border-radius:10px;font-size:16px;color:var(--mut)}
+.ai b{color:var(--acc);margin-right:8px;font-size:13px}
+/* 2 仕分け */
+.row{position:absolute;left:80px;width:1120px;height:118px;padding:0 28px;display:flex;align-items:center;gap:24px}
+.row .nm{flex:1;font-size:26px;font-weight:700}
+.row .src2{font-size:15px}
+.vb{display:flex;gap:12px}
+.vb i{font-style:normal;display:flex;align-items:center;justify-content:center;width:130px;height:56px;border-radius:14px;border:1px solid var(--line);color:var(--mut);font-size:22px;font-weight:700;transition:all .35s}
+.vb i.p{background:var(--pos);border-color:var(--pos);color:var(--on)}
+.vb i.s{background:#b6c2d3;border-color:#b6c2d3;color:var(--on)}
+.vb i.h{background:var(--acc);border-color:var(--acc);color:var(--on)}
+.vb i.fade{opacity:.25}
+.cm{position:absolute;right:28px;bottom:-34px;font-size:17px;color:var(--pos);background:rgba(79,224,166,.1);border:1px solid rgba(79,224,166,.4);padding:4px 12px;border-radius:10px}
+/* 3 音声 */
+.phone{position:absolute;left:80px;top:150px;width:360px;height:520px;border-radius:44px;border:2px solid var(--line);background:var(--s1);overflow:hidden}
+.phone .c{position:absolute;left:18px;right:18px;height:120px;padding:14px 16px;border-radius:14px;border:1px solid var(--line);background:var(--s2);font-size:18px;line-height:1.4}
+.phone .c.sel{border-color:var(--acc);box-shadow:0 0 0 2px rgba(56,209,255,.5)}
+.scroller{position:absolute;inset:0;transition:transform .9s cubic-bezier(.3,.7,.2,1)}
+.dock{position:absolute;left:12px;right:12px;bottom:14px;padding:12px;border:1px solid var(--acc);border-radius:16px;background:rgba(10,16,25,.96);box-shadow:0 0 28px rgba(56,209,255,.2)}
+.mic{display:inline-flex;width:40px;height:40px;border-radius:50%;background:var(--acc);color:var(--on);align-items:center;justify-content:center;font-weight:800;vertical-align:middle;animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(56,209,255,.5)}70%{box-shadow:0 0 0 14px rgba(56,209,255,0)}100%{box-shadow:0 0 0 0 rgba(56,209,255,0)}}
+.cap{margin-top:8px;font-size:20px;min-height:30px;font-weight:600}
+.cap small{display:block;font-size:13px;color:var(--mut);font-weight:400}
+.side{position:absolute;left:520px;top:170px;width:680px}
+.side .li{margin-top:22px;padding:20px 24px;font-size:24px;line-height:1.5}
+.side .li b{color:var(--foc)}
+.track{position:absolute;left:520px;top:520px;width:680px;height:10px;border-radius:5px;background:var(--s2)}
+.track i{position:absolute;left:0;top:0;height:100%;width:0;border-radius:5px;background:var(--acc);transition:width 1s}
+/* 4 理由 */
+.why{position:absolute;left:80px;width:1120px;height:150px;padding:24px 28px}
+.why .nm{font-size:26px;font-weight:700}
+.tags{margin-top:14px;display:flex;gap:12px}
+.tag{padding:8px 20px;border-radius:24px;border:1px solid var(--line);font-size:20px}
+.tag.on{border-color:var(--acc);background:var(--accs);color:var(--ink)}
+/* 5 ログ */
+.logs{position:absolute;left:80px;top:170px;width:640px;padding:10px 24px;font-family:var(--mono)}
+.ll{display:grid;grid-template-columns:110px 1fr 28px;gap:12px;padding:12px 0;border-bottom:1px dashed var(--line);font-size:20px}
+.ll:last-child{border:0}
+.ll .k{color:var(--acc)}.ll .v{font-family:var(--sans);font-size:22px}
+.ll .ck{width:26px;height:26px;border-radius:50%;background:var(--accs);color:var(--acc);display:flex;align-items:center;justify-content:center;font-size:14px}
+.cnt{position:absolute;left:780px;top:170px}
+.cnt .n{font-family:var(--mono);font-size:120px;line-height:1;font-weight:600}
+.cnt .p{font-family:var(--mono);font-size:34px;color:var(--pos);font-weight:600;margin-left:16px}
+.stack{position:absolute;left:780px;top:330px;width:420px}
+.stack div{margin-bottom:10px;padding:12px 16px;border-radius:12px;font-size:18px;border:1px solid var(--line);background:rgba(14,21,32,.8);color:var(--mut)}
+.stack div.new{background:rgba(56,209,255,.12);border-color:rgba(56,209,255,.55);color:var(--ink);font-weight:700}
+.layers{position:absolute;left:80px;top:530px;width:640px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.layers div{padding:14px;border-radius:12px;border:1px dashed var(--line);color:var(--mut);font-size:17px;font-weight:700}
+.layers div small{display:block;font-weight:400;font-size:13px;margin-top:2px}
+.layers div.on{border:1px solid var(--pos);background:rgba(79,224,166,.1);color:var(--pos)}
+.ready{position:absolute;left:780px;top:560px;width:420px;padding:18px 22px;border:1px solid rgba(79,224,166,.45);background:rgba(79,224,166,.08);border-radius:16px;color:var(--pos);font-size:24px;font-weight:800;line-height:1.4}
+.ready small{display:block;color:var(--mut);font-weight:400;font-size:15px;margin-top:6px}
+/* コントロール */
+#ctl{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#0a1019;border-top:1px solid var(--line)}
+#ctl button{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--s2);color:var(--ink);font-size:16px;cursor:pointer}
+#bar{flex:1;display:flex;gap:6px}
+#bar .seg{flex:1;height:44px;display:flex;flex-direction:column;justify-content:center;gap:6px;cursor:pointer;min-width:0}
+#bar .seg u{display:block;height:6px;border-radius:3px;background:var(--s2);overflow:hidden;text-decoration:none}
+#bar .seg i{display:block;height:100%;width:0;background:var(--acc)}
+#bar .seg span{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#bar .seg.cur span{color:var(--ink);font-weight:700}
+@media (prefers-reduced-motion:reduce){[data-at],.scene{transition:none}.mic{animation:none}}
+</style>
+</head>
+<body>
+<div id="frame">
+<div id="stagewrap"><div id="stage">
+
+<!-- 1 提案が届く -->
+<section class="scene" data-dur="5.5" data-title="提案が届く">
+ <div class="eyebrow">01 ／ PROPOSE</div>
+ <h2 data-at="0.2" data-fx="none">いろんなソースから、タスク案が届く</h2>
+ <div class="sub" data-at="0.7" data-fx="none">Slack・メール・やり取り・Journal。AIが Todoist に出す案を用意する</div>
+ <div class="glass src" style="left:80px;top:250px" data-at="1.2" data-fx="left"><span class="badge">Slack</span><p>青葉社向けの見積書、来週火曜までにお願いできますか？</p></div>
+ <div class="glass src" style="left:80px;top:410px" data-at="1.7" data-fx="left"><span class="badge">メール</span><p>先日の件、ご確認のほどお願いいたします。</p></div>
+ <div class="glass src" style="left:80px;top:570px;height:100px" data-at="2.2" data-fx="left"><span class="badge">Journal</span><p style="margin-top:4px">そろそろ保険の見直しをしたい</p></div>
+ <div class="arrow" style="left:500px;top:395px" data-at="2.8" data-fx="left">→</div>
+ <div class="glass task" data-at="3.2" data-fx="right"><span class="badge">提案タスク</span><div class="t">青葉社向け見積書を送付する</div><span class="chip">期限 来週火曜</span><span class="chip">営業</span><div class="ai"><b>AIの推測</b>依頼＋期限あり。既存と重複なし</div></div>
+</section>
+
+<!-- 2 仕分け -->
+<section class="scene" data-dur="6.5" data-title="採る・見送る・保留">
+ <div class="eyebrow">02 ／ SORT</div>
+ <h2 data-at="0.2" data-fx="none">採る・見送る・保留で、仕分ける</h2>
+ <div class="sub" data-at="0.6" data-fx="none">1タップ。採ったものには、Todoist に残すコメントも付けられる</div>
+ <div class="glass row" style="top:230px" data-at="1.0" data-fx="none"><span class="badge src2">Slack</span><div class="nm">青葉社向け見積書を送付する</div><div class="vb"><i data-set="p" data-at="2.0">採る</i><i data-fade="2.0">見送る</i><i data-fade="2.0">保留</i></div><div class="cm" data-at="3.0" data-fx="none">コメント：金額は先方確認後</div></div>
+ <div class="glass row" style="top:380px" data-at="1.3" data-fx="none"><span class="badge src2">Journal</span><div class="nm">保険の見直しを調べる</div><div class="vb"><i data-fade="3.6">採る</i><i data-fade="3.6">見送る</i><i data-set="h" data-at="3.6">保留</i></div></div>
+ <div class="glass row" style="top:530px" data-at="1.6" data-fx="none"><span class="badge src2">メール</span><div class="nm">ミニテックへ返事をする</div><div class="vb"><i data-fade="4.8">採る</i><i data-set="s" data-at="4.8">見送る</i><i data-fade="4.8">保留</i></div></div>
+</section>
+
+<!-- 3 見ながら言う -->
+<section class="scene" data-dur="8" data-title="見ながら声で">
+ <div class="eyebrow">03 ／ SPEAK WHILE VIEWING</div>
+ <h2 data-at="0.2" data-fx="none" style="font-size:40px">見ながら声で言う。字幕で安心</h2>
+ <div class="phone" data-at="0.6" data-fx="none">
+  <div class="scroller" id="scr">
+   <div class="c" style="top:24px">青葉社向け見積書を送付する</div>
+   <div class="c sel" style="top:164px" id="c2">保険の見直しを調べる</div>
+   <div class="c" style="top:304px">ミニテックへ返事をする</div>
+  </div>
+  <div class="dock" data-at="1.2" data-fx="none"><span class="mic">●</span> <span style="font-size:14px;color:var(--mut);margin-left:8px">見ている：保険の見直しを調べる</span>
+   <div class="cap"><span data-type="いつやるかが決まってないので、保留でいい" data-at="2.0" data-cps="9"></span><small data-at="5.4" data-fx="none">話し始めた時点のカードに残しました</small></div></div>
+ </div>
+ <div class="side">
+  <div class="glass li" data-at="2.0" data-fx="right"><b>見ている所に追従</b>：スクロールすると、見ているカードが対象になる</div>
+  <div class="glass li" data-at="3.4" data-fx="right"><b>話し始めた時点</b>のカードに結び付ける。途中で動いても前の話は前に残る</div>
+  <div class="glass li" data-at="5.0" data-fx="right">ずれたら「こちらへ移す」で付け替え。ログは追記だけ</div>
+ </div>
+</section>
+
+<!-- 4 理由 -->
+<section class="scene" data-dur="5.5" data-title="選ばなかった理由">
+ <div class="eyebrow">04 ／ WHY NOT</div>
+ <h2 data-at="0.2" data-fx="none">最後に、選ばなかった理由を聞く</h2>
+ <div class="sub" data-at="0.6" data-fx="none">押すだけ。空のままでも保存できる。「知っている」と「誤り」は別々に残す</div>
+ <div class="glass why" style="top:250px" data-at="1.0" data-fx="none"><div class="nm"><span class="badge" style="background:#b6c2d3;color:var(--on)">見送る</span>　ミニテックへ返事をする</div>
+  <div class="tags"><span class="tag" data-cls="2.2">知っている</span><span class="tag" data-cls="2.2">今は不要</span><span class="tag on" data-cls="2.2" data-on="2.4">誤り</span><span class="tag" data-cls="2.2">合わない</span><span class="tag" data-cls="2.2">重複</span></div></div>
+ <div class="glass why" style="top:430px" data-at="1.4" data-fx="none"><div class="nm"><span class="badge" style="background:var(--acc);color:var(--on)">保留</span>　保険の見直しを調べる</div>
+  <div class="tags"><span class="tag on" data-cls="3.2" data-on="3.4">時期を待つ</span><span class="tag" data-cls="3.2">相手待ち</span><span class="tag" data-cls="3.2">情報不足</span></div></div>
+</section>
+
+<!-- 5 ログ -->
+<section class="scene" data-dur="8.5" data-title="ログが溜まる">
+ <div class="eyebrow">05 ／ LOG</div>
+ <h2 data-at="0.2" data-fx="none" style="font-size:40px">保存すると、ログが溜まる</h2>
+ <div class="glass logs">
+  <div class="ll" data-at="0.8" data-fx="right"><span class="k">take</span><span class="v">採る 1件</span><span class="ck" data-at="1.0" data-fx="pop">✓</span></div>
+  <div class="ll" data-at="1.2" data-fx="right"><span class="k">skip</span><span class="v">見送る 1件</span><span class="ck" data-at="1.4" data-fx="pop">✓</span></div>
+  <div class="ll" data-at="1.6" data-fx="right"><span class="k">hold</span><span class="v">保留 1件</span><span class="ck" data-at="1.8" data-fx="pop">✓</span></div>
+  <div class="ll" data-at="2.0" data-fx="right"><span class="k">reason</span><span class="v">誤り×1・時期を待つ×1</span><span class="ck" data-at="2.2" data-fx="pop">✓</span></div>
+  <div class="ll" data-at="2.4" data-fx="right"><span class="k">voice</span><span class="v">音声コメント 1件（カードごと）</span><span class="ck" data-at="2.6" data-fx="pop">✓</span></div>
+ </div>
+ <div class="cnt" data-at="3.0" data-fx="none"><span class="n" data-count="8" data-from="5" data-cd="3.1" data-ct="1.2">5</span><span class="mono" style="color:var(--mut);font-size:22px"> 件</span><span class="p" data-at="3.6" data-fx="none">+3</span></div>
+ <div class="stack"><div class="new" data-at="4.2" data-fx="none">NEW　3件を仕分けて保存</div><div data-at="4.5" data-fx="none">10:54　お題・白波社の導入資料</div><div data-at="4.7" data-fx="none">10:41　見送り・既存と重複</div></div>
+ <div class="layers" data-at="5.4" data-fx="none"><div class="on">✓ 生の判断<small>保存済み</small></div><div>AIの解釈<small>まだ作らない</small></div><div>承認した基準<small>確認するまで入れない</small></div></div>
+ <div class="ready" data-at="6.2" data-fx="pop">改善に使える形で保存しました<small>Supabase の判断ログに追記・今回だけの判断</small></div>
+</section>
+
+</div></div>
+<div id="ctl"><button id="bPlay" aria-label="再生／一時停止">❚❚</button><div id="bar"></div><button id="bSkip" aria-label="次へ">▶▶</button><button id="bRe" aria-label="最初から">↺</button></div>
+</div>
+<script>
+(function(){
+var stage=document.getElementById('stage'),wrap=document.getElementById('stagewrap');
+function fit(){var s=Math.min(wrap.clientWidth/1280,wrap.clientHeight/720);stage.style.transform='translate(-50%,-50%) scale('+s+')';}
+window.addEventListener('resize',fit);fit();
+var scenes=[].slice.call(document.querySelectorAll('.scene')),durs=scenes.map(function(s){return +s.getAttribute('data-dur');});
+var bar=document.getElementById('bar'),segs=[];
+scenes.forEach(function(s,j){var d=document.createElement('div');d.className='seg';d.innerHTML='<u><i></i></u><span>'+(j+1)+' '+s.getAttribute('data-title')+'</span>';bar.appendChild(d);segs.push(d);});
+var bPlay=document.getElementById('bPlay'),bSkip=document.getElementById('bSkip'),bRe=document.getElementById('bRe');
+var idx=-1,t=0,playing=true,done=false,last=0;
+function ease(x){return 1-Math.pow(1-x,3);}
+/* 章の経過時間 t から毎フレーム全部を決める。一時停止・章ジャンプ・完成形がずれない */
+function render(){
+ var s=scenes[idx],els=s.querySelectorAll('[data-at]'),k;
+ for(k=0;k<els.length;k++){els[k].classList.toggle('in',done||t>=+els[k].getAttribute('data-at'));}
+ [].forEach.call(s.querySelectorAll('[data-type]'),function(el){var at=+el.getAttribute('data-at'),cps=+el.getAttribute('data-cps')||8,txt=el.getAttribute('data-type'),n=done?txt.length:Math.max(0,Math.min(txt.length,Math.floor((t-at)*cps)));el.textContent=txt.slice(0,n);el.style.opacity=1;el.style.transform='none';});
+ [].forEach.call(s.querySelectorAll('[data-count]'),function(el){var to=+el.getAttribute('data-count'),fr=+el.getAttribute('data-from')||0,cd=+el.getAttribute('data-cd')||0,ct=+el.getAttribute('data-ct')||1.2,x=done?1:Math.max(0,Math.min(1,(t-cd)/ct));el.textContent=Math.round(fr+(to-fr)*ease(x));});
+ [].forEach.call(s.querySelectorAll('[data-set]'),function(el){var on=done||t>=+el.getAttribute('data-at');el.className=on?el.getAttribute('data-set'):'';el.style.opacity=1;el.style.transform='none';});
+ [].forEach.call(s.querySelectorAll('[data-fade]'),function(el){el.classList.toggle('fade',done||t>=+el.getAttribute('data-fade'));});
+ [].forEach.call(s.querySelectorAll('[data-on]'),function(el){el.classList.toggle('on',done||t>=+el.getAttribute('data-on'));});
+ [].forEach.call(s.querySelectorAll('[data-cls]'),function(el){el.style.opacity=(done||t>=+el.getAttribute('data-cls'))?1:0;});
+ var scr=document.getElementById('scr');if(scr&&s.contains(scr)){scr.style.transform=(done||t>=4.4)?'translateY(-150px)':'none';}
+ for(k=0;k<segs.length;k++){var w=done||k<idx?1:(k===idx?Math.min(1,t/durs[k]):0);segs[k].querySelector('i').style.width=(w*100)+'%';segs[k].classList.toggle('cur',k===idx);}
+}
+function show(n){
+ if(idx>=0&&idx!==n){var p=scenes[idx];p.classList.remove('on');p.classList.add('out');setTimeout(function(){p.classList.remove('out');},480);}
+ var s=scenes[n];s.classList.remove('out');s.classList.add('on');idx=n;t=0;done=false;render();
+}
+function setPlay(p){playing=p;bPlay.textContent=p?'❚❚':'▶';}
+function finish(){done=true;setPlay(false);t=durs[idx];render();}
+function tick(now){var dt=last?Math.min(.1,(now-last)/1000):0;last=now;
+ if(playing&&!done){t+=dt;if(t>=durs[idx]){if(idx<scenes.length-1)show(idx+1);else finish();}render();}
+ requestAnimationFrame(tick);}
+bPlay.onclick=function(){if(done){show(0);setPlay(true);}else setPlay(!playing);};
+bSkip.onclick=function(){if(idx<scenes.length-1)show(idx+1);else finish();};
+bRe.onclick=function(){show(0);setPlay(true);};
+/* 章バーのタップで章の頭へ。ドラッグで章の途中へ */
+function seek(n,ts){if(n!==idx||done)show(n);t=Math.max(0,Math.min(durs[n]-.05,ts));render();}
+segs.forEach(function(sg,j){sg.addEventListener('click',function(e){var r=sg.querySelector('u').getBoundingClientRect(),q=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));seek(j,q<.05?0:q*durs[j]);if(!playing)setPlay(true);});});
+window.__seek=seek;window.__state=function(){return{idx:idx,t:t,done:done,playing:playing};};
+var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduce){show(scenes.length-1);finish();}else{show(0);}
+requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
