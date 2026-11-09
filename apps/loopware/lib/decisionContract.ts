@@ -29,6 +29,7 @@ export const SURFACES = [
   "kurashift_mail", // KURASHIFT 発のメール
   "zaim_category", // Zaim 費目の仕分け確認
   "rule_review", // ルール候補の採用・取り消し
+  "draft_review", // チャットで作った下書きの版直し（松野さんの直し・ひとこと。scripts/jarvis_draft_decision_log.py）
 ] as const;
 export type Surface = (typeof SURFACES)[number];
 
@@ -78,6 +79,7 @@ export const ACTIONS = [
   "meh", // いまいち
   "none_fit", // どれも違う
   "comment", // 声や文字のひとこと
+  "revise", // 下書きを直した（送る前の版直し。draft_review）
   // ルール
   "rule_accept",
   "rule_once",
@@ -131,6 +133,7 @@ const OUTCOME_OF: Record<string, Outcome> = {
   meh: "note",
   none_fit: "note",
   comment: "note",
+  revise: "note",
   rule_revert: "note",
 };
 

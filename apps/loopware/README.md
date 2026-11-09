@@ -23,6 +23,7 @@ npm run dev   # http://127.0.0.1:3004
 - `/` ハブ
 - `/312?topic=seed-aoba` 扱いを決める（S05）
 - `/313?task=<todoist_id>` 片付ける
+- `/drafts` 下書きを直す（箇所を選んで声でダメ出し → AI が直す → 差分。版ごとに判断ログ surface=draft_review。AI は `GEMINI_API_KEY` が要る）
 - `/312?tab=misses` 提案を仕分ける（いろんなソースの候補を 採る／見送る／保留 → コメント → 最後に選ばなかった理由）
 
 ## 312 の本物のお題（collect／reflect）
