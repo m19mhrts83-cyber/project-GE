@@ -17,7 +17,7 @@ export async function POST(req: Request) {
 
   const sb = serviceClient();
   if (!sb) {
-    // 共有DB未設定。画面は「この端末にだけ保存」と出す
+    // 共有DB未設定。画面は「この端末だけ」と出す
     return NextResponse.json({
       ok: true,
       persisted: false,
@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     });
   }
 
+  // 書き込みの失敗は persisted:false（成功に見せない）。送り直しは deduped:true
   const res = await persistDecision(sb, body);
   return NextResponse.json(res);
 }

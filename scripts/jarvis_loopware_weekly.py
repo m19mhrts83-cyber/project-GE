@@ -216,6 +216,18 @@ def changes(rows: list[dict[str, Any]]) -> list[str]:
     return out
 
 
+def owner_comments(rows: list[dict[str, Any]]) -> list[str]:
+    """ルール候補への「直してひとこと」（ダッシュボード /review・loopware）。314 が修正案に反映する"""
+    out = []
+    for r in rows:
+        if r.get("surface") != "rule_review" or r.get("action") != "comment" or not r.get("note"):
+            continue
+        pl = _pl(r)
+        about = pl.get("text") or pl.get("rule_line") or pl.get("candidate_id") or r.get("target_id")
+        out.append(f"- [{pl.get('candidate_id') or r.get('target_id')}] {about} → 「{str(r['note'])[:300]}」")
+    return out
+
+
 def sections(rows: list[dict[str, Any]], cands: list[dict[str, Any]]) -> str:
     """週次まとめに足す節（Markdown）"""
     o = Counter(outcome(r) for r in rows)
@@ -228,6 +240,9 @@ def sections(rows: list[dict[str, Any]], cands: list[dict[str, Any]]) -> str:
     ]
     ch = changes(rows)
     lines += ["", "### あなたの判断で変わったこと", *(ch or ["- 今週はありません"])]
+    oc = owner_comments(rows)
+    if oc:
+        lines += ["", "### あなたのひとこと（314 はこれを修正案・文言に必ず反映する）", *oc]
     lines += ["", f"### ルール候補（最大 {MAX_CANDIDATES} 件{'・ログが少ないので仮説' if len(rows) < SMALL_LOG else ''}）"]
     if not cands:
         lines.append("- 今週はありません")
