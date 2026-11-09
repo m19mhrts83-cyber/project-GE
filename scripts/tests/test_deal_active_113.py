@@ -295,6 +295,18 @@ class LifecycleTests(unittest.TestCase):
 
 
 class LinkManualTests(unittest.TestCase):
+    def test_pick_newest_links_latest_duplicate(self):
+        import tempfile
+
+        a = deal("viewing") | {"id": "old", "created_at": "2026-10-01T00:00:00Z"}
+        b = deal("viewing") | {"id": "new", "created_at": "2026-10-20T00:00:00Z"}
+        sb = FakeSB([a, b])
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False, encoding="utf-8") as f:
+            f.write('threads:\n  - label: x\n    ts: "1.2"\n    match: ["西吉田"]\n    pick: newest\n')
+        c = m.run_link_manual(sb, today=TODAY, apply=True, path=f.name)
+        self.assertEqual(c["linked"], 1)
+        self.assertIn(("eq", "id", "new"), sb.updates[0][0])
+
     def test_price_narrows_match(self):
         a = deal("viewing") | {"id": "a", "price_man": 400}
         b = deal("viewing") | {"id": "b", "price_man": 980}

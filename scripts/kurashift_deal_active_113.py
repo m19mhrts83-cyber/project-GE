@@ -800,6 +800,9 @@ def run_link_manual(sb: Any, *, today: dt.date, apply: bool, path: str = MANUAL_
         if e.get("skip"):
             continue
         hits = [d for d in deals if d.get("id") == e["deal_id"]] if e.get("deal_id") else match_manual(e, deals)
+        if len(hits) > 1 and e.get("pick") == "newest":
+            # 同じ物件の重複登録。作成日時が一番新しい案件に結ぶ（2026-11-09 松野さん）
+            hits = [max(hits, key=lambda d: str(d.get("created_at") or ""))]
         if len(hits) != 1:
             key = "unmatched" if not hits else "ambiguous"
             counts[key] += 1
