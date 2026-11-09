@@ -207,3 +207,6 @@ outputs/
 supabase/.temp/
 # 611 配車案の下書き（dry-run の出力）
 .jarvis_state/dispatch_suggestions/
+# 611×317 配車の起動記録・作業 worktree
+.jarvis_state/dispatch_queue/
+.jarvis_state/dispatch_worktrees/

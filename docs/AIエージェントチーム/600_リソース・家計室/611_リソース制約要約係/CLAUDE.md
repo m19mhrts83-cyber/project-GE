@@ -90,3 +90,4 @@ ID: **611**。〔Grok:Resource〕ミックス。報告先: Slack `#ops`（判断
 | 2026-11-06 | 実装 第1弾: `scripts/jarvis_ai_usage_weekly.py`（Claude Code・Codex はローカルログ、Cursor・GenCode・ChatGPT は手入力）。314 の土曜 runner に相乗り。Supabase は案のみ（`output/20261106_実装1_使用量集計の結果.md`） |
 | 2026-11-09 | Supabase は新テーブルを作らず既存 `metrics`／`sync_meta` に載せる形へ（`--push` は未了承で未使用）。Cursor の自動取得 `scripts/jarvis_cursor_usage_fetch.py` を追加（ログイン済みブラウザ・非公開 API・失敗しても止めない）。Grok Bot 週次％も表に追加 |
 | 2026-11-10 | 実装 第2弾（動きB 配車案）: `scripts/jarvis_ai_dispatch_suggest.py`。TASK.md か題から種類を判定し、使用量（その場で集計）で割り振り先・理由・外した候補・次の担当3行の文面を作る。既定は `.jarvis_state/dispatch_suggestions/` に書くだけ。`--post` で #consult（松野さんが文面 OK した後だけ）。LLM なし |
+| 2026-11-10 | 実装 第3弾: 配車案への ✅／番号返信で、317 が Codex（codex exec）・ミスレモン（claude -p）・ジャービス（Cloud Agent）を起動しドラフト PR で止める `scripts/jarvis_dispatch_launch.py`。お金・対外送信・本番・削除は起動しない。`JARVIS_DISPATCH_LAUNCH_ENABLE=1` まで dry-run |

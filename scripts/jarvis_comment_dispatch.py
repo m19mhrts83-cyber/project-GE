@@ -842,6 +842,12 @@ def main() -> int:
                 pb[str(n.get("row_id"))] = {"at": _now_iso(), "res": res, "path": path}
                 st["processed_phase_b"] = pb
 
+    # 611 配車案の ✅ 起動（#consult の了承を拾う）。本当に起動するのは
+    # JARVIS_DISPATCH_LAUNCH_ENABLE=1 のときだけ。失敗しても 317 は止めない（終了コード 0）
+    if (os.environ.get("JARVIS_COMMENT_DISPATCH_611") or "1").strip() not in ("0", "false", "no", "off"):
+        run_py("jarvis_dispatch_launch.py", ["--apply"] if args.apply else ["--dry-run"],
+               dry_run=False, timeout=300)
+
     summary = {
         "fb_rc": fb_rc,
         "wh_rc": wh_rc,
