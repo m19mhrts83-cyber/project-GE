@@ -137,7 +137,7 @@ export default async function ReviewPage() {
       <p className="sub">
         土曜の週次分析が判断ログから作った候補です
         {d.cand.week ? `（${d.cand.week}${d.cand.at ? `・${md(d.cand.at)} 作成` : ""}）` : ""}。
-        「採用する」でルール帳へ、「違う」は8週間出しません。言いたいことがあれば「直してひとこと」。
+        効かせ方を選んで「採用」でルール帳へ、「違う」は8週間出しません。ひとことはどのボタンと一緒にでも残せます。
       </p>
       {stale ? (
         <p className="empty">
@@ -184,7 +184,7 @@ export default async function ReviewPage() {
                 これまでのひとこと: {st.comments.slice(-3).join(" ／ ")}
               </p>
             ) : null}
-            <ReviewCandidateActions candidate={c} decided={st?.decided || null} />
+            <ReviewCandidateActions candidate={c} decided={st?.decided || null} decidedOption={st?.option || null} />
           </article>
         );
       })}

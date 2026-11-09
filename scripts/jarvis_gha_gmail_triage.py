@@ -189,7 +189,7 @@ def push_rows(rows: list[dict[str, Any]]) -> int:
         raise SystemExit("JARVIS_SUPABASE_* 未設定")
     sb = create_client(url, key)
     # Web で閉じた行は pending に戻さない
-    PROTECTED = {"sent", "skipped", "snoozed", "done"}
+    PROTECTED = {"sent", "skipped", "snoozed", "done", "todoist"}
     remote_map: dict[str, str] = {}
     try:
         r = (
