@@ -82,6 +82,30 @@ class HealthTests(unittest.TestCase):
         self.assertTrue(ok)
 
 
+class GreenSignalTests(unittest.TestCase):
+    def test_probation_week_then_quiet(self):
+        st: dict = {}
+        d0 = date(2026, 11, 10)
+        self.assertTrue(runner.green_signal_active(st, today=d0))
+        self.assertEqual(st["green_signal_until"], "2026-11-16")
+        self.assertTrue(runner.green_signal_active(st, today=date(2026, 11, 16)))
+        self.assertFalse(runner.green_signal_active(st, today=date(2026, 11, 17)))
+
+    def test_weekly_quiet_after_probation_when_all_green(self):
+        st = {"green_signal_until": "2026-11-16"}
+        ok, why = runner.should_post_weekly_report(st, [{"health": "green"}])
+        self.assertEqual(why, "all_green_quiet") if not ok else None
+        ok2, _ = runner.should_post_weekly_report(st, [{"health": "yellow"}], force=True)
+        self.assertTrue(ok2)
+
+    def test_green_signal_text(self):
+        r = {"label": "S2地場紹介", "health": "green", "health_reason": "",
+             "q": {"contacted_7d": 7, "last_contacted": "2026-11-09"}}
+        text = runner.build_green_signal([r], until="2026-11-16")
+        self.assertIn("判定: 🟢", text)
+        self.assertIn("2026-11-16", text)
+
+
 class SignalTests(unittest.TestCase):
     def test_head_and_worst(self):
         self.assertEqual(sig.head_line("green"), "判定: 🟢 回っています")

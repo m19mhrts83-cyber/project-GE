@@ -232,6 +232,49 @@ def health_rating(
     return level, "／".join(reasons)
 
 
+# 立ち上げ・変更直後の「見守り期間」: この間だけ毎日、緑でも状態を #report に出す。
+# 期間が過ぎたら自動で止める（オペレーション系は「便りがないのが良い便り」。松野さん 2026-11-09）。
+GREEN_SIGNAL_DAYS = 7
+
+
+def green_signal_active(state: dict[str, Any], *, today: date | None = None, dry: bool = False) -> bool:
+    """見守り期間中か。初回は今日から GREEN_SIGNAL_DAYS 日後を state に記録する。"""
+    today = today or now_jst().date()
+    raw = str(state.get("green_signal_until") or "")
+    until: date | None = None
+    if raw:
+        try:
+            until = date.fromisoformat(raw[:10])
+        except ValueError:
+            until = None
+    if until is None:
+        until = today + timedelta(days=GREEN_SIGNAL_DAYS - 1)
+        if not dry:
+            state["green_signal_until"] = until.isoformat()
+    return today <= until
+
+
+def build_green_signal(results: list[dict[str, Any]], *, until: str = "") -> str:
+    """見守り期間中の毎日の一言。先頭行は共通の「判定」行。"""
+    overall = sig.worst(r.get("health", "none") for r in results)
+    lines = ["[516 業者開拓フォロー] *見守り*", sig.head_line(overall)]
+    for r in results:
+        q = r["q"]
+        health = str(r.get("health") or "none")
+        why = str(r.get("health_reason") or "").strip()
+        tail = f"（{why}）" if why else ""
+        lines.append(
+            sig.item_line(
+                health,
+                f"{r.get('label')}: 直近7日の送信 {q.get('contacted_7d', 0)}件・"
+                f"最終 {_short_date(q.get('last_contacted'))}{tail}",
+            )
+        )
+    if until:
+        lines.append(f"この毎日の報告は {until} まで。以降は🔴のときだけ #ops に出ます。")
+    return "\n".join(lines)
+
+
 def now_jst() -> datetime:
     return datetime.now(JST)
 
@@ -1547,13 +1590,18 @@ def should_post_weekly_report(
     *,
     force: bool = False,
 ) -> tuple[bool, str]:
-    """週次 #report は色（🟢🟡🔴）に関わらず出す。月曜 or 最終から7日以上。
+    """週次 #report。見守り期間中は色に関わらず、期間後は 🟡🔴 があるときだけ。月曜 or 最終から7日以上。
 
     以前は全レーン正常のときだけ出していたため、止まって見える週ほど報告が消えていた。
     """
     if force:
         return True, "force"
     today = now_jst().date()
+    # 見守り期間が過ぎたら、全部 🟢 の週は何も出さない（🟡🔴 があるときだけ週次まとめ）
+    if not green_signal_active(state, today=today, dry=True) and all(
+        r.get("health", "green") == "green" for r in results
+    ):
+        return False, "all_green_quiet"
     last_raw = (
         state.get("last_weekly_report_at")
         or state.get("last_daily_report_at")
@@ -1753,6 +1801,16 @@ def run(*, args: argparse.Namespace) -> int:
 
     # evening／daily-report: 見回りは毎日。#report は週次ゲート（healthy のみ）
     do_weekly_slot = bool(args.daily_report or args.evening)
+    if do_weekly_slot and results and green_signal_active(state, dry=dry):
+        today_s = now_jst().date().isoformat()
+        if state.get("last_green_signal_day") != today_s or args.force_report:
+            pr = post_slack(
+                channel="report",
+                text=build_green_signal(results, until=str(state.get("green_signal_until") or "")),
+                dry_run=dry,
+            )
+            if pr.get("ok") and not dry:
+                state["last_green_signal_day"] = today_s
     if do_weekly_slot and results:
         ok_post, reason = should_post_weekly_report(
             state, results, force=bool(args.force_report)
