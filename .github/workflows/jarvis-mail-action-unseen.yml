@@ -1,0 +1,42 @@
+name: Jarvis Mail Action Unseen (116)
+
+# 平日 21:00 JST — Slack に出したのに触られなかったメールカードを「未判断（unseen）」として判断ログへ。
+# NG（見送り）には混ぜない。理由は聞かず、週次レビューで1問だけ聞く材料にする。
+
+on:
+  schedule:
+    - cron: "0 12 * * 1-5" # 21:00 JST weekdays
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "記録せず候補だけ"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: jarvis-mail-action-unseen
+  cancel-in-progress: false
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: python3 -m pip install --quiet supabase
+      - name: Record unseen cards
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          ARGS=(scripts/jarvis_mail_action_unseen.py)
+          if [[ "${{ github.event.inputs.dry_run || 'false' }}" == "true" ]]; then
+            ARGS+=(--dry-run)
+          fi
+          python3 "${ARGS[@]}"
