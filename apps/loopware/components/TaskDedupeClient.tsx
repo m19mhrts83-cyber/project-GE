@@ -154,7 +154,7 @@ export default function TaskDedupeClient({
         }),
       });
       const j = (await res.json().catch(() => null)) as { persisted?: boolean } | null;
-      setSaved((cur) => (cur ? { ...cur, status: j?.persisted === false ? "local" : "server" } : cur));
+      setSaved((cur) => (cur ? { ...cur, status: j?.persisted ? "server" : "local" } : cur));
     } catch {
       setSaved((cur) => (cur ? { ...cur, status: "local" } : cur));
     }
