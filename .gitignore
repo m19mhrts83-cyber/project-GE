@@ -198,3 +198,5 @@ scripts/jarvis_sbi_internal_xfer.py
 
 # runtime residue (repo root)
 outputs/
+# 611 Cursor 使用量の取得用ブラウザプロファイル（ログイン状態を含む）
+.jarvis_state/cursor_usage_profile/

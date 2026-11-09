@@ -23,6 +23,8 @@ export type DecideBody = {
     reasonTags?: string[];
     freeNote?: string;
     decidedVia?: string;
+    /** once＝今回だけ／rule＝次も同じに（基準の候補） */
+    scope?: string;
   };
   todoistTaskId?: string | null;
 };
@@ -91,6 +93,9 @@ async function decide313(
       chosen_index: d.chosenIndex ?? null,
       reason_tags: tags,
       final_text: d.finalText || null,
+      before_text: d.beforeText || null,
+      after_text: d.afterText || null,
+      scope: d.scope || "once",
       // この画面は判断の記録だけ。Todoist の実処置は Slack／CLI 側
       todoist_applied: false,
     },
@@ -166,7 +171,10 @@ async function decide312(
     before_text: d.beforeText || null,
     after_text: d.afterText || null,
     reason_tags: d.reasonTags || [],
-    free_note: d.freeNote || null,
+    free_note:
+      d.scope === "rule"
+        ? `【次も同じに】${d.freeNote || ""}`.trim()
+        : d.freeNote || null,
     decided_via: d.decidedVia || "app",
   };
 

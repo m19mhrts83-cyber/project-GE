@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
+import VoiceDock, { CommentList } from "./VoiceDock";
+import { useVoiceLog } from "./useVoiceLog";
+import SaveSheet, { type SaveLine, type SaveStatus } from "./SaveSheet";
 import {
   REASON_TAGS_312,
   SEED_TOPICS_312,
@@ -11,11 +14,10 @@ import {
 import {
   formatDecisionMd,
   loadStore,
-  syncBadge,
+  removeDecision,
   upsertDecision,
   type DecisionRecord,
 } from "@/lib/storage";
-import { postDecision, syncLabel } from "@/lib/postDecision";
 
 export default function TaskDedupeClient({
   initialTopicId = "",
@@ -34,6 +36,14 @@ export default function TaskDedupeClient({
   const [note, setNote] = useState("");
   const [results, setResults] = useState<DecisionRecord[]>([]);
   const [msg, setMsg] = useState("");
+  const [saved, setSaved] = useState<{
+    rec: DecisionRecord;
+    label: string;
+    lines: SaveLine[];
+    total: number;
+    status: SaveStatus;
+  } | null>(null);
+  const voice = useVoiceLog("312");
   const [sel, setSel] = useState<number | null>(1);
   const [rate, setRate] = useState<Record<number, "good" | "bad" | null>>({});
 
@@ -101,27 +111,98 @@ export default function TaskDedupeClient({
     };
     upsertDecision(rec);
     setResults(loadStore().decisions.filter((d) => d.agentId === "312"));
-    const head = choice === "none_of_above" ? "「どれも違う」を記録" : `案${chosenIndex}で記録`;
-    setMsg(`${head}・共有DBへ送信中…`);
+    setMsg(choice === "none_of_above" ? "「どれも違う」を記録した" : choice === "hold" ? "保留として記録した" : `案${chosenIndex}で記録した`);
     setEditIndex(null);
-    const res = await postDecision(rec, {
-      agentId: "312",
-      topicText: topic.topicText,
-      seedId: topic.id,
-      proposals: topic.proposals,
+    const label =
+      choice === "none_of_above"
+        ? "どれも違う"
+        : choice === "hold"
+          ? "保留（まだ判断できない）"
+          : `案${chosenIndex} ${topic.proposals.find((p) => p.index === chosenIndex)?.label ?? ""}${choice === "edit_use" ? "（直して使う）" : ""}`;
+    const rates = Object.entries(rate)
+      .filter(([, v]) => v)
+      .map(([i, v]) => `案${i}=${v === "good" ? "良い" : "悪い"}`)
+      .join(" / ");
+    const lines: SaveLine[] = [
+      { k: "decision", v: label },
+      { k: "reason", v: tags.join("・") || "選ぶだけで保存（理由は任意）" },
+      { k: "rating", v: rates || "評価なし" },
+      { k: "note", v: note || "一言なし" },
+    ];
+    if (choice === "edit_use") lines.push({ k: "diff", v: "直す前と直した後を保存" });
+    {
+      const n = topic.proposals.reduce((a, p) => a + voice.forTarget(`${topic.id}#${p.index}`).length, 0);
+      lines.push({ k: "voice", v: n ? `音声・文字コメント ${n}件（案ごとにログへ）` : "音声コメントなし" });
+    }
+    setSaved({
+      rec,
+      label,
+      lines,
+      total: loadStore().decisions.length,
+      status: "pending",
     });
-    setResults(loadStore().decisions.filter((d) => d.agentId === "312"));
-    setMsg(`${head}・${syncLabel(res)}`);
+    try {
+      const res = await fetch("/api/decide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agentId: "312",
+          topicText: topic.topicText,
+          seedId: topic.id,
+          proposals: topic.proposals,
+          decision: rec,
+        }),
+      });
+      const j = (await res.json().catch(() => null)) as { persisted?: boolean } | null;
+      setSaved((cur) => (cur ? { ...cur, status: j?.persisted ? "server" : "local" } : cur));
+    } catch {
+      setSaved((cur) => (cur ? { ...cur, status: "local" } : cur));
+    }
   }
 
   if (!topic) return null;
 
   const doneRec = results.find((r) => r.topicId === topic.id);
   const doneIdx = topicIndexOf(SEED_TOPICS_312, topic.id);
+  const decidedProposal = doneRec?.chosenIndex
+    ? topic.proposals.find((p) => p.index === doneRec.chosenIndex)
+    : undefined;
+
+  const nextPending = SEED_TOPICS_312.find(
+    (t) => t.id !== topic.id && !results.some((r) => r.topicId === t.id),
+  );
+
+  function reopen() {
+    removeDecision(topic!.id, "312");
+    setResults(loadStore().decisions.filter((d) => d.agentId === "312"));
+    setMsg("");
+    setSel(1);
+    setRate({});
+    setTags([]);
+    setNote("");
+  }
   const selProposal = topic.proposals.find((p) => p.index === sel);
 
   return (
     <div>
+      {saved ? (
+        <SaveSheet
+          rec={saved.rec}
+          decisionLabel={saved.label}
+          lines={saved.lines}
+          total={saved.total}
+          status={saved.status}
+          closeLabel={nextPending ? "次のお題へ" : "閉じる"}
+          onClose={() => {
+            setSaved(null);
+            if (nextPending) setTopicId(nextPending.id);
+          }}
+          onUndo={() => {
+            setSaved(null);
+            reopen();
+          }}
+        />
+      ) : null}
       <div className="tabs">
         {SEED_TOPICS_312.map((t) => {
           const done = results.some((r) => r.topicId === t.id);
@@ -167,6 +248,53 @@ export default function TaskDedupeClient({
         )}
       </div>
 
+      {doneRec ? (
+        <>
+          <div className="eyebrow">
+            決めた案<small>この1枚だけ残しています</small>
+          </div>
+          <div className="card opt sel done" style={{ minHeight: 0 }}>
+            <div className="done-head">
+              <span className="radio">
+                <Icon name="check" size={12} stroke={3.5} />
+              </span>
+              <span style={{ flexGrow: 1 }}>
+                {doneRec.choice === "none_of_above" ? (
+                  "どれも違う"
+                ) : doneRec.choice === "hold" ? (
+                  "保留"
+                ) : (
+                  <>
+                    <span className="n">{doneRec.chosenIndex}</span>
+                    {decidedProposal?.label}
+                    {doneRec.choice === "edit_use" ? "（直して使う）" : ""}
+                  </>
+                )}
+              </span>
+              <span className="done-badge">決定済み</span>
+            </div>
+            {doneRec.choice === "none_of_above" || doneRec.choice === "hold" ? null : (
+              <dl className="rows" style={{ margin: 0 }}>
+                {parseRows(doneRec.finalText || "").map((r, i) => (
+                  <div key={i}>
+                    <dt>{r.k}</dt>
+                    <dd>{r.v}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {doneRec.reasonTags.length || doneRec.freeNote ? (
+              <div className="meta">
+                {[...doneRec.reasonTags, doneRec.freeNote].filter(Boolean).join(" ／ ")}
+              </div>
+            ) : null}
+            <button type="button" className="secondary" onClick={reopen}>
+              <Icon name="back" size={16} /> やっぱり見直す
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
       <div className="eyebrow">
         3案から選ぶ<small>良い／悪いの評価は任意</small>
       </div>
@@ -175,7 +303,13 @@ export default function TaskDedupeClient({
         const warn = /二重管理/.test(p.body);
         const rows = parseRows(p.body);
         return (
-          <div key={p.index} className={`card opt ${on ? "sel" : ""}`}>
+          <div
+            key={p.index}
+            data-tid={`${topic.id}#${p.index}`}
+            data-tlabel={`${shortTitle(topic.title)} 案${p.index} ${p.label}`}
+            className={`card opt targetable ${on ? "sel is-target" : ""}`}
+            onClick={() => setSel(p.index)}
+          >
             <button
               type="button"
               className="opt-head"
@@ -213,7 +347,8 @@ export default function TaskDedupeClient({
                 二重管理になります
               </div>
             ) : null}
-            <div className="rate">
+            <CommentList comments={voice.forTarget(`${topic.id}#${p.index}`)} onDelete={voice.remove} onMove={voice.reassign} />
+            <div className="rate" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 className={`good ${rate[p.index] === "good" ? "on" : ""}`}
@@ -265,6 +400,9 @@ export default function TaskDedupeClient({
         placeholder="一言（なくても保存できる）"
       />
 
+        </>
+      )}
+
       <div className="eyebrow">記録</div>
       <ul className="list glass">
         {results.length === 0 ? (
@@ -280,13 +418,15 @@ export default function TaskDedupeClient({
                 <strong>{labelOf(r.topicId)}</strong> ·{" "}
                 {r.choice === "none_of_above"
                   ? "どれも違う"
+                  : r.choice === "hold"
+                    ? "保留"
                   : r.chosenIndex != null
                     ? `案${r.chosenIndex}`
                     : r.choice}
               </span>
             </div>
             <div className="meta">
-              {(r.reasonTags || []).join(" / ") || "理由タグなし"} · {syncBadge(r)}
+              {(r.reasonTags || []).join(" / ") || "理由タグなし"}
             </div>
             <div className="btn-row">
               <button
@@ -303,8 +443,12 @@ export default function TaskDedupeClient({
         ))}
       </ul>
 
+      {doneRec ? null : (
       <div className="bar">
         <div className="bar-in">
+          <VoiceDock
+            onComment={voice.add}
+          />
           {msg || doneRec ? (
             <div className="ok-line" role="status">
               <Icon name="check" size={16} stroke={2.6} />
@@ -318,6 +462,13 @@ export default function TaskDedupeClient({
               onClick={() => decide("none_of_above")}
             >
               どれも違う
+            </button>
+            <button
+              type="button"
+              className="secondary ghost"
+              onClick={() => decide("hold")}
+            >
+              保留
             </button>
             {editIndex != null ? (
               <button
@@ -369,6 +520,7 @@ export default function TaskDedupeClient({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

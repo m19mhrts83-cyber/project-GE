@@ -10,8 +10,8 @@ export default function HubPage() {
           <Icon name="bolt" size={20} />
         </div>
         <div>
-          <div className="eyebrow acc">LOOPWARE</div>
-          <strong>社員ループウェア</strong>
+          <div className="eyebrow acc">NODY</div>
+          <strong>Nody</strong>
         </div>
       </div>
 
@@ -78,7 +78,7 @@ export default function HubPage() {
         </span>
         <span className="txt">
           <strong>312 入口</strong>
-          <span className="meta">何を拾うか。追記／別作成／登録しない</span>
+          <span className="meta">いろんなソースから提案を仕分ける。採る／見送る／保留</span>
         </span>
         <Icon name="next" size={18} />
       </Link>
@@ -89,6 +89,17 @@ export default function HubPage() {
         <span className="txt">
           <strong>313 出口</strong>
           <span className="meta">片付ける。済んだ／いつ・優先／やめる</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
+      <Link className="glass nav-card" href="/review">
+        <span className="ico">
+          <Icon name="clock" size={22} />
+        </span>
+        <span className="txt">
+          <strong>週1のレビュー</strong>
+          <span className="meta">判断ログを確認して、基準を更新する</span>
         </span>
         <Icon name="next" size={18} />
       </Link>

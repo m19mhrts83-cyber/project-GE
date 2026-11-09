@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""611 Cursor 使用量の自動取得（ログイン済みブラウザ・ルールのみ）。
+
+cursor.com のダッシュボードが裏で呼ぶ JSON（非公開）を、専用のブラウザプロファイル
+（.jarvis_state/cursor_usage_profile/、Git 管理外）から読み、％だけを
+.jarvis_state/cursor_usage_watch.json に反映する。
+
+  初回だけ（画面が開くので松野さんがログイン）:
+    ~/selenium_env/venv/bin/python scripts/jarvis_cursor_usage_fetch.py --login
+  週次（314 の土曜 runner から。画面は出ない）:
+    ~/selenium_env/venv/bin/python scripts/jarvis_cursor_usage_fetch.py
+
+守ること:
+  - 非公開 API なので、失敗しても終了コード 0（他の処理を止めない）。state は手入力値のまま残す
+  - Cookie・トークン・レスポンス本文はログにも state にも書かない。書くのは数値だけ
+  - 読むだけ。設定変更・課金・送信はしない
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
+JST = ZoneInfo("Asia/Tokyo")
+REPO = Path(__file__).resolve().parents[1]
+STATE_PATH = REPO / ".jarvis_state" / "cursor_usage_watch.json"
+PROFILE_DIR = REPO / ".jarvis_state" / "cursor_usage_profile"
+DASHBOARD_URL = "https://cursor.com/dashboard/spending"
+
+# ページ内の fetch で読む（同一オリジンなので Cookie はブラウザが付ける。こちらでは触らない）
+FETCH_JS = """
+async () => {
+  const out = {};
+  const get = async (url, opts) => {
+    try {
+      const r = await fetch(url, Object.assign({credentials: 'include'}, opts || {}));
+      if (!r.ok) return {status: r.status};
+      return {status: r.status, json: await r.json()};
+    } catch (e) { return {status: -1}; }
+  };
+  out.summary = await get('/api/usage-summary');
+  out.grok = await get('/api/dashboard/get-sand-usage-status',
+    {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+  return out;
+}
+"""
+
+
+def now_iso() -> str:
+    return datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def _num(v: Any) -> float | None:
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        return None
+    return round(max(0.0, min(100.0, n)), 1)
+
+
+def _day(v: Any) -> str | None:
+    """ISO 文字列またはミリ秒の数値を JST の日付へ。"""
+    if v in (None, ""):
+        return None
+    try:
+        if isinstance(v, (int, float)) or str(v).isdigit():
+            dt = datetime.fromtimestamp(int(v) / 1000, timezone.utc)
+        else:
+            dt = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+        return dt.astimezone(JST).date().isoformat()
+    except (ValueError, OSError, OverflowError):
+        return None
+
+
+def _when(v: Any) -> str | None:
+    try:
+        dt = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+        return dt.astimezone(JST).isoformat(timespec="minutes")
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_usage(raw: dict[str, Any]) -> dict[str, Any]:
+    """2 本の JSON から数値だけ抜き出す。形が変わっていたら取れた分だけ返す。"""
+    out: dict[str, Any] = {}
+    s = (raw.get("summary") or {}).get("json")
+    if isinstance(s, dict):
+        plan = ((s.get("individualUsage") or {}).get("plan") or {})
+        out["cursor_models_pct_used"] = _num(plan.get("autoPercentUsed"))
+        out["other_models_pct_used"] = _num(plan.get("apiPercentUsed"))
+        out["total_pct_used"] = _num(plan.get("totalPercentUsed"))
+        out["billing_cycle_end"] = _day(s.get("billingCycleEnd"))
+        if s.get("membershipType"):
+            mt = str(s["membershipType"]).lower().replace("+", "_plus")
+            out["plan"] = "pro_plus" if mt in ("pro_plus", "proplus") else mt
+        od = ((s.get("individualUsage") or {}).get("onDemand") or {})
+        if isinstance(od.get("enabled"), bool):
+            out["on_demand_enabled"] = od["enabled"]
+    g = (raw.get("grok") or {}).get("json")
+    if isinstance(g, dict):
+        out["grok_bot_weekly_pct"] = _num(g.get("usagePercent"))
+        out["grok_bot_resets_at"] = _when(g.get("nextResetTimestampUtc"))
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def statuses(raw: dict[str, Any]) -> dict[str, Any]:
+    return {k: (raw.get(k) or {}).get("status") for k in ("summary", "grok")}
+
+
+def apply_to_state(state: dict[str, Any], vals: dict[str, Any], st: dict[str, Any]) -> dict[str, Any]:
+    out = dict(state)
+    if vals.get("cursor_models_pct_used") is not None or vals.get("other_models_pct_used") is not None:
+        out.update(vals)
+        out["updated_at"] = now_iso()
+        out["auto_fetched_at"] = now_iso()
+        out["fetch_source"] = "auto"
+        out.pop("last_fetch_error", None)
+    else:
+        if vals:  # Grok Bot だけ取れた等
+            out.update(vals)
+        out["last_fetch_error"] = {"at": now_iso(), "status": st}
+    return out
+
+
+def load_state() -> dict[str, Any]:
+    try:
+        d = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_state(state: dict[str, Any]) -> None:
+    try:
+        sys.path.insert(0, str(REPO / "scripts"))
+        import jarvis_cursor_usage_watch as cw  # 判定（level/verdict）は既存ルールで付け直す
+        state = cw.evaluate(state)
+    except Exception:
+        pass
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def fetch_raw(headless: bool, wait_login_sec: int = 0) -> dict[str, Any]:
+    from playwright.sync_api import sync_playwright
+
+    PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(str(PROFILE_DIR), headless=headless)
+        try:
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+            page.goto(DASHBOARD_URL, wait_until="domcontentloaded", timeout=60_000)
+            raw = page.evaluate(FETCH_JS)
+            waited = 0
+            while wait_login_sec and statuses(raw)["summary"] != 200 and waited < wait_login_sec:
+                page.wait_for_timeout(5_000)
+                waited += 5
+                if "cursor.com/dashboard" in page.url:
+                    raw = page.evaluate(FETCH_JS)
+            return raw
+        finally:
+            ctx.close()
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Cursor 使用量の自動取得（非公開 API・失敗しても 0）")
+    ap.add_argument("--login", action="store_true", help="画面を出してログインを待つ（初回だけ）")
+    ap.add_argument("--dry-run", action="store_true", help="state を書かない")
+    args = ap.parse_args()
+    try:
+        raw = fetch_raw(headless=not args.login, wait_login_sec=300 if args.login else 0)
+    except Exception as e:  # ブラウザ起動失敗など
+        print(f"# cursor fetch skip: {type(e).__name__}", file=sys.stderr)
+        if not args.dry_run:
+            st = load_state()
+            st["last_fetch_error"] = {"at": now_iso(), "status": type(e).__name__}
+            save_state(st)
+        return 0
+    vals, st = parse_usage(raw), statuses(raw)
+    del raw  # 本文はここで捨てる
+    print(json.dumps({"status": st, "values": vals}, ensure_ascii=False))
+    if not args.dry_run:
+        save_state(apply_to_state(load_state(), vals, st))
+    if st.get("summary") != 200:
+        print("# cursor fetch: 未ログインか API 変更。手入力値を残した（--login で再ログイン）", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
