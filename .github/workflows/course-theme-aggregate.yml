@@ -1,0 +1,47 @@
+# 講座テーマ提案ループウェア（試作）: 神大家 Q&A の DB を読み取り専用で集計する。
+# - 必要な列だけ PostgREST で読み、集計して JSON 1件にする（通信量対策）
+# - 結果は公開鍵で暗号化し、暗号文だけをブランチにコミットする（平文はどこにも残さない）
+# - 試作用。運営の了承後に週次化する
+name: course-theme aggregate (prototype)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-eziqnx]
+    paths:
+      - scripts/course_theme/**
+      - .github/workflows/course-theme-aggregate.yml
+
+permissions:
+  contents: write
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Aggregate via PostgREST (read only)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 scripts/course_theme/aggregate.py
+      - name: Encrypt and print
+        run: |
+          set -euo pipefail
+          gzip -9 -c resp.json > r.gz
+          openssl rand -hex 32 > k.bin
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in r.gz -out r.enc -pass file:k.bin
+          openssl pkeyutl -encrypt -pubin -inkey scripts/course_theme/pubkey.pem \
+            -pkeyopt rsa_padding_mode:oaep -in k.bin -out k.enc
+          mkdir -p scripts/course_theme/out
+          mv k.enc r.enc scripts/course_theme/out/
+          rm -f resp.json r.gz k.bin
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f scripts/course_theme/out/k.enc scripts/course_theme/out/r.enc
+          git commit -m "course-theme: 暗号化済み集計結果 [skip ci]" || exit 0
+          git push origin HEAD:${GITHUB_REF_NAME}
