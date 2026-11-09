@@ -68,3 +68,4 @@ Slack `#deal-active` を KURASHIFT の写しとして棚卸しする係（2026-1
 |---|---|
 | 2026-10-09 | ビルダー構成に合わせ候補フォルダ作成（ID 113） |
 | 2026-11-05 | #deal-active 棚卸し＋KURASHIFT連携を担当に決定。flow.md に4点の型を記入 |
+| 2026-11-06 | 実装①: `scripts/kurashift_deal_active_113.py`＋GHA `deal-active-113.yml`（手動・既定ドライラン） |

@@ -7,6 +7,8 @@
   python scripts/jarvis_owner_decisions_weekly.py                 # 直近7日を標準出力へ（Markdown）
   python scripts/jarvis_owner_decisions_weekly.py --days 14 --out output/x.md
   python scripts/jarvis_owner_decisions_weekly.py --mark-reviewed # 読んだ行に review_week を付ける
+  python scripts/jarvis_owner_decisions_weekly.py --loopware --improvement-logs --obsidian-dir <dir>
+                                                                  # ループウェアの節・候補・改善ログ・週報
 
 DB は読むだけ（--mark-reviewed のときだけ review_week を書く）。秘密の値は出さない。
 """
@@ -21,6 +23,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 JST = ZoneInfo("Asia/Tokyo")
 
@@ -50,8 +54,41 @@ ACTION_LABEL = {
     "reschedule": "延期",
     "adopt": "採用",
     "skip": "見送り",
+    # 迷った・未判断は NG（見送り）に混ぜない（2026-11-08 松野さん）
+    "hesitated": "迷った",
+    "unseen": "未判断",
+    "rule_accept": "送り手ルール採用",
+    "rule_once": "今回だけ",
 }
 NEGATIVE = {"skipped", "dismiss", "skip"}
+REASON_LABEL = {
+    "promo": "宣伝・通知",
+    "handled": "対応済み",
+    "notnow": "今は不要",
+    "hesitate": "迷う",
+    # 契約 v1（apps/loopware/lib/decisionContract.ts）
+    "no_reply": "回答不要",
+    "self_or_grok": "自分発信・Grok部長",
+    "not_important": "そもそも重要でない",
+    "other": "その他",
+    "area": "エリア外",
+    "yield": "利回り不足",
+    "price": "価格",
+    "age_structure": "築年・構造",
+    "loan": "融資が付きにくい",
+    "no_time": "時間がない",
+    "unsure": "迷った",
+    "need_info": "情報が足りない",
+    "waiting": "誰かの返事待ち",
+}
+
+
+def reason_text(row: dict[str, Any]) -> str:
+    tags = (row.get("payload") or {}).get("reason_tags") or []
+    parts = [REASON_LABEL.get(str(t), str(t)) for t in tags]
+    if row.get("note"):
+        parts.append(str(row["note"]))
+    return "・".join(parts)
 
 
 def employee_of(row: dict[str, Any]) -> str:
@@ -132,7 +169,7 @@ def summarize(rows: list[dict[str, Any]], *, since: datetime, until: datetime) -
         for r in [r for r in rs if r.get("action") in NEGATIVE][:5]:
             ex.append(
                 f"- 見送り: {r.get('partner') or ''}｜{(r.get('subject') or '')[:50]}"
-                + (f"（理由: {r.get('note')}）" if r.get("note") else "")
+                + (f"（理由: {reason_text(r)}）" if reason_text(r) else "")
             )
         if ex:
             details += ["", f"## {EMPLOYEE_LABEL.get(emp, emp)}", *ex]
@@ -178,13 +215,43 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--days", type=int, default=7)
     ap.add_argument("--out", help="Markdown の書き出し先（省略時は標準出力）")
     ap.add_argument("--mark-reviewed", action="store_true", help="読んだ行に review_week を付ける")
+    ap.add_argument("--loopware", action="store_true",
+                    help="ループウェアの節（ルール候補・効いたルール・残っている理由）を足し、候補を loopware に置く")
+    ap.add_argument("--obsidian-dir", help="松野さん用の週報を <dir>/YYYY-Www.md に書く（例: Obsidian の 01_Journaling/判断ログ）")
+    ap.add_argument("--improvement-logs", action="store_true", help="各社員フォルダの logs/改善ログ.md に今週の行を足す")
     args = ap.parse_args(argv)
 
     until = datetime.now(JST)
     since = until - timedelta(days=args.days)
+    week = until.strftime("%G-W%V")
     sb = client()
     rows = fetch(sb, since)
     md = summarize(rows, since=since, until=until)
+    if args.loopware or args.obsidian_dir or args.improvement_logs:
+        import jarvis_loopware_weekly as lw
+
+        lw.attach_from_email(sb, rows)
+        cands = lw.hypotheses(rows, rejected=lw.rejected_ids(sb))
+        if args.loopware:
+            md += lw.sections(rows, cands)
+            lw.publish_candidates(sb, cands, week=week)
+        if args.obsidian_dir:
+            d = Path(args.obsidian_dir).expanduser()
+            d.mkdir(parents=True, exist_ok=True)
+            (d / f"{week}.md").write_text(lw.obsidian_note(rows, cands, week=week), encoding="utf-8")
+            print(f"# wrote {d / f'{week}.md'}", file=sys.stderr)
+        if args.improvement_logs:
+            import jarvis_learned_rules as lr
+
+            for emp, lines in lw.improvement_lines(rows, week=week).items():
+                book = lr.rulebook_path(emp)
+                if not book or not lines:
+                    continue
+                log = book.parent / "logs" / "改善ログ.md"
+                log.parent.mkdir(parents=True, exist_ok=True)
+                head = "" if log.exists() else "# 改善ログ（ループウェア）\n\n直したこと・効いたか。314 が土曜に足す。\n\n"
+                with log.open("a", encoding="utf-8") as f:
+                    f.write(head + "\n".join(lines) + "\n")
     if args.out:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.out).write_text(md, encoding="utf-8")
@@ -192,7 +259,6 @@ def main(argv: list[str] | None = None) -> int:
     else:
         sys.stdout.write(md)
     if args.mark_reviewed and rows:
-        week = until.strftime("%G-W%V")
         ids = [r["id"] for r in rows if not r.get("review_week")]
         for i in range(0, len(ids), 200):
             sb.table("owner_decisions").update({"review_week": week}).in_("id", ids[i : i + 200]).execute()

@@ -99,6 +99,7 @@ PARTNER_111_NIGHT_STATE = REPO / ".jarvis_state" / "partner_111_night.json"
 PARTNER_111_NIGHT_RUNNER = REPO / "launchd" / "partner_111_night_runner.sh"
 PARTNER_111_NIGHT_LOG = Path.home() / "Library" / "Logs" / "jarvis_partner_111_night"
 GMAIL_TOKEN_HEALTH = REPO / "scripts" / "jarvis_gmail_token_health.py"
+LOOPWARE_STATUS = REPO / "scripts" / "jarvis_loopware_status.py"
 
 
 def now_iso() -> str:
@@ -824,6 +825,15 @@ def main() -> int:
                 print(f"# gmail_token_health soft-fail rc={rc}", file=sys.stderr)
     else:
         results["steps"]["gmail_token_health"] = "skipped"
+
+    # 1d. ループウェアの見張りファイル（入口ごとの記録・今週の学び・判断待ち。soft-fail）
+    if LOOPWARE_STATUS.is_file():
+        rc = run_step("loopware_status", [exe, str(LOOPWARE_STATUS)], timeout=90, dry_run=args.dry_run)
+        results["steps"]["loopware_status"] = rc
+        if rc != 0:
+            print(f"# loopware_status attention rc={rc}", file=sys.stderr)
+    else:
+        results["steps"]["loopware_status"] = "skipped"
 
     # 2. パートナー Gmail → OneDrive（軽量=通常差分）
     if not args.skip_fetch:

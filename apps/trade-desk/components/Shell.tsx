@@ -1,6 +1,6 @@
 import TermGlossary from "@/components/TermGlossary";
 import Icon from "@/components/Icon";
-import { DASHBOARD_URL, LOAN_TRACKER_URL } from "@/lib/format";
+import { DASHBOARD_URL, LOAN_TRACKER_URL, LOOPWARE_DESK_URL } from "@/lib/format";
 
 const NAV = [
   { href: "/", label: "ホーム", icon: "home" },
@@ -158,6 +158,15 @@ export default function Shell({
           >
             <Icon name="bolt" />
             <span>Jarvis ダッシュボード ↗</span>
+          </a>
+          <a
+            className="side-link"
+            href={LOOPWARE_DESK_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Icon name="check" />
+            <span>判断デスク（ループウェア） ↗</span>
           </a>
           <div className="meta" style={{ margin: "12px 8px 0" }}>
             {email ?? "—"}

@@ -170,6 +170,39 @@ def _handled_nums(bot_texts: list[str], mark: str) -> set[int]:
     return done
 
 
+def _log_decision(
+    *,
+    action: str,
+    task_id: str,
+    title: str,
+    n: int,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    try:
+        from jarvis_owner_decision_log import log_owner_decision
+
+        payload: dict[str, Any] = {
+            "kind": "cleanup",
+            "n": n,
+            "reason_tags": [action],
+            "via": "slack_text_reply",
+        }
+        if extra:
+            payload.update(extra)
+        log_owner_decision(
+            surface="todoist_313",
+            action=action,
+            source="slack_text_reply",
+            employee=AGENT,
+            target_type="todoist_task",
+            target_id=task_id,
+            subject=title,
+            payload=payload,
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"owner_decisions soft-fail: {e}", file=sys.stderr)
+
+
 def _close_task(item: dict[str, str], token: str, *, dry_run: bool, n: int) -> dict[str, Any]:
     tid = item["task_id"]
     title = item.get("title") or tid
@@ -189,6 +222,7 @@ def _close_task(item: dict[str, str], token: str, *, dry_run: bool, n: int) -> d
         _todoist(f"tasks/{tid}/close", token, method="POST", body={})
     except urllib.error.HTTPError as e:
         return {"ok": False, "error": f"close HTTP {e.code}", "title": title, "task_id": tid}
+    _log_decision(action="close", task_id=tid, title=title, n=n)
     return {"ok": True, "title": title, "task_id": tid}
 
 
@@ -211,6 +245,13 @@ def _reschedule(item: dict[str, str], token: str, *, dry_run: bool, n: int) -> d
         _todoist(f"tasks/{tid}", token, method="POST", body={"due_date": new_due})
     except urllib.error.HTTPError as e:
         return {"ok": False, "error": f"HTTP {e.code}", "title": title, "task_id": tid}
+    _log_decision(
+        action="reschedule",
+        task_id=tid,
+        title=title,
+        n=n,
+        extra={"suggested_due": new_due},
+    )
     return {"ok": True, "title": title, "task_id": tid, "new_due": new_due}
 
 
@@ -248,6 +289,13 @@ def _process_thread(
                 _slack_post(
                     {"channel": channel, "thread_ts": digest["ts"], "text": ack},
                     slack_token,
+                )
+                _log_decision(
+                    action="keep",
+                    task_id=digest.get("ts") or "-",
+                    title=ack,
+                    n=0,
+                    extra={"kind": "digest_skip", "digest_kind": kind},
                 )
             continue
 

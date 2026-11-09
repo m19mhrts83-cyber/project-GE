@@ -45,6 +45,7 @@ tmp_grok_*.md
 # 方針: .jarvis_state 直下の *.json は原則無視し、*.example.json と運用で追跡したい実体だけ ! で戻す。
 .jarvis_state/tavily_cache/
 .jarvis_state/*.json
+.jarvis_state/loopware/
 !.jarvis_state/*.example.json
 !.jarvis_state/vpoint_audit_result.json
 !.jarvis_state/card_annual_fee.json
@@ -194,3 +195,6 @@ scripts/jarvis_sbi_internal_xfer.py
 .jarvis_state/weekly_review_314/
 # WeStudy HTML バックアップの作業フォルダ（会員限定コンテンツ。コミット禁止）
 .jarvis_state/westudy_html_backup/
+
+# runtime residue (repo root)
+outputs/

@@ -75,11 +75,15 @@ Claude デスクトップが閉じていると 9:30 の回は次の起動時に�
 
 松野さんが社員の提案（下書き・未返信判定・起票案・完了候補・S9）にどう判断したかは Supabase `owner_decisions` に毎回残る（triage は DB トリガー、312/313/S9 は `lib/ownerDecisionLog.ts`）。週次レビューで毎回これを読む。
 
-1. `~/selenium_env/venv/bin/python scripts/jarvis_owner_decisions_weekly.py --out <worktree>/docs/…/314_業務品質監査係/output/YYYYMMDD_判断ログ.md`
+1. `~/selenium_env/venv/bin/python scripts/jarvis_owner_decisions_weekly.py --loopware --improvement-logs --out <worktree>/docs/…/314_業務品質監査係/output/YYYYMMDD_判断ログ.md`
+   - `--loopware`: 機械で束ねた節（ルール候補 最大3件・効いたルール・残っている理由・次の一手の型）を足し、候補を loopware「今週の学び」（/rules）に置く。9:00 の機械チェックでも同じ候補を置いている
+   - AI が要るのは `needs_ai`（言い回し）の候補だけ。差分を読んで文言を1行にし、ルール帳の `## 仮説` に置く。それ以外は機械の結果をそのまま使う
+   - loopware で「採用」されたルールは `scripts/jarvis_loopware_apply_rules.py --commit` で1ルール=1コミットでルール帳へ（取り消しも同じ）
 2. 社員ごとに読む: **見送り率が高い**＝提案の出しすぎ（判定・閾値・ノイズ判定）、**直して送った率・書き換えが大きい**＝下書きのプロンプト。diff と見送り理由から「毎回同じ直し」を探す
 3. 同じ直しが **2件以上** ある社員だけ、その社員のプロンプト（`CLAUDE.md`／スクリプト内のプロンプト）かコードを直す。§6 の「最大 5 件」に含める。1件だけのものは「提案」に回す
 4. 週次レビュー MD に「判断ログ」節（件数・社員ごとの見送り率・直して送った率・直したこと）を足す
 5. PR を作ったあと `--mark-reviewed` で読んだ行に `review_week` を付ける（DB への書き込みはこれだけ）
+6. 直し先は、まず各社員フォルダの **ルール帳 `learned_rules.md`**（出さない／上げる／下げる／言い回し）。コードやプロンプト本体より先にここで済むかを考える。書き方は各ファイル冒頭、読む側は `scripts/jarvis_learned_rules.py`（点検: `python3 scripts/jarvis_learned_rules.py <file>`）。新しいルールはまず `## 仮説` に置き、松野さんが loopware で「採用」したら `## 確定ルール`（最大10行）へ。効いたかは判断ログの `payload.applied_rules` で数える
 
 AI 使用量の節約: 機械チェックで済む事実は集め直さない。要確認 0 件かつ仕組みのコミットが 0 件なら、MD に「変更なし・問題なし」と1行書いて終える。
 
@@ -105,3 +109,4 @@ PR: <url>
 | 2026-10-24 | 2回目レビュー（`output/20261024_週次レビュー.md`）。Mac 側の繰り返しエラー5件を是正、GHA 定刻キック導入。ネットワーク一時エラー（DNS・オフライン中）は件数が多くても**ノイズとして扱い**、常駐の生存だけ確認する |
 | 2026-10-24 | 週次レビューを定期化。機械チェック（launchd 土曜 9:00）＋Miss Lemon レビュー（Claude 定期タスク 9:30）。status 運用確認（松野了承） |
 | 2026-10-31 | 3回目（`output/20261031_週次レビュー.md`）＋3か月バックログ（危険度順）。機械チェックの誤検知 2 件を修正（workflow のコメント行を依存に数えない・`scripts/tests` を AI 追加から除外）、**Gemini 呼び出し（`geminiReply`／`gemini.generate`／`GEMINI_API_KEY`）も AI 追加として拾う**ように。Supabase 402 のように1つの原因で多数の GHA が落ちた週は、系統ごとではなく原因ごとに1行にまとめて仕分ける |
+| 2026-11-07 | 4回目（`output/20261107_週次レビュー.md`）。機械チェックの launchd ログは**前回の本番実行（`--post`）で読んだ位置から後だけ**数えるように（`.jarvis_state/weekly_review_314/log_offsets.json`。`--dry-run` は位置を動かさない）。各エラーに「最後に出たファイルの時刻」も付く。それでも件数だけで判断せず、**最後の発生を見てから**仕分ける |

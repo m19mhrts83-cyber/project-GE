@@ -37,7 +37,7 @@ def _loopware() -> str:
     return (
         (os.environ.get("JARVIS_LOOPWARE_URL") or "").strip().rstrip("/")
         or (os.environ.get("NEXT_PUBLIC_LOOPWARE_URL") or "").strip().rstrip("/")
-        or "https://loopware.vercel.app"
+        or "https://jarvis-loopware.vercel.app"
     )
 
 
