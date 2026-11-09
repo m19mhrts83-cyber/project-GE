@@ -18,7 +18,7 @@
   python3 scripts/jarvis_ai_usage_weekly.py                 # 直近7日の表を表示＋写しJSON保存
   python3 scripts/jarvis_ai_usage_weekly.py --dry-run --json
   python3 scripts/jarvis_ai_usage_weekly.py --set-manual gencode --pct 40 --note "Genspark画面"
-  python3 scripts/jarvis_ai_usage_weekly.py --push          # sync_meta（既存テーブル）へ写す
+  python3 scripts/jarvis_ai_usage_weekly.py --push          # 既存 metrics／sync_meta へ写す（スキーマ変更なし）
 
 週次の起動は 314 の週次 runner（土 9:00 launchd）に相乗りする。専用スケジューラは作らない。
 """
@@ -439,21 +439,66 @@ def save_copy(rep: dict[str, Any]) -> None:
     save_json(OUT_PATH, {"latest": rep, "history": hist[-HISTORY_KEEP:]})
 
 
-def push_sync_meta(rep: dict[str, Any]) -> bool:
-    """既存の sync_meta（key/value）に写す。スキーマ変更なし。専用テーブルは案の承認後。"""
+TOOL_ENTITY = {"claude_code": "claude_code", "codex": "codex", "cursor": "cursor",
+               "gencode": "gencode", "chatgpt_mode": "chatgpt_mode"}
+
+
+def metric_rows(rep: dict[str, Any]) -> list[dict[str, Any]]:
+    """既存 metrics（metric, entity, recorded_at で一意）に載せる行。スキーマ変更なし。"""
+    day = rep["period"]["until"][:10]
+    t = rep["tools"]
+    base = {"period": rep["period"]}
+    rows: list[dict[str, Any]] = []
+
+    def add(metric: str, entity: str, value: Any, unit: str, payload: dict[str, Any] | None = None):
+        if isinstance(value, (int, float)):
+            rows.append({"metric": metric, "entity": entity, "value": float(value), "unit": unit,
+                         "recorded_at": day, "payload": {**base, **(payload or {})}})
+
+    pcts = {
+        "claude_code": (t["claude_plan"].get("pct"), "manual"),
+        "codex": (((t["codex"].get("limits_latest") or {}).get("weekly") or {}).get("used_pct"), "local_log"),
+        "cursor": (t["cursor"].get("pct"), "manual"),
+        "gencode": (t["gencode"].get("pct"), "manual"),
+        "chatgpt_mode": (t["chatgpt_mode"].get("pct"), "manual"),
+    }
+    for tool, (pct, src) in pcts.items():
+        add("ai_usage_weekly_pct", TOOL_ENTITY[tool], pct, "pct", {"source": src})
+    cx, cl = t["codex"], t["claude_code"]
+    if cx.get("available"):
+        add("ai_usage_weekly_pct_max", "codex", cx.get("weekly_pct_max"), "pct", {"source": "local_log"})
+        add("ai_usage_output_tokens", "codex", (cx.get("tokens") or {}).get("output"), "tokens",
+            {"tokens": cx.get("tokens"), "sessions": cx.get("sessions")})
+        add("ai_usage_requests", "codex", cx.get("turns"), "turns")
+    if cl.get("available"):
+        add("ai_usage_output_tokens", "claude_code", (cl.get("tokens") or {}).get("output"), "tokens",
+            {"tokens": cl.get("tokens"), "by_model": cl.get("by_model"), "sessions": cl.get("sessions")})
+        add("ai_usage_requests", "claude_code", cl.get("requests"), "responses")
+        add("ai_usage_limit_hits", "claude_code", len(cl.get("limit_hits") or []), "count",
+            {"limit_hits": cl.get("limit_hits")})
+    return rows
+
+
+def push_supabase(rep: dict[str, Any]) -> bool:
+    """既存テーブルだけを使う: metrics に週次の数値、sync_meta に最新の全体 JSON。"""
     url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
     key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
     if not url or not key:
-        print("# sync_meta skip: JARVIS_SUPABASE_* 未設定", file=sys.stderr)
+        print("# supabase skip: JARVIS_SUPABASE_* 未設定", file=sys.stderr)
         return False
     try:
         from supabase import create_client
-        create_client(url, key).table("sync_meta").upsert(
+        sb = create_client(url, key)
+        rows = metric_rows(rep)
+        if rows:
+            sb.table("metrics").upsert(rows, on_conflict="metric,entity,recorded_at").execute()
+        sb.table("sync_meta").upsert(
             {"key": "ai_usage_weekly", "value": json.dumps(rep, ensure_ascii=False),
              "updated_at": rep["generated_at"]}, on_conflict="key").execute()
+        print(f"# supabase metrics rows={len(rows)}", file=sys.stderr)
         return True
     except Exception as e:
-        print(f"# sync_meta skip: {e}", file=sys.stderr)
+        print(f"# supabase skip: {e}", file=sys.stderr)
         return False
 
 
@@ -462,7 +507,7 @@ def main() -> int:
     ap.add_argument("--days", type=int, default=7)
     ap.add_argument("--dry-run", action="store_true", help="写し JSON を保存しない")
     ap.add_argument("--json", action="store_true")
-    ap.add_argument("--push", action="store_true", help="sync_meta へ写す（既存テーブル）")
+    ap.add_argument("--push", action="store_true", help="Supabase の既存 metrics／sync_meta へ写す")
     ap.add_argument("--set-manual", choices=MANUAL_TOOLS, dest="set_manual")
     ap.add_argument("--pct", type=float)
     ap.add_argument("--note")
@@ -480,7 +525,7 @@ def main() -> int:
         save_copy(rep)
         print(f"# saved {OUT_PATH}", file=sys.stderr)
     if args.push:
-        print(f"# push {'ok' if push_sync_meta(rep) else 'failed'}", file=sys.stderr)
+        print(f"# push {'ok' if push_supabase(rep) else 'failed'}", file=sys.stderr)
     print(json.dumps(rep, ensure_ascii=False, indent=2) if args.json else render_md(rep))
     return 0
 

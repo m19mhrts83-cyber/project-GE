@@ -86,6 +86,10 @@ class ManualTests(unittest.TestCase):
             self.assertFalse(rep["tools"]["claude_code"]["available"])
             self.assertFalse(rep["llm_used"])
             self.assertIn("| ツール |", u.render_md(rep))
+            mrows = u.metric_rows(rep)
+            self.assertEqual([(r["metric"], r["entity"], r["value"]) for r in mrows],
+                             [("ai_usage_weekly_pct", "gencode", 95.0)])
+            self.assertEqual(mrows[0]["recorded_at"], rep["period"]["until"][:10])
 
 
 if __name__ == "__main__":
