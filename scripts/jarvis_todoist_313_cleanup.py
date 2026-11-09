@@ -84,16 +84,35 @@ def _star_for(title: str, days_over: int | None, confirm_only: bool) -> str:
     return "reschedule"
 
 
+def _fetch_active_tasks(page_limit: int = 200, max_pages: int = 20) -> list[dict]:
+    """未完了タスクを全ページ取得（v1 は next_cursor でページ送り）。"""
+    out: list[dict] = []
+    cursor = ""
+    for _ in range(max_pages):
+        q = f"/tasks?limit={page_limit}" + (f"&cursor={cursor}" if cursor else "")
+        d = _api(q)
+        if isinstance(d, list):
+            out.extend(d)
+            break
+        out.extend(d.get("results") or [])
+        cursor = str(d.get("next_cursor") or "")
+        if not cursor:
+            break
+    return out
+
+
 def collect_items(limit: int = MAX_TOP) -> tuple[list[dict], int]:
     today = _today()
-    overdue_raw = _api("/tasks?filter=overdue&limit=200")
-    tasks = overdue_raw.get("results", overdue_raw) if isinstance(overdue_raw, dict) else overdue_raw
+    tasks = _fetch_active_tasks()
     scored: list[tuple[int, dict]] = []
     for t in tasks or []:
         due = (t.get("due") or {}).get("date") or ""
         try:
             d0 = date.fromisoformat(due[:10])
         except ValueError:
+            continue
+        # API v1 の /tasks は filter を無視して全件を返すので、ここで超過だけに絞る
+        if d0 >= today:
             continue
         days = (today - d0).days
         title = str(t.get("content") or "")
