@@ -1,5 +1,5 @@
 # 講座テーマ提案ループウェア（試作）: 神大家 Q&A の DB を読み取り専用で集計する。
-# - 集計は DB 内で済ませ、JSON 1件だけ取り出す（通信量対策）
+# - 必要な列だけ PostgREST で読み、集計して JSON 1件にする（通信量対策）
 # - 結果は公開鍵で暗号化してログに出す。会員の質問文はログに平文で残さない
 # - 試作用。運営の了承後に週次化する
 name: course-theme aggregate (prototype)
@@ -9,7 +9,7 @@ on:
   push:
     branches: [claude/project-thread-eziqnx]
     paths:
-      - scripts/course_theme/aggregate.sql
+      - scripts/course_theme/**
       - .github/workflows/course-theme-aggregate.yml
 
 permissions:
@@ -19,28 +19,21 @@ jobs:
   aggregate:
     runs-on: ubuntu-latest
     timeout-minutes: 8
-    env:
-      PROJECT_REF: mwubzgefkkjjbingrmqu
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_KAMIOOYA || secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-      - name: Run aggregate SQL (read only)
-        run: |
-          set -euo pipefail
-          body=$(jq -Rs '{query: .}' < scripts/course_theme/aggregate.sql)
-          code=$(curl -sS -o resp.json -w '%{http_code}' -X POST \
-            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
-            -H "Content-Type: application/json" \
-            --data "$body" \
-            "https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query")
-          echo "HTTP ${code} bytes=$(wc -c < resp.json)"
-          if [[ "$code" != 2* ]]; then head -c 400 resp.json | sed 's/[^[:print:]]//g'; echo; exit 1; fi
-          jq -r '.[0].result | "events=\(.search.events) users=\(.search.users) comments_cats=\(.comment_categories|length) oc_posts=\(.openchat_120d.posts) sources=\(.knowledge_sources|length)"' resp.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Aggregate via PostgREST (read only)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 scripts/course_theme/aggregate.py
       - name: Encrypt and print
         run: |
           set -euo pipefail
           gzip -9 -c resp.json > r.gz
-          openssl rand -out k.bin 32
+          openssl rand -hex 32 > k.bin
           openssl enc -aes-256-cbc -pbkdf2 -salt -in r.gz -out r.enc -pass file:k.bin
           openssl pkeyutl -encrypt -pubin -inkey scripts/course_theme/pubkey.pem \
             -pkeyopt rsa_padding_mode:oaep -in k.bin -out k.enc
