@@ -131,10 +131,12 @@ def hypotheses(rows: list[dict[str, Any]], *, rejected: set[str] | None = None) 
                 "needs_ai": False,
             })
 
-    # 3) 同じ相手に「直して送った」が2回以上 → 言い回し（文言は 314 が差分から決める）
+    # 3) 同じ相手に「直して送った」「下書きを直した（draft_review の版直し）」が2回以上
+    #    → 言い回し（文言は 314 が差分と payload.reason / rule_hint から決める）
     by_partner: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for r in rows:
-        if r.get("action") == "sent" and r.get("edited") and r.get("partner"):
+        revised = r.get("surface") == "draft_review" and r.get("action") == "revise"
+        if ((r.get("action") == "sent" and r.get("edited")) or revised) and r.get("partner"):
             by_partner[str(r["partner"])].append(r)
     for p, rs in by_partner.items():
         if len(rs) >= 2:
@@ -145,7 +147,9 @@ def hypotheses(rows: list[dict[str, Any]], *, rejected: set[str] | None = None) 
                 "key": p,
                 "rule_line": f"rewrite | partner:{p}",
                 "text": f"{p} への下書きで、毎回同じ直しをしています（{len(rs)} 回）。直し方を下書きに入れます",
-                "why": f"直して送った {len(rs)} 回",
+                "why": f"直した {len(rs)} 回"
+                + ("（ヒント: " + " / ".join(h for h in (_pl(r).get("rule_hint") for r in rs) if h)[:300] + "）"
+                   if any(_pl(r).get("rule_hint") for r in rs) else ""),
                 "evidence": [r.get("id") for r in rs][:10],
                 "score": len(rs) * 8,
                 "needs_ai": True,  # 文言は差分から 314 が埋める

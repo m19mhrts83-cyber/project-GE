@@ -1869,3 +1869,73 @@ kbd { font-family: var(--font-mono); font-size: 10px; border: 1px solid currentC
 .rule-line { display: block; padding: 6px 8px; border-radius: 6px; background: var(--surface-2); white-space: pre-wrap; word-break: break-all; }
 .adopted { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
 .adopted button { height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line); background: transparent; white-space: nowrap; }
+
+/* 下書きレビュー（/drafts） */
+.dr-head { display: flex; flex-direction: column; gap: 6px; }
+.dr-versions { display: flex; flex-wrap: wrap; gap: 6px; }
+.dr-versions .pill.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700; }
+.dr-versions .pill.off { opacity: 0.45; text-decoration: line-through; }
+.dr-text {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 15px;
+  line-height: 26px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.dr-mark { background: var(--focus-soft); color: var(--ink); border-bottom: 2px solid var(--focus); border-radius: 2px; }
+.dr-ins { background: rgba(79, 224, 166, 0.18); color: var(--positive); text-decoration: none; border-radius: 2px; }
+.dr-del { background: rgba(255, 125, 110, 0.16); color: var(--alert); text-decoration: line-through; border-radius: 2px; }
+.dr-compare { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.dr-compare select { margin-left: 6px; height: 32px; background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; }
+.dr-changes { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
+.dr-change { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.dr-dock { position: sticky; bottom: 8px; display: flex; flex-direction: column; gap: 8px; z-index: 5; }
+.dr-input { display: flex; gap: 10px; align-items: flex-start; }
+.dr-input .vmic.live { background: var(--accent); color: var(--on-accent); animation: vpulse 1.6s ease-out infinite; }
+.dr-input textarea,
+.dr-edit {
+  flex-grow: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  line-height: 24px;
+  resize: vertical;
+}
+.dr-comments { display: flex; flex-direction: column; gap: 4px; }
+.dr-comment { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
+.dr-comment .grow { flex-grow: 1; min-width: 0; }
+@media (prefers-reduced-motion: reduce) { .dr-input .vmic.live { animation: none; } }
+/* 下書きレビュー: 段落ごとのダメ出し */
+.dr-paras { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
+.dr-para { border-left: 3px solid transparent; padding: 2px 0 2px 8px; border-radius: 4px; }
+.dr-para p { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 15px; line-height: 26px; cursor: pointer; -webkit-user-select: text; user-select: text; }
+.dr-para.on { border-left-color: var(--focus); background: var(--focus-soft); }
+.dr-para.focus { border-left-color: var(--accent); background: var(--accent-soft); }
+.dr-pcomments { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 6px; padding: 6px 8px; border-radius: 8px; background: var(--surface-2); }
+.dr-target { display: flex; gap: 8px; align-items: baseline; }
+.dr-target .grow { flex-grow: 1; min-width: 0; }
+.dr-interim { font-size: 13px; color: var(--accent); }
+.dr-dock.live { box-shadow: 0 0 0 1px var(--accent), 0 12px 32px rgba(0, 0, 0, 0.35); }
+.dr-status { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.dr-status.error { color: var(--alert); }
+.dr-status.queued, .dr-status.running { color: var(--accent); }
+
+/* ---- 下書きを直す: PC では本文を左、ダメ出し欄を右に固定 ---- */
+.dr-kbd { display: none; margin-left: 6px; font-size: 11px; opacity: 0.6; }
+@media (min-width: 1024px) {
+  main:has(.list.dr) { max-width: 1160px; }
+  .list.dr { display: grid; grid-template-columns: minmax(0, 1fr) 380px; column-gap: 20px; align-items: start; }
+  .list.dr > * { grid-column: 1; }
+  .list.dr > .dr-dock { grid-column: 2; grid-row: 1 / span 8; position: sticky; top: 16px; bottom: auto; }
+  .list.dr > .dr-dock textarea { min-height: 120px; }
+  .dr-kbd { display: inline; }
+  .dr-paras { font-size: 16px; line-height: 1.9; }
+}

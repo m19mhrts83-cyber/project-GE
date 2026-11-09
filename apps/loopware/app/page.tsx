@@ -49,6 +49,17 @@ export default function HubPage() {
         <Icon name="next" size={18} />
       </Link>
 
+      <Link className="glass nav-card" href="/drafts">
+        <span className="ico">
+          <Icon name="mic" size={22} />
+        </span>
+        <span className="txt">
+          <strong>下書きを直す</strong>
+          <span className="meta">箇所を選んで声でダメ出し → AI が直す → 差分で確認</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
       <Link className="glass nav-card" href="/rules">
         <span className="ico">
           <Icon name="thumb" size={22} />

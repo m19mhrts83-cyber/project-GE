@@ -24,6 +24,7 @@ _OUTCOME = {
          "create", "done", "close", "drop", "merge"], "take"),
     **dict.fromkeys(["skipped", "reject", "wrong", "rule_reject", "next_wrong", "dismiss", "skip"], "ng"),
     "hesitated": "hesitate",
+    "revise": "note",
     "unseen": "none",
     **dict.fromkeys(["snoozed", "reschedule", "rule_once"], "later"),
 }
