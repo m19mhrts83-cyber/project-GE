@@ -25,7 +25,10 @@ class GuardRaimoTest(unittest.TestCase):
         import json
         for path in ['vercel.json','apps/kamiooya-qa-web/vercel.json','apps/jarvis-dashboard/vercel.json','apps/trade-desk/vercel.json','apps/prompt-share/vercel.json']:
             config=json.loads((ROOT/path).read_text())
-            self.assertIs(config['git']['deploymentEnabled']['codex/kamiooya-auth-offline-review'], False)
+            enabled=config['git']['deploymentEnabled']
+            # Git 連動を丸ごと止めたプロジェクト（false）も、このブランチのプレビューは作られない
+            if enabled is not False:
+                self.assertIs(enabled['codex/kamiooya-auth-offline-review'], False)
 
 if __name__ == '__main__':
     unittest.main()
