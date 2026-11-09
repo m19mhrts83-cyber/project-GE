@@ -200,3 +200,4 @@ scripts/jarvis_sbi_internal_xfer.py
 outputs/
 # 611 Cursor 使用量の取得用ブラウザプロファイル（ログイン状態を含む）
 .jarvis_state/cursor_usage_profile/
+.jarvis_state/cursor_usage_chrome/
