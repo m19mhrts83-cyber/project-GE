@@ -14,14 +14,17 @@ export type SeedTopic = {
 };
 
 export const REASON_TAGS_312 = [
-  "同じ資料",
+  "同じ作業",
+  "補足だけ",
   "完了条件が別",
+  "情報増分なし",
+  "判断材料不足",
   "もう済んだ",
   "今やらない",
   "タスクではない",
 ] as const;
 
-export const SEED_TOPICS_312: SeedTopic[] = [
+const RAW_TOPICS_312: SeedTopic[] = [
   {
     id: "seed-aoba",
     title: "例1 青葉社見積（Slack+メール）",
@@ -133,3 +136,19 @@ export const REASON_TAGS_313 = [
   "やめる",
   "重複",
 ] as const;
+
+/**
+ * 案の並びは選ばれる頻度順：1 登録しない → 2 既存タスクへ追記 → 3 別タスクを作る。
+ * index は並べ替え後に振り直す（記録の chosenIndex はこの並びの番号）。
+ */
+const PROPOSAL_ORDER = ["登録しない", "既存タスクへ追記", "別タスクを作る"];
+
+export const SEED_TOPICS_312: SeedTopic[] = RAW_TOPICS_312.map((t) => ({
+  ...t,
+  proposals: [...t.proposals]
+    .sort(
+      (a, b) =>
+        PROPOSAL_ORDER.indexOf(a.label) - PROPOSAL_ORDER.indexOf(b.label),
+    )
+    .map((p, i) => ({ ...p, index: i + 1 })),
+}));
