@@ -37,7 +37,7 @@ export async function loadDeskCards(sb: SupabaseClient, opts: { item?: string | 
     .eq("status", "pending")
     .in("lane", ["partner", "general"])
     .order("received_at", { ascending: false })
-    .limit(200);
+    .limit(600); // 自動のお知らせを外してから絞るので多めに読む
   if (error) throw new Error(error.message);
   let cards = orderCards(((data || []) as TriageRow[]).filter(isDeskRow).map(toCard)).slice(0, limit);
   if (opts.item) {

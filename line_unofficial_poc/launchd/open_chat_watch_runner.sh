@@ -36,5 +36,27 @@ while /usr/bin/pgrep -f 'application\.jp\.naver\.line\.mac|/Applications/LINE\.a
   sleep 30
 done
 
-# 常駐は QR 禁止。トークン切れ時は healthcheck が NEEDS_RELOGIN を出す。
-exec "$REPO_DIR/run_patch.sh" chrline_open_chat_realtime_watch.py --routes-yaml "$ROUTES_YAML" --verbose
+# 常駐は QR 禁止。保存トークンが無効になると chrline_client_utils が「再ログインが必要」印を書く。
+# 印がある間は LINE に触らず待つ（KeepAlive による起動のくり返し・403 の連打を防ぐ。2026-11-10）。
+# QR 再ログインに成功すると印が消え、ここを抜けて監視が再開する。
+GUARD="$REPO_DIR/watch_relogin_guard.py"
+waiting=0
+while ! /usr/bin/python3 "$GUARD" --check; do
+  if [[ "$waiting" -eq 0 ]]; then
+    echo "[watch] 再ログイン待ち（印: watch_relogin_required.json）。LINE には触らず待機します" >&2
+    /usr/bin/python3 "$GUARD" --notify || true
+    waiting=1
+  fi
+  sleep "${LINE_WATCH_RELOGIN_POLL_SEC:-300}"
+done
+
+set +e
+"$REPO_DIR/run_patch.sh" chrline_open_chat_realtime_watch.py --routes-yaml "$ROUTES_YAML" --verbose
+rc=$?
+set -e
+if /usr/bin/python3 "$GUARD" --check; then
+  exit "$rc"
+fi
+# 今回の終了で印が付いた → #ops に 1 回だけ知らせ、次の起動からは上の待機に入る
+/usr/bin/python3 "$GUARD" --notify || true
+exit 0

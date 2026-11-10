@@ -189,10 +189,129 @@ def _is_refreshable_token_error(exc: BaseException) -> bool:
     return False
 
 
-def _try_refresh_access_token(cl, save_root: Path) -> bool:
-    """保存済み refreshToken で accessToken を更新する（CHRLINE-Patch V3）。"""
+# ---------------------------------------------------------------- refreshToken ローテーション対応（2026-11-10）
+# CHRLINE 本体の tryRefreshToken は、更新応答の新しい refreshToken（field 5）を捨てて古いものを
+# 保存し直す。LINE が refreshToken を入れ替えると古いものは 403 になり、1〜2 週ごとに QR が要った。
+# 本体は書き換えず、ここで「新しい refreshToken を保存」「更新はロック付きで 1 か所」にする。
+TOKEN_REFRESH_LOCK = ".token_refresh.lock"
+_refresh_lock_depth: dict[str, int] = {}
+
+
+@contextmanager
+def _refresh_lock(save_root: Path):
+    """プロセスをまたぐ排他（fcntl）。同じプロセス内で入れ子になっても固まらないよう再入可。"""
+    key = str((save_root / TOKEN_REFRESH_LOCK).resolve())
+    if _refresh_lock_depth.get(key, 0) > 0:
+        _refresh_lock_depth[key] += 1
+        try:
+            yield
+        finally:
+            _refresh_lock_depth[key] -= 1
+        return
+    with _file_lock(save_root / TOKEN_REFRESH_LOCK):
+        _refresh_lock_depth[key] = 1
+        try:
+            yield
+        finally:
+            _refresh_lock_depth[key] = 0
+
+
+def _refresh_dir(save_root: Path) -> Path:
+    return save_root / ".refreshToken"
+
+
+def save_refresh_token(save_root: Path, access_token: str, refresh_token: str) -> None:
+    """CHRLINE と同じ md5(accessToken) 名で保存し、`.refreshToken/latest` にも正本を置く。値はログに出さない。"""
+    rt = (refresh_token or "").strip()
+    at = (access_token or "").strip()
+    if len(rt) < 30:
+        return
+    d = _refresh_dir(save_root)
+    d.mkdir(parents=True, exist_ok=True)
+    if len(at) >= 8:
+        (d / md5(at.encode()).hexdigest()).write_text(rt, encoding="utf-8")
+    (d / "latest").write_text(rt, encoding="utf-8")
+
+
+def read_refresh_token_for(save_root: Path, access_token: str | None) -> str | None:
+    """今の accessToken に対応する refreshToken。無ければ `latest`。"""
+    d = _refresh_dir(save_root)
+    cands = []
+    if access_token:
+        cands.append(d / md5(access_token.strip().encode()).hexdigest())
+    cands.append(d / "latest")
+    for f in cands:
+        if f.is_file():
+            t = f.read_text(encoding="utf-8", errors="replace").strip()
+            if len(t) >= 30:
+                return t
+    return None
+
+
+def _value(cl, obj, name: str, idx: int):
     try:
-        cl.tryRefreshToken()
+        v = cl.checkAndGetValue(obj, name, idx)
+    except Exception:
+        v = None
+    if v is None and isinstance(obj, dict):
+        v = obj.get(name, obj.get(idx))
+    return v
+
+
+def _adopt_access_token(cl, token: str) -> None:
+    """クライアントの accessToken を差し替える（CHRLINE の handleNextToken と同じ扱い）。"""
+    old = (getattr(cl, "authToken", None) or "").strip()
+    if old and hasattr(cl, "handleNextToken"):
+        try:
+            cl.handleNextToken(token)
+            return
+        except Exception:
+            pass
+    cl.authToken = token
+
+
+def refresh_with_rotation(cl, save_root: Path, refresh_token: str) -> str:
+    """refreshToken で更新し、応答の新しい refreshToken（無ければ同じもの）を保存する。新しい accessToken を返す。"""
+    ratr = cl.refreshAccessToken(refresh_token)
+    access = str(_value(cl, ratr, "accessToken", 1) or "").strip()
+    if len(access) < 30:
+        raise RuntimeError("refresh 応答に accessToken が無い")
+    new_rt = str(_value(cl, ratr, "refreshToken", 5) or "").strip() or refresh_token
+    _adopt_access_token(cl, access)
+    persist_auth_token(save_root, access)
+    save_refresh_token(save_root, access, new_rt)
+    return access
+
+
+def refresh_access_token_locked(cl, save_root: Path) -> bool:
+    """更新はロック付きで 1 か所。ロックを取ったら最新の保存を読み直し、
+    他のプロセスが更新済みならそれを使うだけ（LINE には問い合わせない）。"""
+    before = (getattr(cl, "authToken", None) or "").strip()
+    with _refresh_lock(save_root):
+        latest = _read_latest_saved_token(save_root)
+        if latest and before and latest != before:
+            _adopt_access_token(cl, latest)
+            return True
+        rt = read_refresh_token_for(save_root, before)
+        if not rt:
+            raise ValueError("RefreshToken missing.")
+        refresh_with_rotation(cl, save_root, rt)
+        return True
+
+
+def install_rotation_safe_refresh(cl, save_root: Path):
+    """CHRLINE 内部の自動更新（x-line-access-refresh-required）もこちらを通す。"""
+    try:
+        cl.tryRefreshToken = lambda: refresh_access_token_locked(cl, save_root)
+    except Exception:
+        pass
+    return cl
+
+
+def _try_refresh_access_token(cl, save_root: Path) -> bool:
+    """保存済み refreshToken で accessToken を更新する（CHRLINE-Patch V3・ローテーション対応・ロック付き）。"""
+    try:
+        refresh_access_token_locked(cl, save_root)
     except Exception as exc:
         print(f"# refreshToken 失敗: {type(exc).__name__}: {str(exc)[:120]}", file=sys.stderr)
         return False
@@ -530,6 +649,7 @@ def try_client_from_saved_tokens_only(save_root: Path):
                 savePath=str(save_root),
                 **chrline_constructor_kwargs(),
             )
+            install_rotation_safe_refresh(cl, save_root)
             _init_client_all_with_v3_refresh(cl, save_root)
             # latest 正本を更新（md5 ファイル名の取りこぼし防止）
             _persist_client_session(save_root, cl)
@@ -560,40 +680,52 @@ def try_client_from_saved_tokens_only(save_root: Path):
 def _try_client_from_refresh_tokens_only(save_root: Path):
     """
     .tokens が空または accessToken 失効時、.refreshToken/ の refreshToken から復旧する。
-    CHRLINE-Patch V3 向け。
+    CHRLINE-Patch V3 向け。正本 `latest` を最初に試し、応答の新しい refreshToken を保存する（ロック付き）。
     """
     from CHRLINE import CHRLINE
 
-    refresh_files = _iter_refresh_token_files_newest_first(save_root)
-    if not refresh_files:
-        return None
     max_try = 5
-    cl = CHRLINE(
-        savePath=str(save_root),
-        noLogin=True,
-        **chrline_constructor_kwargs(),
-    )
-    for rf in refresh_files[:max_try]:
-        refresh_token = rf.read_text(encoding="utf-8", errors="replace").strip()
-        if len(refresh_token) < 30:
-            continue
-        try:
-            ratr = cl.refreshAccessToken(refresh_token)
-            access = cl.checkAndGetValue(ratr, "accessToken", 1)
-            if not access or len(str(access).strip()) < 30:
+    with _refresh_lock(save_root):
+        # 待っている間に他プロセスが復旧していれば、それを使う
+        latest_access = _read_latest_saved_token(save_root)
+        if latest_access:
+            try:
+                cl = CHRLINE(latest_access, savePath=str(save_root), **chrline_constructor_kwargs())
+                install_rotation_safe_refresh(cl, save_root)
+                cl.initAll()
+                _persist_client_session(save_root, cl)
+                return cl
+            except Exception:
+                pass
+        refresh_files = _iter_refresh_token_files_newest_first(save_root)
+        latest_rt = _refresh_dir(save_root) / "latest"
+        refresh_files = ([latest_rt] if latest_rt.is_file() else []) + [f for f in refresh_files if f.name != "latest"]
+        if not refresh_files:
+            return None
+        cl = CHRLINE(
+            savePath=str(save_root),
+            noLogin=True,
+            **chrline_constructor_kwargs(),
+        )
+        seen: set[str] = set()
+        for rf in refresh_files[:max_try]:
+            refresh_token = rf.read_text(encoding="utf-8", errors="replace").strip()
+            if len(refresh_token) < 30 or refresh_token in seen:
                 continue
-            cl.authToken = str(access).strip()
-            persist_auth_token(save_root, cl.authToken)
-            cl.saveCacheData(".refreshToken", cl.authToken, refresh_token)
-            _init_client_all_with_v3_refresh(cl, save_root)
-            print("# refreshToken から accessToken を復旧しました", file=sys.stderr)
-            return cl
-        except Exception as exc:
-            print(
-                f"# refreshToken 試行失敗 ({rf.name}): {type(exc).__name__}: {str(exc)[:80]}",
-                file=sys.stderr,
-            )
-            continue
+            seen.add(refresh_token)
+            try:
+                refresh_with_rotation(cl, save_root, refresh_token)
+                install_rotation_safe_refresh(cl, save_root)
+                cl.initAll()
+                _persist_client_session(save_root, cl)
+                print("# refreshToken から accessToken を復旧しました", file=sys.stderr)
+                return cl
+            except Exception as exc:
+                print(
+                    f"# refreshToken 試行失敗 ({rf.name}): {type(exc).__name__}: {str(exc)[:80]}",
+                    file=sys.stderr,
+                )
+                continue
     return None
 
 
@@ -906,6 +1038,19 @@ def open_chat_session_lock(save_root: Path, *, blocking: bool = True):
         yield
 
 
+def _relogin_marker(action: str, reason: str = "") -> None:
+    """常駐監視の「再ログインが必要」印（watch_relogin_guard.py）。失敗しても本処理は止めない。"""
+    try:
+        import watch_relogin_guard as g  # 同じフォルダ
+
+        if action == "mark":
+            g.write_marker(reason)
+        else:
+            g.clear_marker()
+    except Exception:
+        pass
+
+
 def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = False):
     """保存済み authToken で CHRLINE を初期化。失効時、allow_qr_login=True のときだけ QR 再認証に進む。"""
     global _qr_logins_this_process
@@ -917,9 +1062,11 @@ def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = False):
     cl = try_client_from_saved_tokens_only(save_root)
     if cl is not None:
         _process_client_cache[cache_key] = cl
+        _relogin_marker("clear")
         return cl
 
     if not allow_qr_login:
+        _relogin_marker("mark", "保存トークンが無効（更新を LINE が拒否）・QR 再認証は不許可")
         print(
             "保存トークンが無効です。QR再認証は許可されていないため終了します。"
             "（取り込み確認などで再ログインするときは、当該スクリプトに --allow-qr-login を付けて実行するか、"
@@ -954,6 +1101,12 @@ def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = False):
             file=sys.stderr,
         )
         cl = _perform_qr_relogin(save_root)
+        install_rotation_safe_refresh(cl, save_root)
+        try:  # QR ログインで CHRLINE が保存した refreshToken を正本 latest にも置く
+            save_refresh_token(save_root, cl.authToken, read_refresh_token_for(save_root, cl.authToken) or "")
+        except Exception:
+            pass
         _qr_logins_this_process += 1
         _process_client_cache[cache_key] = cl
+        _relogin_marker("clear")
         return cl

@@ -74,7 +74,8 @@ def load_credentials(
     if creds and creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
-            TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
+            from jarvis_google_token_save import save_creds_keep_scopes
+            save_creds_keep_scopes(TOKEN_PATH, creds)
         except Exception:
             creds = None
 
@@ -103,7 +104,8 @@ def load_credentials(
                 bind_addr="127.0.0.1",
                 **url_kw,
             )
-        TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
+        from jarvis_google_token_save import save_creds_keep_scopes
+        save_creds_keep_scopes(TOKEN_PATH, creds)
         print(f"token を保存しました: {TOKEN_PATH}", file=sys.stderr)
 
     return creds

@@ -93,7 +93,8 @@ def gmail_service():
     creds = Credentials.from_authorized_user_file(str(path), SCOPES)
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        path.write_text(creds.to_json(), encoding="utf-8")
+        from jarvis_google_token_save import save_creds_keep_scopes
+        save_creds_keep_scopes(path, creds)
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
 
 

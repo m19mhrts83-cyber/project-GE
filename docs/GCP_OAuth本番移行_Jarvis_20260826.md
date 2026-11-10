@@ -70,6 +70,7 @@
 | 取込後に send が消える | 狭い scopes での再同意／保存で JSON の scopes が上書き | `merge_gmail_scopes_for_persist` ＋再同意時は既存 gmail.* を合流（`resolve_scopes_for_oauth_flow`） | **2026-10-15 済** |
 | Cloud／GHA 送信だけ古い | Mac で estate 再同意しても `GMAIL_ESTATE_TOKEN_B64` が追従しない | `gmail_token_sync` がフルスコープ時に project-GE Secret を更新 | **2026-10-15 済** |
 | 切れに気づかない | ヘルスが手動のみ | 朝オープン＋パートナー確認前半に `jarvis_gmail_token_health --mark-prompted` | **2026-10-15 済** |
+| 毎朝 5:01 に「送信は要再同意」（実際は許可が生きている） | `jarvis_app_dev_cards_morning.py` などが readonly で読み込み→refresh→`to_json()` をそのまま保存し、scopes 記録が readonly だけに落ちる（11/8〜11/10 の NG はすべてこれ。invalid_grant は0件） | 保存口を `scripts/jarvis_google_token_save.save_creds_keep_scopes` に一本化（#304、同じ refresh_token なら既存スコープを残す）。ヘルスは記録不足のとき refresh で実際の許可を確かめ、生きていれば記録を自動で直す（再同意なし） | **2026-11-10** |
 
 **estate 送信不足の是正（必須コマンド）**:
 
