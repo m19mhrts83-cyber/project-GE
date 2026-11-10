@@ -315,6 +315,83 @@ class Phase1SyncTests(unittest.TestCase):
         self.assertEqual(target["work_status"], "done")
 
 
+class CloseResolvedTests(unittest.TestCase):
+    def _sb(self):
+        sb = _FakeSB()
+        sb.db["comm_items"] = [
+            {"id": "i1", "work_status": "needs_reply", "party_id": "p", "subject": "送った"},
+            {"id": "i2", "work_status": "needs_reply", "party_id": "p", "subject": "見送り"},
+            {"id": "i3", "work_status": "needs_reply", "party_id": "p", "subject": "まだ"},
+            {"id": "i4", "work_status": "needs_reply", "party_id": "p", "subject": "つながり無し"},
+            {"id": "i5", "work_status": "needs_reply", "party_id": "p", "subject": "triage 行が無い"},
+            {"id": "i6", "work_status": "needs_reply", "party_id": "p", "subject": "混在"},
+            {"id": "i7", "work_status": "done", "party_id": "p", "subject": "逆向き"},
+        ]
+        sb.db["triage_items"] = [
+            {"id": "t1", "status": "sent", "lane": "partner", "comm_item_id": "i1"},
+            {"id": "t2", "status": "skipped", "lane": "partner", "comm_item_id": None},
+            {"id": "t3", "status": "pending", "lane": "general", "comm_item_id": None},
+            {"id": "t6a", "status": "skipped", "lane": "partner", "comm_item_id": None},
+            {"id": "t6b", "status": "todoist", "lane": "partner", "comm_item_id": None},
+            {"id": "t7", "status": "pending", "lane": "partner", "comm_item_id": "i7"},
+        ]
+        sb.db["comm_links"] = [
+            {"item_id": "i2", "target_type": "triage_item", "target_id": "t2"},
+            {"item_id": "i3", "target_type": "triage_item", "target_id": "t3"},
+            {"item_id": "i5", "target_type": "triage_item", "target_id": "gone"},
+            {"item_id": "i6", "target_type": "triage_item", "target_id": "t6a"},
+            {"item_id": "i6", "target_type": "triage_item", "target_id": "t6b"},
+        ]
+        return sb
+
+    def _ws(self, sb):
+        return {r["id"]: r["work_status"] for r in sb.db["comm_items"]}
+
+    def test_resolved_work_status(self):
+        self.assertEqual(hub.resolved_work_status(["sent"]), "done")
+        self.assertEqual(hub.resolved_work_status(["skipped", "todoist"]), "done")
+        self.assertEqual(hub.resolved_work_status(["skipped", "info"]), "no_action")
+        self.assertIsNone(hub.resolved_work_status(["skipped", "pending"]))
+        self.assertIsNone(hub.resolved_work_status(["missing"]))
+        self.assertIsNone(hub.resolved_work_status([]))
+
+    def test_dry_run_does_not_write(self):
+        sb = self._sb()
+        st = hub.close_resolved(sb, apply=False)
+        self.assertEqual((st["to_done"], st["to_no_action"]), (2, 1))
+        self.assertEqual(set(self._ws(sb).values()), {"needs_reply", "done"})
+        self.assertEqual(self._ws(sb)["i1"], "needs_reply")
+
+    def test_apply_closes_only_fully_closed(self):
+        sb = self._sb()
+        hub.close_resolved(sb, apply=True)
+        ws = self._ws(sb)
+        self.assertEqual(ws["i1"], "done")  # sent（comm_item_id 経由）
+        self.assertEqual(ws["i2"], "no_action")  # skipped（comm_links 経由）
+        self.assertEqual(ws["i6"], "done")  # skipped + todoist
+        self.assertEqual(ws["i3"], "needs_reply")  # general の pending は残す
+        self.assertEqual(ws["i4"], "needs_reply")  # つながり無しは触らない
+        self.assertEqual(ws["i5"], "needs_reply")  # triage 行が見つからないものは触らない
+        self.assertEqual(ws["i7"], "done")  # 逆向きは直さない
+
+    def test_link_pending_runs_close(self):
+        sb = self._sb()
+        st = hub.link_pending(sb, apply=True)
+        self.assertEqual((st["closed_done"], st["closed_no_action"]), (2, 1))
+        self.assertEqual(self._ws(sb)["i2"], "no_action")
+
+    def test_reconcile_counts(self):
+        c = hub.reconcile_counts(self._sb())
+        self.assertEqual(c["a"], 1)  # t7（partner の pending）
+        self.assertEqual(c["b"], 0)  # partner の pending につながる needs_reply は無い
+        self.assertEqual(c["b_general"], 1)  # i3（general の pending）
+        self.assertEqual(c["stale"], 3)
+        self.assertEqual(c["unlinked"], 1)
+        self.assertEqual(c["reverse"], 1)  # t7 → i7 は done
+        self.assertFalse(hub.reconcile_ok(c))
+        self.assertTrue(hub.reconcile_ok({"a": 2, "b": 2, "a_unlinked": 0, "stale": 0, "reverse": 0}))
+
+
 class DedupeSyncTests(unittest.TestCase):
     def test_existing_variant_with_other_external_id_not_reinserted(self):
         now = datetime.now(JST)

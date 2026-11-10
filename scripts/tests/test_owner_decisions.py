@@ -90,7 +90,9 @@ class LinkPendingTests(unittest.TestCase):
     def test_dry_run_counts_without_writing(self):
         sb = self._sb()
         st = hub.link_pending(sb, apply=False)
-        self.assertEqual(st, {"pending_unlinked": 2, "matched": 1, "created": 1, "skipped": 0})
+        # link_pending は続けて閉じ残しの戻し（close_resolved）も行う。ドライランでリンクが無いので 0 件
+        self.assertEqual(st, {"pending_unlinked": 2, "matched": 1, "created": 1, "skipped": 0,
+                              "closed_done": 0, "closed_no_action": 0, "_closed_items": []})
         self.assertEqual(len(sb.db["comm_items"]), 1)
         self.assertIsNone(sb.db["triage_items"][0]["comm_item_id"])
 
