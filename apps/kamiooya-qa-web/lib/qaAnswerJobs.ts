@@ -1,5 +1,5 @@
 export type AnswerActor = {id:string;authVersion:string;sessionRef:string};
-export type AnswerMode = 'normal'|'semantic'|'fast';
+export type AnswerMode = 'normal'|'semantic'|'fast'|'deep';
 export type AnswerJob = {
  id:string;user_id:string;chat_id:string;request_id:string;request_hash:string;auth_version:string;parent_session_ref:string;
  mode:AnswerMode;query:string;status:'running'|'done'|'failed';deadline_at:string;result?:unknown;error_code?:string;
@@ -37,7 +37,7 @@ export function createAnswerJobs(d:{
  return {
   async start(actor:AnswerActor,chatId:string,input:Record<string,unknown>){
    const requestId=String(input.request_id||''),query=typeof input.query==='string'?input.query.trim():'',mode=String(input.mode||'');
-   if(!uuid.test(requestId)||!query||query.length>4000||!['normal','semantic','fast'].includes(mode))throw new AnswerJobError('invalid_answer_request');
+   if(!uuid.test(requestId)||!query||query.length>4000||!['normal','semantic','fast','deep'].includes(mode))throw new AnswerJobError('invalid_answer_request');
    const inputHash=await hash(JSON.stringify([chatId,mode,query]));
    const admitted=await d.store.admit({user_id:actor.id,chat_id:chatId,request_id:requestId,request_hash:inputHash,auth_version:actor.authVersion,parent_session_ref:actor.sessionRef,mode:mode as AnswerMode,query,deadline_at:new Date(now()+ANSWER_BUDGET_MS).toISOString()});
    if(admitted.conflict)throw new AnswerJobError('answer_request_conflict',409);
