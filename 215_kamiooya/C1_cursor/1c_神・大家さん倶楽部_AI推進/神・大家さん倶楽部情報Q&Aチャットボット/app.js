@@ -1985,6 +1985,8 @@ const App = {
   displaySourceTitle: (title) => {
     return String(title || '')
       .replace(/^\s*【[^】]*(?:暫定|自動字幕)[^】]*】\s*/, '')
+      // 取込時に付けた Vimeo の番号「（動画1106455203）」は会員には不要なので出さない（11/11 松野さん）
+      .replace(/\s*[（(]動画\s*[0-9０-９]+[）)]/g, '')
       .trim();
   },
 
