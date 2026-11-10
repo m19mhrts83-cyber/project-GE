@@ -27,33 +27,20 @@ Cloud側は一時キュー。本文は最大30日 pending とし、通常のMac�
 - Mac: `scripts/jarvis_obsidian_review_inbox.py`
 - LaunchAgent雛形: `launchd/obsidian_review_inbox_runner.sh`, `launchd/install_obsidian_review_inbox_launchd.sh`
 
-## 初回有効化手順（未実施）
+## 本番設定状況
 
-1. Migration `20261110_obsidian_review_inbox.sql` は2026-11-10にJarvis Supabaseへ適用済み。APIコードが本番反映される前にキュー表だけ作成済み。
-2. 十分にランダムな別々のキーを2つ生成する。値はMacの `.env.jarvis_private`、Vercel Secret、ChatGPT Siteのserver-side secret設定だけに入れ、git・チャット・Siteの本文や画面側コードへ書かない。
-   - `OBSIDIAN_REVIEW_SUBMIT_KEY`: ChatGPT Site pluginからqueueへsubmit
-   - `OBSIDIAN_REVIEW_POLL_KEY`: MacポーラーのGET/ack
-3. Vercel `jarvis-dashboard` のEnvironment Variablesに両キーを設定し、レビュー承認後に該当ブランチを本番へdeployする。既存FlowForge読取APIの権限・キーとは共有しない。
-4. `.env.jarvis_private` に上記2変数を設定する（値を表示しない）。必要なら `OBSIDIAN_REVIEW_INBOX_URL` でDashboard base URLを上書きする。
-5. ChatGPT Plusでは直接の外部MCP write connectorは使えないため、ChatGPT Sites上のprivate pluginにMCP toolを追加し、server-side secret `OBSIDIAN_REVIEW_SUBMIT_KEY` を使って `POST /api/obsidian-review/submit` を呼ぶ。OpenAI公式案内ではSitesはPlus/Proで利用可能だが、サイトの作成・公開とプラグイン接続は別手順。既存FlowForge read-only MCPとは別プラグインにする。
-6. Site pluginの指示: `submit_daily_review` だけを公開し、「今日のレビューを確定」で日本時間の日付・会話で確認できる生ログ・確定した戦術レビューを送る。UUID v4を作成し、再試行には同じUUIDを使う。レスポンスが受付だけであることを明言し、Vault/Drive同期前に保存完了と案内しない。
-7. 手動起動で受信→Vault→OGD→ackを確認し、その後 `launchd/install_obsidian_review_inbox_launchd.sh` を実行する。確認には試験用レビューを使い、iPhone側への到達も見る。
+- Supabase migration `20261110_obsidian_review_inbox.sql` を2026-11-10に適用済み。キューは一時保管のみで、ack時にレビュー本文を消去する。
+- `jarvis-dashboard` のAPIを本番へ反映済み。送信キーとMac取得キーは別々に生成し、Vercel ProductionとMacの `.env.jarvis_private` に設定済み。値は表示・記録しない。
+- ChatGPT Site **Obsidian 日次レビュー**をowner-onlyで公開済み: <https://obsidian-daily-review.cherishedcatfish1.chatgpt.site>
+- SiteのMCP pluginはChatGPTにインストール済み。公開後の `server/discover` と `tools/list` は成功し、ツールは `submit_daily_review` のみ。
+- Mac LaunchAgent `com.matsunoma.jarvis.obsidian-review-inbox` は60秒間隔で稼働中。正本Vaultと既存Google Drive Syncの状態を確認し、認証付きdry-run取得も成功した。
+- 実レビューを使ったVault/Drive書き込みはまだ行っていないため、iPhoneへの実到達までは未確認。初回の実運用で保存・同期ログを確認する。
 
-### ChatGPT Sitesでの作成依頼文
+## ChatGPTでの利用
 
-Site作成時に以下を使い、OpenAPIファイル `docs/obsidian-review-submit-openapi.yaml` もSiteのreference資料として渡す。キー値はSite作成チャットへ貼らず、SiteのEnvironment/Secrets UIで `OBSIDIAN_REVIEW_SUBMIT_KEY` として登録する。Siteがサーバー側SecretとしてAPIへ渡せない場合は、キーをブラウザ側・Site内容・ソース・URLへ移さず、設定を止める。
+新しいChatGPTチャットを開き、プラグイン **Obsidian 日次レビュー**を使える状態にして日次レビューを行う。レビューの最後に **「今日のレビューを確定」** と伝えると、会話で確認できる生ログと戦術レビューを `submit_daily_review` が送信する。今回プラグインを追加した既存チャットにはツール一覧が反映されない場合があるため、新しいチャットで開始する。
 
-```text
-このSiteを自分だけが使うprivate pluginとして仕上げてください。
-MCP toolは submit_daily_review の1つだけにしてください。
-実行条件は私が「今日のレビューを確定」と明示したときだけです。
-toolは会話で確認できる生ログと確定した戦術レビューを分け、日本時間の日付とUUID v4を付け、次のAPIへPOSTしてください:
-https://jarvis-dashboard-amber.vercel.app/api/obsidian-review/submit
-OpenAPI: docs/obsidian-review-submit-openapi.yaml
-Authorization: BearerはSiteのserver-side secret OBSIDIAN_REVIEW_SUBMIT_KEYから設定し、ブラウザ側コードやSite本文へ出さないでください。
-リトライ時は同じreview_idを再利用してください。APIの202は受け付けただけです。MacのObsidian/Drive同期完了前に保存完了と表示しないでください。
-読み取り・検索・編集・削除のtoolは追加しないでください。公開前にtoolの送信先、権限、secretの扱いを確認してください。
-```
+ChatGPTの返答は「受付済み」で、Vaultへの保存完了ではない。Macが起動・オンラインなら通常60秒以内にVaultへ2つのMarkdownを作成し、既存 `jarvis_obsidian_ogd_retag.py` 経由で同期した後にキューをackする。Macがsleep/offline中は復帰後に処理する。
 
 ## Macでの手動実行
 
@@ -66,7 +53,7 @@ set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_obsidian_review_inbox.py
 ```
 
-`--dry-run` はpending IDと日付だけを表示し、Vaultファイル作成・期限切れキュー削除は行わない。通常実行はVaultとDriveに書き込むため、運用開始時の人の確認後に行う。
+`--dry-run` はpending IDと日付だけを表示し、Vaultファイル作成・期限切れキュー削除は行わない。LaunchAgentが稼働中の通常運用では手動実行しない。エラー調査時はログを確認してから、LaunchAgentを停止して手動実行する。
 
 ## 制約・運用
 
@@ -75,4 +62,4 @@ set +a
 - ChatGPTに見えている会話内容だけが生ログ対象。サービス側にある非表示の会話履歴を取得する機能ではない。
 - ChatGPT Plusの直接カスタムMCP接続はread/fetch権限まで。書込みアクションにはSites hosted plugin等のPlus対応経路を使う。APIルート側にはMCP実装もあるが、Business/Enterprise/Edu等でFull MCPが使える場合の選択肢。
 - 受信payloadはレビュー本文を含む。Vaultが正本で、Cloudキューは一時保管。APIキーと本文をログ出力しない。
-- 本番DB migrationは2026-11-10適用済み。Vercel Secrets、デプロイ、LaunchAgent登録、ChatGPT Site接続は別途有効化が必要。
+- LaunchAgentログは `~/Library/Logs/jarvis_obsidian_review/`。`saved and synced` はVault保存と既存OGD同期の両方が成功した記録。
