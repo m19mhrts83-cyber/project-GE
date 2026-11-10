@@ -1,0 +1,274 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>312 作業フロー</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+/* Color: auto(teal) / human decision(amber) / record(slate). Type: Noto Sans JP + Plex Mono for times.
+   Layout: three stage columns (入口 → 日曜の週次 → 反映と週中), decision cards stand out, record band underneath. */
+:root{
+  --bg:#f3f6f7; --panel:#ffffff; --ink:#18232b; --muted:#5a6a75; --line:#d5dee3;
+  --auto:#1f6b70; --auto-bg:#e3f1f1;
+  --dec:#9a5b00; --dec-bg:#fff2d6; --dec-line:#e0a526;
+  --rec:#3d4f66; --rec-bg:#e8edf4;
+  --ok:#1d7a46; --wait:#7a5a00; --todo:#8a3b3b;
+  --font:"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f171c; --panel:#18232b; --ink:#e6eef2; --muted:#9db0bb; --line:#2c3b46;
+  --auto:#6cc4c9; --auto-bg:#173236;
+  --dec:#f0b94a; --dec-bg:#3a2d10; --dec-line:#b98418;
+  --rec:#a9bdd6; --rec-bg:#1d2a3a;
+  --ok:#62c98e; --wait:#e4c466; --todo:#e29a9a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f171c; --panel:#18232b; --ink:#e6eef2; --muted:#9db0bb; --line:#2c3b46;
+  --auto:#6cc4c9; --auto-bg:#173236;
+  --dec:#f0b94a; --dec-bg:#3a2d10; --dec-line:#b98418;
+  --rec:#a9bdd6; --rec-bg:#1d2a3a;
+  --ok:#62c98e; --wait:#e4c466; --todo:#e29a9a; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.65;
+  padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto}
+h1{font-size:clamp(24px,4vw,34px);margin:0 0 6px;letter-spacing:.01em;text-wrap:balance}
+h2{font-size:19px;margin:44px 0 6px;text-wrap:balance}
+.lead{color:var(--muted);margin:0 0 18px;max-width:46em}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted);margin:14px 0 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.chip{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.chip.auto{background:var(--auto-bg);color:var(--auto)}
+.chip.dec{background:var(--dec);color:var(--bg)}
+.chip.man{background:var(--rec-bg);color:var(--rec)}
+.chip.s-ok{background:transparent;color:var(--ok);border:1px solid var(--ok)}
+.chip.s-wait{background:transparent;color:var(--wait);border:1px solid var(--wait)}
+.chip.s-todo{background:transparent;color:var(--todo);border:1px solid var(--todo)}
+
+/* three stages */
+.stages{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:20px;align-items:start}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 14px 14px}
+.stage header{margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.stage h3{margin:0;font-size:16px}
+.when{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:2px}
+.step{position:relative;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;background:var(--bg)}
+.step + .step{margin-top:22px}
+.step + .step::before{content:"";position:absolute;left:24px;top:-22px;height:22px;border-left:2px solid var(--line)}
+.step + .step::after{content:"";position:absolute;left:19px;top:-8px;border:6px solid transparent;border-top:7px solid var(--line);border-bottom:0}
+.step .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+.step .t{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.step b{font-weight:700}
+.step p{margin:2px 0 0}
+.step .note{color:var(--muted);font-size:12.5px;margin-top:4px}
+.step.auto{border-left:4px solid var(--auto)}
+.step.man{border-left:4px solid var(--rec)}
+.step.dec{background:var(--dec-bg);border:2px solid var(--dec-line)}
+.step.dec .n{font-weight:700;color:var(--dec)}
+.opts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0;padding:0;list-style:none}
+.opts li{font-size:12.5px;padding:1px 9px;border-radius:6px;background:var(--panel);border:1px solid var(--dec-line)}
+
+.loop{margin-top:16px;border:2px dashed var(--line);border-radius:10px;padding:12px 16px;font-size:14px;color:var(--muted);display:flex;gap:12px;align-items:center}
+.loop strong{color:var(--ink)}
+.rec{margin-top:16px;background:var(--rec-bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:14px}
+.rec b{color:var(--rec)}
+.rec ul{margin:6px 0 0;padding-left:1.2em}
+
+/* decision table */
+.scroll{overflow-x:auto;margin-top:10px}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:14px;background:var(--panel)}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border:1px solid var(--line)}
+th{background:var(--rec-bg);color:var(--rec);font-size:12.5px;letter-spacing:.04em;white-space:nowrap}
+td:first-child{white-space:nowrap;font-weight:700}
+td:first-child span{color:var(--dec)}
+
+/* review proposals */
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:14px}
+.card h4{margin:0 0 4px;font-size:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card p{margin:4px 0 0}
+.card .prop{color:var(--muted)}
+.card .prop b{color:var(--ink)}
+
+.dates{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:12px}
+.date{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px}
+.date .d{font-family:var(--mono);font-size:13px;color:var(--auto);font-weight:500}
+.foot{margin-top:40px;color:var(--muted);font-size:12.5px}
+
+@media (max-width:900px){
+  .stages{grid-template-columns:minmax(0,1fr)}
+  .cards{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="wrap">
+  <h1>312 起票整理係の作業フロー</h1>
+  <p class="lead">Slack で出た話が、Todoist のタスクになり、毎週の9件に置かれるまでの流れです。松野さんが判断する場面は4つだけで、自動で動く部分と見分けられるようにしました。</p>
+  <div class="legend">
+    <span><span class="chip auto">自動</span> GitHub Actions・Mac が動かす</span>
+    <span><span class="chip dec">判断</span> 松野さんが Nody で選ぶ</span>
+    <span><span class="chip man">人</span> 松野さんの普段の作業</span>
+  </div>
+
+  <div class="stages">
+    <!-- A -->
+    <section class="stage">
+      <header>
+        <h3>① 入口：話を拾う</h3>
+        <div class="when">月・水・金 20:30 ／ 反映は30分ごと</div>
+      </header>
+      <div class="step auto">
+        <div class="top"><span class="chip auto">自動</span></div>
+        <b>Slack の松野さんの発言を集める</b>
+        <p>#consult・#ai-hub・#report。AI が松野さん名義で出した報告文は形で外します。</p>
+      </div>
+      <div class="step auto">
+        <div class="top"><span class="chip auto">自動</span></div>
+        <b>「やりたい話」「どうなってますか？」を起こりと見て、3案を作る</b>
+        <p class="note">Slack のリンクで二重取込を防ぎ、似た Todoist タスクがあれば「既存：…」と添えます。</p>
+      </div>
+      <div class="step auto">
+        <div class="top"><span class="chip auto">自動</span></div>
+        <b>#consult に「起票候補 N件」と Nody のリンクを出す</b>
+      </div>
+      <div class="step dec">
+        <div class="top"><span class="chip dec">判断</span><span class="n">判断1</span><span class="t">Nody /312</span></div>
+        <b>この話をどうするか、3案から選ぶ</b>
+        <ul class="opts"><li>登録しない</li><li>既存タスクに追記</li><li>別タスクを作る</li></ul>
+        <p class="note">選ばなかった話は「未判断」のまま残り、日曜の候補に回ります。</p>
+      </div>
+      <div class="step auto">
+        <div class="top"><span class="chip auto">自動</span><span class="t">30分ごと</span></div>
+        <b>選んだ内容を Todoist に反映</b>
+        <p class="note">新規は 🦾依頼 の印つき。「登録しない」は何もしません。閉じる・統合・削除はしません（313の担当）。</p>
+      </div>
+    </section>
+
+    <!-- B -->
+    <section class="stage">
+      <header>
+        <h3>② 日曜の夜：1週間を決める</h3>
+        <div class="when">日 16:30 カレンダー ／ 17:00 候補作り ／ 夜に判断</div>
+      </header>
+      <div class="step auto">
+        <div class="top"><span class="chip auto">自動</span><span class="t">日 16:30（毎朝 6:30 も）</span></div>
+        <b>Mac が Google カレンダーを3週間分取り込む</b>
+        <p class="note">家族の予定・祝日・締切を、3週間のマスに出すための材料です。</p>
+      </div>
+      <div class="step auto">
+        <div class="top"><span class="chip auto">自動</span><span class="t">日 17:00</span></div>
+        <b>先週の結果と、今週のおすすめ9件を用意</b>
+        <p class="note">先週の完了・残り、締切や待たせ具合の点数、入口で未判断の話。#consult に知らせます。</p>
+      </div>
+      <div class="step dec">
+        <div class="top"><span class="chip dec">判断</span><span class="n">判断2</span><span class="t">/week ① 振り返り</span></div>
+        <b>先週残ったものを、なぜ残ったか・次どうするか</b>
+        <ul class="opts"><li>時間が足りない</li><li>相手待ち</li><li>大きすぎる</li><li>優先が下がった</li><li>AI開発に使った</li></ul>
+        <ul class="opts"><li>来週も入れる</li><li>分ける</li><li>AIに渡す</li><li>やめる</li></ul>
+      </div>
+      <div class="step dec">
+        <div class="top"><span class="chip dec">判断</span><span class="n">判断3</span><span class="t">/week ② 選んで置く</span></div>
+        <b>9件を月・水・金に3件ずつ置く</b>
+        <p>3週間のカレンダーを見ながら、AI が付けた選ぶ理由を直します。</p>
+        <p class="note">入口の未判断は「今週やる／入れる／見送る」で処置します。</p>
+      </div>
+      <div class="step dec">
+        <div class="top"><span class="chip dec">判断</span><span class="n">判断4</span><span class="t">/week ③ 確定</span></div>
+        <b>変更点を確かめて確定</b>
+        <p class="note">AI案から何件変えたか、期日が外れるものはどれか。外したくないものは「期日を残す」にします。外部の締切・行事は外れません。</p>
+      </div>
+    </section>
+
+    <!-- C -->
+    <section class="stage">
+      <header>
+        <h3>③ 反映と、1週間の回し方</h3>
+        <div class="when">確定の30分以内 ／ 月〜日</div>
+      </header>
+      <div class="step auto">
+        <div class="top"><span class="chip auto">自動</span><span class="t">30分ごと</span></div>
+        <b>確定を Todoist に反映</b>
+        <p class="note">期日を設定、選ばなかった期日を外す、残った理由をコメント、入口の話から 🦾依頼 タスクを作る、見送りは記録。</p>
+      </div>
+      <div class="step man">
+        <div class="top"><span class="chip man">人</span><span class="t">月・水・金</span></div>
+        <b>ベースの3件を進める</b>
+        <p class="note">慣れるまでは2件でも構いません。</p>
+      </div>
+      <div class="step man">
+        <div class="top"><span class="chip man">人</span><span class="t">火・木</span></div>
+        <b>派生や追加で出た分を入れる</b>
+        <p class="note">追加は都度リスケせず、受付箱に置いて次の日曜にまとめて見ます。</p>
+      </div>
+      <div class="step man">
+        <div class="top"><span class="chip man">人</span><span class="t">土・日</span></div>
+        <b>その週の残りを片づける</b>
+        <p class="note">期限ありは期日を維持して空き日へ。期限なしは次の日曜へ。</p>
+      </div>
+      <div class="step auto">
+        <div class="top"><span class="chip auto">313</span></div>
+        <b>終わったものの完了確認</b>
+        <p class="note">タスクを閉じるのは313です。312は閉じません。</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="loop"><strong>↻ 次の日曜へ</strong> 残ったものは判断2で理由を残してから、次の週の候補になります。2週続けて残ったものは「やめる／AIに渡す／分ける」を選びます。</div>
+
+  <div class="rec">
+    <b>判断ログ</b>（4つの判断はすべて記録されます）
+    <ul>
+      <li>判断1 → <code>task_loop_decisions</code>（選んだ案、反映先の Todoist ID）</li>
+      <li>判断2〜4 → <code>owner_decisions</code>（surface = weekly_pick。置いた／見送った／残った理由／確定。AI案と何が違ったかも残る）</li>
+      <li>これが日曜の候補作りの基準（rule-v1）を直す材料になります。</li>
+    </ul>
+  </div>
+
+  <h2>松野さんが判断する4つの場面</h2>
+  <p class="lead">見る場所と、選んだあとに何が起きるかの一覧です。</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>場面</th><th>いつ・どこで</th><th>見るもの</th><th>選ぶもの</th><th>選んだあと</th></tr></thead>
+    <tbody>
+      <tr><td><span>判断1</span> 入口</td><td>月水金の夜、Slack の通知から Nody /312</td><td>拾った話と、類似の既存タスク</td><td>登録しない／追記／別タスク</td><td>30分以内に Todoist へ。未判断は日曜へ</td></tr>
+      <tr><td><span>判断2</span> 振り返り</td><td>日曜の夜、Nody /week の①</td><td>先週の完了・残り、残ったタスク</td><td>残った理由（複数可）、次の一手、ひとこと</td><td>Todoist のコメントに残る。「やめる」「AIに渡す」は期日を外す</td></tr>
+      <tr><td><span>判断3</span> 選んで置く</td><td>日曜の夜、Nody /week の②</td><td>3週間カレンダー、おすすめ9件と点数の理由</td><td>どれを・何曜に・どんな理由で</td><td>AI案との差が記録される</td></tr>
+      <tr><td><span>判断4</span> 確定</td><td>日曜の夜、Nody /week の③</td><td>件数、日ごとの期日、外れる期日</td><td>確定／期日を残す／確定し直す</td><td>30分以内に Todoist が週の形になる</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>動き出す日</h2>
+  <div class="dates">
+    <div class="date"><div class="d">11/10（火）</div><span class="chip s-ok">済</span> Mac のカレンダー取込を設定。11/10〜12/6 の51件を取り込み済み</div>
+    <div class="date"><div class="d">11/11（水）20:30</div><span class="chip s-wait">初回待ち</span> 入口の最初の収集。ここで判断1の本物の候補が出ます</div>
+    <div class="date"><div class="d">11/15（日）16:30・17:00</div><span class="chip s-wait">初回待ち</span> カレンダー更新と、最初の候補作り。夜に判断2〜4</div>
+  </div>
+
+  <h2>見直しの提案</h2>
+  <p class="lead">図にして見えた、決めておきたい点です。どれも松野さんの返事で進められます。</p>
+  <div class="cards">
+    <div class="card">
+      <h4>入口の判断が2か所にある <span class="chip s-wait">要確認</span></h4>
+      <p>月水金の夜に選ぶのと、日曜にまとめて選ぶのと、2回の機会があります。</p>
+      <p class="prop"><b>案：</b>今のまま。夜は軽く選び、迷ったものだけ日曜に回す。日曜に10件を超えたら「まとめて見送り」を足します。</p>
+    </div>
+    <div class="card">
+      <h4>締切7日前のSlack通知がない <span class="chip s-todo">未実装</span></h4>
+      <p>ルールは決まっていますが、通知する仕組みはまだ作っていません。</p>
+      <p class="prop"><b>案：</b>月水金の入口の収集に相乗りして、締切が7日以内で期日が置かれていないものを1通で知らせます。</p>
+    </div>
+    <div class="card">
+      <h4>判断ログを基準に戻す道筋 <span class="chip s-todo">未接続</span></h4>
+      <p>ログは溜まりますが、おすすめの基準（rule-v1）を直すのは人が見る週次レビュー（314）を通してです。</p>
+      <p class="prop"><b>案：</b>3〜4週回して安定してから、AI案と違った置き方を見て版を上げます。それまでは基準を変えません。</p>
+    </div>
+    <div class="card">
+      <h4>決めていない2点 <span class="chip s-wait">お返事待ち</span></h4>
+      <p class="prop"><b>① </b>🤖（AIが自分の判断で入れたタスク）を Todoist の「今日」から外すか。</p>
+      <p class="prop"><b>② </b>「その日の枠が済むまで、AI開発を始めない」という約束にするか。</p>
+    </div>
+  </div>
+
+  <p class="foot">正本は <code>/mnt/project-files/agent-flow/312_flow.md</code>。この図の内容は、松野さんの確認後にそちらへも反映します。</p>
+</div>
+
+</body></html>
