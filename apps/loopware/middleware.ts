@@ -28,7 +28,19 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(u);
   }
 
-  if (await isValidSession(key, req.cookies.get(SESSION_COOKIE)?.value)) return NextResponse.next();
+  const cookie = req.cookies.get(SESSION_COOKIE)?.value;
+  if (await isValidSession(key, cookie)) {
+    // 開くたびに期限を延ばす（使っている端末では鍵を入れ直さずに済む）
+    const res = NextResponse.next();
+    res.cookies.set(SESSION_COOKIE, cookie as string, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: SESSION_DAYS * 86400,
+    });
+    return res;
+  }
 
   // Slack からのリンク（?t=）なら、その端末を覚えて t を外したURLへ
   const t = req.nextUrl.searchParams.get("t");
