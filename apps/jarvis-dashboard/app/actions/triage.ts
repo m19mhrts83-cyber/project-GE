@@ -1,5 +1,6 @@
 "use server";
 
+import { deskWorthy } from "@/lib/deskWorthy";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -361,8 +362,8 @@ export async function skipAllNonPartnerPending(
 }
 
 /**
- * ジャンル要約の「確認したよ」: kind=skim のみ skipped＋Gmail既読。
- * kind=mail（要確認）は残す。
+ * ジャンル要約の「確認したよ」: kind=skim と、判断デスクに出さない自動のお知らせを skipped＋Gmail既読。
+ * 人が判断するもの（lib/deskWorthy: 人が書いたメール・パートナー・支払いの失敗など）は残す。
  */
 export async function ackOtherMailDigestSkim(
   path: string,
@@ -376,7 +377,7 @@ export async function ackOtherMailDigestSkim(
   const supabase = await createClient();
   const { data: rows, error: fetchErr } = await supabase
     .from("triage_items")
-    .select("id,kind,status,gmail_message_id,account,payload")
+    .select("id,kind,status,lane,subject,from_email,original_body,gmail_message_id,account,payload")
     .in("id", ids)
     .eq("status", "pending");
   if (fetchErr) return { ok: false, error: fetchErr.message };
@@ -384,7 +385,8 @@ export async function ackOtherMailDigestSkim(
   const now = new Date().toISOString();
   let count = 0;
   for (const row of rows || []) {
-    if ((row.kind || "mail") !== "skim") continue;
+    // skim に加え、判断デスクに出さない自動のお知らせ（kind=mail）もまとめて片付けられる（2026-11-10）
+    if ((row.kind || "mail") !== "skim" && deskWorthy(row)) continue;
     const payload = await tryMarkTriageGmailRead({
       gmail_message_id: row.gmail_message_id,
       account: row.account,
@@ -407,8 +409,8 @@ export async function ackOtherMailDigestSkim(
     count,
     message:
       count > 0
-        ? `要約 ${count} 件を確認済み（既読）にしました`
-        : "要約用（skim）の未読はありません（要確認は個別に処置してください）",
+        ? `${count} 件を確認済み（既読）にしました`
+        : "まとめて片付けられる未読はありません（人が判断するものは個別に処置してください）",
   };
 }
 

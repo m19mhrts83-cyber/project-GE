@@ -102,6 +102,36 @@ def _parse_iso(s: str | None) -> datetime | None:
         return None
 
 
+def try_self_heal(path: Path, record: dict) -> bool:
+    """記録上のスコープが足りないとき、Google 側の実際の許可を確かめて記録を直す。
+
+    2026-11-10: 狭いスコープでの保存で scopes 記録だけが readonly に落ち、実際は送信の
+    許可が生きているのに「要再同意」と出続けていた。refresh_token で全スコープを要求して
+    通れば、scopes 記録をフルに戻す（ブラウザ・再同意なし）。通らなければ何もしない。
+    停止: JARVIS_GMAIL_TOKEN_SELF_HEAL=0
+    """
+    if os.environ.get("JARVIS_GMAIL_TOKEN_SELF_HEAL", "").strip() == "0":
+        return False
+    if not record.get("refresh_token"):
+        return False
+    try:
+        from google.auth.transport.requests import Request
+        from google.oauth2.credentials import Credentials
+
+        creds = Credentials.from_authorized_user_info(record, list(GMAIL_SCOPES_215))
+        creds.refresh(Request())
+        granted = set(getattr(creds, "granted_scopes", None) or [])
+        if granted and not set(GMAIL_SCOPES_215) <= granted:
+            return False
+        data = json.loads(creds.to_json())
+        data["scopes"] = list(GMAIL_SCOPES_215)
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return True
+    except Exception as e:  # invalid_grant など。本当の再同意が要る
+        print(f"# self-heal 不可 {path.name}: {type(e).__name__}", file=sys.stderr)
+        return False
+
+
 def collect_health() -> tuple[list[str], list[str], bool]:
     """Returns (lines, issues, estate_send_missing)."""
     lines: list[str] = ["📎 Gmail token ヘルス"]
@@ -135,6 +165,11 @@ def collect_health() -> tuple[list[str], list[str], bool]:
                 )
             continue
         full = token_satisfies_215_scopes(d)
+        if not full and refresh and try_self_heal(path, d):
+            d = json.loads(path.read_text(encoding="utf-8"))
+            granted = sorted(granted_scopes_from_token_record(d))
+            full = token_satisfies_215_scopes(d)
+            lines.append(f"- {label} ({name}): 記録のスコープを自動で直しました（Google 側の許可は有効・再同意なし）")
         read_mod = token_satisfies_read_modify_scopes(d)
         status = (
             "OK"

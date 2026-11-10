@@ -68,7 +68,8 @@ def _creds(*, force_auth: bool = False, auth_console: bool = False):
     if creds and creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
-            TOKEN_WRITE.write_text(creds.to_json(), encoding="utf-8")
+            from jarvis_google_token_save import save_creds_keep_scopes
+            save_creds_keep_scopes(TOKEN_WRITE, creds)
         except Exception:
             creds = None
     if not creds or not creds.valid:
@@ -79,7 +80,8 @@ def _creds(*, force_auth: bool = False, auth_console: bool = False):
             creds = flow.run_console(login_hint=LOGIN_HINT)
         else:
             creds = flow.run_local_server(port=0, login_hint=LOGIN_HINT)
-        TOKEN_WRITE.write_text(creds.to_json(), encoding="utf-8")
+        from jarvis_google_token_save import save_creds_keep_scopes
+        save_creds_keep_scopes(TOKEN_WRITE, creds)
     return creds
 
 

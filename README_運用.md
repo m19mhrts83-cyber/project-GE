@@ -23,16 +23,10 @@
    - 500 / 300: `git-repos/500_obsidian`、`git-repos/300_ai` を編集。
    - ProgramCode: `git-repos/ProgramCode` を編集（旧 `~/ProgramCode` はワークスペースから外し、1つのリポジトリでコミットする）。
 
-2. **コミット・push**  
-   - Cursor のワークスペースに **`~/git-repos`** を追加しておく。
-   - ソース管理で変更を確認し、**メッセージを入力 → コミット → Push**。  
-   - またはターミナルで:
-     ```bash
-     cd ~/git-repos
-     git add -A
-     git commit -m "ここにメッセージ"
-     git push
-     ```
+2. **コミット・push（2026-11-10 更新）**  
+   - おすすめは **ブランチ → PR → マージ**（AI に頼む作業はすべてこの形。決まりごとは地図の「Git の決まりごと」）。  
+   - 手元で小さな文書だけ直すときは、従来どおり Cursor のソース管理で **メッセージを入力 → コミット → Push** でもよい。ただし `apps/` のコードを main に直接 push すると、そのまま本番に出る（テストを通らない）ので避ける。  
+   - 作業を始める前に `git pull`（GitHub の最新を受け取る）。AI が別の場所で入れた変更とぶつからないようにするため。
 
 3. **215 を OneDrive から同期する場合（従来の rsync）**  
    - 運用メモは `215_kamiooya/C1_cursor/運用メモ_ローカル本番とGitHub.md` にあり、rsync コマンド等は従来どおり。  
