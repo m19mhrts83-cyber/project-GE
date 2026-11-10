@@ -190,9 +190,12 @@ const App = {
       App.state.viewAsMember = localStorage.getItem('qa_view_as_member') === '1';
     } catch (e) { /* ignore */ }
   },
-  // (5) ロゴに合わせた配色（案A）。見た目だけなので画面側の切り替えで足りる（色は index.html の html.theme-a）。
+  // (5) ロゴに合わせた配色（案A）。見た目だけなので画面側の切り替えで足りる（色は index.html と style.css の html.theme-a）。
+  // ログイン前の画面にも出せるよう、この端末で一度見えた人は覚えておく（見えない人がログインしたら消す）。
   applyTheme: () => {
-    if (document.documentElement) document.documentElement.classList.toggle('theme-a', App.featureOn('design_theme'));
+    const on = App.featureOn('design_theme');
+    if (document.documentElement) document.documentElement.classList.toggle('theme-a', on);
+    try { if (on) localStorage.setItem('qa_design_theme', '1'); else localStorage.removeItem('qa_design_theme'); } catch (e) { /* ignore */ }
   },
   renderFeaturePreviewBar: () => {
     const bar = document.getElementById('featurePreviewBar');
@@ -1350,7 +1353,10 @@ const App = {
     App.state.attachmentDetailCommentId = '';
     App.state.features = {};
     App.state.feedbackByMessage = {};
-    if (document.documentElement) document.documentElement.classList.remove('theme-a');
+    // ログアウト後のログイン画面は、この端末で配色が見えていた人だけ案Aのまま（applyTheme で覚えた分）
+    let keepTheme = false;
+    try { keepTheme = localStorage.getItem('qa_design_theme') === '1'; } catch (e) { /* ignore */ }
+    if (document.documentElement) document.documentElement.classList.toggle('theme-a', keepTheme);
     const featureBar = document.getElementById('featurePreviewBar');
     if (featureBar) featureBar.classList.add('hidden');
     App.state.currentUser = null;
