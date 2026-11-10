@@ -7,6 +7,11 @@ const App = {
 
   state: {
     currentUser: null,
+    // 段階公開スイッチ: サーバーが「この人に見えている」と返した機能だけ（/features）
+    features: {},
+    feedbackByMessage: {},
+    featureViewNew: true,
+    viewAsMember: false,
     authToken: '',
     attachmentToken: '',
     attachmentIndex: {},
@@ -166,12 +171,59 @@ const App = {
     App.showAuthView();
   },
 
+  // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認' },
+  featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
+  loadFeatures: async () => {
+    App.state.features = {};
+    if (!App.authGatewayBase) return; // 旧バックエンドには /features が無い → 全部オフ
+    try {
+      const r = await App.apiClient('GET', '/features');
+      if (r && r.features && typeof r.features === 'object') App.state.features = r.features;
+    } catch (e) {
+      App.state.features = {};
+    }
+    try {
+      App.state.featureViewNew = localStorage.getItem('qa_feature_view_new') !== '0';
+      App.state.viewAsMember = localStorage.getItem('qa_view_as_member') === '1';
+    } catch (e) { /* ignore */ }
+  },
+  renderFeaturePreviewBar: () => {
+    const bar = document.getElementById('featurePreviewBar');
+    if (!bar) return;
+    const names = Object.keys(App.state.features || {});
+    bar.classList.toggle('hidden', names.length === 0);
+    if (!names.length) return;
+    const viewNew = document.getElementById('featureViewNewToggle');
+    const asMember = document.getElementById('featureAsMemberToggle');
+    viewNew.checked = !!App.state.featureViewNew;
+    asMember.checked = !!App.state.viewAsMember;
+    document.getElementById('featurePreviewList').textContent = names.map(function (n) {
+      return (App.featureLabels[n] || n) + (App.state.features[n].members ? '（会員にも公開中）' : '（会員には未公開）');
+    }).join(' / ');
+    if (!bar.dataset.bound) {
+      bar.dataset.bound = '1';
+      viewNew.addEventListener('change', function () {
+        App.state.featureViewNew = viewNew.checked;
+        try { localStorage.setItem('qa_feature_view_new', viewNew.checked ? '1' : '0'); } catch (e) { /* ignore */ }
+        App.afterLogin();
+      });
+      asMember.addEventListener('change', function () {
+        App.state.viewAsMember = asMember.checked;
+        try { localStorage.setItem('qa_view_as_member', asMember.checked ? '1' : '0'); } catch (e) { /* ignore */ }
+        App.afterLogin();
+      });
+    }
+  },
+
   isStaffAdmin: () => {
+    if (App.state.viewAsMember && Object.keys(App.state.features || {}).length) return false;
     const role = App.state.currentUser && App.state.currentUser.role;
     return role === 'admin' || role === 'master_admin';
   },
 
   isMasterAdmin: () => {
+    if (App.state.viewAsMember && Object.keys(App.state.features || {}).length) return false;
     return !!(App.state.currentUser && App.state.currentUser.role === 'master_admin');
   },
 
@@ -1232,7 +1284,9 @@ const App = {
       return;
     }
     App.showMainView();
-    App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + App.state.currentUser.role + ')';
+    await App.loadFeatures();
+    App.renderFeaturePreviewBar();
+    App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + (App.isStaffAdmin() || !App.state.viewAsMember ? App.state.currentUser.role : 'user として表示中') + ')';
 
     const isAdmin = App.isStaffAdmin();
     const adminNav = document.getElementById('adminNavSection');
@@ -1282,6 +1336,10 @@ const App = {
     App.state.attachmentIndex = {};
     App.state.referenceComments={};App.state.attachmentStatus='';App.state.attachmentLoading=false;App.renderAttachmentStatus();
     App.state.attachmentDetailCommentId = '';
+    App.state.features = {};
+    App.state.feedbackByMessage = {};
+    const featureBar = document.getElementById('featurePreviewBar');
+    if (featureBar) featureBar.classList.add('hidden');
     App.state.currentUser = null;
     App.state.currentSessionId = null;
     App.state.chatSessions = [];
@@ -3282,7 +3340,8 @@ const App = {
           ? '<div class="md-body">' + App.formatAssistantHtml(App.linkReferenceLabels(m.content || '', messageCitations, msgId)) + '</div>'
           : App.escapeHtml(m.content || '')) +
         '</div>' +
-        (m.role === 'assistant' ? App.renderCitationsPanel(messageCitations, msgId, m.content) : '');
+        (m.role === 'assistant' ? App.renderCitationsPanel(messageCitations, msgId, m.content) : '') +
+        (m.role === 'assistant' && msgId && App.featureOn('answer_feedback') ? App.renderFeedbackBox(msgId) : '');
 
       wrap.appendChild(bubble);
       area.appendChild(wrap);
@@ -3311,12 +3370,79 @@ const App = {
         event.preventDefault();target.scrollIntoView({block:'start',behavior:'auto'});
       });
     });
+    area.querySelectorAll('.answer-feedback').forEach(App.bindFeedbackBox);
     area.scrollTop = area.scrollHeight;
     area.querySelectorAll('.citation-attachments').forEach(function (container) {
       App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：');
     });
     area.querySelectorAll('.openchat-citation-attachments').forEach(function(container){
       App.appendAttachmentLinks(container,container.getAttribute('data-openchat-source-id'),'関連添付：','openchat');
+    });
+  },
+
+  // (2) 回答の評価（段階公開スイッチ answer_feedback が見える人だけ）。2026-11-10
+  feedbackChoices: [
+    { rating: 'great', label: '超いいね', icon: '🌟', ask: 'どこが特に良かったですか？（任意）' },
+    { rating: 'good', label: 'いいね', icon: '👍', ask: '' },
+    { rating: 'bad', label: '悪いね', icon: '👎', ask: '何が良くなかったですか？（任意）' }
+  ],
+  // いいねは理由を聞かない。超いいねは良かった点、悪いねは良くなかった点を聞く（11/10 松野さん）
+  feedbackAsk: (rating) => { const c = App.feedbackChoices.find(function (x) { return x.rating === rating; }); return c ? c.ask : ''; },
+  renderFeedbackBox: (msgId) => {
+    const saved = (App.state.feedbackByMessage || {})[msgId] || {};
+    const buttons = App.feedbackChoices.map(function (c) {
+      const on = saved.rating === c.rating;
+      return '<button type="button" class="answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50') +
+        '" data-rating="' + c.rating + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + c.icon + ' ' + c.label + '</button>';
+    }).join('');
+    return '<div class="answer-feedback mt-2 pt-2 border-t border-slate-200 text-xs" data-message-id="' + App.escapeHtml(msgId) + '">' +
+      '<div class="flex flex-wrap items-center gap-2"><span class="text-slate-500">この回答はどうでしたか？</span>' + buttons + '</div>' +
+      '<div class="answer-feedback-comment ' + (App.feedbackAsk(saved.rating) ? '' : 'hidden') + ' mt-2 flex gap-2">' +
+      '<input type="text" maxlength="1000" class="flex-1 border rounded px-2 py-1" placeholder="' + App.escapeHtml(App.feedbackAsk(saved.rating)) + '" value="' + App.escapeHtml(saved.comment || '') + '">' +
+      '<button type="button" class="answer-feedback-send px-2 py-1 rounded bg-blue-700 text-white">送る</button></div>' +
+      '<div class="answer-feedback-status text-slate-500 mt-1" role="status" aria-live="polite">' + (saved.sent ? 'ありがとうございます。受け付けました。' : '') + '</div></div>';
+  },
+  bindFeedbackBox: (box) => {
+    const msgId = box.getAttribute('data-message-id');
+    const status = box.querySelector('.answer-feedback-status');
+    const send = async function (rating, comment) {
+      const chatId = App.state.currentSessionId;
+      if (!chatId) return;
+      const prev = (App.state.feedbackByMessage || {})[msgId] || {};
+      App.state.feedbackByMessage = Object.assign({}, App.state.feedbackByMessage, { [msgId]: { rating: rating, comment: comment, sent: false } });
+      status.textContent = '送信中…';
+      try {
+        await App.apiClient('POST', '/answer-feedback', { chat_id: String(chatId), message_id: msgId, rating: rating, comment: comment });
+        App.state.feedbackByMessage[msgId].sent = true;
+        status.textContent = 'ありがとうございます。受け付けました。';
+      } catch (e) {
+        App.state.feedbackByMessage[msgId] = prev;
+        status.textContent = '送れませんでした。時間をおいてもう一度お試しください。';
+        return;
+      }
+      box.querySelectorAll('.answer-feedback-btn').forEach(function (b) {
+        const on = b.getAttribute('data-rating') === rating;
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.className = 'answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50');
+      });
+      const ask = App.feedbackAsk(rating), row = box.querySelector('.answer-feedback-comment');
+      row.classList.toggle('hidden', !ask);
+      if (ask) row.querySelector('input').setAttribute('placeholder', ask);
+    };
+    box.querySelectorAll('.answer-feedback-btn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const rating = b.getAttribute('data-rating'), prev = (App.state.feedbackByMessage || {})[msgId] || {};
+        const input = box.querySelector('.answer-feedback-comment input');
+        // 評価を変えたら前の理由は引き継がない（いいねは理由なし）
+        const comment = App.feedbackAsk(rating) && prev.rating === rating && input ? input.value.trim() : '';
+        if (input && prev.rating !== rating) input.value = '';
+        void send(rating, comment);
+      });
+    });
+    box.querySelector('.answer-feedback-send').addEventListener('click', function () {
+      const cur = (App.state.feedbackByMessage || {})[msgId];
+      if (!cur || !cur.rating) { status.textContent = '先にボタンで評価を選んでください。'; return; }
+      void send(cur.rating, box.querySelector('.answer-feedback-comment input').value.trim());
     });
   },
 
@@ -4018,9 +4144,39 @@ const App = {
     }
   },
 
+  // (2) 回答の評価の一覧。見えない人には枠ごと出さない。2026-11-10
+  loadFeedbackAnalytics: async () => {
+    const box = document.getElementById('feedbackAnalytics');
+    if (!box) return;
+    const show = App.isStaffAdmin() && App.featureOn('answer_feedback');
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const summary = document.getElementById('feedbackSummary'), list = document.getElementById('feedbackList');
+    const btn = document.getElementById('reloadFeedbackBtn');
+    if (btn && !btn.dataset.bound) { btn.dataset.bound = '1'; btn.addEventListener('click', function () { void App.loadFeedbackAnalytics(); }); }
+    summary.textContent = '読み込み中…'; list.innerHTML = '';
+    try {
+      const r = await App.apiClient('POST', '/admin/answer-feedback/list', {});
+      const rows = (r && Array.isArray(r.feedback)) ? r.feedback : [];
+      const count = { great: 0, good: 0, bad: 0 };
+      rows.forEach(function (x) { if (count[x.rating] != null) count[x.rating]++; });
+      summary.textContent = '🌟超いいね ' + count.great + ' ／ 👍いいね ' + count.good + ' ／ 👎悪いね ' + count.bad + '（全 ' + rows.length + ' 件）';
+      const icon = { great: '🌟', good: '👍', bad: '👎' };
+      list.innerHTML = rows.length ? rows.map(function (x) {
+        return '<div class="border rounded p-2"><div class="text-xs text-slate-500">' + (icon[x.rating] || '') + ' ' + App.escapeHtml(String(x.updated_at || '').replace('T', ' ').slice(0, 16)) + '</div>' +
+          '<div><span class="text-slate-500">質問：</span>' + App.escapeHtml(x.question || '') + '</div>' +
+          (x.comment ? '<div><span class="text-slate-500">意見：</span>' + App.escapeHtml(x.comment) + '</div>' : '') +
+          '<details class="text-xs text-slate-600"><summary>回答の冒頭</summary>' + App.escapeHtml(x.answer || '') + '</details></div>';
+      }).join('') : '<p class="text-slate-500">まだ評価はありません。</p>';
+    } catch (e) {
+      summary.textContent = '取得できませんでした: ' + ((e && e.message) || String(e));
+    }
+  },
+
   // Phase 13: 運営分析ダッシュボード（qa-analytics Edge）
   loadAnalytics: async () => {
     if (!App.isStaffAdmin()) return;
+    void App.loadFeedbackAnalytics();
     const statusEl = document.getElementById('analyticsStatus');
     const daysSelect = document.getElementById('analyticsDaysSelect');
     const days = daysSelect ? Number(daysSelect.value) || 14 : 14;

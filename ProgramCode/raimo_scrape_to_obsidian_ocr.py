@@ -770,6 +770,7 @@ def main() -> None:
 
             # DOM順で画像ローカルパスを列挙（src_to_path に存在するものだけ）
             img_locals_in_order: list[Path] = []
+            img_seen: set[Path] = set()  # 重複判定用（順序は list 側で保持）
             for tok in seq:
                 if tok.get("type") != "img":
                     continue
@@ -778,7 +779,8 @@ def main() -> None:
                     continue
                 abs_src = norm_abs(src)
                 local = src_to_path.get(abs_src)
-                if local and local not in img_locals_in_order:
+                if local and local not in img_seen:
+                    img_seen.add(local)
                     img_locals_in_order.append(local)
 
             # DOM順が取れない場合でも、保存済み画像は最低限末尾へ差し込めるようにする

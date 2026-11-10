@@ -140,16 +140,28 @@ def find_pairs(
 
     pairs: list[dict[str, Any]] = []
     seen: set[tuple] = set()
+    # 高速化: クレカ明細の日付解析・店名キーは1回だけ計算し、日付ごとに振り分けておく。
+    # 照合は前後1日の明細だけを元の並び順で見る（全件×全件の比較をしない）。
+    card_by_date: dict[Any, list[int]] | None = None
+    card_meta: list[tuple[str, str]] = []
     for (d, sk), agg in smart_agg.items():
         if agg["sum"] < 100:
             continue
         dt = datetime.strptime(d, "%Y-%m-%d")
-        for r in card_rows:
-            rd = r["日付"]
-            rdt = datetime.strptime(rd, "%Y-%m-%d")
-            if abs((rdt - dt).days) > 1:
-                continue
-            csk = shop_key(r.get("お店") or "")
+        if card_by_date is None:
+            card_by_date = defaultdict(list)
+            for idx, cr in enumerate(card_rows):
+                crd = cr["日付"]
+                card_by_date[datetime.strptime(crd, "%Y-%m-%d").date()].append(idx)
+                card_meta.append((crd, shop_key(cr.get("お店") or "")))
+        near = sorted(
+            idx
+            for off in (-1, 0, 1)
+            for idx in card_by_date.get((dt + timedelta(days=off)).date(), ())
+        )
+        for idx in near:
+            r = card_rows[idx]
+            rd, csk = card_meta[idx]
             shared = bool(sk and csk and (sk[:6] in csk or csk[:6] in sk))
             if not shared:
                 for i in range(max(0, len(sk) - 3)):
@@ -533,12 +545,15 @@ def check_must_exclude(
         acct_kw = rule.get("account_keywords") or []
         comment_kw = rule.get("comment_keywords") or []
         cat_kw = rule.get("category_keywords") or []
+        acct_kw_l = [k.lower() for k in acct_kw]  # ルールごとに1回だけ小文字化
         for r in rows:
             pay = (r.get("支払元") or "").strip()
             inc = (r.get("入金先") or "").strip()
             acct_blob = pay + " " + inc
-            if acct_kw and not any(k.lower() in acct_blob.lower() for k in acct_kw):
-                continue
+            if acct_kw:
+                acct_blob_l = acct_blob.lower()  # 明細ごとに1回だけ小文字化
+                if not any(k in acct_blob_l for k in acct_kw_l):
+                    continue
 
             shop = (r.get("お店") or "").strip()
             item = (r.get("品目") or "").strip()

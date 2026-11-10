@@ -104,6 +104,11 @@ def _wait_page_ready(page, timeout_ms: int) -> None:
         pass
 
 
+def sony_service_suspended(text: str) -> bool:
+    """お客さまWEB 自体が止まっている案内ページ（システムエラー画面）か。"""
+    return "お客さまWEBはご利用いただけません" in (text or "")
+
+
 def _raise_if_sony_out_of_service(page) -> None:
     """
     LIFEPLANNER WEB のサービス時間外ページを誤って no-table 扱いにしない。
@@ -122,6 +127,11 @@ def _raise_if_sony_out_of_service(page) -> None:
     except Exception:
         pass
     blob = f"{title}\n{body}"
+    if sony_service_suspended(blob):
+        # 2026-11: 不正アクセス対応でお客さまWEB全体が停止（ログイン欄が無く acctId 待ちで落ちていた）
+        raise RuntimeError(
+            "ソニー生命 お客さまWEB がサービス停止中です（サイト側の案内。再開後に自動で取り直します）。"
+        )
     if "サービス時間外" in blob or "サービス時間外エラー" in title:
         raise RuntimeError(
             "ソニー生命 LIFEPLANNER WEB がサービス時間外です。"
@@ -851,6 +861,7 @@ def fetch_sony_surrender_value(
                 page.goto(login_url, wait_until="domcontentloaded")
                 _wait_page_ready(page, timeout_ms)
 
+            _raise_if_sony_out_of_service(page)
             if username:
                 page.locator(username_selector).first.fill(username)
             if password:

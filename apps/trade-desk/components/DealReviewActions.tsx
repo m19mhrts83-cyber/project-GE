@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import DealInquiryQuickButton from "@/components/DealInquiryQuickButton";
 import type { InquiryChannel } from "@/lib/reInquiryChannel";
+import DecisionNotePanel from "@/components/DecisionNotePanel";
+import type { DecisionNote } from "@/lib/kurashiftDecision";
 
 type Action =
   | "confirm"
@@ -71,11 +73,14 @@ export default function DealReviewActions({
   // 買付へ: viewing 推奨。info からも可（イレギュラーはチャットで）
   const allowOffer = st === "viewing" || st === "info";
 
-  async function run(action: Action) {
-    if (action === "pass") {
-      if (!window.confirm("見送り（候補から外す）にします。よろしいですか？")) {
-        return;
-      }
+  const [pending, setPending] = useState<Action | null>(null);
+
+  /** お金の判断になるもの（見送り・内見・買付）は判断メモを出す。他は従来どおり */
+  function pick(action: Action) {
+    if (action === "pass" || action === "set_viewing" || action === "set_offer") {
+      setPending(action);
+      setMsg(null);
+      return;
     }
     if (action === "pursue_remove") {
       if (
@@ -86,22 +91,17 @@ export default function DealReviewActions({
         return;
       }
     }
-    if (action === "set_offer") {
-      if (
-        !window.confirm(
-          "買付へ進めます（買い進め＝買付証明・融資のフェーズ）。よろしいですか？"
-        )
-      ) {
-        return;
-      }
-    }
+    void run(action, null);
+  }
+
+  async function run(action: Action, decision: DecisionNote | null) {
     setBusy(action);
     setMsg(null);
     try {
       const res = await fetch(`/api/re/deals/${dealId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, decision }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -115,7 +115,8 @@ export default function DealReviewActions({
           set_viewing: "内見にしました",
           set_offer: "買付（買い進め）にしました",
         };
-        setMsg(labels[action]);
+        setMsg(decision ? `${labels[action]}（判断ログに記録）` : labels[action]);
+        setPending(null);
         if (action === "confirm") setConfirmed(true);
         onInquiryChanged?.();
         router.refresh();
@@ -141,8 +142,8 @@ export default function DealReviewActions({
         <button
           type="button"
           className="btn"
-          disabled={busy !== null}
-          onClick={() => run("pursue_remove")}
+          disabled={busy !== null || pending !== null}
+          onClick={() => pick("pursue_remove")}
           style={{ fontSize: 12, padding: "4px 8px" }}
         >
           {busy === "pursue_remove" ? "…" : "外す"}
@@ -182,8 +183,8 @@ export default function DealReviewActions({
           <button
             type="button"
             className="btn"
-            disabled={busy !== null}
-            onClick={() => run("confirm")}
+            disabled={busy !== null || pending !== null}
+            onClick={() => pick("confirm")}
             style={{ fontSize: 12, padding: "4px 8px" }}
             title="候補に残す。次は図面・マイソクの問合せ（内見ではない）"
           >
@@ -192,8 +193,8 @@ export default function DealReviewActions({
           <button
             type="button"
             className="btn"
-            disabled={busy !== null || status === "passed"}
-            onClick={() => run("pass")}
+            disabled={busy !== null || pending !== null || status === "passed"}
+            onClick={() => pick("pass")}
             style={{ fontSize: 12, padding: "4px 8px" }}
             title="候補から外す（見送り）"
           >
@@ -203,8 +204,8 @@ export default function DealReviewActions({
             <button
               type="button"
               className="btn"
-              disabled={busy !== null}
-              onClick={() => run("pursue_add")}
+              disabled={busy !== null || pending !== null}
+              onClick={() => pick("pursue_add")}
               style={{ fontSize: 12, padding: "4px 8px" }}
               title="進行中（詳細〜内見）ブロックに入れる"
             >
@@ -215,8 +216,8 @@ export default function DealReviewActions({
             <button
               type="button"
               className="btn"
-              disabled={busy !== null}
-              onClick={() => run("pursue_remove")}
+              disabled={busy !== null || pending !== null}
+              onClick={() => pick("pursue_remove")}
               style={{ fontSize: 12, padding: "4px 8px" }}
             >
               {busy === "pursue_remove" ? "…" : "進行中から外す"}
@@ -226,8 +227,8 @@ export default function DealReviewActions({
             <button
               type="button"
               className="btn"
-              disabled={busy !== null}
-              onClick={() => run("set_viewing")}
+              disabled={busy !== null || pending !== null}
+              onClick={() => pick("set_viewing")}
               style={{ fontSize: 12, padding: "4px 8px" }}
               title="需給・融資を見ながら内見へ"
             >
@@ -238,8 +239,8 @@ export default function DealReviewActions({
             <button
               type="button"
               className="btn"
-              disabled={busy !== null}
-              onClick={() => run("set_offer")}
+              disabled={busy !== null || pending !== null}
+              onClick={() => pick("set_offer")}
               style={{ fontSize: 12, padding: "4px 8px" }}
               title="買付証明〜融資の買い進めフェーズへ"
             >
@@ -247,6 +248,29 @@ export default function DealReviewActions({
             </button>
           ) : null}
         </div>
+      ) : null}
+      {pending ? (
+        <DecisionNotePanel
+          title={
+            pending === "pass"
+              ? "見送りにします（候補から外す）"
+              : pending === "set_offer"
+                ? "買付へ進めます（買付証明・融資のフェーズ）"
+                : "内見にします"
+          }
+          hint={
+            pending === "pass"
+              ? "何で外したかを残すと、次の物件の絞り込みが良くなります。"
+              : "決め手を残すと、内見・買付の後で答え合わせができます。"
+          }
+          tagKind={pending === "pass" ? "deal_pass" : "deal_take"}
+          ctx={`deal:${pending}`}
+          tone={pending === "pass" ? "stop" : "go"}
+          confirmLabel={pending === "pass" ? "見送る" : "進める"}
+          busy={busy !== null}
+          onConfirm={(d) => void run(pending, d)}
+          onCancel={() => setPending(null)}
+        />
       ) : null}
       {showActions ? (
         <p className="meta" style={{ marginTop: 6, maxWidth: 220, lineHeight: 1.4 }}>

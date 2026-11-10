@@ -70,6 +70,14 @@ export async function middleware(request: NextRequest) {
   ) {
     return NextResponse.next({ request });
   }
+  // Obsidian review handoff (submit/poll keys are checked by each route).
+  if (
+    path === "/api/obsidian-review/mcp" ||
+    path === "/api/obsidian-review/inbox" ||
+    path === "/api/obsidian-review/submit"
+  ) {
+    return NextResponse.next({ request });
+  }
   const isAuth = path.startsWith("/login") || path.startsWith("/auth");
   if (!user && !isAuth) {
     const url = request.nextUrl.clone();
