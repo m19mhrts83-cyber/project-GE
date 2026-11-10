@@ -324,7 +324,8 @@ def comm_hub_sync(
     hub.mark_needs_reply(sb, needs)
     hub.link_items(sb, links)
     try:  # 前の回や夜の Mac トリアージ由来の未返信もつなぐ（/partner と台帳の件数をそろえる）
-        lp = hub.link_pending(sb, apply=True)
+        lp = hub.link_pending(sb, apply=True)  # 閉じ残し（triage 側で閉じた needs_reply）も戻す
+        lp.pop("_closed_items", None)  # 件名などはログに出さない
         print(f"# comm hub link-pending: {lp}", file=sys.stderr)
     except Exception as e:  # noqa: BLE001
         print(f"# comm hub link-pending soft-fail: {e}", file=sys.stderr)
