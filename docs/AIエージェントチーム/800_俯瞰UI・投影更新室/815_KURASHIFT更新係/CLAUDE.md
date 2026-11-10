@@ -71,6 +71,13 @@
 - スレッドは30日経過でアクセス不能になるため、削除済み404は想定内。stateでdeleted化し日常取得をスキップする
 - 健全性attentionは、返信または新着スレッド通知など「スレッド活動の証拠」があるのに取得できない場合に限る。メイン投稿だけでは取りこぼし扱いにしない
 
+### 使い勝手への声（2026-11-10〜）
+
+- KURASHIFT の全画面右下「声を残す」から、松野さんの声が相談メモ（Supabase `kurashift_consultations`、`metadata.kind=app_feedback`、`metadata.path`＝どの画面か、`metadata.tags`、本文）に溜まる
+- 画面を直す作業の前と週次の見直しで `status=open` の声を読み、同じ画面・同じ種類の声が2件以上あるものから直す。1件だけの声は聞き返すか、小さく直す
+- 直したら `status=decided`、`decision` に何をどう直したか（PR）を書く。直さないと決めたものは理由を書いて `archived`。勝手に消さない
+- お金の判断ログの仕組みは `apps/trade-desk/README.md`「お金の判断ログ」。判断箇所を足すときは `DecisionNotePanel` と判断ログ契約 v1 に乗せる
+
 ### 一括（Phase L）
 
 ```bash
@@ -89,3 +96,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-11 | Phase L: ui_cycle 報告経路。朝refresh＋12:30相乗り |
 | 2026-10-16 | `#ops` は要フォロー時のみ（OKは投稿スキップ） |
 | 2026-10-30 | 30日失効404を想定内化。Grok二次出力を日次本線から分離し、スレッド活動証拠ベースの監視へ修正 |
+| 2026-11-10 | 使い勝手への声（app_feedback）を拾って直す手順を追加。お金の判断ログ（判断メモ・答え合わせ）導入 |

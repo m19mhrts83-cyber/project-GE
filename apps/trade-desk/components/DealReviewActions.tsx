@@ -264,6 +264,8 @@ export default function DealReviewActions({
               : "決め手を残すと、内見・買付の後で答え合わせができます。"
           }
           tagKind={pending === "pass" ? "deal_pass" : "deal_take"}
+          ctx={`deal:${pending}`}
+          tone={pending === "pass" ? "stop" : "go"}
           confirmLabel={pending === "pass" ? "見送る" : "進める"}
           busy={busy !== null}
           onConfirm={(d) => void run(pending, d)}

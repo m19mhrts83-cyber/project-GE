@@ -116,7 +116,7 @@ SQL Editor または CLI で:
 2. `apps/jarvis-dashboard/supabase/migrations/20261107_task_loop.sql`
 3. `apps/jarvis-dashboard/supabase/migrations/20261107_owner_decisions_loopware_payload.sql`
 4. `apps/jarvis-dashboard/supabase/migrations/20261108_owner_decisions_idem_key.sql`（二重記録防止。未適用でも先に重複を確かめてから入れるので動く）
-5. `apps/jarvis-dashboard/supabase/migrations/20261110_kurashift_owner_decisions.sql`（KURASHIFT の資金移動・物件の判断を owner_decisions へ写すトリガー。surface=kurashift_money／kurashift_deal）
+5. `apps/jarvis-dashboard/supabase/migrations/20261111_kurashift_owner_decisions_retro.sql`（KURASHIFT の資金移動・物件の判断と答え合わせを owner_decisions へ写すトリガー。surface=kurashift_money／kurashift_deal。20261110 の上位互換でこれ1本でよい）
 
 （MCP 権限が無い環境では Dashboard SQL で手動適用。）
 

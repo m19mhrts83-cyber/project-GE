@@ -222,6 +222,9 @@ export async function PATCH(
       reason_tags: note?.reason_tags ?? [],
       note: note?.note ?? null,
       scope: note?.scope ?? "once",
+      decide_ms: note?.decide_ms ?? null,
+      suggested_tags: note?.suggested_tags ?? [],
+      same_as_last: note?.same_as_last ?? false,
       amount_jpy:
         row.amount_jpy == null || !Number.isFinite(Number(row.amount_jpy))
           ? null

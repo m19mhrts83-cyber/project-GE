@@ -116,11 +116,13 @@ export default function MoneyOpStatusActions({
       ))}
       {msg ? <span className="meta">{msg}</span> : null}
       {pending ? (
-        <div style={{ flexBasis: "100%" }}>
+        <div>
           <DecisionNotePanel
             title={`「${labelOf(pending)}」にします`}
             hint={hintFor(pending)}
             tagKind="money"
+            ctx={`money:${pending}`}
+            tone={pending === "cancelled" ? "stop" : pending === "consulting" ? "hold" : "go"}
             confirmLabel={pending === "approved" ? "承認する" : "決める"}
             busy={busy}
             onConfirm={(d) => void setStatus(pending, d)}

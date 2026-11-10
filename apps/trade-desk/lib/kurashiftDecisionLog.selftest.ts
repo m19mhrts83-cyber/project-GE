@@ -2,7 +2,17 @@
  * Run: npx tsx lib/kurashiftDecisionLog.selftest.ts
  */
 import { appendMoneyDecision, parseDecisionNote } from "./kurashiftDecision";
-import { dealRows, moneyRows, sortNewest, summarize } from "./kurashiftDecisionLog";
+import { parseRetro } from "./kurashiftDecision";
+import {
+  buildHints,
+  dealRows,
+  moneyRows,
+  retroCandidates,
+  sortNewest,
+  summarize,
+  summarizeRetro,
+  toAiBrief,
+} from "./kurashiftDecisionLog";
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(msg);
@@ -71,5 +81,60 @@ assert(s.reasonRate === 4 / 5, `reason rate ${s.reasonRate}`);
 assert(s.patterns.length === 1 && s.patterns[0].tag === "yield" && s.patterns[0].count === 2, `patterns ${JSON.stringify(s.patterns)}`);
 assert(s.ruleCandidates.length === 1, "rule candidates");
 assert(sortNewest([...m, ...d])[0].key === "d:e4", "newest first");
+
+// 判断メモの付帯情報（時間・候補・前回と同じ）
+const n2 = parseDecisionNote({ decide_ms: 4200.4, suggested_tags: ["yield", "x"], same_as_last: true });
+assert(n2!.decide_ms === 4200 && n2!.suggested_tags!.length === 1 && n2!.same_as_last === true, "extras");
+assert(parseDecisionNote({ decide_ms: 7 * 3600_000 })!.decide_ms === null, "left open → not counted");
+assert(parseRetro({ quality: "regret", note: " x " })!.note === "x" && parseRetro({ quality: "bad" }) === null, "retro parse");
+
+// ヒント: 同じ種類の過去の判断だけを引く。よく使う理由が先、前回は理由のあるもの
+const hist = [
+  ...moneyRows([
+    {
+      id: "a",
+      title: "積立",
+      kind: "broker_transfer",
+      assist_payload: {
+        decision_log: [
+          { at: "2026-09-01T00:00:00Z", to: "approved", reason_tags: ["plan_fit"], retro: { at: "2026-09-20T00:00:00Z", quality: "regret", note: "金額を確かめる" } },
+          { at: "2026-10-01T00:00:00Z", to: "approved", reason_tags: ["plan_fit", "buffer"], note: "6か月分残す", scope: "always" },
+          { at: "2026-10-20T00:00:00Z", to: "approved" },
+          { at: "2026-10-21T00:00:00Z", to: "done" },
+          { at: "2026-10-22T00:00:00Z", to: "cancelled", reason_tags: ["timing"] },
+        ],
+      },
+    },
+  ]),
+  ...dealRows(
+    [
+      { id: "v1", deal_id: "x", event_type: "status_change", actor: "user", occurred_at: "2026-10-01T00:00:00Z", payload: { action: "set_viewing" } },
+      { id: "r1", deal_id: "x", event_type: "note", actor: "user", occurred_at: "2026-10-30T00:00:00Z", payload: { action: "retro", ref_event_id: "v1", quality: "good" } },
+      { id: "c1", deal_id: "x", event_type: "review_confirm", actor: "user", occurred_at: "2026-09-01T00:00:00Z", payload: { action: "confirm" } },
+    ],
+    new Map()
+  ),
+];
+const h = buildHints(hist, "money:approved");
+assert(h.count === 3, `hint count ${h.count}`);
+assert(h.tagCounts[0].key === "plan_fit" && h.tagCounts[0].count === 2, "most used first");
+assert(h.last?.at === "2026-10-01T00:00:00Z" && h.last.note === "6か月分残す", "last = newest with a reason");
+assert(h.alwaysTags.includes("buffer") && h.alwaysTags.includes("plan_fit"), "always tags");
+assert(h.regrets.length === 1 && h.regrets[0].note === "金額を確かめる", "regret shown before deciding");
+assert(buildHints(hist, "money:cancelled").tagCounts[0].key === "timing", "ctx separated");
+assert(buildHints(hist, "deal:pass").last === null, "no history → no last");
+
+// 答え合わせ: 14日たった「承認・内見・買付」だけ。完了・候補に残す・答え合わせ済みは出さない
+const wait = retroCandidates(hist, new Date("2026-11-10T00:00:00Z"));
+assert(wait.length === 2, `retro candidates ${wait.map((r) => r.key).join(",")}`);
+assert(wait.every((r) => r.ctx === "money:approved"), "only decisions themselves");
+const rs = summarizeRetro(hist);
+assert(rs.total === 2 && rs.good === 1 && rs.regret === 1, "retro summary");
+
+// AI に渡す文章: 件数に合った頼み方・表の区切りを壊さない
+const brief = toAiBrief(hist);
+assert(brief.includes("空欄を推測で埋めないでください") && brief.includes("参照例として"), "stage wording");
+assert(brief.includes("やり直したい：金額を確かめる"), "retro in brief");
+assert(!toAiBrief([{ ...hist[0], note: "a|b" }]).includes("a|b"), "pipe escaped");
 
 console.log("kurashiftDecisionLog selftest OK");

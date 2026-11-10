@@ -22,7 +22,32 @@ export type DecisionNote = {
   reason_tags: string[];
   note: string | null;
   scope: DecisionScope;
+  /** 判断メモを開いてから決めるまで（ms）。判断しにくさを見るため（L11） */
+  decide_ms?: number | null;
+  /** 画面が出した「前回と同じ」「よく使う」の候補（本人の理由とは分けて残す） */
+  suggested_tags?: string[];
+  /** 「前回と同じ」をそのまま使った */
+  same_as_last?: boolean;
 };
+
+/** 後日の答え合わせ（S21 使った結果を振り返る） */
+export const RETRO_QUALITY = {
+  good: "良かった",
+  meh: "まあまあ",
+  regret: "やり直したい",
+} as const;
+export type RetroQuality = keyof typeof RETRO_QUALITY;
+
+export type Retro = { at: string; quality: RetroQuality; note: string | null };
+
+export function parseRetro(raw: unknown, now: Date = new Date()): Retro | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const q = String(r.quality || "");
+  if (!(q in RETRO_QUALITY)) return null;
+  const note = typeof r.note === "string" && r.note.trim() ? r.note.trim().slice(0, 400) : null;
+  return { at: now.toISOString(), quality: q as RetroQuality, note };
+}
 
 export type TagOption = { key: string; label: string };
 
@@ -59,10 +84,22 @@ export function parseDecisionNote(raw: unknown): DecisionNote | null {
   const noteRaw = typeof r.note === "string" ? r.note.trim() : "";
   const note = noteRaw ? noteRaw.slice(0, 400) : null;
   const scope: DecisionScope = r.scope === "always" ? "always" : "once";
-  if (!tags.length && !note && scope === "once") {
-    return { reason_tags: [], note: null, scope };
-  }
-  return { reason_tags: tags, note, scope };
+  const ms = Number(r.decide_ms);
+  // 6時間を超えるのは開きっぱなし。数えない（契約 v1 の decideMs と同じ）
+  const decide_ms = Number.isFinite(ms) && ms >= 0 && ms <= 6 * 3600_000 ? Math.round(ms) : null;
+  const suggested_tags = Array.isArray(r.suggested_tags)
+    ? Array.from(
+        new Set(r.suggested_tags.map((t) => String(t || "").trim()).filter((t) => ALL_KEYS.has(t)))
+      ).slice(0, 6)
+    : [];
+  return {
+    reason_tags: tags,
+    note,
+    scope,
+    decide_ms,
+    suggested_tags,
+    same_as_last: r.same_as_last === true,
+  };
 }
 
 /** 資金移動の status 変化 → 判断ログの action（契約 v1 の語） */
@@ -86,6 +123,10 @@ export type MoneyDecisionEntry = {
   note: string | null;
   scope: DecisionScope;
   amount_jpy: number | null;
+  decide_ms?: number | null;
+  suggested_tags?: string[];
+  same_as_last?: boolean;
+  retro?: Retro;
 };
 
 const LOG_MAX = 50;
