@@ -22,7 +22,7 @@ import urllib.request
 URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
-MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
 DAYS = int(os.environ.get("THEME_DAYS", "120"))
 JST = dt.timezone(dt.timedelta(hours=9))
 
@@ -145,5 +145,6 @@ if __name__ == "__main__":
     try:
         main()
     except urllib.error.HTTPError as e:
-        print(f"HTTP {e.code} {e.url.split('?')[0]}", file=sys.stderr)
+        detail = e.read().decode("utf-8", "replace")[:300] if "googleapis" in (e.url or "") else ""
+        print(f"HTTP {e.code} {e.url.split('?')[0]} {detail}", file=sys.stderr)
         sys.exit(1)
