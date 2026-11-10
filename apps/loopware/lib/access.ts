@@ -2,7 +2,7 @@
  * loopware の入場確認（Edge／Node どちらでも動く Web Crypto 版）。
  *
  * - 環境変数 LOOPWARE_ACCESS_KEY を決める（Vercel のみ。コードやログに書かない）
- * - 端末ごとに1回 /login で鍵を入れる → 署名つき Cookie（180日）
+ * - 端末ごとに1回 /login で鍵を入れる → 署名つき Cookie（400日。開くたびに延長するので、使っていれば切れない）
  * - Slack からのリンクは ?t=<期限>.<署名>（7日）を付ければ、そのまま入れる
  *   （作り方は linkToken。Jarvis ダッシュボード側も同じ鍵で作る）
  *
@@ -11,7 +11,7 @@
  */
 
 export const SESSION_COOKIE = "lw_s";
-export const SESSION_DAYS = 180;
+export const SESSION_DAYS = 400; // ブラウザが受け付ける上限。開くたびに延長（middleware）
 const LINK_DAYS = 7;
 
 const enc = new TextEncoder();
