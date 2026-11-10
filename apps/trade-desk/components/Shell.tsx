@@ -1,5 +1,6 @@
 import TermGlossary from "@/components/TermGlossary";
 import Icon from "@/components/Icon";
+import FeedbackButton from "@/components/FeedbackButton";
 import { DASHBOARD_URL, LOAN_TRACKER_URL, LOOPWARE_DESK_URL } from "@/lib/format";
 
 const NAV = [
@@ -107,6 +108,7 @@ export default function Shell({
               "/themes",
               "/stock-watch",
               "/money-ops",
+              "/decisions",
               "/portfolio",
               "/household-bs",
               "/consultations",
@@ -184,6 +186,7 @@ export default function Shell({
         <TermGlossary />
         {children}
       </main>
+      <FeedbackButton path={active} />
     </div>
   );
 }

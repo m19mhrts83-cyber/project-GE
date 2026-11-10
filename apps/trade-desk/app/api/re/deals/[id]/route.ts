@@ -179,6 +179,9 @@ export async function POST(
       reason_tags: decision?.reason_tags ?? [],
       note: decision?.note ?? null,
       scope: decision?.scope ?? "once",
+      decide_ms: decision?.decide_ms ?? null,
+      suggested_tags: decision?.suggested_tags ?? [],
+      same_as_last: decision?.same_as_last ?? false,
       decided_by: user.email ?? user.id,
     },
   });
