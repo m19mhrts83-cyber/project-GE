@@ -64,3 +64,28 @@ test('残り案件と次の一手（型で決める）', () => {
   assert.equal(d.nextStepFor(mk({ at: '2026-11-07T11:00:00Z', lane: 'partner', draft: '下書き' }), now).id, 'draft_reply');
   assert.equal(d.nextStepFor(mk({ at: '2026-11-07T11:00:00Z' }), now).id, 'default_todo');
 });
+
+test('人が判断するカードだけデスクに出す（自動のお知らせ・メルマガはまとめ側）', () => {
+  const row = (o) => ({ id: 'gha-abc1234', status: 'pending', lane: 'general', kind: 'mail', ...o });
+  // 自動のお知らせ・広告・認証コード
+  assert.equal(d.isDeskRow(row({ from_email: 'post_master@netbk.co.jp', subject: '振込入金のお知らせ', original_body: 'いつもご利用' })), false);
+  assert.equal(d.isDeskRow(row({ from_email: 'mail-info@diamond.co.jp', subject: '記事', original_body: '松野様\n配信停止はこちら' })), false);
+  assert.equal(d.isDeskRow(row({ kind: 'skim', from_email: 'a.b@x.jp', subject: 'RE: 件' })), false);
+  // 支払いの失敗は自動でも出す
+  assert.equal(d.isDeskRow(row({ from_email: 'smbc_service@dn.smbc.co.jp', subject: '【三井住友銀行】口座引き落とし未済のお知らせ' })), true);
+  assert.equal(d.isDeskRow(row({ kind: 'skim', from_email: 'statement@vpass.ne.jp', subject: 'カードがご利用いただけませんでした【三井住友カード】' })), true);
+  // 人が書いたメール
+  assert.equal(d.isDeskRow(row({ from_email: 'to-sirai@nakado.com', subject: '富士見台物件について', original_body: '松野様\nお世話になります。' })), true);
+  assert.equal(d.isDeskRow(row({ from_email: 'someone@gmail.com', subject: 'こんにちは' })), true);
+  assert.equal(d.isDeskRow(row({ from_email: 'info@shop.jp', subject: 'Re: お見積り' })), true);
+  // パートナー・Slack に出した・迷ったは従来どおり出す
+  assert.equal(d.isDeskRow(row({ lane: 'partner', from_email: 'info@x.jp', subject: 'お知らせ' })), true);
+  assert.equal(d.isDeskRow(row({ from_email: 'info@x.jp', subject: 'お知らせ', payload: { slack_ma_posted_at: 't' } })), true);
+  assert.equal(d.isDeskRow(row({ kind: 'skim', from_email: 'info@x.jp', payload: { loopware_hesitated_at: 't' } })), true);
+});
+
+test('フリーメールからの転送は、転送元の配信停止の文言があっても出す', () => {
+  const r = { id: 'gha-abc1235', status: 'pending', lane: 'general', kind: 'mail', from_email: 'family.x@gmail.com',
+    subject: 'Fwd: 【資生堂オンラインストア】お支払いについて', original_body: '---------- Forwarded message ---------\n配信停止はこちら' };
+  assert.equal(d.isDeskRow(r), true);
+});

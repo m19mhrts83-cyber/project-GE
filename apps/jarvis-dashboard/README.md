@@ -175,6 +175,8 @@ Site URL = `https://jarvis-dashboard-amber.vercel.app`、Redirect に `/auth/cal
 
 **本番自動デプロイ**: Vercel プロジェクト `jarvis-dashboard` は GitHub `m19mhrts83-cyber/project-GE` に接続済み（Root Directory = `apps/jarvis-dashboard`、Production Branch = `main`）。`main` への merge / push で本番へ自動デプロイ。モノレポの別アプリは `project-ge`（`apps/kamiooya-qa-web`）側。
 
+**取り残しに注意（2026-11-10）**: `vercel.json` の `ignoreCommand` は「main の一番新しいコミットがこのフォルダを変えたか」だけを見る。デプロイ回数の上限などでこのフォルダの変更が出そびれたあと、別フォルダの変更が main に入ると、その本番デプロイは「変更なし」でキャンセルされ、ダッシュボードの変更は出ないまま残る。そのときは Vercel の画面でこのフォルダを変えたコミットを指定して本番デプロイするか、このフォルダに触れる次の PR をマージする。
+
 1. （初回のみ）Vercel にログインし、ルートを `apps/jarvis-dashboard` にして import
 2. Environment Variables:
    - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`（**jarvis-dashboard**・`sb_publishable_…`）
