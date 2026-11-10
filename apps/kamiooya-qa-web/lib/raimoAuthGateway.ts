@@ -141,7 +141,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         requireFeature(Array.isArray(flags)?flags:[],'answer_feedback',{id:user.id,email:user.email});
         if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
         if(!d.listFeedback)return json({error:'feature_not_available'},404);
-        const rows=(await d.listFeedback()).map((r:any)=>({rating:r.rating,comment:r.comment,question:r.question,answer:String(r.answer||'').slice(0,400),updated_at:r.updated_at}));
+        const rows=(await d.listFeedback()).map((r:any)=>({rating:r.rating,reasons:Array.isArray(r.reasons)?r.reasons:[],comment:r.comment,question:r.question,answer:String(r.answer||'').slice(0,400),updated_at:r.updated_at}));
         return json({feedback:rows});
       }
       if(path==='/reference-metadata' && req.method==='GET' && d.referenceMetadata)return json(await d.referenceMetadata());
