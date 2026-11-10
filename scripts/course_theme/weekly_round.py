@@ -38,10 +38,30 @@ def rest(path: str, method: str = "GET", body: object | None = None, prefer: str
     return json.loads(raw) if raw else None
 
 
-def gemini(prompt: str) -> dict:
+STR = {"type": "STRING"}
+INT = {"type": "INTEGER"}
+SCHEMA = {"type": "OBJECT", "required": ["ranking", "themes"], "properties": {
+    "ranking": {"type": "ARRAY", "items": {"type": "OBJECT", "required": ["topic", "count"], "properties": {
+        "topic": STR, "count": INT, "chatbot": INT, "forum": INT, "openchat": INT,
+        "examples": {"type": "ARRAY", "items": STR}}}},
+    "themes": {"type": "ARRAY", "items": {"type": "OBJECT", "required": ["id", "title", "why", "evidence"], "properties": {
+        "id": STR, "title": STR, "why": STR, "evidence": STR, "format": STR, "target": STR}}}}}
+
+
+def gemini(prompt: str, tries: int = 3) -> dict:
+    for i in range(tries):
+        try:
+            return _gemini_once(prompt)
+        except (json.JSONDecodeError, KeyError, IndexError) as e:
+            print(f"Gemini の応答を読めませんでした（{i + 1}回目）: {type(e).__name__}", file=sys.stderr)
+    raise SystemExit("Gemini の応答を3回とも読めませんでした")
+
+
+def _gemini_once(prompt: str) -> dict:
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"responseMimeType": "application/json", "temperature": 0.4},
+        "generationConfig": {"responseMimeType": "application/json", "responseSchema": SCHEMA,
+                             "temperature": 0.4, "maxOutputTokens": 16384},
     }
     req = urllib.request.Request(
         f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent",
