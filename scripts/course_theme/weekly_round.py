@@ -52,7 +52,7 @@ def gemini(prompt: str, tries: int = 3) -> dict:
     for i in range(tries):
         try:
             return _gemini_once(prompt)
-        except (json.JSONDecodeError, KeyError, IndexError) as e:
+        except (ValueError, KeyError, IndexError) as e:
             print(f"Gemini の応答を読めませんでした（{i + 1}回目）: {type(e).__name__}", file=sys.stderr)
     raise SystemExit("Gemini の応答を3回とも読めませんでした")
 
@@ -60,8 +60,9 @@ def gemini(prompt: str, tries: int = 3) -> dict:
 def _gemini_once(prompt: str) -> dict:
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        # Gemini 3 は温度を下げると同じ出力を繰り返しやすい（数字が延々と続く等）ので既定の 1.0 のまま。
         "generationConfig": {"responseMimeType": "application/json", "responseSchema": SCHEMA,
-                             "temperature": 0.4, "maxOutputTokens": 16384},
+                             "maxOutputTokens": 16384},
     }
     req = urllib.request.Request(
         f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent",
@@ -95,7 +96,7 @@ PROMPT = """あなたは不動産投資家コミュニティ「神・大家さ�
 
 やること:
 1. ranking: 材料の質問（chatbot.top / forum.questions / forum.topics / openchat.questions / openchat.threads）を、
-   意味の近いもの同士でまとめ、多い順に最大20個。count はまとまりの件数の目安（chatbot.top の n も足す）。
+   意味の近いもの同士でまとめ、多い順に最大20個。count はまとまりの件数の目安（chatbot.top の n も足す。0〜20000 の整数）。
    chatbot / forum / openchat はそれぞれの内訳の目安。examples は実際の質問を短く言い直したもの最大3つ
    （個人名・会社名・物件の住所・電話番号などは入れない）。topic は会員の言葉で20字以内。
 2. themes: 講座またはグループコンサル（グルコン）のテーマ案をちょうど5つ。id は t1〜t5。
