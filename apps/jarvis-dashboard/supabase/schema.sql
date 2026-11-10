@@ -589,6 +589,8 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260930_line_oa_events.sql）
 -- yen_rate_daily（615 円動向・USD/JPY 日次投影）
 -- （migrations/20261017_yen_rate_daily.sql）
+-- obsidian_review_inbox（ChatGPT 日次レビューの一時受信箱）
+-- （migrations/20261110_obsidian_review_inbox.sql）
 
 -- Data API 明示 GRANT（2026-10-30 以降の新規テーブル対策。既存も明示して reset 耐性を確保）
 -- 全テーブル分の正本: migrations/20260926_data_api_explicit_grants.sql
@@ -610,6 +612,7 @@ grant select, insert, update, delete on table public.vital_daily to authenticate
 grant select, insert, update, delete on table public.vital_journal_daily to authenticated, service_role;
 grant select, insert, update, delete on table public.vital_context_notes to authenticated, service_role;
 grant select, insert, update, delete on table public.vital_quiet_reviews to authenticated, service_role;
+grant select, insert, update, delete on table public.obsidian_review_inbox to service_role;
 grant select, insert, update, delete on table public.glucon_schedule to authenticated, service_role;
 grant select, insert, update, delete on table public.glucon_journal_days to authenticated, service_role;
 grant select, insert, update, delete on table public.glucon_report_drafts to authenticated, service_role;
