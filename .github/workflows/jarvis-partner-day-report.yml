@@ -10,6 +10,10 @@ on:
     - cron: "50 2 * * *" # 11:50 JST
   workflow_dispatch:
     inputs:
+      recovery_actor:
+        description: "復旧窓口からの再実行のとき押した人（hawk / banto）。通常は空"
+        required: false
+        default: ""
       dry_run:
         description: "OneDrive 書込なし・Slack も dry-run"
         required: false
@@ -112,3 +116,13 @@ jobs:
             fi
           fi
           python scripts/jarvis_partner_day_pipeline.py "${ARGS[@]}"
+
+      - name: Finish (heartbeat / 復旧窓口の結果)
+        if: ${{ always() }}
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_WEBHOOK_AI_TEAM_HUB: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_HUB }}
+          RECOVERY_ACTOR: ${{ github.event.inputs.recovery_actor || '' }}
+          DRY: ${{ github.event.inputs.dry_run || 'false' }}
+        run: bash scripts/jarvis_job_finish.sh partner_111 "${{ job.status }}"

@@ -697,6 +697,75 @@ def reconcile_ok(c: dict[str, int]) -> bool:
     return c["a"] == c["b"] and c["a_unlinked"] == 0 and c["stale"] == 0 and c["reverse"] == 0
 
 
+# ------------------------------------------------------------ heartbeat（sync_meta に相乗り）
+
+
+def write_heartbeat(sb, job: str, source: str, *, now: datetime | None = None) -> str:
+    """sync_meta に job_ok:<job> = {"at", "source"} を書く（GHA は scripts/jarvis_job_finish.sh が同じ形で書く）。"""
+    at = (now or datetime.now(ZoneInfo("UTC"))).astimezone(ZoneInfo("UTC")).strftime("%Y-%m-%dT%H:%M:%SZ")
+    value = json.dumps({"at": at, "source": source}, ensure_ascii=False)
+    sb.table("sync_meta").upsert(
+        [{"key": f"job_ok:{job}", "value": value, "updated_at": at}], on_conflict="key"
+    ).execute()
+    return at
+
+
+def read_heartbeat(sb, job: str) -> dict[str, Any] | None:
+    """job_ok:<job> → {"at": datetime(UTC), "source": str}。無ければ None。"""
+    r = sb.table("sync_meta").select("key,value,updated_at").eq("key", f"job_ok:{job}").execute()
+    rows = r.data or []
+    if not rows:
+        return None
+    raw = rows[0].get("value") or ""
+    try:
+        v = json.loads(raw)
+    except (TypeError, ValueError):
+        v = {"at": rows[0].get("updated_at") or raw, "source": "?"}
+    try:
+        at = datetime.fromisoformat(re.sub(r"\.[0-9]+", "", str(v.get("at") or "")).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=ZoneInfo("UTC"))
+    return {"at": at.astimezone(ZoneInfo("UTC")), "source": str(v.get("source") or "?")}
+
+
+def _source_label(source: str) -> str:
+    if source.startswith("gha:"):
+        return f"窓口・{source[4:]}"
+    return {"gha": "GHA", "backup": "予備"}.get(source, source)
+
+
+def reconcile_slack_text(c: dict[str, int], *, source: str, last_write: dict[str, Any] | None) -> str:
+    """#ai-hub 用の3行（iPhone 前提・空行なし）。1行目が「台帳 ✅／⚠️」の目印。"""
+    ok = reconcile_ok(c)
+    now = datetime.now(JST).strftime("%m/%d %H:%M")
+    mark = "✅" if ok else "⚠️"
+    l1 = f"1 台帳 {mark} {now}（{_source_label(source)}）突き合わせ {'一致' if ok else '不一致'}"
+    l2 = (
+        f"2 未返信 /partner {c['a']}件・台帳 {c['b']}件"
+        f"（閉じ残し{c['stale']}・逆向き{c['reverse']}・つながり無し{c['a_unlinked']}・general {c['b_general']}）"
+    )
+    if last_write:
+        w = last_write["at"].astimezone(JST).strftime("%m/%d %H:%M")
+        l3 = f"3 台帳の最終書き込み {w}（{_source_label(last_write['source'])}）"
+    else:
+        l3 = "3 台帳の最終書き込み 記録なし"
+    return "\n".join([l1, l2, l3])
+
+
+def post_slack(text: str, channel: str = "hub") -> int:
+    """既存の jarvis_slack_webhook_post.py に渡す（Webhook。許可待ちが起きない）。"""
+    import subprocess
+
+    script = Path(__file__).resolve().parent / "jarvis_slack_webhook_post.py"
+    r = subprocess.run(
+        [sys.executable, str(script), "--channel", channel, "--text", text, "--signal", "off", "--no-fb-footer"],
+        check=False,
+    )
+    return r.returncode
+
+
 def link_pending(sb, *, apply: bool) -> dict[str, Any]:
     """未返信を台帳へつなぎ（_link_unlinked）、続けて閉じ残しを戻す（close_resolved）。"""
     stats: dict[str, Any] = dict(_link_unlinked(sb, apply=apply))
@@ -887,10 +956,28 @@ def cmd_link_pending(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_reconcile(_args: argparse.Namespace) -> int:
-    c = reconcile_counts(client())
+def cmd_reconcile(args: argparse.Namespace) -> int:
+    sb = client()
+    if getattr(args, "once_per_day", False):
+        hb = read_heartbeat(sb, "comm_reconcile")
+        if hb and hb["at"].astimezone(JST).date() == datetime.now(JST).date():
+            print(f"⏭ comm reconcile: 今日はもう済み（{hb['at'].astimezone(JST):%H:%M} {hb['source']}）")
+            return 0
+    c = reconcile_counts(sb)
     ok = reconcile_ok(c)
     print(f"📒 comm reconcile {'一致' if ok else '不一致'} " + " ".join(f"{k}={v}" for k, v in c.items()))
+    if getattr(args, "slack", False):
+        text = reconcile_slack_text(c, source=args.source, last_write=read_heartbeat(sb, "comm_write"))
+        rc = post_slack(text)
+        if rc != 0:
+            return rc
+        write_heartbeat(sb, "comm_reconcile", args.source)
+    return 0
+
+
+def cmd_heartbeat(args: argparse.Namespace) -> int:
+    at = write_heartbeat(client(), args.job, args.source)
+    print(f"💓 job_ok:{args.job} {at} {args.source}")
     return 0
 
 
@@ -929,7 +1016,15 @@ def main(argv: list[str] | None = None) -> int:
     s5.set_defaults(func=cmd_link_pending)
 
     s6 = sub.add_parser("reconcile", help="毎朝の突き合わせ（pending の triage につながる needs_reply で数える・読み取りのみ）")
+    s6.add_argument("--slack", action="store_true", help="#ai-hub に3行で投稿し、job_ok:comm_reconcile を書く")
+    s6.add_argument("--source", default="gha", help="gha / backup / gha:<押した人>")
+    s6.add_argument("--once-per-day", action="store_true", help="今日の job_ok:comm_reconcile があれば何もしない")
     s6.set_defaults(func=cmd_reconcile)
+
+    s7 = sub.add_parser("heartbeat", help="sync_meta に job_ok:<job> を書く")
+    s7.add_argument("--job", required=True)
+    s7.add_argument("--source", default="backup")
+    s7.set_defaults(func=cmd_heartbeat)
 
     s3 = sub.add_parser("search")
     s3.add_argument("--party", action="append")

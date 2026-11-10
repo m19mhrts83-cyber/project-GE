@@ -138,7 +138,9 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       has:rosterHas,
       meta:async()=>{const m=(await rest('qa_roster_meta?select=row_count,synced_at&id=eq.1&limit=1'))?.[0];return {row_count:m?.row_count,synced_at:m?.synced_at};}
     },
-    listFeedback:async()=>rest('qa_answer_feedback?select=rating,reasons,comment,question,answer,updated_at&order=updated_at.desc&limit=200'),
+    listFeedback:async()=>rest('qa_answer_feedback?select=chat_id,message_id,rating,reasons,comment,question,answer,updated_at&order=updated_at.desc&limit=200'),
+    saveSourceClick:async row=>{await rest('qa_answer_source_clicks?on_conflict=user_id,chat_id,message_id,kind,source_key',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
+    listSourceClicks:async()=>rest('qa_answer_source_clicks?select=user_id,chat_id,message_id,kind,source_key,title,label&order=clicked_at.desc&limit=1000'),
     saveFeedback:async row=>{await rest('qa_answer_feedback?on_conflict=user_id,chat_id,message_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
     semanticConfig:async()=>{
       const r=await backend('POST','/semantic-search-config',{});
