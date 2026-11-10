@@ -7,6 +7,7 @@ const NAV = [
   { href: "/themes", label: "テーマ", icon: "trend" },
   { href: "/stock-watch", label: "株式ウォッチ", icon: "watch" },
   { href: "/money-ops", label: "資金移動", icon: "transfer" },
+  { href: "/decisions", label: "判断ログ", icon: "decide" },
   { href: "/portfolio", label: "資産", icon: "wallet" },
   { href: "/household-bs", label: "家計B/S", icon: "pie" },
   { href: "/consultations", label: "相談", icon: "chat" },

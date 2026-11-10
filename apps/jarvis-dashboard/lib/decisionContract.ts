@@ -9,7 +9,7 @@
  * - 同じ判断を二度送っても1行だけ残る（payload.idem_key）
  *
  * 外部に依存しない純粋な部品。正本は apps/loopware/lib/decisionContract.ts。
- * apps/jarvis-dashboard/lib/decisionContract.ts は同じ内容の写し
+ * apps/jarvis-dashboard/lib/decisionContract.ts・apps/trade-desk/lib/decisionContract.ts は同じ内容の写し
  * （scripts/tests/test_decision_contract_sync.py が一致を確かめる）。
  */
 
@@ -24,7 +24,8 @@ export const SURFACES = [
   "todoist_312",
   "todoist_313",
   "s9",
-  "kurashift_deal", // 物件の見送り・検討
+  "kurashift_deal", // 物件の見送り・検討（確認・進行中・内見・買付も。DB トリガーが kurashift_re_deal_events から写す）
+  "kurashift_money", // 資金移動の承認・相談・取消・完了（DB トリガーが kurashift_money_ops の status 変化から写す）
   "kurashift_consult", // 相談メモ
   "kurashift_mail", // KURASHIFT 発のメール
   "zaim_category", // Zaim 費目の仕分け確認
@@ -172,6 +173,28 @@ export const DEAL_REASON_TAGS = {
   other: "その他",
 } as const;
 
+/** 物件を進めた決め手（内見・買付へ） */
+export const DEAL_TAKE_REASON_TAGS = {
+  cf_ok: "CFが合う",
+  area_ok: "エリアが良い",
+  price_ok: "価格に納得",
+  loan_ok: "融資が通りそう",
+  fix_ok: "修繕が読める",
+  want_see: "現地で確かめたい",
+} as const;
+
+/** 資金移動（KURASHIFT のお金の判断）：承認・相談・取消の理由 */
+export const MONEY_REASON_TAGS = {
+  plan_fit: "計画どおり",
+  buffer: "防衛資金・バッファを守る",
+  due_date: "引落・期日に間に合わせる",
+  rate: "金利・手数料",
+  amount_check: "金額を見直したい",
+  timing: "時期をずらしたい",
+  ask_someone: "誰かに相談したい",
+  other: "その他",
+} as const;
+
 /** 残っている理由（迷った・見ていない案件） */
 export const STAY_REASON_TAGS = {
   no_time: "時間がない",
@@ -210,6 +233,8 @@ export const SCOPES = ["once", "partner", "always"] as const;
 const KNOWN_TAGS = new Set<string>([
   ...Object.keys(MAIL_REASON_TAGS),
   ...Object.keys(DEAL_REASON_TAGS),
+  ...Object.keys(DEAL_TAKE_REASON_TAGS),
+  ...Object.keys(MONEY_REASON_TAGS),
   ...Object.keys(STAY_REASON_TAGS),
   ...Object.keys(PICK_REASON_TAGS),
   ...Object.keys(LEFT_REASON_TAGS),
