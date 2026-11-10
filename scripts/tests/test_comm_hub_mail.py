@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import base64
 import sys
+import argparse
 import unittest
+from unittest import mock
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -91,6 +93,55 @@ class SentTest(unittest.TestCase):
     def test_secret_skipped(self):
         it = mail.item_from_sent(_sent("x@example.jp", subject="パスワード再設定"), account="admin", partner_filter=lambda a: False)
         self.assertIsNone(it)
+
+
+class IdempotentSoftFailTest(unittest.TestCase):
+    """2回走っても重複しない・失敗しても止めない（PR #333 の確認項目）。"""
+
+    def test_same_input_same_external_id(self):
+        a = mail.item_from_triage(_triage())
+        b = mail.item_from_triage(_triage())
+        self.assertEqual(a["external_id"], b["external_id"])
+        s1 = mail.item_from_sent(_sent("x@example.jp"), account="admin", partner_filter=lambda _: False)
+        s2 = mail.item_from_sent(_sent("x@example.jp"), account="admin", partner_filter=lambda _: False)
+        self.assertEqual((s1["channel"], s1["account"], s1["external_id"]), (s2["channel"], s2["account"], s2["external_id"]))
+
+    def test_insert_uses_ignore_duplicates(self):
+        import jarvis_comm_hub as hub
+
+        sb = mock.MagicMock()
+        with mock.patch.object(hub, "ensure_parties"), mock.patch.object(hub, "lookup_ids", return_value={}):
+            hub.insert_items(sb, [mail.item_from_triage(_triage())])
+            hub.insert_items(sb, [mail.item_from_triage(_triage())])
+        calls = sb.table.return_value.upsert.call_args_list
+        self.assertEqual(len(calls), 2)
+        for c in calls:
+            self.assertEqual(c.kwargs["on_conflict"], "channel,account,external_id")
+            self.assertTrue(c.kwargs["ignore_duplicates"])
+
+    def test_triage_link_does_not_overwrite(self):
+        import jarvis_comm_hub as hub
+
+        sb = mock.MagicMock()
+        with mock.patch.object(hub, "client", return_value=sb), \
+             mock.patch.object(mail, "fetch_general_mail", return_value=[_triage()]), \
+             mock.patch.object(hub, "insert_items", return_value={"gmail:m1": "item-1"}), \
+             mock.patch.object(hub, "link_items") as link:
+            rc = mail.cmd_ingest_triage(argparse.Namespace(days=14, apply=True, dry_run=False))
+        self.assertEqual(rc, 0)
+        sb.table.return_value.update.return_value.eq.return_value.is_.assert_called_with("comm_item_id", "null")
+        link.assert_called_once()
+
+    def test_sent_account_failure_is_soft(self):
+        with mock.patch.object(mail, "gmail_service", side_effect=RuntimeError("token missing")), \
+             mock.patch("jarvis_comm_hub.resolve_contact_yaml", return_value=Path("/nonexistent.yaml")):
+            rc = mail.cmd_ingest_sent(argparse.Namespace(account=["admin", "estate"], days=3, max=10, apply=False, dry_run=True))
+        self.assertEqual(rc, 0)
+
+    def test_runner_soft_fails_each_step(self):
+        runner = (REPO / "launchd" / "comm_hub_mail_runner.sh").read_text(encoding="utf-8")
+        self.assertIn('ingest-mail-triage --days 14 --apply || echo "# comm hub soft-fail', runner)
+        self.assertIn('ingest-mail-sent --account admin --account estate --days 3 --apply || echo "# comm hub soft-fail', runner)
 
 
 if __name__ == "__main__":
