@@ -800,6 +800,8 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       relatedOpenchat: attachReferenceLabels(relatedOpenchatForClient,"id",referenceLabels.openchats),
       referenceLabels,
       referenceSelection:hasMentioned?"mentioned":"provided-context",
+      // (2) 評価と結び付けるため、実際に答えたモデルを返す（要約を呼ばなかったときは空）。11/11
+      answerModel: geminiUsage.calls>0?geminiUsage.model:"",
       hitCount: commentRows.length + relatedChunks.length + openchatRows.length,
       meta: {
         embeddingProviderCalls,
