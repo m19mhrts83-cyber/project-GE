@@ -7,11 +7,18 @@ LOG_DIR="${HOME}/Library/Logs/jarvis_obsidian_review"
 mkdir -p "$LOG_DIR"
 cd "$REPO_DIR"
 
-if [[ -f "${REPO_DIR}/.env.jarvis_private" ]]; then
+PRIVATE_ENV="${HOME}/git-repos/.env.jarvis_private"
+if [[ ! -f "$PRIVATE_ENV" ]]; then
+  PRIVATE_ENV="${REPO_DIR}/.env.jarvis_private"
+fi
+if [[ -f "$PRIVATE_ENV" ]]; then
   set -a
   # shellcheck disable=SC1091
-  source "${REPO_DIR}/.env.jarvis_private"
+  source "$PRIVATE_ENV"
   set +a
+else
+  echo "private environment file is missing" >&2
+  exit 2
 fi
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
