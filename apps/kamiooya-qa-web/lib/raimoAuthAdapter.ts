@@ -148,6 +148,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       const row=(await rest('qa_answer_meta?user_id=eq.'+encodeURIComponent(userId)+'&chat_id=eq.'+encodeURIComponent(chatId)+'&answer_hash=eq.'+h+'&select=mode,tier,model,reused&limit=1'))[0];
       return cleanMeta(row);
     },
+    listChangeLog:async()=>rest('qa_change_log?visible=is.true&select=released_on,title,body,trigger&order=released_on.desc,id.desc&limit=200'),
     saveFeedback:async row=>{await rest('qa_answer_feedback?on_conflict=user_id,chat_id,message_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
     semanticConfig:async()=>{
       const r=await backend('POST','/semantic-search-config',{});
