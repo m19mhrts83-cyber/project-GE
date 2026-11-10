@@ -4,15 +4,21 @@
 
 運営の「※削除厳禁※【神大家】目標設定・合格状況」シート（gid=929377200）を
 estate アカウント（閲覧が許可されているのはこのアカウントだけ）で読み、
-会員番号と「会員番号＋姓名」のハッシュだけを Supabase の qa_roster_hashes に全件入れ替える。
+会員番号と「会員番号＋姓名」のハッシュだけを Supabase の qa_roster_hashes に反映する。
 名前・番号の平文は Supabase にも画面にもログにも出さない。
+
+効率化（2026-11-11 松野さん「差分だけにするなど効率的に」）:
+  1. まず Supabase 側の名簿の指紋（全ハッシュの md5）を1行だけ読み、シートと同じなら何も書かない
+     （確認した時刻 synced_at だけ更新）。
+  2. 違うときだけ、1つの SQL で「消えた人の行を削除・増えた人の行を追加」の差分だけを書く。
+  --full で以前の全件入れ替えも選べる。
 
 照合のルール（正規化・ハッシュ）は apps/kamiooya-qa-web/lib/rosterMatch.ts と同じ。
 tests/rosterMatch.test.mjs が両方の結果が一致することを確かめている。
 
 例（Mac）:
   ~/selenium_env/venv/bin/python scripts/kamiooya_roster_sync.py --dry-run   # 件数だけ表示
-  ~/selenium_env/venv/bin/python scripts/kamiooya_roster_sync.py             # 入れ替え
+  ~/selenium_env/venv/bin/python scripts/kamiooya_roster_sync.py             # 差分だけ反映
 """
 from __future__ import annotations
 
@@ -89,9 +95,41 @@ def replace_sql(hashes: set[tuple[str, str]], members: int) -> str:
     )
 
 
+def fingerprint(hashes: set[tuple[str, str]]) -> str:
+    """Supabase 側の FINGERPRINT_SQL と同じ並び（kind, hash の C 照合順）で md5 を取る。"""
+    return hashlib.md5(",".join(f"{k}:{h}" for k, h in sorted(hashes)).encode("ascii")).hexdigest()
+
+
+FINGERPRINT_SQL = (
+    "select md5(coalesce(string_agg(kind||':'||hash, ',' order by kind collate \"C\", hash collate \"C\"),'')) as fp,"
+    " count(*) filter (where kind='no') as members from public.qa_roster_hashes"
+)
+
+
+def touch_sql() -> str:
+    """名簿に変化が無いとき: 確認した時刻だけ更新する。"""
+    return "update public.qa_roster_meta set synced_at=now() where id=1"
+
+
+def diff_sql(hashes: set[tuple[str, str]], members: int) -> str:
+    """1つの文で差分だけ反映する（途中で失敗すれば何も変わらない）。消した数・足した数を返す。"""
+    values = ",".join(f"('{k}','{h}')" for k, h in sorted(hashes))
+    return (
+        f"with t(kind,hash) as (values {values}),"
+        " del as (delete from public.qa_roster_hashes h where not exists"
+        " (select 1 from t where t.kind=h.kind and t.hash=h.hash) returning 1),"
+        " ins as (insert into public.qa_roster_hashes(kind,hash) select kind,hash from t"
+        " on conflict (kind,hash) do nothing returning 1),"
+        f" meta as (insert into public.qa_roster_meta(id,row_count,synced_at) values (1,{int(members)},now())"
+        " on conflict (id) do update set row_count=excluded.row_count, synced_at=excluded.synced_at returning 1)"
+        " select (select count(*) from del) as removed, (select count(*) from ins) as added, (select count(*) from meta) as meta"
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--full", action="store_true", help="差分でなく全件入れ替える")
     a = ap.parse_args()
     hashes = hashes_from_rows(read_sheet())
     members = sum(1 for k, _ in hashes if k == "no")
@@ -104,8 +142,17 @@ def main() -> int:
     import kamiooya_qa_release as rel  # 同じ秘密情報ファイルと Management API を使う
 
     rel.load_env()
-    rel.mgmt_query(replace_sql(hashes, members))
-    print("qa_roster_hashes を入れ替えました")
+    if a.full:
+        rel.mgmt_query(replace_sql(hashes, members))
+        print("qa_roster_hashes を入れ替えました（全件）")
+        return 0
+    cur = (rel.mgmt_query(FINGERPRINT_SQL) or [{}])[0]
+    if cur.get("fp") == fingerprint(hashes):
+        rel.mgmt_query(touch_sql())
+        print("qa_roster_hashes を入れ替えました（変化なし・書き込みなし）")
+        return 0
+    r = (rel.mgmt_query(diff_sql(hashes, members)) or [{}])[0]
+    print(f"qa_roster_hashes を入れ替えました（差分: 追加 {r.get('added', '?')} 行・削除 {r.get('removed', '?')} 行）")
     return 0
 
 
