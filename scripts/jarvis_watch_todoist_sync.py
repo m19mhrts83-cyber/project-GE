@@ -44,6 +44,8 @@ LABEL_JARVIS = "要Jarvis連携"
 
 sys.path.insert(0, str(REPO / "scripts"))
 
+from jarvis_todoist_mark import mark_title  # noqa: E402
+
 OPS_EPHEMERAL = {"vercel_deploy", "gha_workflow_fail", "ops_fix_notice"}
 BANNER_IDS = {
     "etc_mileage",
@@ -339,7 +341,7 @@ def _title_for(row: dict[str, Any]) -> str:
     wid = str(row.get("id") or "")
     summary = str(row.get("summary") or row.get("title") or wid).strip()
     summary = re.sub(r"\s+", " ", summary)[:80]
-    return f"[要フォロー][{wid}] {summary}"
+    return mark_title(f"[要フォロー][{wid}] {summary}")
 
 
 def _due_string(row: dict[str, Any]) -> str | None:

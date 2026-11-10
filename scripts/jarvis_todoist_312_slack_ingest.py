@@ -26,6 +26,8 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from jarvis_todoist_mark import mark_title, strip_mark  # noqa: E402
+
 JST = timezone(timedelta(hours=9))
 DIGEST_MARKER = "起票してよければ番号で返信"
 DEFAULT_CHANNEL = "C0C7R0UF3MM"
@@ -76,7 +78,7 @@ def _todoist(path: str, token: str, *, method: str = "GET", body: dict | None = 
 
 
 def _clean(title: str) -> str:
-    t = re.sub(r"\s+", " ", str(title or "")).strip()
+    t = re.sub(r"\s+", " ", strip_mark(str(title or ""))).strip()
     t = re.sub(r"\s*[—–-]\s*状況[:：].*$", "", t)
     t = re.sub(r"[（(]状況[:：][^）)]*[）)]", "", t)
     return t.strip().rstrip("。．.")
@@ -143,7 +145,11 @@ def create_task(item: dict[str, str], token: str, *, dry_run: bool) -> dict[str,
         "tasks",
         token,
         method="POST",
-        body={"content": title, "labels": ["SecondBrain", "quick"], "description": desc},
+        body={
+            "content": mark_title(title, requested=True),
+            "labels": ["SecondBrain", "quick"],
+            "description": desc,
+        },
     )
     tid = str(task.get("id") or "")
     if not tid:

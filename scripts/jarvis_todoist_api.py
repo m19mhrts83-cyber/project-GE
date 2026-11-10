@@ -59,6 +59,8 @@ HOLD_REVIEW_DAYS = 30
 
 # アウトプット行の相対パス → Markdown https（未pushは明示）
 sys.path.insert(0, str(REPO / "scripts"))
+
+from jarvis_todoist_mark import mark_title, strip_mark  # noqa: E402
 try:
     from jarvis_todoist_comment_links import enrich_comment_output_links  # noqa: E402
 except ImportError:  # pragma: no cover
@@ -672,10 +674,10 @@ def find_open_duplicate(
     due が YYYY-MM-DD なら due.date と一致するものだけ。自然言語（tomorrow 等）や期日なしは
     タイトル一致で重複とみなす（同じ依頼の再実行で「明日」が毎回ずれるのを防ぐ）。
     """
-    want = (title or "").strip()
+    want = strip_mark(title)
     d = (due or "").strip()
     for t in tasks:
-        if str(t.get("content") or "").strip() != want:
+        if strip_mark(str(t.get("content") or "")) != want:
             continue
         tdue = ((t.get("due") or {}) or {}).get("date") or ""
         if d and _ISO_DATE_RE.match(d) and str(tdue)[:10] != d:
@@ -721,7 +723,11 @@ def cmd_create_task(args: argparse.Namespace) -> int:
     seen: set[str] = set()
     labels = [x for x in labels if not (x in seen or seen.add(x))]
     body: dict[str, Any] = {
-        "content": args.title.strip(),
+        "content": (
+            args.title.strip()
+            if getattr(args, "no_ai_mark", False)
+            else mark_title(args.title, requested=getattr(args, "requested", False))
+        ),
         "project_id": proj["project_id"],
         "labels": labels,
     }
@@ -1464,6 +1470,16 @@ def main() -> int:
         "--allow-duplicate",
         action="store_true",
         help="同じタイトル・同じ期日のオープンタスクがあっても作る（既定は既存を返して作らない）",
+    )
+    c.add_argument(
+        "--requested",
+        action="store_true",
+        help="松野さんに頼まれて入れる（件名の頭に「🦾依頼」）。既定は AI の判断として「🤖」",
+    )
+    c.add_argument(
+        "--no-ai-mark",
+        action="store_true",
+        help="件名に印を付けない（松野さんが自分で入れる場合だけ）",
     )
     c.add_argument(
         "--no-hold-stamp",
