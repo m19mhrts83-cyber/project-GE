@@ -18,6 +18,10 @@ migration: apps/jarvis-dashboard/supabase/migrations/20261104_comm_hub.sql
   python scripts/jarvis_comm_hub.py dedupe --dry-run   # 二重記載の整理（--apply で削除）
   python scripts/jarvis_comm_hub.py link-pending --dry-run   # /partner の未返信を台帳へつなぐ（--apply）
   python scripts/jarvis_comm_hub.py search --party partner:P102_ミニテック --query エアコン
+
+  # メール（パートナー以外）: 要確認→inquiry、自分の送信→self（中身は jarvis_comm_hub_mail.py）
+  python scripts/jarvis_comm_hub.py ingest-mail-triage --days 14 --apply
+  python scripts/jarvis_comm_hub.py ingest-mail-sent --account admin --account estate --days 3 --apply
 """
 from __future__ import annotations
 
@@ -775,7 +779,18 @@ def main(argv: list[str] | None = None) -> int:
     s3.add_argument("--limit", type=int, default=30)
     s3.set_defaults(func=cmd_search)
 
-    args = ap.parse_args(argv)
+    # チャネル追加の共通入口: メール（パートナー以外）
+    for name, target in (("ingest-mail-triage", "ingest-triage"), ("ingest-mail-sent", "ingest-sent")):
+        sm = sub.add_parser(name, add_help=False, help=f"jarvis_comm_hub_mail.py {target} へ渡す")
+        sm.set_defaults(func=None, mail_cmd=target)
+
+    args, rest = ap.parse_known_args(argv)
+    if getattr(args, "mail_cmd", None):
+        import jarvis_comm_hub_mail
+
+        return jarvis_comm_hub_mail.main([args.mail_cmd, *rest])
+    if rest:
+        ap.error(f"unrecognized arguments: {' '.join(rest)}")
     return int(args.func(args) or 0)
 
 
