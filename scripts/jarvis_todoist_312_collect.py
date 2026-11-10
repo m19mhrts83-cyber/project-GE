@@ -402,6 +402,42 @@ def own_text(body: str, limit: int = 1500) -> str:
     return "\n".join(out)[:limit]
 
 
+GREETING_LINE_RE = re.compile(
+    r"^(.{0,12}(さん|様|さま)[、,。\s]*|CC[:：].*|To[:：].*|お疲れ|おつかれ|お世話にな|いつも|ありがとう|ご対応ありがとう|"
+    r"よろしく|宜しく|かしこまり|了解|承知|失礼いたします|追加です|追加ですみません|すみません|恐れ入り|.*添付します|.*\.(png|jpe?g|pdf|xlsx?)$|---)"
+)
+CHAT_ASK_RE = re.compile(
+    r"(ください|いただけ|頂け|お願い(します|いたします|できます)|でしょうか|(です|でした|ます)か[、。？?\s]|"
+    r"ご(確認|検討|連絡|返信|回答|手配)(を|の)?(ください|お願い|いただけ|頂け|下さい)|いかが|教えて|"
+    r"可能(でしょうか|ですか)|して(ほしい|欲しい)|までに|締切|期限)"
+)
+_LINE_HEAD_RE = re.compile(r"^\s*\d{4}/\d{1,2}/\d{1,2}\s+\d{1,2}:\d{2}\s+\S+\s+")
+
+
+def chat_ask_line(body: str) -> str | None:
+    """チャット本文から、あいさつ・前置きを除いた『依頼・問いかけ』の1文を返す（無ければ None）。"""
+    t = re.sub(r"<[^>]+>", "\n", body or "")
+    t = t.split("**添付ファイル**")[0]
+    t = re.sub(r"\[qt\].*?\[/qt\]", "\n", t, flags=re.S)  # Chatwork の引用
+    t = re.sub(r"\[/?[a-zA-Z]+[^\]]*\]", " ", t)  # Chatwork のタグ（[To:…] [qtmeta …] など）
+    cand: list[str] = []
+    for raw in t.splitlines():
+        line = _LINE_HEAD_RE.sub("", raw).strip()
+        if not line or line in ("本文", "本文を開く") or GREETING_LINE_RE.match(line):
+            continue
+        cand.append(line)
+    for i, line in enumerate(cand):
+        test = re.sub(r"(どうぞ)?(よろしく|宜しく)お願い(いた)?(します|致します|申し上げます)[。！!]?", "", line)
+        if CHAT_ASK_RE.search(test) or classify(test) in ("request", "question"):
+            # 「〜ですが、」で前の行から続く文は前の行も付ける／この行が「〜が、」で切れていたら次の行も付ける
+            if i > 0 and len(line) < 25 and re.search(r"(が|けど|ので|て)[、,]?$", cand[i - 1]):
+                line = cand[i - 1] + line
+            if re.search(r"(が|けど|ので|て)[、,]$", line) and i + 1 < len(cand):
+                line = line + cand[i + 1]
+            return line[:120] if len(re.sub(r"\W", "", line)) >= 6 else None
+    return None
+
+
 def comm_label(it: dict[str, Any]) -> str:
     cat = CAT_JA.get(str(it.get("category") or ""), "台帳")
     ch = CH_JA.get(str(it.get("channel") or ""), str(it.get("channel") or ""))
@@ -447,6 +483,13 @@ def comm_text(it: dict[str, Any]) -> str:
             end = body.find("\n", m.end())
             line = body[start : end if end >= 0 else None].strip()
         return f"{subject}｜{line}" if line else subject
+    if it.get("channel") != "gmail":
+        ask = chat_ask_line(str(it.get("body_text") or ""))
+        if ask:
+            return ask
+    elif re.search(r"(様|さま|御中|お世話に|と申します)", summary[:30]):
+        ask = chat_ask_line(str(it.get("body_text") or ""))  # 要約が宛名・あいさつだけのとき
+        return f"{subject}｜{ask}" if (ask and subject) else (ask or subject or summary)
     if summary and summary != subject:
         return f"{subject}｜{summary}" if subject else summary
     return subject or summary
@@ -462,13 +505,18 @@ def pick_comm(rows: list[dict[str, Any]], pending_ids: set[str], known: set[str]
         if AUTO_REPLY_RE.search(str(it.get("subject") or "")):
             continue  # 自動返信はやることにならない
         if it.get("category") != "self":
+            ref = it.get("source_ref") if isinstance(it.get("source_ref"), dict) else {}
+            if str(ref.get("channel_raw") or "").startswith(("こちらから", "自分から")):
+                continue  # md 見出しでは自分から（受信扱いの誤り）
             body_plain = re.sub(r"<[^>]+>|本文", " ", str(it.get("body_text") or "")).strip()
+            if "**対応**" in body_plain or re.search(r"(松野と申します|松野です。|リビングサポート松の松野)", body_plain[:600]):
+                continue  # 対応済みのメモつき・自分が書いた文面
             if OWN_FIRST_RE.match(body_plain):
                 continue  # 受信扱いでも中身は自分の発言（LINE の既知の限界）
             if THANKS_RE.match(comm_text(it).strip()):
                 continue  # お礼・あいさつだけ
-            if it.get("channel") != "gmail" and not (classify(body_plain[:800]) or classify(comm_text(it)) or ASK_RE.search(body_plain[:800])):
-                continue  # チャットは依頼・問いかけ・お願いの形があるものだけ（メールは仕分け済み）
+            if it.get("channel") != "gmail" and not chat_ask_line(str(it.get("body_text") or "")):
+                continue  # チャットは、あいさつを除いた本文に依頼・問いかけの文があるものだけ（メールは仕分け済み）
         if it.get("category") == "self":
             if it.get("direction") != "outbound" or not PROMISE_RE.search(own_text(str(it.get("body_text") or ""))):
                 continue
