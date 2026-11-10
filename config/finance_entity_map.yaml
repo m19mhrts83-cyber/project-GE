@@ -65,6 +65,10 @@ category_rules:
   - match: "自己投資・寄付"
     entity: personal
     kind: other_expense
+  # 立替の戻り（飲み会など）は入金先口座にかかわらず個人（2026-11-10 本人確認）
+  - match: "キャッシュバック"
+    entity: personal
+    kind: other_income
   - match: "不労所得(LUUP)"
     entity: personal
     kind: other_income
