@@ -54,8 +54,27 @@ jobs:
         id: deploy
         run: |
           set -euo pipefail
-          OUT="$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          # Hobby の日次100件（api-deployments-free-per-day）はコード失敗ではない。
+          # 本番は直前の成功デプロイのままにし、ジョブは赤にしない（約24時間後に再実行）。
+          set +e
+          OUT="$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN" 2>&1)"
+          CODE=$?
+          set -e
           echo "$OUT"
+          if [[ "$CODE" -ne 0 ]]; then
+            if echo "$OUT" | grep -q 'api-deployments-free-per-day'; then
+              echo "::warning title=Vercel Hobby daily cap::本番デプロイを見送りました。1日100件の上限（api-deployments-free-per-day）で、ビルド失敗ではありません。本番は直前の成功デプロイのままです。約24時間後にこの workflow を再実行すると載ります。"
+              if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+                {
+                  echo "### デプロイ見送り（Vercel Hobby 日次上限）"
+                  echo "ビルドは成功。\`vercel deploy\` が api-deployments-free-per-day（1日100件超）で拒否されました。"
+                  echo "本番は直前の成功デプロイのままです。約24時間後に再実行してください。"
+                } >> "$GITHUB_STEP_SUMMARY"
+              fi
+              exit 0
+            fi
+            exit "$CODE"
+          fi
           URL="$(echo "$OUT" | grep -Eo 'https://jarvis-trade-desk[^ ]+\.vercel\.app' | head -1)"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           if [[ -n "$URL" ]]; then

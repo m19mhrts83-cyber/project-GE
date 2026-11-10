@@ -10,6 +10,10 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 
 const GEMINI_EMBED_MODEL = "gemini-embedding-001";
 const GEMINI_ANSWER_MODEL = "gemini-3-flash-preview";
+// (1) 使用量の削減: raimo-auth が answer_tier=lite を付けた質問だけ軽いモデル＋短い参考情報で答える。
+// 軽いモデルが使えないとき（名前の変更・停止）は今のモデルに戻す。
+const GEMINI_LITE_MODEL = (Deno.env.get("GEMINI_LITE_MODEL") || "gemini-2.5-flash-lite").trim();
+const LITE_LIMITS = { comments: 30, chunks: 15, openchats: 10 };
 const GEMINI_EMBED_DIM = 768;
 const queryEmbeddingCache=createQueryEmbeddingCache(GEMINI_EMBED_DIM);
 const GEMINI_EMBED_URL =
@@ -38,6 +42,7 @@ type SemanticSearchRequest = {
   openchat_limit?: number;
   match_threshold?: number;
   skip_answer?: boolean;
+  answer_tier?: string;
   list_openchat?: boolean;
   only_attachments?: boolean;
   /** 「DBで見る」用: line_openchat_logs.id を正確に取得（query の KW 検索ではヒットしない） */
@@ -332,7 +337,8 @@ async function summarizeAnswer(
   query: string,
   answerContext: string,
   usage?: GeminiUsage,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  lite = false
 ): Promise<string> {
   const trimmed = answerContext.trim();
   if (!trimmed) return REFUSAL;
@@ -340,7 +346,7 @@ async function summarizeAnswer(
   const apiKey = (Deno.env.get("GEMINI_API_KEY") || "").trim();
   if (!apiKey) throw new Error("Missing env: GEMINI_API_KEY");
 
-  const response = await fetch(`${GEMINI_GENERATE_URL}?key=${encodeURIComponent(apiKey)}`, {
+  const call = (url: string) => fetch(`${url}?key=${encodeURIComponent(apiKey)}`, {
     method: "POST",
     signal,
     headers: { "Content-Type": "application/json" },
@@ -352,6 +358,13 @@ async function summarizeAnswer(
       },
     }),
   });
+  let response: Response | null = null;
+  if (lite && /^[a-z0-9.\-]{3,60}$/.test(GEMINI_LITE_MODEL)) {
+    response = await call(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_LITE_MODEL}:generateContent`);
+    if (response.ok) { if (usage) usage.model = GEMINI_LITE_MODEL; }
+    else { await response.text().catch(() => ""); response = null; }
+  }
+  if (!response) response = await call(GEMINI_GENERATE_URL);
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`gemini_generation_http_${response.status}`);
@@ -622,6 +635,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       ? Number(body?.match_threshold)
       : DEFAULT_MATCH_THRESHOLD;
     const skipAnswer = body?.skip_answer === true;
+    const liteAnswer = body?.answer_tier === "lite";
 
     // Keyword retrieval does not depend on the vector. Start it immediately,
     // while retaining its rejection for the eventual join (including embed failure).
@@ -714,18 +728,18 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
     const openchatsForAnswer = openchatRows
       .slice()
       .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, Math.min(ANSWER_OPENCHAT_LIMIT, openchatRows.length));
+      .slice(0, Math.min(liteAnswer ? LITE_LIMITS.openchats : ANSWER_OPENCHAT_LIMIT, openchatRows.length));
 
     const commentsForAnswer = mergeSimilarityAndRecency(
       commentRows,
-      Math.min(ANSWER_COMMENT_LIMIT, commentRows.length),
+      Math.min(liteAnswer ? LITE_LIMITS.comments : ANSWER_COMMENT_LIMIT, commentRows.length),
       commentKey,
       recencyScore
     );
     const chunksForAnswer = relatedChunks
       .slice()
       .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, Math.min(ANSWER_CHUNK_LIMIT, relatedChunks.length));
+      .slice(0, Math.min(liteAnswer ? LITE_LIMITS.chunks : ANSWER_CHUNK_LIMIT, relatedChunks.length));
 
     const answerContext = buildAnswerContext(
       commentsForAnswer,
@@ -734,7 +748,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       openchatsForAnswer
     );
     const retrievalMs=Math.round(performance.now()-retrievalStarted);
-    const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext, geminiUsage, req.signal);
+    const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext, geminiUsage, req.signal, liteAnswer);
 
     const referenceLabels=labelAnswerSources(commentsForAnswer,chunksForAnswer,openchatsForAnswer);
     const knownLabels=new Set([...Object.values(referenceLabels.comments),...Object.values(referenceLabels.chunks),...Object.values(referenceLabels.openchats)]);
@@ -786,6 +800,8 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       relatedOpenchat: attachReferenceLabels(relatedOpenchatForClient,"id",referenceLabels.openchats),
       referenceLabels,
       referenceSelection:hasMentioned?"mentioned":"provided-context",
+      // (2) 評価と結び付けるため、実際に答えたモデルを返す（要約を呼ばなかったときは空）。11/11
+      answerModel: geminiUsage.calls>0?geminiUsage.model:"",
       hitCount: commentRows.length + relatedChunks.length + openchatRows.length,
       meta: {
         embeddingProviderCalls,

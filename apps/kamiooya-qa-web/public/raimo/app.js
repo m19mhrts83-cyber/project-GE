@@ -58,6 +58,8 @@ const App = {
     currentScreen: 'chat',
     returnScreen: null,
     semanticMode: false,
+    deepMode: false,
+    semanticForced: false,
     loadingCount: 0,
     sendAbortController: null,
     pendingAnswerRequest: null,
@@ -172,7 +174,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', brand_theme: '(5)ロゴに合わせたデザイン' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -188,12 +190,12 @@ const App = {
       App.state.viewAsMember = localStorage.getItem('qa_view_as_member') === '1';
     } catch (e) { /* ignore */ }
   },
-  // (5) ロゴに合わせたデザイン。見える人だけ <html class="theme-brand">。
+  // (5) ロゴに合わせた配色（案A）。見た目だけなので画面側の切り替えで足りる（色は index.html と style.css の html.theme-a）。
   // ログイン前の画面にも出せるよう、この端末で一度見えた人は覚えておく（見えない人がログインしたら消す）。
-  applyBrandTheme: () => {
-    const on = App.featureOn('brand_theme');
-    document.documentElement.classList.toggle('theme-brand', on);
-    try { if (on) localStorage.setItem('qa_brand_theme', '1'); else localStorage.removeItem('qa_brand_theme'); } catch (e) { /* ignore */ }
+  applyTheme: () => {
+    const on = App.featureOn('design_theme');
+    if (document.documentElement) document.documentElement.classList.toggle('theme-a', on);
+    try { if (on) localStorage.setItem('qa_design_theme', '1'); else localStorage.removeItem('qa_design_theme'); } catch (e) { /* ignore */ }
   },
   renderFeaturePreviewBar: () => {
     const bar = document.getElementById('featurePreviewBar');
@@ -1174,13 +1176,16 @@ const App = {
         registered = true;
       } catch (rosterErr) {
         if (isNotOnRoster(rosterErr)) {
+          // (3) 名簿（目標設定・合格状況）と番号＋氏名が合えば、サーバーがその場で承認する（auto_approved）
           try {
-            await App.apiClient('POST', '/auth/register', payload);
+            const reg = await App.apiClient('POST', '/auth/register', payload);
             registered = true;
+            if (reg && String(reg.auto_approved) === 'true') autoApproved = true;
           } catch (regErr) {
             if (isReregisterCandidate(regErr)) {
-              await App.apiClient('POST', '/auth/reregister', payload);
+              const rereg = await App.apiClient('POST', '/auth/reregister', payload);
               registered = true;
+              if (rereg && String(rereg.auto_approved) === 'true') autoApproved = true;
             } else {
               throw regErr;
             }
@@ -1195,9 +1200,10 @@ const App = {
             registered = true;
           } catch (rrErr) {
             if (isNotOnRoster(rrErr)) {
-              await App.apiClient('POST', '/auth/reregister', payload);
+              const rereg = await App.apiClient('POST', '/auth/reregister', payload);
               registered = true;
-              await App.notifyRegistrationPending(email, '再登録（アプリ）', memberNo, name, prefecture);
+              if (rereg && String(rereg.auto_approved) === 'true') autoApproved = true;
+              else await App.notifyRegistrationPending(email, '再登録（アプリ）', memberNo, name, prefecture);
             } else {
               throw rrErr;
             }
@@ -1292,8 +1298,9 @@ const App = {
     }
     App.showMainView();
     await App.loadFeatures();
+    App.applyTheme();
     App.renderFeaturePreviewBar();
-    App.applyBrandTheme();
+    App.applySearchModeUi();
     App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + (App.isStaffAdmin() || !App.state.viewAsMember ? App.state.currentUser.role : 'user として表示中') + ')';
 
     const isAdmin = App.isStaffAdmin();
@@ -1346,6 +1353,10 @@ const App = {
     App.state.attachmentDetailCommentId = '';
     App.state.features = {};
     App.state.feedbackByMessage = {};
+    // ログアウト後のログイン画面は、この端末で配色が見えていた人だけ案Aのまま（applyTheme で覚えた分）
+    let keepTheme = false;
+    try { keepTheme = localStorage.getItem('qa_design_theme') === '1'; } catch (e) { /* ignore */ }
+    if (document.documentElement) document.documentElement.classList.toggle('theme-a', keepTheme);
     const featureBar = document.getElementById('featurePreviewBar');
     if (featureBar) featureBar.classList.add('hidden');
     App.state.currentUser = null;
@@ -1355,6 +1366,7 @@ const App = {
     App.state.suggestedQuestions = [];
     App.state.comments = [];App.state.referenceReady={};App.state.referenceLoads={};
     App.state.pendingUsers = [];
+    App.state.rosterMatches = {};
     App.state.approvedUsers = [];
     App.state.roleRequestUsers = [];
     App.state.members = [];
@@ -2038,11 +2050,33 @@ const App = {
     App.updateSemanticModeButton();
   },
 
+  // (1) 使用量の削減が見える人は、意味検索がふだんの検索。ボタンは「より詳しく調べる」（上位のAI・使い回しなし）。2026-11-11
+  semanticBase: () => !!App.authGatewayBase && App.featureOn('cost_saving'),
+  semanticHintOld: '',
+  applySearchModeUi: () => {
+    const hint = document.getElementById('semanticModeHint');
+    if (hint && !App.semanticHintOld) App.semanticHintOld = hint.textContent;
+    if (App.semanticBase()) {
+      if (!App.state.semanticMode) App.state.semanticForced = true;
+      App.state.semanticMode = true;
+      if (hint) hint.textContent = 'ふだんは意味検索で、言い換えや関連事例まで探して手早く答えます。比較・手順・計算など詳しく知りたいときは「より詳しく調べる」をONにすると、上位のAIで時間をかけて答えます。';
+    } else {
+      if (App.state.semanticForced) App.state.semanticMode = false;
+      App.state.semanticForced = false;
+      App.state.deepMode = false;
+      if (hint && App.semanticHintOld) hint.textContent = App.semanticHintOld;
+    }
+    App.updateSemanticModeButton();
+  },
+  currentAnswerMode: (fast) => fast ? 'fast' : App.semanticBase() ? (App.state.deepMode ? 'deep' : 'semantic') : App.state.semanticMode ? 'semantic' : 'normal',
+
   updateSemanticModeButton: () => {
     const btn = App.elements.semanticModeToggle;
     if (!btn) return;
-    const on = !!App.state.semanticMode;
-    btn.textContent = '意味検索モード: ' + (on ? 'ON' : 'OFF');
+    const base = App.semanticBase();
+    const on = base ? !!App.state.deepMode : !!App.state.semanticMode;
+    btn.textContent = (base ? 'より詳しく調べる: ' : '意味検索モード: ') + (on ? 'ON' : 'OFF');
+    btn.title = base ? 'ONにすると、上位のAIで時間をかけて答えます（このタブのあいだだけ）' : '';
     btn.className =
       'shrink-0 px-3 py-1 rounded-full border ' +
       (on
@@ -2076,6 +2110,12 @@ const App = {
   },
 
   handleSemanticModeToggle: () => {
+    if (App.semanticBase()) {
+      App.state.deepMode = !App.state.deepMode;
+      App.updateSemanticModeButton();
+      App.showToast(App.state.deepMode ? 'より詳しく調べる: ON（上位のAIで時間をかけて答えます。このタブのみ）' : 'より詳しく調べる: OFF（ふだんの意味検索に戻しました）', App.state.deepMode ? 'success' : 'info');
+      return;
+    }
     const nextValue = !App.state.semanticMode;
     // オンにするたびに注意ダイアログを表示（了承後に有効化）
     if (nextValue) {
@@ -2408,7 +2448,11 @@ const App = {
     if(!citations||!citations.length)return '';
     const esc=App.escapeHtml;
     const badge=c=>c.citationLabel?'<strong class="text-blue-900">['+esc(c.citationLabel)+']</strong> ':'';
-    const attrs=c=>' id="'+esc(App.citationAnchor(c,messageId))+'" class="mb-2 scroll-mt-4"';
+    // 根拠を開いたら判断ログに残すため、どの根拠かを li に持たせる（(2) answer_feedback が見える人だけ送る）
+    const src=c=>{const key=c.kind==='video_chunk'?(c.chunkKey||c.videoTitle):c.kind==='openchat'?c.openchatId:c.commentId;
+      const title=c.kind==='video_chunk'?(c.videoTitle||'動画')+' ・ '+App.formatMmSs(c.startSec||0):c.kind==='lesson'?(c.lessonTitle||c.topicTitle||'講座ページ'):c.kind==='openchat'?[c.chatTitle||'LINEオプチャ',c.threadTitle].filter(Boolean).join(' / '):'コミュニティ投稿 #'+(c.commentId||'')+(c.postedAt?'（'+App.citationDateLabel(c)+'）':'');
+      return key?' data-src-kind="'+esc(c.kind)+'" data-src-key="'+esc(key)+'" data-src-title="'+esc(title)+'" data-src-label="'+esc(c.citationLabel||'')+'"':'';};
+    const attrs=c=>' id="'+esc(App.citationAnchor(c,messageId))+'" class="mb-2 scroll-mt-4"'+src(c);
     const db=(kind,key)=>' <button type="button" class="citation-db-link text-blue-700 underline" data-kind="'+esc(kind)+'" data-key="'+esc(key||'')+'">本文を見る</button>';
     const dated=(list,item)=>App.groupReferencesByDate(list).map(g=>'<div class="font-medium text-slate-700 mt-2">'+esc(g.label)+'</div><ul class="citations-list mb-2">'+g.items.map(item).join('')+'</ul>').join('');
     const comments=citations.filter(c=>c.kind==='comment');
@@ -2423,10 +2467,10 @@ const App = {
       const anchor='<a class="text-blue-700 underline" href="#'+esc(App.citationAnchor(c,messageId))+'">'+esc(c.citationLabel)+'</a>';
       if(c.kind==='video_chunk'){
         const page=App.safeReferenceUrl(c.videoPageUrl),u=page||App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl,c.startSec||0));const title=esc(c.videoTitle||'動画タイトル未登録')+' ・ '+esc(App.formatMmSs(c.startSec||0));
-        return '<li class="mb-1">'+anchor+' ・ '+(u?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+title+(page?' 元動画ページを開く':' から再生')+'</a>':title)+'</li>';
+        return '<li class="mb-1"'+src(c)+'>'+anchor+' ・ '+(u?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+title+(page?' 元動画ページを開く':' から再生')+'</a>':title)+'</li>';
       }
-      if(c.kind==='lesson')return '<li class="mb-1">'+anchor+' ・ '+esc(c.lessonTitle||c.topicTitle||'講座ページ')+db('lesson',c.commentId)+'</li>';
-      return '<li class="mb-1">'+anchor+' ・ '+esc(App.citationDateLabel(c))+db(c.kind,c.commentId||c.openchatId)+'</li>';
+      if(c.kind==='lesson')return '<li class="mb-1"'+src(c)+'>'+anchor+' ・ '+esc(c.lessonTitle||c.topicTitle||'講座ページ')+db('lesson',c.commentId)+'</li>';
+      return '<li class="mb-1"'+src(c)+'>'+anchor+' ・ '+esc(App.citationDateLabel(c))+db(c.kind,c.commentId||c.openchatId)+'</li>';
     }).join('')+'</ul>');
     if(videos.length){
       const rows=videos.map(c=>{
@@ -2449,7 +2493,7 @@ const App = {
       return '<li'+attrs(c)+'>'+badge(c)+esc(c.lessonTitle||c.topicTitle||c.commentId||'講座')+db('lesson',c.commentId)+(url?' <a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(url)+'">講座を開く</a>':'')+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div></li>';
     }).join('')+'</ul>');
     const note=citations.some(c=>c.referenceSelection==='provided-context')?'<p class="text-slate-600 mb-2">回答作成時の参考候補です。本文中の使用箇所が明示されていない情報も含みます。</p>':'';
-    return '<div class="citations-panel mt-3 border-t pt-2 text-xs">'+note+parts.join('')+'</div>';
+    return '<div class="citations-panel mt-3 border-t pt-2 text-xs" data-message-id="'+esc(messageId||'')+'">'+note+parts.join('')+'</div>';
   },
 
   cleanOpenchatDisplayText: (value) => {
@@ -3274,7 +3318,46 @@ const App = {
     if (!App.isStaffAdmin()) return;
     const res = await App.apiClient('GET', '/admin/users/pending');
     App.state.pendingUsers = (res && res.users) ? res.users : [];
+    App.state.rosterMatches = {};
     App.renderPendingUsers();
+    void App.loadRosterMatches();
+  },
+
+  // (3) 名簿（目標設定・合格状況）との照合。スイッチ auto_approval が見える管理者だけ。2026-11-10
+  // 判定はサーバー。画面は印を付けて「名簿一致の人を選ぶ」を出すだけで、承認は人が押す。
+  rosterBadges: {
+    match: ['名簿一致', 'bg-emerald-100 text-emerald-800'],
+    number_only: ['番号だけ一致・名前を確認', 'bg-amber-100 text-amber-800'],
+    none: ['名簿になし', 'bg-slate-100 text-slate-600'],
+    duplicate: ['同じ番号が複数・確認', 'bg-amber-100 text-amber-800'],
+    missing: ['番号か名前が空', 'bg-slate-100 text-slate-600']
+  },
+  loadRosterMatches: async () => {
+    const info = document.getElementById('rosterMatchInfo'), btn = document.getElementById('selectRosterMatchedBtn');
+    const show = App.isStaffAdmin() && App.featureOn('auto_approval');
+    if (info) info.classList.toggle('hidden', !show);
+    if (btn) btn.classList.toggle('hidden', !show);
+    if (!show || !App.state.pendingUsers.length) { if (info) info.textContent = ''; return; }
+    if (btn && !btn.dataset.bound) {
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function () {
+        App.elements.pendingUsersTableBody.querySelectorAll('.pending-user-check').forEach(function (cb) {
+          cb.checked = (App.state.rosterMatches || {})[cb.getAttribute('data-id')] === 'match';
+        });
+        App.updateBulkApproveButtonState();
+      });
+    }
+    info.textContent = '名簿と照合中…';
+    try {
+      const r = await App.apiClient('POST', '/admin/users/pending/roster-match', {});
+      App.state.rosterMatches = (r && r.matches) || {};
+      App.renderPendingUsers();
+      const n = Object.values(App.state.rosterMatches).filter(function (v) { return v === 'match'; }).length;
+      const when = r && r.synced_at ? String(r.synced_at).replace('T', ' ').slice(0, 16) : '未取得';
+      info.textContent = '名簿一致 ' + n + ' 人／承認待ち ' + App.state.pendingUsers.length + ' 人（名簿の読み込み：' + when + '）';
+    } catch (e) {
+      info.textContent = '名簿と照合できませんでした: ' + ((e && e.message) || String(e));
+    }
   },
 
   renderAll: () => {
@@ -3379,6 +3462,7 @@ const App = {
       });
     });
     area.querySelectorAll('.answer-feedback').forEach(App.bindFeedbackBox);
+    area.querySelectorAll('.citations-panel').forEach(App.bindSourceClicks);
     area.scrollTop = area.scrollHeight;
     area.querySelectorAll('.citation-attachments').forEach(function (container) {
       App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：');
@@ -3389,68 +3473,96 @@ const App = {
   },
 
   // (2) 回答の評価（段階公開スイッチ answer_feedback が見える人だけ）。2026-11-10
+  // いいね＝理由を聞かない。超いいね・悪いね＝選択肢から複数選ぶ＋その他は任意で書く（11/10 松野さん）。
+  // 理由のコードはサーバー（lib/answerFeedback.ts の REASONS）と同じ。悪いねは直す場所に対応させている。
   feedbackChoices: [
-    { rating: 'great', label: '超いいね', icon: '🌟', ask: 'どこが特に良かったですか？（任意）' },
-    { rating: 'good', label: 'いいね', icon: '👍', ask: '' },
-    { rating: 'bad', label: '悪いね', icon: '👎', ask: '何が良くなかったですか？（任意）' }
+    { rating: 'great', label: '超いいね', icon: '🌟', ask: 'どこが特に良かったですか？（いくつでも）', reasons: [
+      ['accurate', '内容が正確で信頼できた'], ['practical', '具体的で、すぐ実践に使える'], ['clear', '分かりやすく、まとまっていた'],
+      ['source', '根拠・出典（講義や投稿）が役に立った'], ['new_view', '知らなかった視点・情報があった']] },
+    { rating: 'good', label: 'いいね', icon: '👍', ask: '', reasons: [] },
+    { rating: 'bad', label: '悪いね', icon: '👎', ask: '何が良くなかったですか？（いくつでも）', reasons: [
+      ['wrong', '内容が間違っている・情報が古い'], ['off_topic', '質問とずれた答えだった'], ['vague', '一般論で、具体性が足りない'],
+      ['hard_to_read', '分かりにくい・長すぎる'], ['no_source', '根拠・出典が足りない、見つからない']] }
   ],
-  // いいねは理由を聞かない。超いいねは良かった点、悪いねは良くなかった点を聞く（11/10 松野さん）
-  feedbackAsk: (rating) => { const c = App.feedbackChoices.find(function (x) { return x.rating === rating; }); return c ? c.ask : ''; },
+  feedbackChoice: (rating) => App.feedbackChoices.find(function (x) { return x.rating === rating; }) || null,
+  feedbackAsk: (rating) => { const c = App.feedbackChoice(rating); return c ? c.ask : ''; },
+  feedbackReasonLabel: (code) => {
+    for (const c of App.feedbackChoices) for (const r of c.reasons) if (r[0] === code) return r[1];
+    return code;
+  },
+  feedbackBtnClass: (on) => 'answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50'),
+  renderFeedbackReasons: (rating, saved) => {
+    const c = App.feedbackChoice(rating);
+    if (!c || !c.reasons.length) return '';
+    const picked = (saved && saved.rating === rating && Array.isArray(saved.reasons)) ? saved.reasons : [];
+    return '<fieldset class="mt-2"><legend class="text-slate-600 mb-1">' + App.escapeHtml(c.ask) + '</legend>' +
+      '<div class="grid gap-1 sm:grid-cols-2">' + c.reasons.map(function (r) {
+        return '<label class="flex items-start gap-2 px-2 py-1 rounded border bg-white cursor-pointer hover:bg-slate-50">' +
+          '<input type="checkbox" class="answer-feedback-reason mt-0.5" value="' + r[0] + '"' + (picked.includes(r[0]) ? ' checked' : '') + '>' +
+          '<span>' + App.escapeHtml(r[1]) + '</span></label>';
+      }).join('') + '</div></fieldset>';
+  },
   renderFeedbackBox: (msgId) => {
     const saved = (App.state.feedbackByMessage || {})[msgId] || {};
     const buttons = App.feedbackChoices.map(function (c) {
       const on = saved.rating === c.rating;
-      return '<button type="button" class="answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50') +
-        '" data-rating="' + c.rating + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + c.icon + ' ' + c.label + '</button>';
+      return '<button type="button" class="' + App.feedbackBtnClass(on) + '" data-rating="' + c.rating + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + c.icon + ' ' + c.label + '</button>';
     }).join('');
     return '<div class="answer-feedback mt-2 pt-2 border-t border-slate-200 text-xs" data-message-id="' + App.escapeHtml(msgId) + '">' +
       '<div class="flex flex-wrap items-center gap-2"><span class="text-slate-500">この回答はどうでしたか？</span>' + buttons + '</div>' +
-      '<div class="answer-feedback-comment ' + (App.feedbackAsk(saved.rating) ? '' : 'hidden') + ' mt-2 flex gap-2">' +
-      '<input type="text" maxlength="1000" class="flex-1 border rounded px-2 py-1" placeholder="' + App.escapeHtml(App.feedbackAsk(saved.rating)) + '" value="' + App.escapeHtml(saved.comment || '') + '">' +
-      '<button type="button" class="answer-feedback-send px-2 py-1 rounded bg-blue-700 text-white">送る</button></div>' +
+      '<div class="answer-feedback-detail ' + (App.feedbackAsk(saved.rating) ? '' : 'hidden') + '">' +
+      '<div class="answer-feedback-reasons">' + App.renderFeedbackReasons(saved.rating, saved) + '</div>' +
+      '<div class="answer-feedback-comment mt-2 flex gap-2">' +
+      '<input type="text" maxlength="1000" class="flex-1 border rounded px-2 py-1" placeholder="その他（任意）" aria-label="その他（任意）" value="' + App.escapeHtml(saved.comment || '') + '">' +
+      '<button type="button" class="answer-feedback-send px-2 py-1 rounded bg-blue-700 text-white">送る</button></div></div>' +
       '<div class="answer-feedback-status text-slate-500 mt-1" role="status" aria-live="polite">' + (saved.sent ? 'ありがとうございます。受け付けました。' : '') + '</div></div>';
   },
   bindFeedbackBox: (box) => {
     const msgId = box.getAttribute('data-message-id');
     const status = box.querySelector('.answer-feedback-status');
-    const send = async function (rating, comment) {
+    const detail = box.querySelector('.answer-feedback-detail');
+    const input = box.querySelector('.answer-feedback-comment input');
+    const picked = function () { return Array.from(box.querySelectorAll('.answer-feedback-reason:checked')).map(function (x) { return x.value; }); };
+    // 評価は押した時点で送る。理由とその他は「送る」で追加で送る（同じ回答には最後の1件だけが残る）。
+    const send = async function (rating, reasons, comment) {
       const chatId = App.state.currentSessionId;
       if (!chatId) return;
       const prev = (App.state.feedbackByMessage || {})[msgId] || {};
-      App.state.feedbackByMessage = Object.assign({}, App.state.feedbackByMessage, { [msgId]: { rating: rating, comment: comment, sent: false } });
+      App.state.feedbackByMessage = Object.assign({}, App.state.feedbackByMessage, { [msgId]: { rating: rating, reasons: reasons, comment: comment, sent: false } });
       status.textContent = '送信中…';
       try {
-        await App.apiClient('POST', '/answer-feedback', { chat_id: String(chatId), message_id: msgId, rating: rating, comment: comment });
+        await App.apiClient('POST', '/answer-feedback', { chat_id: String(chatId), message_id: msgId, rating: rating, reasons: reasons, comment: comment });
         App.state.feedbackByMessage[msgId].sent = true;
         status.textContent = 'ありがとうございます。受け付けました。';
       } catch (e) {
         App.state.feedbackByMessage[msgId] = prev;
         status.textContent = '送れませんでした。時間をおいてもう一度お試しください。';
-        return;
+        return false;
       }
-      box.querySelectorAll('.answer-feedback-btn').forEach(function (b) {
-        const on = b.getAttribute('data-rating') === rating;
-        b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        b.className = 'answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50');
-      });
-      const ask = App.feedbackAsk(rating), row = box.querySelector('.answer-feedback-comment');
-      row.classList.toggle('hidden', !ask);
-      if (ask) row.querySelector('input').setAttribute('placeholder', ask);
+      return true;
     };
     box.querySelectorAll('.answer-feedback-btn').forEach(function (b) {
-      b.addEventListener('click', function () {
+      b.addEventListener('click', async function () {
         const rating = b.getAttribute('data-rating'), prev = (App.state.feedbackByMessage || {})[msgId] || {};
-        const input = box.querySelector('.answer-feedback-comment input');
-        // 評価を変えたら前の理由は引き継がない（いいねは理由なし）
-        const comment = App.feedbackAsk(rating) && prev.rating === rating && input ? input.value.trim() : '';
-        if (input && prev.rating !== rating) input.value = '';
-        void send(rating, comment);
+        if (prev.rating === rating) return; // 同じ評価の押し直しでは選んだ理由を消さない
+        // 評価を変えたら前の理由は引き継がない
+        if (!(await send(rating, [], ''))) return;
+        box.querySelectorAll('.answer-feedback-btn').forEach(function (x) {
+          const on = x.getAttribute('data-rating') === rating;
+          x.setAttribute('aria-pressed', on ? 'true' : 'false');
+          x.className = App.feedbackBtnClass(on);
+        });
+        box.querySelector('.answer-feedback-reasons').innerHTML = App.renderFeedbackReasons(rating, null);
+        input.value = '';
+        detail.classList.toggle('hidden', !App.feedbackAsk(rating));
       });
     });
     box.querySelector('.answer-feedback-send').addEventListener('click', function () {
       const cur = (App.state.feedbackByMessage || {})[msgId];
       if (!cur || !cur.rating) { status.textContent = '先にボタンで評価を選んでください。'; return; }
-      void send(cur.rating, box.querySelector('.answer-feedback-comment input').value.trim());
+      const reasons = picked(), comment = input.value.trim();
+      if (!reasons.length && !comment) { status.textContent = '当てはまるものを選ぶか、その他に書いてください。'; return; }
+      void send(cur.rating, reasons, comment);
     });
   },
 
@@ -3990,7 +4102,7 @@ const App = {
         '<td class="p-2">' + App.escapeHtml(u.email || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.member_no || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.prefecture || '') + '</td>' +
-        '<td class="p-2">' + App.escapeHtml(u.status || '') + '</td>' +
+        '<td class="p-2">' + App.escapeHtml(u.status || '') + App.rosterBadge(u.id) + '</td>' +
         '<td class="p-2">' +
         '<div class="flex flex-wrap gap-2">' +
         '<button type="button" class="approve-btn px-3 py-1 rounded bg-blue-600 text-white text-xs" data-id="' +
@@ -4027,6 +4139,10 @@ const App = {
     App.updateBulkApproveButtonState();
   },
 
+  rosterBadge: (id) => {
+    const b = App.rosterBadges[(App.state.rosterMatches || {})[id]];
+    return b ? ' <span class="inline-block mt-1 px-2 py-0.5 rounded text-xs ' + b[1] + '">' + App.escapeHtml(b[0]) + '</span>' : '';
+  },
   updateBulkApproveButtonState: () => {
     const btn = App.elements.bulkApprovePendingUsersBtn;
     if (!btn) return;
@@ -4152,6 +4268,62 @@ const App = {
     }
   },
 
+  // (2) 判断ログの補足: 「本文を見る」や元ページのリンクを押したら、参考にした根拠として記録する。
+  // 同じ画面で同じ根拠は1回だけ送る。送れなくても画面の動きは変えない。2026-11-10
+  bindSourceClicks: (panel) => {
+    if (!panel || panel.dataset.srcBound) return;
+    panel.dataset.srcBound = '1';
+    panel.addEventListener('click', function (event) {
+      const el = event.target && event.target.closest ? event.target.closest('a,button') : null;
+      if (!el || !panel.contains(el)) return;
+      const href = String(el.getAttribute('href') || '');
+      if (href.charAt(0) === '#') return; // 一覧の中を移動するだけのリンクは数えない
+      const li = el.closest('[data-src-kind]');
+      if (!li) return;
+      void App.logSourceClick(panel.getAttribute('data-message-id') || '', {
+        kind: li.getAttribute('data-src-kind') || '', source_key: li.getAttribute('data-src-key') || '',
+        title: li.getAttribute('data-src-title') || '', label: li.getAttribute('data-src-label') || '',
+        action: el.classList.contains('citation-db-link') ? 'open_text' : 'open_link'
+      });
+    });
+  },
+
+  logSourceClick: async (msgId, s) => {
+    const chatId = App.state.currentSessionId;
+    if (!chatId || !msgId || !s.kind || !s.source_key || !App.featureOn('answer_feedback')) return;
+    const seen = App.state.sourceClicksSent || (App.state.sourceClicksSent = {});
+    const key = chatId + '/' + msgId + '/' + s.kind + '/' + s.source_key;
+    if (seen[key]) return;
+    seen[key] = true;
+    try {
+      await App.apiClient('POST', '/answer-source-click', Object.assign({ chat_id: String(chatId), message_id: String(msgId) }, s));
+    } catch (e) {
+      delete seen[key];
+    }
+  },
+
+  // (2) 評価した答えの作り方（11/11）。軽いモデルや使い回しで悪いねが多いかを見分ける。
+  answerMakeLabel: (x) => {
+    if (!x || !x.answer_mode) return '不明（記録前の評価）';
+    const mode = { semantic: '意味検索', deep: 'より詳しく調べる', normal: '通常検索', fast: '高速' }[x.answer_mode] || x.answer_mode;
+    const tier = x.answer_mode === 'semantic' ? (x.answer_tier === 'lite' ? '・ライト版' : '・上位版') : '';
+    return mode + tier + (x.answer_model ? '（' + x.answer_model + '）' : '') + (x.answer_reused ? '・使い回し' : '');
+  },
+  feedbackByMakeHtml: (rows) => {
+    const groups = {};
+    (rows || []).forEach(function (x) {
+      const k = App.answerMakeLabel(x);
+      const g = groups[k] || (groups[k] = { great: 0, good: 0, bad: 0 });
+      if (g[x.rating] != null) g[x.rating]++;
+    });
+    const keys = Object.keys(groups);
+    if (!keys.length) return '';
+    return '<div class="md:col-span-2"><div class="font-medium">🤖 答えの作り方ごとの評価</div><ul class="text-slate-600">' + keys.map(function (k) {
+      const g = groups[k], n = g.great + g.good + g.bad;
+      return '<li>' + App.escapeHtml(k) + '：🌟' + g.great + ' 👍' + g.good + ' 👎' + g.bad + '（悪いね ' + Math.round(g.bad * 100 / n) + '%）</li>';
+    }).join('') + '</ul></div>';
+  },
+
   // (2) 回答の評価の一覧。見えない人には枠ごと出さない。2026-11-10
   loadFeedbackAnalytics: async () => {
     const box = document.getElementById('feedbackAnalytics');
@@ -4169,11 +4341,38 @@ const App = {
       const count = { great: 0, good: 0, bad: 0 };
       rows.forEach(function (x) { if (count[x.rating] != null) count[x.rating]++; });
       summary.textContent = '🌟超いいね ' + count.great + ' ／ 👍いいね ' + count.good + ' ／ 👎悪いね ' + count.bad + '（全 ' + rows.length + ' 件）';
+      // 理由の内訳（多い順）。悪いねの内訳が、どこを直すかの目安になる。
+      const tally = function (rating) {
+        const n = {};
+        rows.forEach(function (x) { if (x.rating === rating && Array.isArray(x.reasons)) x.reasons.forEach(function (c) { n[c] = (n[c] || 0) + 1; }); });
+        const c = App.feedbackChoice(rating);
+        return (c ? c.reasons : []).map(function (r) { return [r[1], n[r[0]] || 0]; }).sort(function (p, q) { return q[1] - p[1]; });
+      };
+      const breakdown = document.getElementById('feedbackBreakdown');
+      if (breakdown) {
+        breakdown.innerHTML = [['great', '🌟超いいねの理由'], ['bad', '👎悪いねの理由']].map(function (g) {
+          return '<div><div class="font-medium">' + g[1] + '</div><ul class="text-slate-600">' + tally(g[0]).map(function (t) {
+            return '<li>' + App.escapeHtml(t[0]) + '：' + t[1] + ' 件</li>';
+          }).join('') + '</ul></div>';
+        }).join('') + App.feedbackByMakeHtml(rows);
+      }
+      // よく参考にされた根拠（開いた人の数が多い順）。評価を付けていない回答で開いたものも含む。
+      const topBox = document.getElementById('feedbackSources');
+      if (topBox) {
+        const top = Array.isArray(r && r.sources_top) ? r.sources_top : [];
+        const kindLabel = { comment: 'コミュニティ', openchat: 'LINEオプチャ', lesson: '講座', video_chunk: '動画' };
+        topBox.innerHTML = '<div class="font-medium">📎 参考にされた根拠（開いた人の多い順）</div>' + (top.length ? '<ol class="list-decimal ml-5 text-slate-600">' + top.map(function (t) {
+          return '<li>' + App.escapeHtml((kindLabel[t.kind] || '') + '：' + (t.title || '')) + ' ― ' + t.people + ' 人・' + t.answers + ' 回答</li>';
+        }).join('') + '</ol>' : '<p class="text-slate-500">まだ記録はありません。会員が答えの「本文を見る」や元ページのリンクを押すと、ここに出ます。</p>');
+      }
       const icon = { great: '🌟', good: '👍', bad: '👎' };
       list.innerHTML = rows.length ? rows.map(function (x) {
         return '<div class="border rounded p-2"><div class="text-xs text-slate-500">' + (icon[x.rating] || '') + ' ' + App.escapeHtml(String(x.updated_at || '').replace('T', ' ').slice(0, 16)) + '</div>' +
           '<div><span class="text-slate-500">質問：</span>' + App.escapeHtml(x.question || '') + '</div>' +
-          (x.comment ? '<div><span class="text-slate-500">意見：</span>' + App.escapeHtml(x.comment) + '</div>' : '') +
+          (Array.isArray(x.reasons) && x.reasons.length ? '<div><span class="text-slate-500">理由：</span>' + x.reasons.map(function (c) { return App.escapeHtml(App.feedbackReasonLabel(c)); }).join('、') + '</div>' : '') +
+          (x.comment ? '<div><span class="text-slate-500">その他：</span>' + App.escapeHtml(x.comment) + '</div>' : '') +
+          '<div class="text-xs text-slate-500">作り方：' + App.escapeHtml(App.answerMakeLabel(x)) + '</div>' +
+          (Array.isArray(x.sources) && x.sources.length ? '<div><span class="text-slate-500">開いた根拠：</span>' + x.sources.map(function (c) { return App.escapeHtml((c.label ? '[' + c.label + '] ' : '') + (c.title || '')); }).join('、') + '</div>' : '') +
           '<details class="text-xs text-slate-600"><summary>回答の冒頭</summary>' + App.escapeHtml(x.answer || '') + '</details></div>';
       }).join('') : '<p class="text-slate-500">まだ評価はありません。</p>';
     } catch (e) {
@@ -4765,7 +4964,7 @@ const App = {
     if(!App.state.currentUser||App.state.sendAbortController)return;
     const pending=App.state.pendingAnswerRequest||App.readPendingAnswer();if(!pending)return;
     App.state.pendingAnswerRequest=pending;App.state.currentSessionId=pending.sessionId;
-    App.state.semanticMode=pending.mode==='semantic';App.updateSemanticModeButton();
+    App.state.semanticMode=pending.mode==='semantic'||pending.mode==='deep';App.state.deepMode=pending.mode==='deep';App.updateSemanticModeButton();
     await App.sendQuestion(pending.query,true);
   },
 
@@ -4824,7 +5023,7 @@ const App = {
         try {
           if(App.authGatewayBase){
             const pending=App.state.pendingAnswerRequest||App.readPendingAnswer();
-            const mode=pending?pending.mode:(fast?'fast':App.state.semanticMode?'semantic':'normal');
+            const mode=pending?pending.mode:App.currentAnswerMode(fast);
             msgRes=await App.runAnswerJob(sessionId,questionText,mode,controller.signal);
           } else if (App.state.semanticMode && !fast) {
             // 意味検索: Raimo api ネスト障害を避け、Edge をブラウザから直接呼ぶ

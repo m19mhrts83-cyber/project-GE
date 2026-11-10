@@ -1,4 +1,8 @@
 import {createAnswerJobs,createRestAnswerStore,compactAnswerResult} from './qaAnswerJobs.ts';
+import {featureAllowed} from './featureFlags.ts';
+import {matchPending} from './rosterMatch.ts';
+import {answerTier,cacheable,queryKey,fresh} from './answerCost.ts';
+import {answerHash,cleanMeta,RAIMO_ANSWER_MODEL,type AnswerMeta} from './answerMeta.ts';
 // Runtime-neutral production adapters. Secrets are injected only by the Edge entrypoint.
 import type { GatewayDependencies } from './raimoAuthGateway.ts';
 export type RuntimeConfig = { origin: string; raimoBase: string; gatewaySecret: string; projectUrl: string; serviceKey: string; proxySecret: string };
@@ -50,6 +54,28 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     if(!/^[0-9a-f]{64}$/.test(ref))return {user_id:uid,session_active:false};
     const [s,u]=await Promise.all([parentSession(ref),lookup({user_id:uid}).then(memberOf)]);
     return {user_id:uid,status:u?.status,role:u?.role,session_active:sessionActive(uid,s,u)};
+  };
+
+  const rosterHas=async(hashes:string[])=>{
+    const found=new Set<string>();const list=hashes.filter(h=>/^[0-9a-f]{64}$/.test(h));
+    for(let i=0;i<list.length;i+=100){const rows=await rest('qa_roster_hashes?select=hash&hash=in.('+list.slice(i,i+100).join(',')+')');for(const r of rows||[])found.add(String(r.hash));}
+    return found;
+  };
+  // スイッチ auto_approval が「全員」なら全員に、owner/reviewers なら名指しのメールの人の登録だけに効く（試験用）。
+  const autoApprove=async(email:string,memberNo:string,name:string)=>{
+    const flags=await rest('qa_feature_flags?select=feature,stage,owner_ids,reviewer_ids&feature=eq.auto_approval&limit=1');
+    if(!featureAllowed(Array.isArray(flags)?flags[0]:undefined,{id:'',email}))return false;
+    const u=await lookup({email});
+    if(!u||u.status!=='pending')return false;
+    const pending=await backend('GET','/admin/users/pending',{});
+    // 本人は今回の登録内容で照合し、ほかの承認待ちは同じ番号がいないかを見るのに使う
+    const users=(Array.isArray(pending?.users)?pending.users:[]).filter((x:any)=>String(x.id)!==String(u.id)).map((x:any)=>({id:String(x.id),member_no:x.member_no,name:x.name}));
+    users.push({id:String(u.id),member_no:memberNo,name});
+    const result=(await matchPending(users,rosterHas))[String(u.id)];
+    if(result!=='match')return false;
+    await backend('PUT','/admin/users/'+encodeURIComponent(String(u.id))+'/approve',{});
+    await backend('POST','/notify/approval',{email}).catch(()=>{}); // メールが失敗しても承認は済んでいる（ログインはできる）
+    return true;
   };
 
   const deps:GatewayDependencies={origin:c.origin,sessions,allowLogin:email=>allow('login:'+email),
@@ -109,7 +135,19 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     },
     referenceMetadata:async()=>rest('rpc/qa_reference_metadata',{method:'POST',body:'{}'}),
     featureFlags:async()=>rest('qa_feature_flags?select=feature,stage,owner_ids,reviewer_ids&limit=100'),
-    listFeedback:async()=>rest('qa_answer_feedback?select=rating,comment,question,answer,updated_at&order=updated_at.desc&limit=200'),
+    roster:{
+      has:rosterHas,
+      meta:async()=>{const m=(await rest('qa_roster_meta?select=row_count,synced_at&id=eq.1&limit=1'))?.[0];return {row_count:m?.row_count,synced_at:m?.synced_at};}
+    },
+    listFeedback:async()=>rest('qa_answer_feedback?select=chat_id,message_id,rating,reasons,comment,question,answer,updated_at,answer_mode,answer_tier,answer_model,answer_reused&order=updated_at.desc&limit=200'),
+    saveSourceClick:async row=>{await rest('qa_answer_source_clicks?on_conflict=user_id,chat_id,message_id,kind,source_key',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
+    listSourceClicks:async()=>rest('qa_answer_source_clicks?select=user_id,chat_id,message_id,kind,source_key,title,label&order=clicked_at.desc&limit=1000'),
+    // (2) 答えの作り方（モデル・使い回し）。評価のときに本文のハッシュで引く。11/11
+    answerMeta:async(userId,chatId,answer)=>{
+      const h=await answerHash(answer);
+      const row=(await rest('qa_answer_meta?user_id=eq.'+encodeURIComponent(userId)+'&chat_id=eq.'+encodeURIComponent(chatId)+'&answer_hash=eq.'+h+'&select=mode,tier,model,reused&limit=1'))[0];
+      return cleanMeta(row);
+    },
     saveFeedback:async row=>{await rest('qa_answer_feedback?on_conflict=user_id,chat_id,message_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
     semanticConfig:async()=>{
       const r=await backend('POST','/semantic-search-config',{});
@@ -125,8 +163,12 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         const password=String(input.password_hash||'');if(password.length<8||new TextEncoder().encode(password).length>72)throw new UpstreamError('invalid_password',400);
         const data={email,password_hash:await hash(password),name:String(input.name||'').slice(0,200),member_no:String(input.member_no||'').slice(0,100),prefecture:String(input.prefecture||'').slice(0,50)};
         const r=await backend('POST',path,data);
-        if(!path.endsWith('-roster'))await backend('POST','/notify/registration',{email,member_no:data.member_no,note:'アプリ登録',registered_at:new Date().toISOString()});
-        return r;
+        if(path.endsWith('-roster'))return r;
+        // (3) 名簿（目標設定・合格状況）と会員番号＋氏名が合えば、その場で承認して本人に完了メール（11/10 松野さん）。
+        // 合わない・同じ番号の承認待ちがいる・照合できないときは、今までどおり承認待ち。
+        const auto=await autoApprove(email,data.member_no,data.name).catch(()=>false);
+        await backend('POST','/notify/registration',{email,member_no:data.member_no,note:auto?'アプリ登録（名簿一致で自動承認済み・対応不要）':'アプリ登録',registered_at:new Date().toISOString()});
+        return auto?{...r,auto_approved:'true'}:r;
       }
       if(path==='/auth/reset-password/check')return {email}; // no unauthenticated account enumeration
       if(path==='/auth/forgot-password/issue'){
@@ -151,6 +193,10 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       throw new UpstreamError('route_not_reviewed',403);
     }
   };
+  const recordMeta=(job:{user_id:string;chat_id:string},answer:string,m:AnswerMeta)=>answerHash(answer)
+    .then(h=>rest('qa_answer_meta?on_conflict=user_id,chat_id,answer_hash',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({user_id:job.user_id,chat_id:job.chat_id,answer_hash:h,...m,created_at:new Date().toISOString()})}))
+    .catch(()=>{/* 記録できなくても答えは返す */});
   if(jobsRuntime)deps.jobs=createAnswerJobs({
     store:createRestAnswerStore(rest),schedule:jobsRuntime.schedule,
     authorize:async job=>{
@@ -158,18 +204,51 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       return !!(u&&u.status==='approved'&&u.authVersion===job.auth_version&&sessionActive(job.user_id,parent,u)&&owner===job.user_id);
     },
     execute:async(job,signal)=>{
-      if(job.mode!=='semantic'){
+      // deep = (1)の「より詳しく調べる」。意味検索を上位のモデルで、使い回しなしで答える。
+      if(job.mode!=='semantic'&&job.mode!=='deep'){
         const result=compactAnswerResult(await backend('POST','/chat-sessions/'+job.chat_id+(job.mode==='fast'?'/messages-fast':'/messages'),{content:job.query,actor_user_id:job.user_id},signal));
-        if(!result.answer.trim())throw new Error('empty_answer');return result;
+        if(!result.answer.trim())throw new Error('empty_answer');
+        await recordMeta(job,result.answer,{mode:job.mode==='fast'?'fast':'normal',tier:'standard',model:RAIMO_ANSWER_MODEL,reused:false});
+        return result;
       }
       const cfg=await deps.semanticConfig!();
       await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'user',content:job.query},signal);
-      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22}),signal}));
+      // (1) 使用量の削減。スイッチ cost_saving が見える人の質問だけ。読めなければ今までどおり。
+      let saving=false;
+      try{
+        const flags=await deps.featureFlags!();const flag=(Array.isArray(flags)?flags:[]).find((f:any)=>f.feature==='cost_saving');
+        // オフ・全員公開のときは本人を引き直さない（会員情報の読み出しを増やさない）
+        if(flag&&flag.stage==='all')saving=true;
+        else if(flag&&['owner','reviewers'].includes(flag.stage)){const u=await deps.member(job.user_id);saving=!!u&&featureAllowed(flag,{id:u.id,email:u.email});}
+      }catch{saving=false;}
+      const deep=job.mode==='deep';
+      const key=saving&&!deep?await queryKey(job.query):'';
+      if(saving&&!deep){
+        try{
+          const row=(await rest('qa_answer_cache?query_hash=eq.'+key+'&select=result,created_at,hits,tier&limit=1'))[0];
+          if(row&&fresh(row)&&cacheable(String(row.result?.answer||''))){
+            const reused=compactAnswerResult(row.result);
+            await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'assistant',content:reused.answer},signal);
+            rest('qa_answer_cache?query_hash=eq.'+key,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({hits:Number(row.hits||0)+1,last_hit_at:new Date().toISOString()})}).catch(()=>{});
+            await recordMeta(job,reused.answer,{mode:'semantic',tier:row.tier==='lite'?'lite':'standard',model:String(row.result?.answerModel||''),reused:true});
+            return {...reused,reused:true};
+          }
+        }catch{/* 使い回しが読めなくても答えは作る */}
+      }
+      const tier=saving&&!deep?answerTier(job.query):'standard';
+      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{})}),signal}));
       const result=await response.json();
       if(!response.ok){if(signal.aborted)throw signal.reason;throw new UpstreamError(result?.code==='semantic_disabled'?'semantic_disabled':'operation_failed',503);}
       const answer=String(result.answer||'').trim();if(!answer)throw new Error('empty_answer');
       await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'assistant',content:answer},signal);
-      return compactAnswerResult(result);
+      const compact=compactAnswerResult(result);
+      // 実際に答えたモデル（軽いモデルが使えず今のモデルに戻った場合もそちら）。古い意味検索は返さないので空＝不明。
+      const answerModel=typeof result.answerModel==='string'?result.answerModel:'';
+      await recordMeta(job,answer,{mode:deep?'deep':'semantic',tier,model:answerModel,reused:false});
+      if(saving&&!deep&&cacheable(answer)){
+        await rest('qa_answer_cache?on_conflict=query_hash',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({query_hash:key,query:job.query.slice(0,4000),result:{...compact,answerModel},tier,hits:0,created_at:new Date().toISOString(),last_hit_at:null})}).catch(()=>{});
+      }
+      return compact;
     }
   });
   return {deps, status, allow, backend};
