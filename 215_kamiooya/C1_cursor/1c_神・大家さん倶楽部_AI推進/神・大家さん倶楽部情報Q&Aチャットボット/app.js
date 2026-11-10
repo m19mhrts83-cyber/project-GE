@@ -3425,68 +3425,96 @@ const App = {
   },
 
   // (2) 回答の評価（段階公開スイッチ answer_feedback が見える人だけ）。2026-11-10
+  // いいね＝理由を聞かない。超いいね・悪いね＝選択肢から複数選ぶ＋その他は任意で書く（11/10 松野さん）。
+  // 理由のコードはサーバー（lib/answerFeedback.ts の REASONS）と同じ。悪いねは直す場所に対応させている。
   feedbackChoices: [
-    { rating: 'great', label: '超いいね', icon: '🌟', ask: 'どこが特に良かったですか？（任意）' },
-    { rating: 'good', label: 'いいね', icon: '👍', ask: '' },
-    { rating: 'bad', label: '悪いね', icon: '👎', ask: '何が良くなかったですか？（任意）' }
+    { rating: 'great', label: '超いいね', icon: '🌟', ask: 'どこが特に良かったですか？（いくつでも）', reasons: [
+      ['accurate', '内容が正確で信頼できた'], ['practical', '具体的で、すぐ実践に使える'], ['clear', '分かりやすく、まとまっていた'],
+      ['source', '根拠・出典（講義や投稿）が役に立った'], ['new_view', '知らなかった視点・情報があった']] },
+    { rating: 'good', label: 'いいね', icon: '👍', ask: '', reasons: [] },
+    { rating: 'bad', label: '悪いね', icon: '👎', ask: '何が良くなかったですか？（いくつでも）', reasons: [
+      ['wrong', '内容が間違っている・情報が古い'], ['off_topic', '質問とずれた答えだった'], ['vague', '一般論で、具体性が足りない'],
+      ['hard_to_read', '分かりにくい・長すぎる'], ['no_source', '根拠・出典が足りない、見つからない']] }
   ],
-  // いいねは理由を聞かない。超いいねは良かった点、悪いねは良くなかった点を聞く（11/10 松野さん）
-  feedbackAsk: (rating) => { const c = App.feedbackChoices.find(function (x) { return x.rating === rating; }); return c ? c.ask : ''; },
+  feedbackChoice: (rating) => App.feedbackChoices.find(function (x) { return x.rating === rating; }) || null,
+  feedbackAsk: (rating) => { const c = App.feedbackChoice(rating); return c ? c.ask : ''; },
+  feedbackReasonLabel: (code) => {
+    for (const c of App.feedbackChoices) for (const r of c.reasons) if (r[0] === code) return r[1];
+    return code;
+  },
+  feedbackBtnClass: (on) => 'answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50'),
+  renderFeedbackReasons: (rating, saved) => {
+    const c = App.feedbackChoice(rating);
+    if (!c || !c.reasons.length) return '';
+    const picked = (saved && saved.rating === rating && Array.isArray(saved.reasons)) ? saved.reasons : [];
+    return '<fieldset class="mt-2"><legend class="text-slate-600 mb-1">' + App.escapeHtml(c.ask) + '</legend>' +
+      '<div class="grid gap-1 sm:grid-cols-2">' + c.reasons.map(function (r) {
+        return '<label class="flex items-start gap-2 px-2 py-1 rounded border bg-white cursor-pointer hover:bg-slate-50">' +
+          '<input type="checkbox" class="answer-feedback-reason mt-0.5" value="' + r[0] + '"' + (picked.includes(r[0]) ? ' checked' : '') + '>' +
+          '<span>' + App.escapeHtml(r[1]) + '</span></label>';
+      }).join('') + '</div></fieldset>';
+  },
   renderFeedbackBox: (msgId) => {
     const saved = (App.state.feedbackByMessage || {})[msgId] || {};
     const buttons = App.feedbackChoices.map(function (c) {
       const on = saved.rating === c.rating;
-      return '<button type="button" class="answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50') +
-        '" data-rating="' + c.rating + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + c.icon + ' ' + c.label + '</button>';
+      return '<button type="button" class="' + App.feedbackBtnClass(on) + '" data-rating="' + c.rating + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + c.icon + ' ' + c.label + '</button>';
     }).join('');
     return '<div class="answer-feedback mt-2 pt-2 border-t border-slate-200 text-xs" data-message-id="' + App.escapeHtml(msgId) + '">' +
       '<div class="flex flex-wrap items-center gap-2"><span class="text-slate-500">この回答はどうでしたか？</span>' + buttons + '</div>' +
-      '<div class="answer-feedback-comment ' + (App.feedbackAsk(saved.rating) ? '' : 'hidden') + ' mt-2 flex gap-2">' +
-      '<input type="text" maxlength="1000" class="flex-1 border rounded px-2 py-1" placeholder="' + App.escapeHtml(App.feedbackAsk(saved.rating)) + '" value="' + App.escapeHtml(saved.comment || '') + '">' +
-      '<button type="button" class="answer-feedback-send px-2 py-1 rounded bg-blue-700 text-white">送る</button></div>' +
+      '<div class="answer-feedback-detail ' + (App.feedbackAsk(saved.rating) ? '' : 'hidden') + '">' +
+      '<div class="answer-feedback-reasons">' + App.renderFeedbackReasons(saved.rating, saved) + '</div>' +
+      '<div class="answer-feedback-comment mt-2 flex gap-2">' +
+      '<input type="text" maxlength="1000" class="flex-1 border rounded px-2 py-1" placeholder="その他（任意）" aria-label="その他（任意）" value="' + App.escapeHtml(saved.comment || '') + '">' +
+      '<button type="button" class="answer-feedback-send px-2 py-1 rounded bg-blue-700 text-white">送る</button></div></div>' +
       '<div class="answer-feedback-status text-slate-500 mt-1" role="status" aria-live="polite">' + (saved.sent ? 'ありがとうございます。受け付けました。' : '') + '</div></div>';
   },
   bindFeedbackBox: (box) => {
     const msgId = box.getAttribute('data-message-id');
     const status = box.querySelector('.answer-feedback-status');
-    const send = async function (rating, comment) {
+    const detail = box.querySelector('.answer-feedback-detail');
+    const input = box.querySelector('.answer-feedback-comment input');
+    const picked = function () { return Array.from(box.querySelectorAll('.answer-feedback-reason:checked')).map(function (x) { return x.value; }); };
+    // 評価は押した時点で送る。理由とその他は「送る」で追加で送る（同じ回答には最後の1件だけが残る）。
+    const send = async function (rating, reasons, comment) {
       const chatId = App.state.currentSessionId;
       if (!chatId) return;
       const prev = (App.state.feedbackByMessage || {})[msgId] || {};
-      App.state.feedbackByMessage = Object.assign({}, App.state.feedbackByMessage, { [msgId]: { rating: rating, comment: comment, sent: false } });
+      App.state.feedbackByMessage = Object.assign({}, App.state.feedbackByMessage, { [msgId]: { rating: rating, reasons: reasons, comment: comment, sent: false } });
       status.textContent = '送信中…';
       try {
-        await App.apiClient('POST', '/answer-feedback', { chat_id: String(chatId), message_id: msgId, rating: rating, comment: comment });
+        await App.apiClient('POST', '/answer-feedback', { chat_id: String(chatId), message_id: msgId, rating: rating, reasons: reasons, comment: comment });
         App.state.feedbackByMessage[msgId].sent = true;
         status.textContent = 'ありがとうございます。受け付けました。';
       } catch (e) {
         App.state.feedbackByMessage[msgId] = prev;
         status.textContent = '送れませんでした。時間をおいてもう一度お試しください。';
-        return;
+        return false;
       }
-      box.querySelectorAll('.answer-feedback-btn').forEach(function (b) {
-        const on = b.getAttribute('data-rating') === rating;
-        b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        b.className = 'answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50');
-      });
-      const ask = App.feedbackAsk(rating), row = box.querySelector('.answer-feedback-comment');
-      row.classList.toggle('hidden', !ask);
-      if (ask) row.querySelector('input').setAttribute('placeholder', ask);
+      return true;
     };
     box.querySelectorAll('.answer-feedback-btn').forEach(function (b) {
-      b.addEventListener('click', function () {
+      b.addEventListener('click', async function () {
         const rating = b.getAttribute('data-rating'), prev = (App.state.feedbackByMessage || {})[msgId] || {};
-        const input = box.querySelector('.answer-feedback-comment input');
-        // 評価を変えたら前の理由は引き継がない（いいねは理由なし）
-        const comment = App.feedbackAsk(rating) && prev.rating === rating && input ? input.value.trim() : '';
-        if (input && prev.rating !== rating) input.value = '';
-        void send(rating, comment);
+        if (prev.rating === rating) return; // 同じ評価の押し直しでは選んだ理由を消さない
+        // 評価を変えたら前の理由は引き継がない
+        if (!(await send(rating, [], ''))) return;
+        box.querySelectorAll('.answer-feedback-btn').forEach(function (x) {
+          const on = x.getAttribute('data-rating') === rating;
+          x.setAttribute('aria-pressed', on ? 'true' : 'false');
+          x.className = App.feedbackBtnClass(on);
+        });
+        box.querySelector('.answer-feedback-reasons').innerHTML = App.renderFeedbackReasons(rating, null);
+        input.value = '';
+        detail.classList.toggle('hidden', !App.feedbackAsk(rating));
       });
     });
     box.querySelector('.answer-feedback-send').addEventListener('click', function () {
       const cur = (App.state.feedbackByMessage || {})[msgId];
       if (!cur || !cur.rating) { status.textContent = '先にボタンで評価を選んでください。'; return; }
-      void send(cur.rating, box.querySelector('.answer-feedback-comment input').value.trim());
+      const reasons = picked(), comment = input.value.trim();
+      if (!reasons.length && !comment) { status.textContent = '当てはまるものを選ぶか、その他に書いてください。'; return; }
+      void send(cur.rating, reasons, comment);
     });
   },
 
@@ -4209,11 +4237,27 @@ const App = {
       const count = { great: 0, good: 0, bad: 0 };
       rows.forEach(function (x) { if (count[x.rating] != null) count[x.rating]++; });
       summary.textContent = '🌟超いいね ' + count.great + ' ／ 👍いいね ' + count.good + ' ／ 👎悪いね ' + count.bad + '（全 ' + rows.length + ' 件）';
+      // 理由の内訳（多い順）。悪いねの内訳が、どこを直すかの目安になる。
+      const tally = function (rating) {
+        const n = {};
+        rows.forEach(function (x) { if (x.rating === rating && Array.isArray(x.reasons)) x.reasons.forEach(function (c) { n[c] = (n[c] || 0) + 1; }); });
+        const c = App.feedbackChoice(rating);
+        return (c ? c.reasons : []).map(function (r) { return [r[1], n[r[0]] || 0]; }).sort(function (p, q) { return q[1] - p[1]; });
+      };
+      const breakdown = document.getElementById('feedbackBreakdown');
+      if (breakdown) {
+        breakdown.innerHTML = [['great', '🌟超いいねの理由'], ['bad', '👎悪いねの理由']].map(function (g) {
+          return '<div><div class="font-medium">' + g[1] + '</div><ul class="text-slate-600">' + tally(g[0]).map(function (t) {
+            return '<li>' + App.escapeHtml(t[0]) + '：' + t[1] + ' 件</li>';
+          }).join('') + '</ul></div>';
+        }).join('');
+      }
       const icon = { great: '🌟', good: '👍', bad: '👎' };
       list.innerHTML = rows.length ? rows.map(function (x) {
         return '<div class="border rounded p-2"><div class="text-xs text-slate-500">' + (icon[x.rating] || '') + ' ' + App.escapeHtml(String(x.updated_at || '').replace('T', ' ').slice(0, 16)) + '</div>' +
           '<div><span class="text-slate-500">質問：</span>' + App.escapeHtml(x.question || '') + '</div>' +
-          (x.comment ? '<div><span class="text-slate-500">意見：</span>' + App.escapeHtml(x.comment) + '</div>' : '') +
+          (Array.isArray(x.reasons) && x.reasons.length ? '<div><span class="text-slate-500">理由：</span>' + x.reasons.map(function (c) { return App.escapeHtml(App.feedbackReasonLabel(c)); }).join('、') + '</div>' : '') +
+          (x.comment ? '<div><span class="text-slate-500">その他：</span>' + App.escapeHtml(x.comment) + '</div>' : '') +
           '<details class="text-xs text-slate-600"><summary>回答の冒頭</summary>' + App.escapeHtml(x.answer || '') + '</details></div>';
       }).join('') : '<p class="text-slate-500">まだ評価はありません。</p>';
     } catch (e) {
