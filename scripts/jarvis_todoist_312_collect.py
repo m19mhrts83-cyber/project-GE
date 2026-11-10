@@ -42,6 +42,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from jarvis_todoist_mark import mark_title, strip_mark  # noqa: E402
+
 HERE = Path(__file__).resolve().parent
 JST = timezone(timedelta(hours=9))
 AGENT = "312"
@@ -154,7 +156,7 @@ def best_match(text: str, tasks: list[dict[str, Any]]) -> tuple[dict[str, Any] |
     ids = set(re.findall(r"(?<!\d)([1-8]\d{2})(?!\d)", text or ""))
     best, score = None, 0.0
     for t in tasks:
-        content = t.get("content") or ""
+        content = strip_mark(t.get("content") or "")
         s = similarity(text, content)
         if ids and any(f"[{i}]" in content for i in ids):
             s += 0.35
@@ -506,7 +508,7 @@ def reflect(*, dry: bool) -> int:
         elif label == "別タスクを作る":
             title = f.get("タイトル") or derive_title(t.get("topic_text") or "")
             task: dict[str, Any] = {
-                "content": f"[{AGENT}] {title}",
+                "content": mark_title(f"[{AGENT}] {title}", requested=True),
                 "description": f"{f.get('説明') or ''}\n完了条件: {f.get('完了条件') or '記載なし'}\n出典: {src}".strip(),
                 "labels": ["312"],
             }

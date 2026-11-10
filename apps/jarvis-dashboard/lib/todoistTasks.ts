@@ -1,3 +1,4 @@
+import { markTodoistTitle, stripTodoistMark, type TodoistMark } from "@/lib/todoistMark";
 import {
   loadTodoistLaneConfig,
   type TodoistLaneConfig,
@@ -203,10 +204,10 @@ export function findOpenDuplicate(
   title: string,
   due?: string | null,
 ): { id: string; url: string } | null {
-  const want = title.slice(0, 500).trim();
+  const want = stripTodoistMark(title.slice(0, 500));
   const d = (due || "").trim().slice(0, 10);
   for (const t of tasks) {
-    if (String(t.content || "").trim() !== want) continue;
+    if (stripTodoistMark(String(t.content || "")) !== want) continue;
     const td = String(t.due?.date || "").slice(0, 10);
     if (td !== d) continue;
     const id = String(t.id || "");
@@ -222,6 +223,8 @@ export async function createTodoistTask(
     summary?: string;
     due?: string | null;
     labels?: string[];
+    /** 件名の印。既定は AI の判断（🤖）。松野さんがボタンで頼んだら requested（🦾依頼） */
+    mark?: TodoistMark;
   },
 ): Promise<
   { ok: true; url: string; id: string; duplicate?: boolean } | { ok: false; error: string }
@@ -240,7 +243,7 @@ export async function createTodoistTask(
   const labels = Array.from(new Set([cfg.laneLabel, ...extra].filter(Boolean)));
 
   const body: Record<string, unknown> = {
-    content: input.title.slice(0, 500),
+    content: markTodoistTitle(input.title, input.mark ?? "ai").slice(0, 500),
     project_id: cfg.projectId,
     section_id: sectionId,
     labels,
