@@ -23,7 +23,8 @@
   --brass-bright: #e2b65a;
   --brass-soft: #f6e7c4;
   --alert: #a8321f;
-  --font-serif: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  /* 見出し・大きな金額も本文と同じゴシック（ダッシュボードに合わせる。2026-11-10 松野さん） */
+  --font-serif: var(--font-sans);
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
   --shadow-card: 0 1px 2px rgba(27, 36, 32, 0.06), 0 10px 28px rgba(60, 48, 20, 0.07);
   --shadow-focus: 0 0 0 1px rgba(138, 90, 0, 0.35), 0 12px 32px rgba(138, 90, 0, 0.12);
@@ -343,4 +344,99 @@ details.hq-fresh[open] > summary::after {
 
 .card.job-fail .lvl {
   color: var(--alert);
+}
+
+/* ---------- 判断メモ（お金の判断の直前に出す。理由は任意） ---------- */
+.decision-note {
+  margin-top: 8px;
+  padding: 12px;
+  max-width: 420px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+.decision-note-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.decision-note-hint,
+.decision-note-foot {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+  white-space: pre-line;
+}
+.decision-note-label {
+  margin-top: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.decision-note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.chip {
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--card-soft);
+  color: var(--ink);
+  cursor: pointer;
+}
+.chip.on {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green);
+  font-weight: 700;
+}
+.decision-note-input {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fff;
+}
+.decision-note-scope {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+}
+.decision-note-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* ---------- 判断ログ（/decisions） ---------- */
+.decision-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.decision-tag {
+  font-size: 0.72rem;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green);
+}
+.decision-tag.always {
+  background: var(--brass-soft);
+  color: var(--brass);
+}
+.decision-empty-reason {
+  font-size: 0.75rem;
+  color: var(--muted);
 }

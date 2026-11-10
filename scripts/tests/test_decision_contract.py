@@ -16,7 +16,10 @@ sys.path.insert(0, str(REPO / "scripts"))
 import jarvis_owner_decision_log as odl  # noqa: E402
 
 CANON = REPO / "apps/loopware/lib/decisionContract.ts"
-COPIES = [REPO / "apps/jarvis-dashboard/lib/decisionContract.ts"]
+COPIES = [
+    REPO / "apps/jarvis-dashboard/lib/decisionContract.ts",
+    REPO / "apps/trade-desk/lib/decisionContract.ts",
+]
 
 
 class ContractSyncTests(unittest.TestCase):
