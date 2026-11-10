@@ -26,7 +26,7 @@ test('対象者は評価を保存でき、本文はサーバーがチャット�
   const r = await s.post('a'.repeat(64), { chat_id: 'c1', message_id: 'm2', rating: 'great', comment: ' 分かりやすい ', answer: '偽の本文', user_id: 'other' });
   assert.equal(r.status, 200);
   assert.equal(s.saved.length, 1);
-  assert.deepEqual({ ...s.saved[0], updated_at: 'x' }, { user_id: 'o1', chat_id: 'c1', message_id: 'm2', rating: 'great', comment: '分かりやすい', question: '火災保険 保険料', answer: '回答本文', updated_at: 'x' });
+  assert.deepEqual({ ...s.saved[0], updated_at: 'x' }, { user_id: 'o1', chat_id: 'c1', message_id: 'm2', rating: 'great', reasons: [], comment: '分かりやすい', question: '火災保険 保険料', answer: '回答本文', updated_at: 'x' });
 });
 
 test('スイッチで見えない管理者には 404、他人のチャットは 403、質問への評価は 404', async () => {
@@ -60,7 +60,22 @@ test('評価の一覧は「管理者」かつ「スイッチで見える人」�
   const ok = await post('a'.repeat(64));
   assert.equal(ok.status, 200);
   const body = await ok.json();
-  assert.deepEqual(body, { feedback: [{ rating: 'bad', comment: 'c', question: 'q', answer: 'a', updated_at: 't' }] });
+  assert.deepEqual(body, { feedback: [{ rating: 'bad', reasons: [], comment: 'c', question: 'q', answer: 'a', updated_at: 't' }] });
   assert.equal((await post('b'.repeat(64))).status, 404); // 管理者でも名指しが無い
   assert.equal((await post('c'.repeat(64))).status, 403); // 名指しでも一般会員
+});
+
+test('理由の選択肢: 超いいね・悪いねは決まった選択肢だけ複数選べる。いいねは理由なし', async () => {
+  const base = { chat_id: 'c1', message_id: 'm2' };
+  assert.deepEqual(parseFeedback({ ...base, rating: 'bad', reasons: ['vague', 'wrong', 'vague'] }).reasons, ['wrong', 'vague']);
+  assert.deepEqual(parseFeedback({ ...base, rating: 'great' }).reasons, []);
+  assert.throws(() => parseFeedback({ ...base, rating: 'great', reasons: ['wrong'] })); // 悪いねの理由は超いいねに付けられない
+  assert.throws(() => parseFeedback({ ...base, rating: 'good', reasons: ['clear'] }));
+  assert.throws(() => parseFeedback({ ...base, rating: 'bad', reasons: 'wrong' }));
+  const s = setup();
+  const r = await s.post('a'.repeat(64), { ...base, rating: 'bad', reasons: ['no_source'], comment: '物件の地域が違う' });
+  assert.equal(r.status, 200);
+  assert.deepEqual(s.saved[0].reasons, ['no_source']);
+  assert.equal(s.saved[0].comment, '物件の地域が違う');
+  assert.equal((await s.post('a'.repeat(64), { ...base, rating: 'bad', reasons: ['nope'] })).status, 400);
 });
