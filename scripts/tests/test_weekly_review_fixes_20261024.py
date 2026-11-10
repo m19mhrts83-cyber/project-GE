@@ -154,5 +154,67 @@ class OpsAutofixOnceTests(unittest.TestCase):
         self.assertEqual(items[0]["payload"]["autofix_launched_ids"], ["1", "2"])
 
 
+class DeployQuotaTests(unittest.TestCase):
+    def test_quota_text(self):
+        sample = (
+            'Resource is limited - try again in 24 hours '
+            '(more than 100, code: "api-deployments-free-per-day").'
+        )
+        self.assertTrue(ofw._is_deploy_quota_text(sample))
+        self.assertFalse(ofw._is_deploy_quota_text("Type error in page.tsx"))
+        self.assertFalse(ofw._is_deploy_quota_text("Resource is limited"))
+
+    def test_quota_only_gha_is_info_not_attention(self):
+        from datetime import datetime, timezone
+
+        created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        run = {
+            "databaseId": 42648773309,
+            "conclusion": "failure",
+            "createdAt": created,
+            "url": "https://example.test/runs/42648773309",
+            "displayTitle": "Merge pull request",
+        }
+
+        def fake_gh(args, timeout=60):
+            if "--workflow=trade-desk-deploy.yml" in args:
+                return [run]
+            return []
+
+        with mock.patch.object(ofw, "_gh_json", side_effect=fake_gh), mock.patch.object(
+            ofw, "_gha_run_is_deploy_quota", return_value=True
+        ) as seen:
+            item = ofw.check_gha_workflows()
+        self.assertEqual(item["level"], "info")
+        self.assertTrue(item["payload"]["deploy_quota_only"])
+        self.assertEqual(item["payload"]["fail_run_ids"], ["42648773309"])
+        seen.assert_called_once_with("42648773309")
+
+    def test_note_records_quota_run_as_resolved(self):
+        from datetime import datetime, timezone
+
+        created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        run = {
+            "databaseId": 42648773309,
+            "conclusion": "failure",
+            "createdAt": created,
+            "url": "https://example.test/runs/42648773309",
+            "displayTitle": "Merge pull request",
+        }
+
+        def fake_gh(args, timeout=60):
+            if "--workflow=trade-desk-deploy.yml" in args:
+                return [run]
+            return []
+
+        with mock.patch.object(ofw, "_gh_json", side_effect=fake_gh), mock.patch.object(
+            ofw, "check_vercel_main", return_value={"id": "vercel_deploy", "level": "ok", "payload": {}}
+        ), mock.patch.object(ofw, "_gha_run_is_deploy_quota", return_value=True):
+            items = ofw.collect_items(note="日次上限なのでコード修正ではない")
+        gha = next(i for i in items if i["id"] == "gha_workflow_fail")
+        self.assertEqual(gha["level"], "ok")
+        self.assertIn("42648773309", gha["payload"]["resolved_run_ids"])
+
+
 if __name__ == "__main__":
     unittest.main()
