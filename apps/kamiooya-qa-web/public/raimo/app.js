@@ -4943,8 +4943,37 @@ const App = {
   renderAnswerJobStatus: () => {
     const box=document.getElementById('answerJobStatus'),text=document.getElementById('answerJobStatusText'),button=document.getElementById('resumeAnswerBtn');
     if(!box||!text||!button)return;
-    box.classList.toggle('hidden',!App.state.answerJobStatus);text.textContent=App.state.answerJobStatus;
+    // 作成中は、画面上の細い帯ではなくチャット欄の中に大きく出す（11/11 松野さん「今検討中だとわかりやすく」）。
+    // 帯は「取得を再開」が要るとき（通信の中断など）だけ使う。
+    const working=!!App.state.answerJobStatus&&!!App.state.sendAbortController;
+    box.classList.toggle('hidden',!App.state.answerJobStatus||working);text.textContent=App.state.answerJobStatus;
     button.classList.toggle('hidden',!!App.state.sendAbortController);button.disabled=!!App.state.sendAbortController;
+    App.renderAnswerWorkingCard(working);
+  },
+
+  renderAnswerWorkingCard: (on) => {
+    const stop=()=>{if(App.state.answerWorkingTimer){window.clearInterval(App.state.answerWorkingTimer);App.state.answerWorkingTimer=null;}const old=document.getElementById('answerWorkingCard');if(old)old.remove();};
+    if(!on){stop();App.state.answerWorkingSince=0;return;}
+    if(!App.state.answerWorkingSince)App.state.answerWorkingSince=Date.now();
+    const deep=(App.state.pendingAnswerRequest&&App.state.pendingAnswerRequest.mode==='deep')||!!App.state.deepMode;
+    const draw=()=>{
+      const list=document.getElementById('chatMessages');if(!list)return;
+      let card=document.getElementById('answerWorkingCard');
+      if(!card){
+        card=document.createElement('div');card.id='answerWorkingCard';card.setAttribute('role','status');card.setAttribute('aria-live','polite');
+        card.className='flex justify-center py-4';
+        card.innerHTML='<div class="flex items-center gap-3 rounded-xl border border-blue-200 bg-white shadow-sm px-5 py-4 max-w-md w-full">'+
+          '<i class="fa-solid fa-spinner fa-spin text-blue-700 text-xl" aria-hidden="true"></i>'+
+          '<div class="min-w-0"><div class="font-semibold text-blue-900">'+(deep?'より詳しく調べています…':'回答を考えています…')+'</div>'+
+          '<div class="text-xs text-slate-500 mt-0.5">'+(deep?'たくさんの投稿や動画を読み比べるため、1〜3分ほどかかることがあります。':'関連する投稿・動画・LINEオプチャを探して、まとめています。')+'</div>'+
+          '<div class="text-xs text-slate-400 mt-1" data-elapsed></div></div></div>';
+      }
+      if(card.parentNode!==list||list.lastElementChild!==card){list.appendChild(card);list.scrollTop=list.scrollHeight;}
+      const sec=Math.floor((Date.now()-App.state.answerWorkingSince)/1000),el=card.querySelector('[data-elapsed]');
+      if(el)el.textContent='経過 '+(sec>=60?Math.floor(sec/60)+'分':'')+(sec%60)+'秒';
+    };
+    draw();
+    if(!App.state.answerWorkingTimer)App.state.answerWorkingTimer=window.setInterval(draw,1000);
   },
 
   answerPollDelay: (ms,signal) => new Promise((resolve,reject)=>{
