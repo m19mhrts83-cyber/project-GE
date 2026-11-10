@@ -1,4 +1,6 @@
 import {createAnswerJobs,createRestAnswerStore,compactAnswerResult} from './qaAnswerJobs.ts';
+import {featureAllowed} from './featureFlags.ts';
+import {answerTier,cacheable,queryKey,fresh} from './answerCost.ts';
 // Runtime-neutral production adapters. Secrets are injected only by the Edge entrypoint.
 import type { GatewayDependencies } from './raimoAuthGateway.ts';
 export type RuntimeConfig = { origin: string; raimoBase: string; gatewaySecret: string; projectUrl: string; serviceKey: string; proxySecret: string };
@@ -164,12 +166,37 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       }
       const cfg=await deps.semanticConfig!();
       await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'user',content:job.query},signal);
-      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22}),signal}));
+      // (1) 使用量の削減。スイッチ cost_saving が見える人の質問だけ。読めなければ今までどおり。
+      let saving=false;
+      try{
+        const flags=await deps.featureFlags!();const flag=(Array.isArray(flags)?flags:[]).find((f:any)=>f.feature==='cost_saving');
+        // オフ・全員公開のときは本人を引き直さない（会員情報の読み出しを増やさない）
+        if(flag&&flag.stage==='all')saving=true;
+        else if(flag&&['owner','reviewers'].includes(flag.stage)){const u=await deps.member(job.user_id);saving=!!u&&featureAllowed(flag,{id:u.id,email:u.email});}
+      }catch{saving=false;}
+      const key=saving?await queryKey(job.query):'';
+      if(saving){
+        try{
+          const row=(await rest('qa_answer_cache?query_hash=eq.'+key+'&select=result,created_at,hits&limit=1'))[0];
+          if(row&&fresh(row)&&cacheable(String(row.result?.answer||''))){
+            const reused=compactAnswerResult(row.result);
+            await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'assistant',content:reused.answer},signal);
+            rest('qa_answer_cache?query_hash=eq.'+key,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({hits:Number(row.hits||0)+1,last_hit_at:new Date().toISOString()})}).catch(()=>{});
+            return {...reused,reused:true};
+          }
+        }catch{/* 使い回しが読めなくても答えは作る */}
+      }
+      const tier=saving?answerTier(job.query):'standard';
+      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{})}),signal}));
       const result=await response.json();
       if(!response.ok){if(signal.aborted)throw signal.reason;throw new UpstreamError(result?.code==='semantic_disabled'?'semantic_disabled':'operation_failed',503);}
       const answer=String(result.answer||'').trim();if(!answer)throw new Error('empty_answer');
       await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'assistant',content:answer},signal);
-      return compactAnswerResult(result);
+      const compact=compactAnswerResult(result);
+      if(saving&&cacheable(answer)){
+        await rest('qa_answer_cache?on_conflict=query_hash',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({query_hash:key,query:job.query.slice(0,4000),result:compact,tier,hits:0,created_at:new Date().toISOString(),last_hit_at:null})}).catch(()=>{});
+      }
+      return compact;
     }
   });
   return {deps, status, allow, backend};
