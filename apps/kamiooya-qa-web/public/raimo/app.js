@@ -58,6 +58,8 @@ const App = {
     currentScreen: 'chat',
     returnScreen: null,
     semanticMode: false,
+    deepMode: false,
+    semanticForced: false,
     loadingCount: 0,
     sendAbortController: null,
     pendingAnswerRequest: null,
@@ -172,7 +174,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -187,6 +189,10 @@ const App = {
       App.state.featureViewNew = localStorage.getItem('qa_feature_view_new') !== '0';
       App.state.viewAsMember = localStorage.getItem('qa_view_as_member') === '1';
     } catch (e) { /* ignore */ }
+  },
+  // (5) ロゴに合わせた配色（案A）。見た目だけなので画面側の切り替えで足りる（色は index.html の html.theme-a）。
+  applyTheme: () => {
+    if (document.documentElement) document.documentElement.classList.toggle('theme-a', App.featureOn('design_theme'));
   },
   renderFeaturePreviewBar: () => {
     const bar = document.getElementById('featurePreviewBar');
@@ -1289,7 +1295,9 @@ const App = {
     }
     App.showMainView();
     await App.loadFeatures();
+    App.applyTheme();
     App.renderFeaturePreviewBar();
+    App.applySearchModeUi();
     App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + (App.isStaffAdmin() || !App.state.viewAsMember ? App.state.currentUser.role : 'user として表示中') + ')';
 
     const isAdmin = App.isStaffAdmin();
@@ -1342,6 +1350,7 @@ const App = {
     App.state.attachmentDetailCommentId = '';
     App.state.features = {};
     App.state.feedbackByMessage = {};
+    if (document.documentElement) document.documentElement.classList.remove('theme-a');
     const featureBar = document.getElementById('featurePreviewBar');
     if (featureBar) featureBar.classList.add('hidden');
     App.state.currentUser = null;
@@ -2035,11 +2044,33 @@ const App = {
     App.updateSemanticModeButton();
   },
 
+  // (1) 使用量の削減が見える人は、意味検索がふだんの検索。ボタンは「より詳しく調べる」（上位のAI・使い回しなし）。2026-11-11
+  semanticBase: () => !!App.authGatewayBase && App.featureOn('cost_saving'),
+  semanticHintOld: '',
+  applySearchModeUi: () => {
+    const hint = document.getElementById('semanticModeHint');
+    if (hint && !App.semanticHintOld) App.semanticHintOld = hint.textContent;
+    if (App.semanticBase()) {
+      if (!App.state.semanticMode) App.state.semanticForced = true;
+      App.state.semanticMode = true;
+      if (hint) hint.textContent = 'ふだんは意味検索で、言い換えや関連事例まで探して手早く答えます。比較・手順・計算など詳しく知りたいときは「より詳しく調べる」をONにすると、上位のAIで時間をかけて答えます。';
+    } else {
+      if (App.state.semanticForced) App.state.semanticMode = false;
+      App.state.semanticForced = false;
+      App.state.deepMode = false;
+      if (hint && App.semanticHintOld) hint.textContent = App.semanticHintOld;
+    }
+    App.updateSemanticModeButton();
+  },
+  currentAnswerMode: (fast) => fast ? 'fast' : App.semanticBase() ? (App.state.deepMode ? 'deep' : 'semantic') : App.state.semanticMode ? 'semantic' : 'normal',
+
   updateSemanticModeButton: () => {
     const btn = App.elements.semanticModeToggle;
     if (!btn) return;
-    const on = !!App.state.semanticMode;
-    btn.textContent = '意味検索モード: ' + (on ? 'ON' : 'OFF');
+    const base = App.semanticBase();
+    const on = base ? !!App.state.deepMode : !!App.state.semanticMode;
+    btn.textContent = (base ? 'より詳しく調べる: ' : '意味検索モード: ') + (on ? 'ON' : 'OFF');
+    btn.title = base ? 'ONにすると、上位のAIで時間をかけて答えます（このタブのあいだだけ）' : '';
     btn.className =
       'shrink-0 px-3 py-1 rounded-full border ' +
       (on
@@ -2073,6 +2104,12 @@ const App = {
   },
 
   handleSemanticModeToggle: () => {
+    if (App.semanticBase()) {
+      App.state.deepMode = !App.state.deepMode;
+      App.updateSemanticModeButton();
+      App.showToast(App.state.deepMode ? 'より詳しく調べる: ON（上位のAIで時間をかけて答えます。このタブのみ）' : 'より詳しく調べる: OFF（ふだんの意味検索に戻しました）', App.state.deepMode ? 'success' : 'info');
+      return;
+    }
     const nextValue = !App.state.semanticMode;
     // オンにするたびに注意ダイアログを表示（了承後に有効化）
     if (nextValue) {
@@ -4259,6 +4296,28 @@ const App = {
     }
   },
 
+  // (2) 評価した答えの作り方（11/11）。軽いモデルや使い回しで悪いねが多いかを見分ける。
+  answerMakeLabel: (x) => {
+    if (!x || !x.answer_mode) return '不明（記録前の評価）';
+    const mode = { semantic: '意味検索', deep: 'より詳しく調べる', normal: '通常検索', fast: '高速' }[x.answer_mode] || x.answer_mode;
+    const tier = x.answer_mode === 'semantic' ? (x.answer_tier === 'lite' ? '・ライト版' : '・上位版') : '';
+    return mode + tier + (x.answer_model ? '（' + x.answer_model + '）' : '') + (x.answer_reused ? '・使い回し' : '');
+  },
+  feedbackByMakeHtml: (rows) => {
+    const groups = {};
+    (rows || []).forEach(function (x) {
+      const k = App.answerMakeLabel(x);
+      const g = groups[k] || (groups[k] = { great: 0, good: 0, bad: 0 });
+      if (g[x.rating] != null) g[x.rating]++;
+    });
+    const keys = Object.keys(groups);
+    if (!keys.length) return '';
+    return '<div class="md:col-span-2"><div class="font-medium">🤖 答えの作り方ごとの評価</div><ul class="text-slate-600">' + keys.map(function (k) {
+      const g = groups[k], n = g.great + g.good + g.bad;
+      return '<li>' + App.escapeHtml(k) + '：🌟' + g.great + ' 👍' + g.good + ' 👎' + g.bad + '（悪いね ' + Math.round(g.bad * 100 / n) + '%）</li>';
+    }).join('') + '</ul></div>';
+  },
+
   // (2) 回答の評価の一覧。見えない人には枠ごと出さない。2026-11-10
   loadFeedbackAnalytics: async () => {
     const box = document.getElementById('feedbackAnalytics');
@@ -4289,7 +4348,7 @@ const App = {
           return '<div><div class="font-medium">' + g[1] + '</div><ul class="text-slate-600">' + tally(g[0]).map(function (t) {
             return '<li>' + App.escapeHtml(t[0]) + '：' + t[1] + ' 件</li>';
           }).join('') + '</ul></div>';
-        }).join('');
+        }).join('') + App.feedbackByMakeHtml(rows);
       }
       // よく参考にされた根拠（開いた人の数が多い順）。評価を付けていない回答で開いたものも含む。
       const topBox = document.getElementById('feedbackSources');
@@ -4306,6 +4365,7 @@ const App = {
           '<div><span class="text-slate-500">質問：</span>' + App.escapeHtml(x.question || '') + '</div>' +
           (Array.isArray(x.reasons) && x.reasons.length ? '<div><span class="text-slate-500">理由：</span>' + x.reasons.map(function (c) { return App.escapeHtml(App.feedbackReasonLabel(c)); }).join('、') + '</div>' : '') +
           (x.comment ? '<div><span class="text-slate-500">その他：</span>' + App.escapeHtml(x.comment) + '</div>' : '') +
+          '<div class="text-xs text-slate-500">作り方：' + App.escapeHtml(App.answerMakeLabel(x)) + '</div>' +
           (Array.isArray(x.sources) && x.sources.length ? '<div><span class="text-slate-500">開いた根拠：</span>' + x.sources.map(function (c) { return App.escapeHtml((c.label ? '[' + c.label + '] ' : '') + (c.title || '')); }).join('、') + '</div>' : '') +
           '<details class="text-xs text-slate-600"><summary>回答の冒頭</summary>' + App.escapeHtml(x.answer || '') + '</details></div>';
       }).join('') : '<p class="text-slate-500">まだ評価はありません。</p>';
@@ -4898,7 +4958,7 @@ const App = {
     if(!App.state.currentUser||App.state.sendAbortController)return;
     const pending=App.state.pendingAnswerRequest||App.readPendingAnswer();if(!pending)return;
     App.state.pendingAnswerRequest=pending;App.state.currentSessionId=pending.sessionId;
-    App.state.semanticMode=pending.mode==='semantic';App.updateSemanticModeButton();
+    App.state.semanticMode=pending.mode==='semantic'||pending.mode==='deep';App.state.deepMode=pending.mode==='deep';App.updateSemanticModeButton();
     await App.sendQuestion(pending.query,true);
   },
 
@@ -4957,7 +5017,7 @@ const App = {
         try {
           if(App.authGatewayBase){
             const pending=App.state.pendingAnswerRequest||App.readPendingAnswer();
-            const mode=pending?pending.mode:(fast?'fast':App.state.semanticMode?'semantic':'normal');
+            const mode=pending?pending.mode:App.currentAnswerMode(fast);
             msgRes=await App.runAnswerJob(sessionId,questionText,mode,controller.signal);
           } else if (App.state.semanticMode && !fast) {
             // 意味検索: Raimo api ネスト障害を避け、Edge をブラウザから直接呼ぶ

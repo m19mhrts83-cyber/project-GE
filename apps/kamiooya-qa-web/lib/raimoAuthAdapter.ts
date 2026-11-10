@@ -2,6 +2,7 @@ import {createAnswerJobs,createRestAnswerStore,compactAnswerResult} from './qaAn
 import {featureAllowed} from './featureFlags.ts';
 import {matchPending} from './rosterMatch.ts';
 import {answerTier,cacheable,queryKey,fresh} from './answerCost.ts';
+import {answerHash,cleanMeta,RAIMO_ANSWER_MODEL,type AnswerMeta} from './answerMeta.ts';
 // Runtime-neutral production adapters. Secrets are injected only by the Edge entrypoint.
 import type { GatewayDependencies } from './raimoAuthGateway.ts';
 export type RuntimeConfig = { origin: string; raimoBase: string; gatewaySecret: string; projectUrl: string; serviceKey: string; proxySecret: string };
@@ -138,9 +139,15 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       has:rosterHas,
       meta:async()=>{const m=(await rest('qa_roster_meta?select=row_count,synced_at&id=eq.1&limit=1'))?.[0];return {row_count:m?.row_count,synced_at:m?.synced_at};}
     },
-    listFeedback:async()=>rest('qa_answer_feedback?select=chat_id,message_id,rating,reasons,comment,question,answer,updated_at&order=updated_at.desc&limit=200'),
+    listFeedback:async()=>rest('qa_answer_feedback?select=chat_id,message_id,rating,reasons,comment,question,answer,updated_at,answer_mode,answer_tier,answer_model,answer_reused&order=updated_at.desc&limit=200'),
     saveSourceClick:async row=>{await rest('qa_answer_source_clicks?on_conflict=user_id,chat_id,message_id,kind,source_key',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
     listSourceClicks:async()=>rest('qa_answer_source_clicks?select=user_id,chat_id,message_id,kind,source_key,title,label&order=clicked_at.desc&limit=1000'),
+    // (2) 答えの作り方（モデル・使い回し）。評価のときに本文のハッシュで引く。11/11
+    answerMeta:async(userId,chatId,answer)=>{
+      const h=await answerHash(answer);
+      const row=(await rest('qa_answer_meta?user_id=eq.'+encodeURIComponent(userId)+'&chat_id=eq.'+encodeURIComponent(chatId)+'&answer_hash=eq.'+h+'&select=mode,tier,model,reused&limit=1'))[0];
+      return cleanMeta(row);
+    },
     saveFeedback:async row=>{await rest('qa_answer_feedback?on_conflict=user_id,chat_id,message_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
     semanticConfig:async()=>{
       const r=await backend('POST','/semantic-search-config',{});
@@ -186,6 +193,10 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       throw new UpstreamError('route_not_reviewed',403);
     }
   };
+  const recordMeta=(job:{user_id:string;chat_id:string},answer:string,m:AnswerMeta)=>answerHash(answer)
+    .then(h=>rest('qa_answer_meta?on_conflict=user_id,chat_id,answer_hash',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({user_id:job.user_id,chat_id:job.chat_id,answer_hash:h,...m,created_at:new Date().toISOString()})}))
+    .catch(()=>{/* 記録できなくても答えは返す */});
   if(jobsRuntime)deps.jobs=createAnswerJobs({
     store:createRestAnswerStore(rest),schedule:jobsRuntime.schedule,
     authorize:async job=>{
@@ -193,9 +204,12 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       return !!(u&&u.status==='approved'&&u.authVersion===job.auth_version&&sessionActive(job.user_id,parent,u)&&owner===job.user_id);
     },
     execute:async(job,signal)=>{
-      if(job.mode!=='semantic'){
+      // deep = (1)の「より詳しく調べる」。意味検索を上位のモデルで、使い回しなしで答える。
+      if(job.mode!=='semantic'&&job.mode!=='deep'){
         const result=compactAnswerResult(await backend('POST','/chat-sessions/'+job.chat_id+(job.mode==='fast'?'/messages-fast':'/messages'),{content:job.query,actor_user_id:job.user_id},signal));
-        if(!result.answer.trim())throw new Error('empty_answer');return result;
+        if(!result.answer.trim())throw new Error('empty_answer');
+        await recordMeta(job,result.answer,{mode:job.mode==='fast'?'fast':'normal',tier:'standard',model:RAIMO_ANSWER_MODEL,reused:false});
+        return result;
       }
       const cfg=await deps.semanticConfig!();
       await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'user',content:job.query},signal);
@@ -207,27 +221,32 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         if(flag&&flag.stage==='all')saving=true;
         else if(flag&&['owner','reviewers'].includes(flag.stage)){const u=await deps.member(job.user_id);saving=!!u&&featureAllowed(flag,{id:u.id,email:u.email});}
       }catch{saving=false;}
-      const key=saving?await queryKey(job.query):'';
-      if(saving){
+      const deep=job.mode==='deep';
+      const key=saving&&!deep?await queryKey(job.query):'';
+      if(saving&&!deep){
         try{
-          const row=(await rest('qa_answer_cache?query_hash=eq.'+key+'&select=result,created_at,hits&limit=1'))[0];
+          const row=(await rest('qa_answer_cache?query_hash=eq.'+key+'&select=result,created_at,hits,tier&limit=1'))[0];
           if(row&&fresh(row)&&cacheable(String(row.result?.answer||''))){
             const reused=compactAnswerResult(row.result);
             await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'assistant',content:reused.answer},signal);
             rest('qa_answer_cache?query_hash=eq.'+key,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({hits:Number(row.hits||0)+1,last_hit_at:new Date().toISOString()})}).catch(()=>{});
+            await recordMeta(job,reused.answer,{mode:'semantic',tier:row.tier==='lite'?'lite':'standard',model:String(row.result?.answerModel||''),reused:true});
             return {...reused,reused:true};
           }
         }catch{/* 使い回しが読めなくても答えは作る */}
       }
-      const tier=saving?answerTier(job.query):'standard';
+      const tier=saving&&!deep?answerTier(job.query):'standard';
       const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{})}),signal}));
       const result=await response.json();
       if(!response.ok){if(signal.aborted)throw signal.reason;throw new UpstreamError(result?.code==='semantic_disabled'?'semantic_disabled':'operation_failed',503);}
       const answer=String(result.answer||'').trim();if(!answer)throw new Error('empty_answer');
       await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'assistant',content:answer},signal);
       const compact=compactAnswerResult(result);
-      if(saving&&cacheable(answer)){
-        await rest('qa_answer_cache?on_conflict=query_hash',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({query_hash:key,query:job.query.slice(0,4000),result:compact,tier,hits:0,created_at:new Date().toISOString(),last_hit_at:null})}).catch(()=>{});
+      // 実際に答えたモデル（軽いモデルが使えず今のモデルに戻った場合もそちら）。古い意味検索は返さないので空＝不明。
+      const answerModel=typeof result.answerModel==='string'?result.answerModel:'';
+      await recordMeta(job,answer,{mode:deep?'deep':'semantic',tier,model:answerModel,reused:false});
+      if(saving&&!deep&&cacheable(answer)){
+        await rest('qa_answer_cache?on_conflict=query_hash',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({query_hash:key,query:job.query.slice(0,4000),result:{...compact,answerModel},tier,hits:0,created_at:new Date().toISOString(),last_hit_at:null})}).catch(()=>{});
       }
       return compact;
     }

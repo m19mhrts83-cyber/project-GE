@@ -22,7 +22,7 @@ test('質問の正規化・モデルの使い分け・使い回せる答え', as
 });
 
 function fixture(stage) {
-  const sessions = new Map(), jobs = new Map(), cache = new Map(), tasks = [], semanticBodies = [], appended = [];
+  const sessions = new Map(), jobs = new Map(), cache = new Map(), meta = [], tasks = [], semanticBodies = [], appended = [];
   const c = { origin: 'https://app.example', raimoBase: 'https://app.example/miniAppApi/test', projectUrl: 'https://fixture.supabase.co', serviceKey: 'service-only', gatewaySecret: 'g'.repeat(40), proxySecret: 'p'.repeat(40) };
   const user = { id: 'one', email: 'owner@example.test', role: 'user', status: 'approved', password_hash: 'pw' };
   const transport = async (url, options = {}) => {
@@ -40,6 +40,7 @@ function fixture(stage) {
       if (options.method === 'PATCH') { Object.assign(cache.get(key), body); return new Response(null, { status: 204 }); }
       return Response.json(cache.has(key) ? [cache.get(key)] : []);
     }
+    if (u.pathname.endsWith('/qa_answer_meta')) { meta.push(body); return new Response(null, { status: 201 }); }
     if (u.pathname.endsWith('/rpc/qa_admit_answer_job')) { const job = { ...body.job, id: crypto.randomUUID(), status: 'running' }; jobs.set(job.id, job); return Response.json({ job, created: true }); }
     if (u.pathname.endsWith('/qa_answer_jobs')) {
       const id = u.searchParams.get('id')?.slice(3), job = jobs.get(id);
@@ -57,11 +58,11 @@ function fixture(stage) {
   };
   const adapter = createProductionAdapter(c, async (a, b) => a === b, async () => '', transport, {
     schedule: p => tasks.push(p),
-    semantic: async request => { semanticBodies.push(await request.json()); return Response.json({ answer: '補償の範囲を見直し、水災の要否を地域のハザードで判断し、複数社で見積もりを取ります。', usedSources: '{}' }); }
+    semantic: async request => { semanticBodies.push(await request.json()); return Response.json({ answer: '補償の範囲を見直し、水災の要否を地域のハザードで判断し、複数社で見積もりを取ります。', usedSources: '{}', answerModel: semanticBodies.at(-1)?.answer_tier === 'lite' ? 'gemini-2.5-flash-lite' : 'gemini-3-flash-preview' }); }
   });
   const gateway = createRaimoAuthGateway(adapter.deps);
   const request = (path, body, token = '', method = 'POST') => gateway(new Request('https://gateway.example' + path, { method, headers: { Origin: c.origin, Authorization: 'Bearer ' + token }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }));
-  return { request, tasks, cache, semanticBodies, appended };
+  return { request, tasks, cache, semanticBodies, appended, meta };
 }
 const ask = (f, token, n, query) => f.request('/chat-sessions/mine/answer-jobs', { request_id: `1111111${n}-1111-4111-8111-111111111111`, mode: 'semantic', query }, token);
 async function login(f) { return (await (await f.request('/auth/login', { email: 'owner@example.test', password_hash: 'pw' })).json()).auth_token; }
@@ -87,4 +88,27 @@ test('スイッチがオフなら今までどおり（今のモデル・使い�
   assert.equal(f.semanticBodies.length, 2);
   assert.equal(f.semanticBodies[0].answer_tier, undefined);
   assert.equal(f.cache.size, 0);
+});
+
+test('「より詳しく調べる」(deep): 上位のモデルで答え、使い回しの読み書きをしない', async () => {
+  const f = fixture('owner'), token = await login(f);
+  await ask(f, token, 1, '火災保険の保険料を下げるには'); await Promise.all(f.tasks);
+  assert.equal(f.cache.size, 1);
+  const r = await f.request('/chat-sessions/mine/answer-jobs', { request_id: '11111119-1111-4111-8111-111111111111', mode: 'deep', query: '火災保険の保険料を下げるには' }, token);
+  assert.ok(r.ok);
+  await Promise.all(f.tasks);
+  assert.equal(f.semanticBodies.length, 2); // 同じ日の同じ質問でも使い回さない
+  assert.equal(f.semanticBodies[1].answer_tier, undefined); // 上位のモデル
+  assert.equal([...f.cache.values()][0].hits, 0);
+});
+
+test('答えの作り方を記録する: 1回目はライト版、2回目は使い回し（同じモデル名）。本文は持たずハッシュだけ', async () => {
+  const f = fixture('owner'), token = await login(f);
+  await ask(f, token, 1, '火災保険の保険料を下げるには？'); await Promise.all(f.tasks);
+  await ask(f, token, 2, '火災保険の保険料を下げるには'); await Promise.all(f.tasks);
+  assert.equal(f.meta.length, 2);
+  assert.deepEqual(f.meta.map(m => [m.mode, m.tier, m.model, m.reused]), [['semantic', 'lite', 'gemini-2.5-flash-lite', false], ['semantic', 'lite', 'gemini-2.5-flash-lite', true]]);
+  assert.match(f.meta[0].answer_hash, /^[0-9a-f]{64}$/);
+  assert.equal(f.meta[0].answer_hash, f.meta[1].answer_hash);
+  assert.ok(!JSON.stringify(f.meta).includes('補償'));
 });

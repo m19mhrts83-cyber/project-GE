@@ -286,10 +286,32 @@ export async function POST(request: NextRequest) {
       return new NextResponse("", { status: 200 });
     }
 
+    if (parseT313ButtonValue(value) && responseUrl) {
+      // 先に受け取りを返し（Slack の3秒待ち・ぐるぐるを短く）、
+      // Todoist 反映後に response_url で押した行を「報告済み」に差し替える
+      after(async () => {
+        await handleT313BlockAction({
+          value,
+          responseUrl,
+          messageBlocks: Array.isArray(messageObj.blocks)
+            ? (messageObj.blocks as Array<Record<string, unknown>>)
+            : [],
+          blockId: String(act.block_id || ""),
+          messageText: String(messageObj.text || ""),
+        });
+      });
+      return new NextResponse("", { status: 200 });
+    }
+
     if (parseT313ButtonValue(value)) {
       const result = await handleT313BlockAction({
         value,
         responseUrl,
+        messageBlocks: Array.isArray(messageObj.blocks)
+          ? (messageObj.blocks as Array<Record<string, unknown>>)
+          : [],
+        blockId: String(act.block_id || ""),
+        messageText: String(messageObj.text || ""),
       });
       return NextResponse.json({
         response_type: "ephemeral",
