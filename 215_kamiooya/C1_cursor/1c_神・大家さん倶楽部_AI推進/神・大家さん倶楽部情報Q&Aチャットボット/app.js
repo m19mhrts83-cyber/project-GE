@@ -4290,6 +4290,28 @@ const App = {
     }
   },
 
+  // (2) 評価した答えの作り方（11/11）。軽いモデルや使い回しで悪いねが多いかを見分ける。
+  answerMakeLabel: (x) => {
+    if (!x || !x.answer_mode) return '不明（記録前の評価）';
+    const mode = { semantic: '意味検索', deep: 'より詳しく調べる', normal: '通常検索', fast: '高速' }[x.answer_mode] || x.answer_mode;
+    const tier = x.answer_mode === 'semantic' ? (x.answer_tier === 'lite' ? '・ライト版' : '・上位版') : '';
+    return mode + tier + (x.answer_model ? '（' + x.answer_model + '）' : '') + (x.answer_reused ? '・使い回し' : '');
+  },
+  feedbackByMakeHtml: (rows) => {
+    const groups = {};
+    (rows || []).forEach(function (x) {
+      const k = App.answerMakeLabel(x);
+      const g = groups[k] || (groups[k] = { great: 0, good: 0, bad: 0 });
+      if (g[x.rating] != null) g[x.rating]++;
+    });
+    const keys = Object.keys(groups);
+    if (!keys.length) return '';
+    return '<div class="md:col-span-2"><div class="font-medium">🤖 答えの作り方ごとの評価</div><ul class="text-slate-600">' + keys.map(function (k) {
+      const g = groups[k], n = g.great + g.good + g.bad;
+      return '<li>' + App.escapeHtml(k) + '：🌟' + g.great + ' 👍' + g.good + ' 👎' + g.bad + '（悪いね ' + Math.round(g.bad * 100 / n) + '%）</li>';
+    }).join('') + '</ul></div>';
+  },
+
   // (2) 回答の評価の一覧。見えない人には枠ごと出さない。2026-11-10
   loadFeedbackAnalytics: async () => {
     const box = document.getElementById('feedbackAnalytics');
@@ -4320,7 +4342,7 @@ const App = {
           return '<div><div class="font-medium">' + g[1] + '</div><ul class="text-slate-600">' + tally(g[0]).map(function (t) {
             return '<li>' + App.escapeHtml(t[0]) + '：' + t[1] + ' 件</li>';
           }).join('') + '</ul></div>';
-        }).join('');
+        }).join('') + App.feedbackByMakeHtml(rows);
       }
       // よく参考にされた根拠（開いた人の数が多い順）。評価を付けていない回答で開いたものも含む。
       const topBox = document.getElementById('feedbackSources');
@@ -4337,6 +4359,7 @@ const App = {
           '<div><span class="text-slate-500">質問：</span>' + App.escapeHtml(x.question || '') + '</div>' +
           (Array.isArray(x.reasons) && x.reasons.length ? '<div><span class="text-slate-500">理由：</span>' + x.reasons.map(function (c) { return App.escapeHtml(App.feedbackReasonLabel(c)); }).join('、') + '</div>' : '') +
           (x.comment ? '<div><span class="text-slate-500">その他：</span>' + App.escapeHtml(x.comment) + '</div>' : '') +
+          '<div class="text-xs text-slate-500">作り方：' + App.escapeHtml(App.answerMakeLabel(x)) + '</div>' +
           (Array.isArray(x.sources) && x.sources.length ? '<div><span class="text-slate-500">開いた根拠：</span>' + x.sources.map(function (c) { return App.escapeHtml((c.label ? '[' + c.label + '] ' : '') + (c.title || '')); }).join('、') + '</div>' : '') +
           '<details class="text-xs text-slate-600"><summary>回答の冒頭</summary>' + App.escapeHtml(x.answer || '') + '</details></div>';
       }).join('') : '<p class="text-slate-500">まだ評価はありません。</p>';

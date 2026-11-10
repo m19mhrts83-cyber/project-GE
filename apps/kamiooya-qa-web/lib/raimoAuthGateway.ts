@@ -1,6 +1,7 @@
 import type {AnswerActor} from './qaAnswerJobs.ts';
 import {featuresFor, requireFeature, type FeatureFlag} from './featureFlags.ts';
 import {parseFeedback, feedbackRow} from './answerFeedback.ts';
+import {feedbackMetaColumns, type AnswerMeta} from './answerMeta.ts';
 import {parseSourceClick, sourceClickRow, summarizeSourceClicks} from './sourceClicks.ts';
 import {matchPending} from './rosterMatch.ts';
 // Shared gateway: the production adapter supplies persistent sessions and live membership checks.
@@ -25,6 +26,7 @@ export type GatewayDependencies = {
   // (3) 名簿のハッシュと、最後に同期した時刻・件数。
   roster?: { has(hashes:string[]): Promise<Set<string>>; meta(): Promise<{synced_at?:string;row_count?:number}> };
   saveFeedback?(row: Record<string, unknown>): Promise<void>;
+  answerMeta?(userId: string, chatId: string, answer: string): Promise<AnswerMeta | null>;
   listFeedback?(): Promise<unknown[]>;
   saveSourceClick?(row: Record<string, unknown>): Promise<void>;
   listSourceClicks?(): Promise<unknown[]>;
@@ -137,7 +139,12 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         const f=parseFeedback(input);
         if(await d.chatOwner(f.chat_id)!==user.id)return json({error:'forbidden'},403);
         const chat=await d.forward('GET','/chat-sessions/'+f.chat_id,{actor_user_id:user.id}) as {messages?:unknown};
-        await d.saveFeedback(feedbackRow(user.id,f,Array.isArray(chat?.messages)?chat.messages:[]));
+        const msgs=Array.isArray(chat?.messages)?chat.messages as {id?:unknown;content?:unknown}[]:[];
+        const row=feedbackRow(user.id,f,msgs);
+        // どのAIで作った答えか（11/11）。引けなければ空のまま保存する。
+        let meta:AnswerMeta|null=null;
+        try{meta=d.answerMeta?await d.answerMeta(user.id,f.chat_id,String(msgs.find(m=>String(m?.id??'')===f.message_id)?.content??'')):null;}catch{meta=null;}
+        await d.saveFeedback({...row,...feedbackMetaColumns(meta)});
         return json({ok:true});
       }
       // (2) 判断ログの補足: 答えの根拠を開いたら記録する。スイッチ answer_feedback と同じ人だけ。
@@ -175,6 +182,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         try{clicks=d.listSourceClicks?await d.listSourceClicks():[];}catch{clicks=[];}
         const sc=summarizeSourceClicks(Array.isArray(clicks)?clicks as any[]:[]);
         const rows=(await d.listFeedback()).map((r:any)=>({rating:r.rating,reasons:Array.isArray(r.reasons)?r.reasons:[],comment:r.comment,question:r.question,answer:String(r.answer||'').slice(0,400),updated_at:r.updated_at,
+          answer_mode:r.answer_mode??null,answer_tier:r.answer_tier??null,answer_model:r.answer_model??null,answer_reused:r.answer_reused??null,
           sources:(sc.byMessage.get(String(r.chat_id??'')+'/'+String(r.message_id??''))||[]).map(x=>({kind:x.kind,title:x.title,label:x.label}))}));
         return json({feedback:rows,sources_top:sc.top,source_clicks:Array.isArray(clicks)?clicks.length:0});
       }
