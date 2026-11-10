@@ -109,6 +109,14 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     },
     referenceMetadata:async()=>rest('rpc/qa_reference_metadata',{method:'POST',body:'{}'}),
     featureFlags:async()=>rest('qa_feature_flags?select=feature,stage,owner_ids,reviewer_ids&limit=100'),
+    roster:{
+      has:async hashes=>{
+        const found=new Set<string>();const list=hashes.filter(h=>/^[0-9a-f]{64}$/.test(h));
+        for(let i=0;i<list.length;i+=100){const rows=await rest('qa_roster_hashes?select=hash&hash=in.('+list.slice(i,i+100).join(',')+')');for(const r of rows||[])found.add(String(r.hash));}
+        return found;
+      },
+      meta:async()=>{const m=(await rest('qa_roster_meta?select=row_count,synced_at&id=eq.1&limit=1'))?.[0];return {row_count:m?.row_count,synced_at:m?.synced_at};}
+    },
     listFeedback:async()=>rest('qa_answer_feedback?select=rating,comment,question,answer,updated_at&order=updated_at.desc&limit=200'),
     saveFeedback:async row=>{await rest('qa_answer_feedback?on_conflict=user_id,chat_id,message_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
     semanticConfig:async()=>{

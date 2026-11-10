@@ -1347,6 +1347,7 @@ const App = {
     App.state.suggestedQuestions = [];
     App.state.comments = [];App.state.referenceReady={};App.state.referenceLoads={};
     App.state.pendingUsers = [];
+    App.state.rosterMatches = {};
     App.state.approvedUsers = [];
     App.state.roleRequestUsers = [];
     App.state.members = [];
@@ -3266,7 +3267,46 @@ const App = {
     if (!App.isStaffAdmin()) return;
     const res = await App.apiClient('GET', '/admin/users/pending');
     App.state.pendingUsers = (res && res.users) ? res.users : [];
+    App.state.rosterMatches = {};
     App.renderPendingUsers();
+    void App.loadRosterMatches();
+  },
+
+  // (3) 名簿（目標設定・合格状況）との照合。スイッチ auto_approval が見える管理者だけ。2026-11-10
+  // 判定はサーバー。画面は印を付けて「名簿一致の人を選ぶ」を出すだけで、承認は人が押す。
+  rosterBadges: {
+    match: ['名簿一致', 'bg-emerald-100 text-emerald-800'],
+    number_only: ['番号だけ一致・名前を確認', 'bg-amber-100 text-amber-800'],
+    none: ['名簿になし', 'bg-slate-100 text-slate-600'],
+    duplicate: ['同じ番号が複数・確認', 'bg-amber-100 text-amber-800'],
+    missing: ['番号か名前が空', 'bg-slate-100 text-slate-600']
+  },
+  loadRosterMatches: async () => {
+    const info = document.getElementById('rosterMatchInfo'), btn = document.getElementById('selectRosterMatchedBtn');
+    const show = App.isStaffAdmin() && App.featureOn('auto_approval');
+    if (info) info.classList.toggle('hidden', !show);
+    if (btn) btn.classList.toggle('hidden', !show);
+    if (!show || !App.state.pendingUsers.length) { if (info) info.textContent = ''; return; }
+    if (btn && !btn.dataset.bound) {
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function () {
+        App.elements.pendingUsersTableBody.querySelectorAll('.pending-user-check').forEach(function (cb) {
+          cb.checked = (App.state.rosterMatches || {})[cb.getAttribute('data-id')] === 'match';
+        });
+        App.updateBulkApproveButtonState();
+      });
+    }
+    info.textContent = '名簿と照合中…';
+    try {
+      const r = await App.apiClient('POST', '/admin/users/pending/roster-match', {});
+      App.state.rosterMatches = (r && r.matches) || {};
+      App.renderPendingUsers();
+      const n = Object.values(App.state.rosterMatches).filter(function (v) { return v === 'match'; }).length;
+      const when = r && r.synced_at ? String(r.synced_at).replace('T', ' ').slice(0, 16) : '未取得';
+      info.textContent = '名簿一致 ' + n + ' 人／承認待ち ' + App.state.pendingUsers.length + ' 人（名簿の読み込み：' + when + '）';
+    } catch (e) {
+      info.textContent = '名簿と照合できませんでした: ' + ((e && e.message) || String(e));
+    }
   },
 
   renderAll: () => {
@@ -3982,7 +4022,7 @@ const App = {
         '<td class="p-2">' + App.escapeHtml(u.email || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.member_no || '') + '</td>' +
         '<td class="p-2">' + App.escapeHtml(u.prefecture || '') + '</td>' +
-        '<td class="p-2">' + App.escapeHtml(u.status || '') + '</td>' +
+        '<td class="p-2">' + App.escapeHtml(u.status || '') + App.rosterBadge(u.id) + '</td>' +
         '<td class="p-2">' +
         '<div class="flex flex-wrap gap-2">' +
         '<button type="button" class="approve-btn px-3 py-1 rounded bg-blue-600 text-white text-xs" data-id="' +
@@ -4019,6 +4059,10 @@ const App = {
     App.updateBulkApproveButtonState();
   },
 
+  rosterBadge: (id) => {
+    const b = App.rosterBadges[(App.state.rosterMatches || {})[id]];
+    return b ? ' <span class="inline-block mt-1 px-2 py-0.5 rounded text-xs ' + b[1] + '">' + App.escapeHtml(b[0]) + '</span>' : '';
+  },
   updateBulkApproveButtonState: () => {
     const btn = App.elements.bulkApprovePendingUsersBtn;
     if (!btn) return;

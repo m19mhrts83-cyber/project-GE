@@ -1,6 +1,7 @@
 import type {AnswerActor} from './qaAnswerJobs.ts';
 import {featuresFor, requireFeature, type FeatureFlag} from './featureFlags.ts';
 import {parseFeedback, feedbackRow} from './answerFeedback.ts';
+import {matchPending} from './rosterMatch.ts';
 // Shared gateway: the production adapter supplies persistent sessions and live membership checks.
 type Member = { id: string; email: string; role: string; status: string; authVersion: string; name?: string; member_no?: string; prefecture?: string };
 type Session = { uid: string; authVersion: string; expires: number };
@@ -20,6 +21,8 @@ export type GatewayDependencies = {
   publicAction?(path: string, input: Record<string, unknown>): Promise<unknown>;
   // 段階公開スイッチ（lib/featureFlags.ts）。未設定なら全機能オフ。
   featureFlags?(): Promise<FeatureFlag[]>;
+  // (3) 名簿のハッシュと、最後に同期した時刻・件数。
+  roster?: { has(hashes:string[]): Promise<Set<string>>; meta(): Promise<{synced_at?:string;row_count?:number}> };
   saveFeedback?(row: Record<string, unknown>): Promise<void>;
   listFeedback?(): Promise<unknown[]>;
   now?: () => number;
@@ -135,6 +138,18 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         return json({ok:true});
       }
       // (2) 評価の一覧（運営分析）。管理者で、かつスイッチで見える人だけ。会員の名前・IDは返さない。
+      // (3) 承認待ちの人を名簿と照合。管理者で、かつスイッチ auto_approval で見える人だけ。名簿の中身は返さない。
+      if(path==='/admin/users/pending/roster-match' && req.method==='POST'){
+        let flags:FeatureFlag[]=[];
+        try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
+        requireFeature(Array.isArray(flags)?flags:[],'auto_approval',{id:user.id,email:user.email});
+        if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
+        if(!d.roster)return json({error:'feature_not_available'},404);
+        const roster=d.roster;
+        const [pending,meta]=await Promise.all([d.forward('GET','/admin/users/pending',{actor_user_id:user.id,actor_email:user.email}) as Promise<any>,roster.meta()]);
+        const users=Array.isArray(pending?.users)?pending.users.map((u:any)=>({id:String(u.id),member_no:u.member_no,name:u.name})):[];
+        return json({matches:await matchPending(users,h=>roster.has(h)),roster_count:meta.row_count??null,synced_at:meta.synced_at??null});
+      }
       if(path==='/admin/answer-feedback/list' && req.method==='POST'){
         let flags:FeatureFlag[]=[];
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
