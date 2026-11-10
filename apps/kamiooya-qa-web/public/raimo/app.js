@@ -1839,13 +1839,13 @@ const App = {
           '<span class="openchat-sender">' + App.escapeHtml(String(r.sender_name || r.senderName || '')) + '</span>' +
           '</td>' +
           '<td class="p-2 text-xs text-slate-700">' +
-          App.escapeHtml(snippet) + '<span class="openchat-attachment-slot" data-openchat-source-id="'+App.escapeHtml(rowId)+'"></span>' +
+          App.escapeHtml(snippet) + '<span class="openchat-attachment-slot" data-openchat-source-id="'+App.escapeHtml(rowId)+'" data-when="'+App.escapeHtml(when)+'" data-who="'+App.escapeHtml(String(r.sender_name || r.senderName || ''))+'"></span>' +
           '</td></tr>'
         );
       })
       .join('');
     tbody.querySelectorAll('.openchat-attachment-slot').forEach(function(container){
-      App.appendAttachmentLinks(container,container.getAttribute('data-openchat-source-id'),'添付：','openchat');
+      App.appendAttachmentLinks(container,container.getAttribute('data-openchat-source-id'),'添付：','openchat',App.attachmentMetaFromElement(container));
     });
   },
 
@@ -2488,11 +2488,11 @@ const App = {
     }
     if(comments.length)parts.push('<div class="font-semibold mb-1">コミュニティの根拠</div>'+dated(comments,c=>{
       const d=App.referenceDateParts(c.postedAt),cat=c.forumCategory&&c.forumCategory!=='未分類'?' ・ '+esc(c.forumCategory):'';
-      return '<li'+attrs(c)+'>'+badge(c)+esc(App.citationDateLabel(c))+' ・ '+esc(App.formatAuthorForDisplay(c.authorName||''))+cat+' #'+esc(c.commentId||'')+db('comment',c.commentId)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div><span class="citation-attachments" data-comment-id="'+esc(c.commentId||'')+'"></span></li>';
+      return '<li'+attrs(c)+'>'+badge(c)+esc(App.citationDateLabel(c))+' ・ '+esc(App.formatAuthorForDisplay(c.authorName||''))+cat+' #'+esc(c.commentId||'')+db('comment',c.commentId)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div><span class="citation-attachments" data-comment-id="'+esc(c.commentId||'')+'" data-when="'+esc(c.postedAt||'')+'" data-who="'+esc(c.authorName||'')+'"></span></li>';
     }));
     if(lines.length)parts.push('<div class="font-semibold mb-1">LINEオプチャの根拠</div>'+dated(lines,c=>{
       const d=App.referenceDateParts(c.postedAt);
-      return '<li'+attrs(c)+'>'+badge(c)+(d?esc(d.label)+' ・ ':'')+esc(c.chatTitle||'オプチャ名未登録')+(c.streamLabel?' / '+esc(c.streamLabel):'')+(c.threadTitle?' / '+esc(c.threadTitle):'')+db('openchat',c.openchatId)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div><div class="openchat-citation-attachments" data-openchat-source-id="'+esc(c.openchatId||'')+'"></div></li>';
+      return '<li'+attrs(c)+'>'+badge(c)+(d?esc(d.label)+' ・ ':'')+esc(c.chatTitle||'オプチャ名未登録')+(c.streamLabel?' / '+esc(c.streamLabel):'')+(c.threadTitle?' / '+esc(c.threadTitle):'')+db('openchat',c.openchatId)+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div><div class="openchat-citation-attachments" data-openchat-source-id="'+esc(c.openchatId||'')+'" data-when="'+esc(c.postedAt||'')+'" data-who="'+esc(c.authorName||'')+'"></div></li>';
     }));
     if(lessons.length)parts.push('<div class="font-semibold mb-1">講座ページの根拠</div><ul class="citations-list mb-2">'+lessons.map(c=>{
       const url=App.safeReferenceUrl(c.lessonUrl);
@@ -3471,10 +3471,10 @@ const App = {
     area.querySelectorAll('.citations-panel').forEach(App.bindSourceClicks);
     area.scrollTop = area.scrollHeight;
     area.querySelectorAll('.citation-attachments').forEach(function (container) {
-      App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：');
+      App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：', '', App.attachmentMetaFromElement(container));
     });
     area.querySelectorAll('.openchat-citation-attachments').forEach(function(container){
-      App.appendAttachmentLinks(container,container.getAttribute('data-openchat-source-id'),'関連添付：','openchat');
+      App.appendAttachmentLinks(container,container.getAttribute('data-openchat-source-id'),'関連添付：','openchat',App.attachmentMetaFromElement(container));
     });
   },
 
@@ -3811,7 +3811,7 @@ const App = {
         if(data.next_offset==null){
           App.state.attachmentIndex=index;App.state.attachmentStatus='';
           App.renderCommentTable();App.renderChatMessages();App.renderOpenchatTable();
-          if(App.elements.commentDetailDialog&&App.elements.commentDetailDialog.open&&App.elements.commentDetailBody&&App.state.attachmentDetailCommentId)App.appendAttachmentLinks(App.elements.commentDetailBody,App.state.attachmentDetailCommentId);
+          if(App.elements.commentDetailDialog&&App.elements.commentDetailDialog.open&&App.elements.commentDetailBody&&App.state.attachmentDetailCommentId)App.appendAttachmentLinks(App.elements.commentDetailBody,App.state.attachmentDetailCommentId,'','',App.state.attachmentDetailMeta);
           complete=true;break;
         }
         if(!Number.isInteger(data.next_offset)||data.next_offset<=offset)throw new Error('invalid_attachment_offset');
@@ -3832,15 +3832,60 @@ const App = {
     return response.json();
   },
 
-  attachmentDisplayName: (item) => {
+  attachmentDisplayName: (item, meta, seq) => {
     const name = String(item.original_name || '').trim();
-    if (name && !/^(image|video|audio|file)$/i.test(name)) return name;
-    const kind = String(item.content_type || item.mime_type || item.mime || '').split('/')[0] || name.toLowerCase();
-    const label = { image: '画像', video: '動画', audio: '音声' }[kind] || '添付ファイル';
-    return label + '（ファイル名未取得）';
+    const type = String(item.content_type || item.mime_type || item.mime || '').toLowerCase();
+    const kind = type.split('/')[0] || name.toLowerCase();
+    const label = App.attachmentKindLabel(item);
+    const prefix = App.attachmentNamePrefix(meta);
+    if (!prefix) {
+      if (name && !/^(image|video|audio|file)$/i.test(name)) return name;
+      return ({ image: '画像', video: '動画', audio: '音声' }[kind] || '添付ファイル') + '（ファイル名未取得）';
+    }
+    // 「いつ_誰_中身」の形に揃える（保存しているファイル名は変えず、表示だけ）
+    if (name && !App.isMeaninglessAttachmentName(name)) return prefix + '_' + name;
+    const ext = (name.match(/\.([A-Za-z0-9]{1,5})$/) || [])[1] || ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3', 'application/pdf': 'pdf' }[type] || '');
+    return prefix + '_' + label + (seq ? String(seq) : '') + (ext ? '.' + ext.toLowerCase() : '');
   },
 
-  appendAttachmentLinks: (container, commentId, label, source) => {
+  attachmentKindLabel: (item) => {
+    const name = String(item.original_name || '').toLowerCase();
+    const type = String(item.content_type || item.mime_type || item.mime || '').toLowerCase();
+    const ext = (name.match(/\.([a-z0-9]{1,5})$/) || [])[1] || '';
+    if (type === 'application/pdf' || ext === 'pdf') return 'PDF';
+    if (/sheet|excel|csv/.test(type) || /^(xlsx?|csv)$/.test(ext)) return '表';
+    if (/word/.test(type) || /^docx?$/.test(ext)) return '文書';
+    if (/presentation|powerpoint/.test(type) || /^pptx?$/.test(ext)) return 'スライド';
+    const kind = type.split('/')[0] || name;
+    return { image: '画像', video: '動画', audio: '音声' }[kind] || (/^(jpe?g|png|webp|heic|gif)$/.test(ext) ? '画像' : /^(mp4|mov)$/.test(ext) ? '動画' : '添付');
+  },
+
+  // IMG_1234.jpg・S__6856725.jpg・英数字の長い記号・image など、人が見て意味のない名前
+  isMeaninglessAttachmentName: (name) => {
+    const base = String(name || '').trim().replace(/\.[A-Za-z0-9]{1,5}$/, '');
+    if (!base) return true;
+    return /^(image|video|audio|file|photo|movie|attachment)$/i.test(base) ||
+      /^(IMG|DSC|DSCN|DCIM|PXL|MOV|VID|S_+|LINE_ALBUM|line_\d+)[_\-\s]*[0-9_\-\s]*$/i.test(base) ||
+      /^[0-9a-f]{16,}$/i.test(base) || /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(base) ||
+      /^[0-9_\-\s]+$/.test(base);
+  },
+
+  attachmentNamePrefix: (meta) => {
+    if (!meta) return '';
+    const d = App.referenceDateParts(meta.when);
+    const date = d ? d.year + '-' + String(d.month).padStart(2, '0') + '-' + String(d.day).padStart(2, '0') : '';
+    const parsed = App.parseWeStudyAuthorName(String(meta.who || ''));
+    const who = String(parsed.authorName || parsed.raw || '').replace(/[\\/:*?"<>|\s　]+/g, '').slice(0, 30);
+    return [date || '日付不明', who || '投稿者不明'].join('_');
+  },
+
+  attachmentMetaFromElement: (el) => {
+    const when = el && el.getAttribute ? el.getAttribute('data-when') : '';
+    const who = el && el.getAttribute ? el.getAttribute('data-who') : '';
+    return when || who ? { when: when || '', who: who || '' } : null;
+  },
+
+  appendAttachmentLinks: (container, commentId, label, source, meta) => {
     const previous = container.querySelector('.community-attachment-links');
     if (previous) previous.remove();
     const isOpenchat=source==='openchat';
@@ -3851,11 +3896,17 @@ const App = {
     const title = document.createElement('span');
     title.textContent = label || '添付資料：';
     wrapper.appendChild(title);
+    const totals = {}, seen = {};
+    const needsSeq = item => meta && (!String(item.original_name || '').trim() || App.isMeaninglessAttachmentName(item.original_name));
+    items.forEach(item => { if (needsSeq(item)) { const k = App.attachmentKindLabel(item); totals[k] = (totals[k] || 0) + 1; } });
     items.forEach(function (item) {
+      const kindKey = App.attachmentKindLabel(item);
+      const seq = needsSeq(item) && totals[kindKey] > 1 ? (seen[kindKey] = (seen[kindKey] || 0) + 1) : 0;
       const link = document.createElement('a');
       link.href = '#attachment-' + String(item.id);
       link.className = 'block text-blue-700 hover:underline break-all';
-      link.textContent = App.attachmentDisplayName(item);
+      link.textContent = App.attachmentDisplayName(item, meta, seq);
+      if (meta && item.original_name) link.title = '元のファイル名: ' + String(item.original_name);
       link.addEventListener('click', async function (event) {
         event.preventDefault();
         const generation = App.state.attachmentGeneration;
@@ -4006,7 +4057,7 @@ const App = {
         App.openCommentDetailDialog(r);
       });
       contentTd.appendChild(openBtn);
-      App.appendAttachmentLinks(contentTd, App.commentField(r, 'comment_id'));
+      App.appendAttachmentLinks(contentTd, App.commentField(r, 'comment_id'), '', '', { when: App.commentField(r, 'posted_at') || '', who: App.commentField(r, 'author_name') || '' });
 
       tr.innerHTML =
         '<td class="p-2 whitespace-nowrap">' +
@@ -4057,7 +4108,8 @@ const App = {
     if (App.elements.commentDetailBody) {
       App.elements.commentDetailBody.textContent = content;
       App.state.attachmentDetailCommentId = cid;
-      App.appendAttachmentLinks(App.elements.commentDetailBody, cid);
+      App.state.attachmentDetailMeta = { when: postedAt, who: App.commentField(row, 'author_name') || '' };
+      App.appendAttachmentLinks(App.elements.commentDetailBody, cid, '', '', App.state.attachmentDetailMeta);
     }
     if (typeof App.elements.commentDetailDialog.showModal === 'function') {
       App.elements.commentDetailDialog.showModal();
