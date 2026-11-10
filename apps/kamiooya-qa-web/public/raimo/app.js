@@ -3386,8 +3386,14 @@ const App = {
     { rating: 'good', label: 'いいね', icon: '👍' },
     { rating: 'bad', label: '悪いね', icon: '👎' }
   ],
+  // いいね＝理由は聞かない／超いいね＝良かった理由／悪いね＝何が悪かったか（2026-11-10 松野さん）
+  feedbackAsk: {
+    great: { question: 'どこが特に良かったですか？', placeholder: '例: 具体例が分かりやすかった（任意）' },
+    bad: { question: '何が良くなかったですか？', placeholder: '例: 質問とずれている、情報が古い（任意）' }
+  },
   renderFeedbackBox: (msgId) => {
     const saved = (App.state.feedbackByMessage || {})[msgId] || {};
+    const ask = App.feedbackAsk[saved.rating];
     const buttons = App.feedbackChoices.map(function (c) {
       const on = saved.rating === c.rating;
       return '<button type="button" class="answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50') +
@@ -3395,9 +3401,10 @@ const App = {
     }).join('');
     return '<div class="answer-feedback mt-2 pt-2 border-t border-slate-200 text-xs" data-message-id="' + App.escapeHtml(msgId) + '">' +
       '<div class="flex flex-wrap items-center gap-2"><span class="text-slate-500">この回答はどうでしたか？</span>' + buttons + '</div>' +
-      '<div class="answer-feedback-comment ' + (saved.rating ? '' : 'hidden') + ' mt-2 flex gap-2">' +
-      '<input type="text" maxlength="1000" class="flex-1 border rounded px-2 py-1" placeholder="よければ理由やご意見（任意）" value="' + App.escapeHtml(saved.comment || '') + '">' +
-      '<button type="button" class="answer-feedback-send px-2 py-1 rounded bg-blue-700 text-white">送る</button></div>' +
+      '<div class="answer-feedback-comment ' + (ask ? '' : 'hidden') + ' mt-2">' +
+      '<div class="answer-feedback-question text-slate-600 mb-1">' + App.escapeHtml(ask ? ask.question : '') + '</div>' +
+      '<div class="flex gap-2"><input type="text" maxlength="1000" class="flex-1 border rounded px-2 py-1" placeholder="' + App.escapeHtml(ask ? ask.placeholder : '') + '" value="' + App.escapeHtml(saved.comment || '') + '">' +
+      '<button type="button" class="answer-feedback-send px-2 py-1 rounded bg-blue-700 text-white">送る</button></div></div>' +
       '<div class="answer-feedback-status text-slate-500 mt-1" role="status" aria-live="polite">' + (saved.sent ? 'ありがとうございます。受け付けました。' : '') + '</div></div>';
   },
   bindFeedbackBox: (box) => {
@@ -3423,12 +3430,17 @@ const App = {
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
         b.className = 'answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50');
       });
-      box.querySelector('.answer-feedback-comment').classList.remove('hidden');
+      App.showFeedbackAsk(box, rating);
     };
     box.querySelectorAll('.answer-feedback-btn').forEach(function (b) {
       b.addEventListener('click', function () {
+        const rating = b.getAttribute('data-rating');
         const input = box.querySelector('.answer-feedback-comment input');
-        void send(b.getAttribute('data-rating'), input ? input.value.trim() : '');
+        const cur = (App.state.feedbackByMessage || {})[msgId] || {};
+        // いいねは理由を聞かない（前の意見も消す）。超いいね・悪いねは、評価を変えたら意見を書き直してもらう
+        const comment = (!App.feedbackAsk[rating] || cur.rating !== rating || !input) ? '' : input.value.trim();
+        if (input && cur.rating !== rating) input.value = '';
+        void send(rating, comment);
       });
     });
     box.querySelector('.answer-feedback-send').addEventListener('click', function () {
@@ -3436,6 +3448,16 @@ const App = {
       if (!cur || !cur.rating) { status.textContent = '先にボタンで評価を選んでください。'; return; }
       void send(cur.rating, box.querySelector('.answer-feedback-comment input').value.trim());
     });
+  },
+
+  showFeedbackAsk: (box, rating) => {
+    const ask = App.feedbackAsk[rating];
+    const wrap = box.querySelector('.answer-feedback-comment');
+    if (!wrap) return;
+    wrap.classList.toggle('hidden', !ask);
+    if (!ask) return;
+    wrap.querySelector('.answer-feedback-question').textContent = ask.question;
+    wrap.querySelector('input').setAttribute('placeholder', ask.placeholder);
   },
 
   renderSuggestedQuestions: () => {
