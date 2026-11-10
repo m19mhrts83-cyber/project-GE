@@ -1167,13 +1167,16 @@ const App = {
         registered = true;
       } catch (rosterErr) {
         if (isNotOnRoster(rosterErr)) {
+          // (3) 名簿（目標設定・合格状況）と番号＋氏名が合えば、サーバーがその場で承認する（auto_approved）
           try {
-            await App.apiClient('POST', '/auth/register', payload);
+            const reg = await App.apiClient('POST', '/auth/register', payload);
             registered = true;
+            if (reg && String(reg.auto_approved) === 'true') autoApproved = true;
           } catch (regErr) {
             if (isReregisterCandidate(regErr)) {
-              await App.apiClient('POST', '/auth/reregister', payload);
+              const rereg = await App.apiClient('POST', '/auth/reregister', payload);
               registered = true;
+              if (rereg && String(rereg.auto_approved) === 'true') autoApproved = true;
             } else {
               throw regErr;
             }
@@ -1188,9 +1191,10 @@ const App = {
             registered = true;
           } catch (rrErr) {
             if (isNotOnRoster(rrErr)) {
-              await App.apiClient('POST', '/auth/reregister', payload);
+              const rereg = await App.apiClient('POST', '/auth/reregister', payload);
               registered = true;
-              await App.notifyRegistrationPending(email, '再登録（アプリ）', memberNo, name, prefecture);
+              if (rereg && String(rereg.auto_approved) === 'true') autoApproved = true;
+              else await App.notifyRegistrationPending(email, '再登録（アプリ）', memberNo, name, prefecture);
             } else {
               throw rrErr;
             }

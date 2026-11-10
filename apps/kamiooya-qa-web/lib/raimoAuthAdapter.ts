@@ -1,4 +1,6 @@
 import {createAnswerJobs,createRestAnswerStore,compactAnswerResult} from './qaAnswerJobs.ts';
+import {featureAllowed} from './featureFlags.ts';
+import {matchPending} from './rosterMatch.ts';
 // Runtime-neutral production adapters. Secrets are injected only by the Edge entrypoint.
 import type { GatewayDependencies } from './raimoAuthGateway.ts';
 export type RuntimeConfig = { origin: string; raimoBase: string; gatewaySecret: string; projectUrl: string; serviceKey: string; proxySecret: string };
@@ -50,6 +52,28 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     if(!/^[0-9a-f]{64}$/.test(ref))return {user_id:uid,session_active:false};
     const [s,u]=await Promise.all([parentSession(ref),lookup({user_id:uid}).then(memberOf)]);
     return {user_id:uid,status:u?.status,role:u?.role,session_active:sessionActive(uid,s,u)};
+  };
+
+  const rosterHas=async(hashes:string[])=>{
+    const found=new Set<string>();const list=hashes.filter(h=>/^[0-9a-f]{64}$/.test(h));
+    for(let i=0;i<list.length;i+=100){const rows=await rest('qa_roster_hashes?select=hash&hash=in.('+list.slice(i,i+100).join(',')+')');for(const r of rows||[])found.add(String(r.hash));}
+    return found;
+  };
+  // スイッチ auto_approval が「全員」なら全員に、owner/reviewers なら名指しのメールの人の登録だけに効く（試験用）。
+  const autoApprove=async(email:string,memberNo:string,name:string)=>{
+    const flags=await rest('qa_feature_flags?select=feature,stage,owner_ids,reviewer_ids&feature=eq.auto_approval&limit=1');
+    if(!featureAllowed(Array.isArray(flags)?flags[0]:undefined,{id:'',email}))return false;
+    const u=await lookup({email});
+    if(!u||u.status!=='pending')return false;
+    const pending=await backend('GET','/admin/users/pending',{});
+    // 本人は今回の登録内容で照合し、ほかの承認待ちは同じ番号がいないかを見るのに使う
+    const users=(Array.isArray(pending?.users)?pending.users:[]).filter((x:any)=>String(x.id)!==String(u.id)).map((x:any)=>({id:String(x.id),member_no:x.member_no,name:x.name}));
+    users.push({id:String(u.id),member_no:memberNo,name});
+    const result=(await matchPending(users,rosterHas))[String(u.id)];
+    if(result!=='match')return false;
+    await backend('PUT','/admin/users/'+encodeURIComponent(String(u.id))+'/approve',{});
+    await backend('POST','/notify/approval',{email}).catch(()=>{}); // メールが失敗しても承認は済んでいる（ログインはできる）
+    return true;
   };
 
   const deps:GatewayDependencies={origin:c.origin,sessions,allowLogin:email=>allow('login:'+email),
@@ -110,11 +134,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     referenceMetadata:async()=>rest('rpc/qa_reference_metadata',{method:'POST',body:'{}'}),
     featureFlags:async()=>rest('qa_feature_flags?select=feature,stage,owner_ids,reviewer_ids&limit=100'),
     roster:{
-      has:async hashes=>{
-        const found=new Set<string>();const list=hashes.filter(h=>/^[0-9a-f]{64}$/.test(h));
-        for(let i=0;i<list.length;i+=100){const rows=await rest('qa_roster_hashes?select=hash&hash=in.('+list.slice(i,i+100).join(',')+')');for(const r of rows||[])found.add(String(r.hash));}
-        return found;
-      },
+      has:rosterHas,
       meta:async()=>{const m=(await rest('qa_roster_meta?select=row_count,synced_at&id=eq.1&limit=1'))?.[0];return {row_count:m?.row_count,synced_at:m?.synced_at};}
     },
     listFeedback:async()=>rest('qa_answer_feedback?select=rating,comment,question,answer,updated_at&order=updated_at.desc&limit=200'),
@@ -133,8 +153,12 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         const password=String(input.password_hash||'');if(password.length<8||new TextEncoder().encode(password).length>72)throw new UpstreamError('invalid_password',400);
         const data={email,password_hash:await hash(password),name:String(input.name||'').slice(0,200),member_no:String(input.member_no||'').slice(0,100),prefecture:String(input.prefecture||'').slice(0,50)};
         const r=await backend('POST',path,data);
-        if(!path.endsWith('-roster'))await backend('POST','/notify/registration',{email,member_no:data.member_no,note:'アプリ登録',registered_at:new Date().toISOString()});
-        return r;
+        if(path.endsWith('-roster'))return r;
+        // (3) 名簿（目標設定・合格状況）と会員番号＋氏名が合えば、その場で承認して本人に完了メール（11/10 松野さん）。
+        // 合わない・同じ番号の承認待ちがいる・照合できないときは、今までどおり承認待ち。
+        const auto=await autoApprove(email,data.member_no,data.name).catch(()=>false);
+        await backend('POST','/notify/registration',{email,member_no:data.member_no,note:auto?'アプリ登録（名簿一致で自動承認済み・対応不要）':'アプリ登録',registered_at:new Date().toISOString()});
+        return auto?{...r,auto_approved:'true'}:r;
       }
       if(path==='/auth/reset-password/check')return {email}; // no unauthenticated account enumeration
       if(path==='/auth/forgot-password/issue'){

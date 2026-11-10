@@ -59,3 +59,51 @@ test('照合 API は「管理者」かつ「スイッチで見える人」だけ
   assert.deepEqual(await ok.json(), { matches: { p1: 'match' }, roster_count: 2723, synced_at: '2026-11-10T14:00:00Z' });
   assert.equal((await post('b'.repeat(64))).status, 404); // 管理者でも名指しが無い
 });
+
+import { createProductionAdapter } from '../lib/raimoAuthAdapter.ts';
+function registerFixture({ stage = 'all', owners = [], roster = [], pending = [] } = {}) {
+  const calls = [];
+  const c = { origin: 'https://app.example', raimoBase: 'https://app.example/miniAppApi/test', projectUrl: 'https://fixture.supabase.co', serviceKey: 'service-only', gatewaySecret: 'g'.repeat(40), proxySecret: 'p'.repeat(40) };
+  const transport = async (url, options = {}) => {
+    const u = new URL(url), body = options.body ? JSON.parse(options.body) : {};
+    calls.push({ path: u.pathname, body, search: u.search });
+    if (u.pathname.endsWith('/rpc/raimo_auth_take_limit')) return Response.json(true);
+    if (u.pathname.endsWith('/qa_feature_flags')) return Response.json([{ feature: 'auto_approval', stage, owner_ids: owners, reviewer_ids: [] }]);
+    if (u.pathname.endsWith('/qa_roster_hashes')) { const asked = decodeURIComponent(u.searchParams.get('hash') || '').replace(/^in\.\(|\)$/g, '').split(','); return Response.json(asked.filter(h => roster.includes(h)).map(hash => ({ hash }))); }
+    const path = u.pathname.slice('/miniAppApi/test'.length);
+    if (path === '/auth/register') return Response.json({ id: 'u9' });
+    if (path === '/internal/auth-user/email') return Response.json({ user: { id: 'u9', email: body.email, status: 'pending', role: 'user' } });
+    if (path === '/internal/read/admin/users/pending') return Response.json({ users: [{ id: 'u9', member_no: '123', name: '山田 太郎' }, ...pending] });
+    if (path === '/admin/users/u9/approve' || path === '/notify/approval' || path === '/notify/registration') return Response.json({ ok: true });
+    throw new Error('unexpected ' + url);
+  };
+  const adapter = createProductionAdapter(c, async () => false, async p => 'hashed:' + p, transport);
+  return { calls, register: input => adapter.deps.publicAction('/auth/register', { email: 'new@example.test', password_hash: 'password-123', member_no: '123', name: '山田 太郎', prefecture: '東京都', ...input }) };
+}
+const rosterOf = async () => [await rosterHash('no', '123'), await rosterHash('no_name', '123', '山田太郎')];
+
+test('自動承認: 名簿と番号＋氏名が合えば、その場で承認して本人に完了メール', async () => {
+  const f = registerFixture({ roster: await rosterOf() });
+  const r = await f.register({});
+  assert.equal(r.auto_approved, 'true');
+  assert.ok(f.calls.some(x => x.path.endsWith('/admin/users/u9/approve')));
+  assert.deepEqual(f.calls.find(x => x.path.endsWith('/notify/approval')).body.email, 'new@example.test');
+  assert.match(f.calls.find(x => x.path.endsWith('/notify/registration')).body.note, /自動承認済み/);
+});
+
+test('自動承認しない: 名前が違う／同じ番号の承認待ちがいる／スイッチがオフ／名指し外', async () => {
+  const wrongName = registerFixture({ roster: await rosterOf() });
+  assert.equal((await wrongName.register({ name: '山田 花子' })).auto_approved, undefined);
+  const dup = registerFixture({ roster: await rosterOf(), pending: [{ id: 'u8', member_no: '0123', name: '別人' }] });
+  assert.equal((await dup.register({})).auto_approved, undefined);
+  const off = registerFixture({ stage: 'off', roster: await rosterOf() });
+  assert.equal((await off.register({})).auto_approved, undefined);
+  const named = registerFixture({ stage: 'owner', owners: ['someone@example.test'], roster: await rosterOf() });
+  assert.equal((await named.register({})).auto_approved, undefined);
+  for (const f of [wrongName, dup, off, named]) {
+    assert.equal(f.calls.some(x => x.path.endsWith('/approve')), false);
+    assert.equal(f.calls.find(x => x.path.endsWith('/notify/registration')).body.note, 'アプリ登録');
+  }
+  const tester = registerFixture({ stage: 'owner', owners: ['new@example.test'], roster: await rosterOf() });
+  assert.equal((await tester.register({})).auto_approved, 'true'); // 試験：名指しのメールの人だけ自動承認
+});
