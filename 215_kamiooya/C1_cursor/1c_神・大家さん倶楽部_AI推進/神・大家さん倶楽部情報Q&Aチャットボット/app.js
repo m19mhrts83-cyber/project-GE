@@ -174,7 +174,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -1303,6 +1303,8 @@ const App = {
     App.applySearchModeUi();
     App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + (App.isStaffAdmin() || !App.state.viewAsMember ? App.state.currentUser.role : 'user として表示中') + ')';
 
+    const changeLogTab = document.getElementById('changeLogTabBtn');
+    if (changeLogTab) changeLogTab.classList.toggle('hidden', !App.featureOn('change_log'));
     const isAdmin = App.isStaffAdmin();
     const adminNav = document.getElementById('adminNavSection');
     if (adminNav) adminNav.classList.toggle('hidden', !isAdmin);
@@ -1392,7 +1394,8 @@ const App = {
       adminAdminList: 'adminAdminListScreen',
       adminMembers: 'adminMembersScreen',
       adminData: 'adminDataScreen',
-      adminAnalytics: 'adminAnalyticsScreen'
+      adminAnalytics: 'adminAnalyticsScreen',
+      changeLog: 'changeLogScreen'
     };
     const targetId = map[screenName];
     if (targetId) {
@@ -1428,6 +1431,7 @@ const App = {
         App.showToast((err && err.message) || '会員名簿の取得に失敗しました', 'error');
       });
     }
+    if (screenName === 'changeLog') void App.loadChangeLog();
     if (screenName === 'adminAnalytics') {
       App.loadAnalytics().catch(function (err) {
         App.showToast((err && err.message) || '分析データの取得に失敗しました', 'error');
@@ -4301,6 +4305,26 @@ const App = {
       await App.apiClient('POST', '/answer-source-click', Object.assign({ chat_id: String(chatId), message_id: String(msgId) }, s));
     } catch (e) {
       delete seen[key];
+    }
+  },
+
+  // 改善履歴（11/11）。会員の声を受けて直したことを新しい順に出す。スイッチ change_log が見える人だけ。
+  loadChangeLog: async () => {
+    const list = document.getElementById('changeLogList');
+    if (!list) return;
+    if (!App.featureOn('change_log')) { list.innerHTML = ''; return; }
+    list.innerHTML = '<p class="text-sm text-slate-500">読み込み中…</p>';
+    try {
+      const r = await App.apiClient('GET', '/change-log');
+      const rows = (r && Array.isArray(r.entries)) ? r.entries : [];
+      list.innerHTML = rows.length ? rows.map(function (x) {
+        return '<div class="bg-white rounded border p-4"><div class="text-xs text-slate-500">' + App.escapeHtml(String(x.released_on || '').replace(/-/g, '/')) + '</div>' +
+          '<div class="font-semibold">' + App.escapeHtml(x.title || '') + '</div>' +
+          (x.body ? '<p class="text-sm text-slate-700 mt-1 whitespace-pre-line">' + App.escapeHtml(x.body) + '</p>' : '') +
+          (x.trigger ? '<p class="text-xs text-slate-500 mt-2">きっかけ：' + App.escapeHtml(x.trigger) + '</p>' : '') + '</div>';
+      }).join('') : '<p class="text-sm text-slate-500">まだ履歴はありません。</p>';
+    } catch (e) {
+      list.innerHTML = '<p class="text-sm text-red-600">取得できませんでした: ' + App.escapeHtml((e && e.message) || String(e)) + '</p>';
     }
   },
 
