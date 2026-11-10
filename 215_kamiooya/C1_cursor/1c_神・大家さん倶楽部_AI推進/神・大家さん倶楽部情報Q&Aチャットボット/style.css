@@ -501,6 +501,7 @@ body {
 .theme-brand .brand-hero-lead { margin-top: 14px; font-size: 0.95rem; line-height: 1.8; color: rgba(255, 255, 255, 0.85); }
 .theme-brand .brand-hero-points-label { margin-top: 22px; font-size: 0.8rem; font-weight: 700; color: #ffb347; letter-spacing: 0.08em; }
 .theme-brand .brand-hero-points { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.theme-brand .brand-hero-points i { color: #ffb347; margin-right: 6px; }
 .theme-brand .brand-hero-points span {
   padding: 4px 10px;
   border: 1px solid rgba(255, 255, 255, 0.35);
