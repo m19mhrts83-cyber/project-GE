@@ -9,6 +9,7 @@ const App = {
     currentUser: null,
     // 段階公開スイッチ: サーバーが「この人に見えている」と返した機能だけ（/features）
     features: {},
+    feedbackByMessage: {},
     featureViewNew: true,
     viewAsMember: false,
     authToken: '',
@@ -1336,6 +1337,7 @@ const App = {
     App.state.referenceComments={};App.state.attachmentStatus='';App.state.attachmentLoading=false;App.renderAttachmentStatus();
     App.state.attachmentDetailCommentId = '';
     App.state.features = {};
+    App.state.feedbackByMessage = {};
     const featureBar = document.getElementById('featurePreviewBar');
     if (featureBar) featureBar.classList.add('hidden');
     App.state.currentUser = null;
@@ -3338,7 +3340,8 @@ const App = {
           ? '<div class="md-body">' + App.formatAssistantHtml(App.linkReferenceLabels(m.content || '', messageCitations, msgId)) + '</div>'
           : App.escapeHtml(m.content || '')) +
         '</div>' +
-        (m.role === 'assistant' ? App.renderCitationsPanel(messageCitations, msgId, m.content) : '');
+        (m.role === 'assistant' ? App.renderCitationsPanel(messageCitations, msgId, m.content) : '') +
+        (m.role === 'assistant' && msgId && App.featureOn('answer_feedback') ? App.renderFeedbackBox(msgId) : '');
 
       wrap.appendChild(bubble);
       area.appendChild(wrap);
@@ -3367,12 +3370,71 @@ const App = {
         event.preventDefault();target.scrollIntoView({block:'start',behavior:'auto'});
       });
     });
+    area.querySelectorAll('.answer-feedback').forEach(App.bindFeedbackBox);
     area.scrollTop = area.scrollHeight;
     area.querySelectorAll('.citation-attachments').forEach(function (container) {
       App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：');
     });
     area.querySelectorAll('.openchat-citation-attachments').forEach(function(container){
       App.appendAttachmentLinks(container,container.getAttribute('data-openchat-source-id'),'関連添付：','openchat');
+    });
+  },
+
+  // (2) 回答の評価（段階公開スイッチ answer_feedback が見える人だけ）。2026-11-10
+  feedbackChoices: [
+    { rating: 'great', label: '超いいね', icon: '🌟' },
+    { rating: 'good', label: 'いいね', icon: '👍' },
+    { rating: 'bad', label: '悪いね', icon: '👎' }
+  ],
+  renderFeedbackBox: (msgId) => {
+    const saved = (App.state.feedbackByMessage || {})[msgId] || {};
+    const buttons = App.feedbackChoices.map(function (c) {
+      const on = saved.rating === c.rating;
+      return '<button type="button" class="answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50') +
+        '" data-rating="' + c.rating + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + c.icon + ' ' + c.label + '</button>';
+    }).join('');
+    return '<div class="answer-feedback mt-2 pt-2 border-t border-slate-200 text-xs" data-message-id="' + App.escapeHtml(msgId) + '">' +
+      '<div class="flex flex-wrap items-center gap-2"><span class="text-slate-500">この回答はどうでしたか？</span>' + buttons + '</div>' +
+      '<div class="answer-feedback-comment ' + (saved.rating ? '' : 'hidden') + ' mt-2 flex gap-2">' +
+      '<input type="text" maxlength="1000" class="flex-1 border rounded px-2 py-1" placeholder="よければ理由やご意見（任意）" value="' + App.escapeHtml(saved.comment || '') + '">' +
+      '<button type="button" class="answer-feedback-send px-2 py-1 rounded bg-blue-700 text-white">送る</button></div>' +
+      '<div class="answer-feedback-status text-slate-500 mt-1" role="status" aria-live="polite">' + (saved.sent ? 'ありがとうございます。受け付けました。' : '') + '</div></div>';
+  },
+  bindFeedbackBox: (box) => {
+    const msgId = box.getAttribute('data-message-id');
+    const status = box.querySelector('.answer-feedback-status');
+    const send = async function (rating, comment) {
+      const chatId = App.state.currentSessionId;
+      if (!chatId) return;
+      const prev = (App.state.feedbackByMessage || {})[msgId] || {};
+      App.state.feedbackByMessage = Object.assign({}, App.state.feedbackByMessage, { [msgId]: { rating: rating, comment: comment, sent: false } });
+      status.textContent = '送信中…';
+      try {
+        await App.apiClient('POST', '/answer-feedback', { chat_id: String(chatId), message_id: msgId, rating: rating, comment: comment });
+        App.state.feedbackByMessage[msgId].sent = true;
+        status.textContent = 'ありがとうございます。受け付けました。';
+      } catch (e) {
+        App.state.feedbackByMessage[msgId] = prev;
+        status.textContent = '送れませんでした。時間をおいてもう一度お試しください。';
+        return;
+      }
+      box.querySelectorAll('.answer-feedback-btn').forEach(function (b) {
+        const on = b.getAttribute('data-rating') === rating;
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.className = 'answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50');
+      });
+      box.querySelector('.answer-feedback-comment').classList.remove('hidden');
+    };
+    box.querySelectorAll('.answer-feedback-btn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const input = box.querySelector('.answer-feedback-comment input');
+        void send(b.getAttribute('data-rating'), input ? input.value.trim() : '');
+      });
+    });
+    box.querySelector('.answer-feedback-send').addEventListener('click', function () {
+      const cur = (App.state.feedbackByMessage || {})[msgId];
+      if (!cur || !cur.rating) { status.textContent = '先にボタンで評価を選んでください。'; return; }
+      void send(cur.rating, box.querySelector('.answer-feedback-comment input').value.trim());
     });
   },
 

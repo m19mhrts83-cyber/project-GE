@@ -109,6 +109,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     },
     referenceMetadata:async()=>rest('rpc/qa_reference_metadata',{method:'POST',body:'{}'}),
     featureFlags:async()=>rest('qa_feature_flags?select=feature,stage,owner_ids,reviewer_ids&limit=100'),
+    saveFeedback:async row=>{await rest('qa_answer_feedback?on_conflict=user_id,chat_id,message_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
     semanticConfig:async()=>{
       const r=await backend('POST','/semantic-search-config',{});
       if(r?.url!==c.projectUrl+'/functions/v1/semantic-search' || typeof r.secret!=='string' ||

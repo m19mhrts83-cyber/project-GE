@@ -1,5 +1,6 @@
 import type {AnswerActor} from './qaAnswerJobs.ts';
-import {featuresFor, type FeatureFlag} from './featureFlags.ts';
+import {featuresFor, requireFeature, type FeatureFlag} from './featureFlags.ts';
+import {parseFeedback, feedbackRow} from './answerFeedback.ts';
 // Shared gateway: the production adapter supplies persistent sessions and live membership checks.
 type Member = { id: string; email: string; role: string; status: string; authVersion: string; name?: string; member_no?: string; prefecture?: string };
 type Session = { uid: string; authVersion: string; expires: number };
@@ -19,6 +20,7 @@ export type GatewayDependencies = {
   publicAction?(path: string, input: Record<string, unknown>): Promise<unknown>;
   // 段階公開スイッチ（lib/featureFlags.ts）。未設定なら全機能オフ。
   featureFlags?(): Promise<FeatureFlag[]>;
+  saveFeedback?(row: Record<string, unknown>): Promise<void>;
   now?: () => number;
 };
 const approved = (u: Member | null): u is Member => !!u && u.status === 'approved' && ['user', 'admin', 'master_admin'].includes(u.role) && !!u.authVersion;
@@ -119,6 +121,18 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
         return json(featuresFor(Array.isArray(flags)?flags:[],{id:user.id,email:user.email}));
       }
+      // (2) 回答の評価。スイッチで見えない人には「無い」と同じ 404。本文はサーバーが本人のチャットから引く。
+      if(path==='/answer-feedback' && req.method==='POST'){
+        let flags:FeatureFlag[]=[];
+        try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
+        requireFeature(Array.isArray(flags)?flags:[],'answer_feedback',{id:user.id,email:user.email});
+        if(!d.saveFeedback)return json({error:'feature_not_available'},404);
+        const f=parseFeedback(input);
+        if(await d.chatOwner(f.chat_id)!==user.id)return json({error:'forbidden'},403);
+        const chat=await d.forward('GET','/chat-sessions/'+f.chat_id,{actor_user_id:user.id}) as {messages?:unknown};
+        await d.saveFeedback(feedbackRow(user.id,f,Array.isArray(chat?.messages)?chat.messages:[]));
+        return json({ok:true});
+      }
       if(path==='/reference-metadata' && req.method==='GET' && d.referenceMetadata)return json(await d.referenceMetadata());
       // This legacy browser search credential is separate from every privileged server secret.
       if(path==='/semantic-search-config' && req.method==='POST' && d.semanticConfig)return json(await d.semanticConfig());
@@ -151,7 +165,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       return json(req.method === 'GET' && ['/admin/users','/admin/users/pending'].includes(path) ? safeUsers(result) : stripPrivate(result));
     } catch (err) {
       const e=err as {code?:string;status?:number};
-      if(e && ['invalid_request','email_taken','not_on_roster','already_registered','invalid_token','not_approved','user_not_found','forbidden','member_not_found','invalid_password','try_later','route_not_reviewed','operation_failed','invalid_answer_request','answer_request_conflict','answer_in_progress','answer_not_found','answer_unavailable'].includes(e.code||'')) return json({error:e.code,errorCode:e.code},[400,403,404,409,429,503].includes(e.status||0)?e.status:400);
+      if(e && ['feature_not_available','invalid_feedback','invalid_request','email_taken','not_on_roster','already_registered','invalid_token','not_approved','user_not_found','forbidden','member_not_found','invalid_password','try_later','route_not_reviewed','operation_failed','invalid_answer_request','answer_request_conflict','answer_in_progress','answer_not_found','answer_unavailable'].includes(e.code||'')) return json({error:e.code,errorCode:e.code},[400,403,404,409,429,503].includes(e.status||0)?e.status:400);
       // Neither upstream response bodies nor credential/session values are exposed.
       return json({ error: 'service_unavailable' }, 503);
     }
