@@ -83,6 +83,16 @@ export default function HubPage() {
       </Link>
 
       <div className="eyebrow">IN ／ OUT</div>
+      <Link className="glass nav-card" href="/week">
+        <span className="ico">
+          <Icon name="calendar" size={22} />
+        </span>
+        <span className="txt">
+          <strong>今週の9件</strong>
+          <span className="meta">日曜の夜に。残った理由→おすすめを直して月・水・金に置く</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
       <Link className="glass nav-card" href="/312">
         <span className="ico">
           <Icon name="inbox" size={22} />
