@@ -1009,7 +1009,8 @@ def deliver_gdrive(dest: dict[str, Any], zip_path: Path, summary: dict[str, Any]
     creds = Credentials.from_authorized_user_file(str(token))
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        token.write_text(creds.to_json(), encoding="utf-8")
+        from jarvis_google_token_save import save_creds_keep_scopes
+        save_creds_keep_scopes(token, creds)
     svc = build("drive", "v3", credentials=creds, cache_discovery=False)
     parent = dest["folder_id"]
     sub = (dest.get("subfolder") or "").strip()
