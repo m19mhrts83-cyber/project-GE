@@ -3382,10 +3382,12 @@ const App = {
 
   // (2) 回答の評価（段階公開スイッチ answer_feedback が見える人だけ）。2026-11-10
   feedbackChoices: [
-    { rating: 'great', label: '超いいね', icon: '🌟' },
-    { rating: 'good', label: 'いいね', icon: '👍' },
-    { rating: 'bad', label: '悪いね', icon: '👎' }
+    { rating: 'great', label: '超いいね', icon: '🌟', ask: 'どこが特に良かったですか？（任意）' },
+    { rating: 'good', label: 'いいね', icon: '👍', ask: '' },
+    { rating: 'bad', label: '悪いね', icon: '👎', ask: '何が良くなかったですか？（任意）' }
   ],
+  // いいねは理由を聞かない。超いいねは良かった点、悪いねは良くなかった点を聞く（11/10 松野さん）
+  feedbackAsk: (rating) => { const c = App.feedbackChoices.find(function (x) { return x.rating === rating; }); return c ? c.ask : ''; },
   renderFeedbackBox: (msgId) => {
     const saved = (App.state.feedbackByMessage || {})[msgId] || {};
     const buttons = App.feedbackChoices.map(function (c) {
@@ -3395,8 +3397,8 @@ const App = {
     }).join('');
     return '<div class="answer-feedback mt-2 pt-2 border-t border-slate-200 text-xs" data-message-id="' + App.escapeHtml(msgId) + '">' +
       '<div class="flex flex-wrap items-center gap-2"><span class="text-slate-500">この回答はどうでしたか？</span>' + buttons + '</div>' +
-      '<div class="answer-feedback-comment ' + (saved.rating ? '' : 'hidden') + ' mt-2 flex gap-2">' +
-      '<input type="text" maxlength="1000" class="flex-1 border rounded px-2 py-1" placeholder="よければ理由やご意見（任意）" value="' + App.escapeHtml(saved.comment || '') + '">' +
+      '<div class="answer-feedback-comment ' + (App.feedbackAsk(saved.rating) ? '' : 'hidden') + ' mt-2 flex gap-2">' +
+      '<input type="text" maxlength="1000" class="flex-1 border rounded px-2 py-1" placeholder="' + App.escapeHtml(App.feedbackAsk(saved.rating)) + '" value="' + App.escapeHtml(saved.comment || '') + '">' +
       '<button type="button" class="answer-feedback-send px-2 py-1 rounded bg-blue-700 text-white">送る</button></div>' +
       '<div class="answer-feedback-status text-slate-500 mt-1" role="status" aria-live="polite">' + (saved.sent ? 'ありがとうございます。受け付けました。' : '') + '</div></div>';
   },
@@ -3423,12 +3425,18 @@ const App = {
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
         b.className = 'answer-feedback-btn px-2 py-1 rounded border text-xs ' + (on ? 'bg-violet-100 border-violet-400' : 'bg-white hover:bg-slate-50');
       });
-      box.querySelector('.answer-feedback-comment').classList.remove('hidden');
+      const ask = App.feedbackAsk(rating), row = box.querySelector('.answer-feedback-comment');
+      row.classList.toggle('hidden', !ask);
+      if (ask) row.querySelector('input').setAttribute('placeholder', ask);
     };
     box.querySelectorAll('.answer-feedback-btn').forEach(function (b) {
       b.addEventListener('click', function () {
+        const rating = b.getAttribute('data-rating'), prev = (App.state.feedbackByMessage || {})[msgId] || {};
         const input = box.querySelector('.answer-feedback-comment input');
-        void send(b.getAttribute('data-rating'), input ? input.value.trim() : '');
+        // 評価を変えたら前の理由は引き継がない（いいねは理由なし）
+        const comment = App.feedbackAsk(rating) && prev.rating === rating && input ? input.value.trim() : '';
+        if (input && prev.rating !== rating) input.value = '';
+        void send(rating, comment);
       });
     });
     box.querySelector('.answer-feedback-send').addEventListener('click', function () {
