@@ -906,6 +906,19 @@ def open_chat_session_lock(save_root: Path, *, blocking: bool = True):
         yield
 
 
+def _relogin_marker(action: str, reason: str = "") -> None:
+    """常駐監視の「再ログインが必要」印（watch_relogin_guard.py）。失敗しても本処理は止めない。"""
+    try:
+        import watch_relogin_guard as g  # 同じフォルダ
+
+        if action == "mark":
+            g.write_marker(reason)
+        else:
+            g.clear_marker()
+    except Exception:
+        pass
+
+
 def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = False):
     """保存済み authToken で CHRLINE を初期化。失効時、allow_qr_login=True のときだけ QR 再認証に進む。"""
     global _qr_logins_this_process
@@ -917,9 +930,11 @@ def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = False):
     cl = try_client_from_saved_tokens_only(save_root)
     if cl is not None:
         _process_client_cache[cache_key] = cl
+        _relogin_marker("clear")
         return cl
 
     if not allow_qr_login:
+        _relogin_marker("mark", "保存トークンが無効（更新を LINE が拒否）・QR 再認証は不許可")
         print(
             "保存トークンが無効です。QR再認証は許可されていないため終了します。"
             "（取り込み確認などで再ログインするときは、当該スクリプトに --allow-qr-login を付けて実行するか、"
@@ -956,4 +971,5 @@ def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = False):
         cl = _perform_qr_relogin(save_root)
         _qr_logins_this_process += 1
         _process_client_cache[cache_key] = cl
+        _relogin_marker("clear")
         return cl
