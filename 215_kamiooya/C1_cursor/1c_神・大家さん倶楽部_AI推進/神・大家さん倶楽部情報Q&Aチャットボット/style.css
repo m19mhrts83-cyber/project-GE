@@ -452,6 +452,9 @@ body {
 /* ---- (5) ログイン画面: ロゴと賃貸物件のイラスト（2026-11-10） ---- */
 .brand-only { display: none; }
 .theme-brand .brand-only { display: block; }
+.brand-only-inline { display: none; }
+.theme-brand .brand-only-inline { display: inline; }
+.theme-brand .brand-hide { display: none; }
 .theme-brand #authView {
   padding: 0;
   align-items: stretch;
