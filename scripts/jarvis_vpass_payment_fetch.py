@@ -268,13 +268,17 @@ def parse_payment_from_text(text: str) -> dict[str, Any]:
     due: str | None = None
 
     # Myページ: 「8月26日お支払い金額 （確定）」「1,596,308円」
+    # 確定前は「11月26日お支払い金額（未確定）」と出る。これを拾えないと
+    # 引落日が画面上部の「2026年11月9日現在」に化ける。
+    amount_confirmed: bool | None = None
     m = re.search(
-        r"(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*お支払い金額\s*[（(]?\s*確定\s*[）)]?\s*"
+        r"(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*お支払い金額\s*[（(]?\s*(未?確定)\s*[）)]?\s*"
         r"([0-9]{1,3}(?:,[0-9]{3})+)\s*円",
         t,
         re.S,
     )
     if m:
+        amount_confirmed = m.group(3) == "確定"
         today = datetime.now(JST).date()
         mo, d = int(m.group(1)), int(m.group(2))
         y = today.year
@@ -285,7 +289,7 @@ def parse_payment_from_text(text: str) -> dict[str, Any]:
             due = due_d.isoformat()
         except ValueError:
             due = None
-        amount = int(m.group(3).replace(",", ""))
+        amount = int(m.group(4).replace(",", ""))
 
     if amount is None:
         for pat in (
@@ -317,6 +321,7 @@ def parse_payment_from_text(text: str) -> dict[str, Any]:
     return {
         "amount_jpy": amount,
         "due_date": due,
+        "amount_confirmed": amount_confirmed,
         "has_olive_inf_marker": has_inf,
         "source": "vpass_web",
     }
