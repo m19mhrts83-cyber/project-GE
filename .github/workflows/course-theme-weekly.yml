@@ -1,5 +1,5 @@
 # (4) 質問ランキング＋講座テーマ案の週次の回（2026-11-11）。
-# - DB 関数 qa_theme_source_digest で DB の中で集計した小さな材料だけを読む（通信量 数十KB）
+# - DB 関数 qa_theme_source_digest で DB の中で集計した小さな材料だけを読む（通信量 百KB前後）
 # - 過去の「採用／直して採用／不採用＋理由」を読んで Gemini で案を作り、qa_theme_rounds に入れる
 # - 見るのは Q&A の運営分析（段階公開スイッチ ranking_themes）。ログには件数だけ出す
 name: course-theme weekly
@@ -8,6 +8,12 @@ on:
   schedule:
     - cron: "0 21 * * 0" # 毎週月曜 6:00 JST
   workflow_dispatch:
+  # 作り始めの確認用（main に入る前に1回目の回を作る）。マージ前に外す。
+  push:
+    branches: [claude/project-thread-eziqnx]
+    paths:
+      - scripts/course_theme/weekly_round.py
+      - .github/workflows/course-theme-weekly.yml
 
 permissions:
   contents: read

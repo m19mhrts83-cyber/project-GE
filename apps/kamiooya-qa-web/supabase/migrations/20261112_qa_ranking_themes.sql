@@ -31,7 +31,7 @@ alter table public.qa_theme_decisions enable row level security;
 revoke all on public.qa_theme_decisions from public, anon, authenticated;
 grant select, insert, update on public.qa_theme_decisions to service_role;
 
--- 週次の材料。全件を外へ出さず、DB の中で数えて小さく（数十KB）して返す（無料プランの通信量対策）。
+-- 週次の材料。全件を外へ出さず、DB の中で数えて小さく（百KB前後）して返す（無料プランの通信量対策）。
 create or replace function public.qa_theme_source_digest(p_days int default 120)
 returns jsonb
 language sql
