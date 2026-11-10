@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -48,6 +49,10 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(subprocess.run(cmd, env=env).returncode, 3)
 
 
+# Mac は /bin/zsh、CI（Ubuntu）は apt の zsh
+ZSH = shutil.which("zsh") or "/bin/zsh"
+
+
 class RunnerTests(unittest.TestCase):
     """runner を偽の run_patch.sh で動かす（LINE には触らない・投稿もしない）。"""
 
@@ -73,13 +78,13 @@ class RunnerTests(unittest.TestCase):
             env = {**os.environ, "LINE_WATCH_RELOGIN_MARKER": str(d / "m.json"), "RAN_LOG": str(d / "ran.log"),
                    "LINE_WATCH_NOTIFY_DRY_RUN": "1", "LINE_WATCH_RELOGIN_POLL_SEC": "1"}
             r = self._runner(d, fake_rc=2, mark=True)
-            p = subprocess.run(["/bin/zsh", str(r)], env=env, capture_output=True, text=True, timeout=30)
+            p = subprocess.run([ZSH, str(r)], env=env, capture_output=True, text=True, timeout=30)
             self.assertEqual(p.returncode, 0)              # 印が付いたら 0 で静かに終わる
             self.assertIn("判定: 🔴 要対応", p.stdout)     # 知らせ（dry-run）
             self.assertTrue((d / "m.json").is_file())
             # 2 回目の起動: 印がある間は run_patch を呼ばずに待つ
             with self.assertRaises(subprocess.TimeoutExpired):
-                subprocess.run(["/bin/zsh", str(r)], env=env, capture_output=True, text=True, timeout=4)
+                subprocess.run([ZSH, str(r)], env=env, capture_output=True, text=True, timeout=4)
             self.assertEqual((d / "ran.log").read_text().count("ran"), 1)
 
     def test_normal_exit_passes_rc_through(self):
@@ -88,7 +93,7 @@ class RunnerTests(unittest.TestCase):
             env = {**os.environ, "LINE_WATCH_RELOGIN_MARKER": str(d / "m.json"), "RAN_LOG": str(d / "ran.log"),
                    "LINE_WATCH_NOTIFY_DRY_RUN": "1"}
             r = self._runner(d, fake_rc=1, mark=False)
-            p = subprocess.run(["/bin/zsh", str(r)], env=env, capture_output=True, text=True, timeout=30)
+            p = subprocess.run([ZSH, str(r)], env=env, capture_output=True, text=True, timeout=30)
             self.assertEqual(p.returncode, 1)
             self.assertFalse((d / "m.json").exists())
 
