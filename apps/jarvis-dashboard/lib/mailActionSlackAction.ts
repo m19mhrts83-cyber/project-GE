@@ -661,6 +661,7 @@ export async function applyMailActionSlack(
     ].join("\n").slice(0, 4000);
     const created = await createTodoistTask(lane, {
       title,
+      mark: "requested",
       summary: summaryBlock,
       labels: materials.length
         ? ["quick", MAIL_REPLY_WAIT_LABEL, MATERIAL_WAIT_LABEL]
