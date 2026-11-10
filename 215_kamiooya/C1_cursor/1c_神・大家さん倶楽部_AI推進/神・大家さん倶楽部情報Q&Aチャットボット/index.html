@@ -185,6 +185,13 @@
           <button id="logoutBtn" class="px-3 py-1 rounded bg-blue-700 hover:bg-blue-600">ログアウト</button>
         </div>
       </header>
+      <!-- 段階公開の確認バー（2026-11-10）。改善機能が見える人（松野さん・指定した確認者）にだけ出る -->
+      <div id="featurePreviewBar" class="hidden shrink-0 px-4 py-2 bg-violet-50 text-sm flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span class="font-bold text-violet-900">確認用</span>
+        <label class="flex items-center gap-1"><input id="featureViewNewToggle" type="checkbox"> 新しい版で見る</label>
+        <label class="flex items-center gap-1"><input id="featureAsMemberToggle" type="checkbox"> 会員として見る</label>
+        <span id="featurePreviewList" class="text-violet-800"></span>
+      </div>
       <div id="attachmentStatus" class="hidden shrink-0 px-4 py-2 bg-amber-50 text-sm flex items-center justify-between gap-2">
         <span id="attachmentStatusText" role="status" aria-live="polite"></span>
         <button id="retryAttachmentsBtn" type="button" class="text-blue-700 underline shrink-0">添付を再取得</button>

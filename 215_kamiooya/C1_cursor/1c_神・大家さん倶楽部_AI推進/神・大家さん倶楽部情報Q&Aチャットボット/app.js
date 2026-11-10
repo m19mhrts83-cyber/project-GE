@@ -7,6 +7,10 @@ const App = {
 
   state: {
     currentUser: null,
+    // 段階公開スイッチ: サーバーが「この人に見えている」と返した機能だけ（/features）
+    features: {},
+    featureViewNew: true,
+    viewAsMember: false,
     authToken: '',
     attachmentToken: '',
     attachmentIndex: {},
@@ -166,12 +170,59 @@ const App = {
     App.showAuthView();
   },
 
+  // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認' },
+  featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
+  loadFeatures: async () => {
+    App.state.features = {};
+    if (!App.authGatewayBase) return; // 旧バックエンドには /features が無い → 全部オフ
+    try {
+      const r = await App.apiClient('GET', '/features');
+      if (r && r.features && typeof r.features === 'object') App.state.features = r.features;
+    } catch (e) {
+      App.state.features = {};
+    }
+    try {
+      App.state.featureViewNew = localStorage.getItem('qa_feature_view_new') !== '0';
+      App.state.viewAsMember = localStorage.getItem('qa_view_as_member') === '1';
+    } catch (e) { /* ignore */ }
+  },
+  renderFeaturePreviewBar: () => {
+    const bar = document.getElementById('featurePreviewBar');
+    if (!bar) return;
+    const names = Object.keys(App.state.features || {});
+    bar.classList.toggle('hidden', names.length === 0);
+    if (!names.length) return;
+    const viewNew = document.getElementById('featureViewNewToggle');
+    const asMember = document.getElementById('featureAsMemberToggle');
+    viewNew.checked = !!App.state.featureViewNew;
+    asMember.checked = !!App.state.viewAsMember;
+    document.getElementById('featurePreviewList').textContent = names.map(function (n) {
+      return (App.featureLabels[n] || n) + (App.state.features[n].members ? '（会員にも公開中）' : '（会員には未公開）');
+    }).join(' / ');
+    if (!bar.dataset.bound) {
+      bar.dataset.bound = '1';
+      viewNew.addEventListener('change', function () {
+        App.state.featureViewNew = viewNew.checked;
+        try { localStorage.setItem('qa_feature_view_new', viewNew.checked ? '1' : '0'); } catch (e) { /* ignore */ }
+        App.afterLogin();
+      });
+      asMember.addEventListener('change', function () {
+        App.state.viewAsMember = asMember.checked;
+        try { localStorage.setItem('qa_view_as_member', asMember.checked ? '1' : '0'); } catch (e) { /* ignore */ }
+        App.afterLogin();
+      });
+    }
+  },
+
   isStaffAdmin: () => {
+    if (App.state.viewAsMember && Object.keys(App.state.features || {}).length) return false;
     const role = App.state.currentUser && App.state.currentUser.role;
     return role === 'admin' || role === 'master_admin';
   },
 
   isMasterAdmin: () => {
+    if (App.state.viewAsMember && Object.keys(App.state.features || {}).length) return false;
     return !!(App.state.currentUser && App.state.currentUser.role === 'master_admin');
   },
 
@@ -1232,7 +1283,9 @@ const App = {
       return;
     }
     App.showMainView();
-    App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + App.state.currentUser.role + ')';
+    await App.loadFeatures();
+    App.renderFeaturePreviewBar();
+    App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + (App.isStaffAdmin() || !App.state.viewAsMember ? App.state.currentUser.role : 'user として表示中') + ')';
 
     const isAdmin = App.isStaffAdmin();
     const adminNav = document.getElementById('adminNavSection');
@@ -1282,6 +1335,9 @@ const App = {
     App.state.attachmentIndex = {};
     App.state.referenceComments={};App.state.attachmentStatus='';App.state.attachmentLoading=false;App.renderAttachmentStatus();
     App.state.attachmentDetailCommentId = '';
+    App.state.features = {};
+    const featureBar = document.getElementById('featurePreviewBar');
+    if (featureBar) featureBar.classList.add('hidden');
     App.state.currentUser = null;
     App.state.currentSessionId = null;
     App.state.chatSessions = [];
