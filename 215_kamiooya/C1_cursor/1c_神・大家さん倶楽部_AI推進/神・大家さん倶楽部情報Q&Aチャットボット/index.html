@@ -427,12 +427,15 @@
               <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h3 class="font-semibold">承認待ちユーザ</h3>
                 <div class="flex flex-wrap gap-2">
+                  <!-- (3) 名簿との照合（スイッチ auto_approval が見える管理者だけ） -->
+                  <button id="selectRosterMatchedBtn" type="button" class="hidden px-4 py-2 rounded border border-emerald-600 text-emerald-800 bg-white">名簿一致の人を選ぶ</button>
                   <button id="bulkApprovePendingUsersBtn" type="button" class="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-40 disabled:cursor-not-allowed" disabled>
                     選択したユーザを一括承認
                   </button>
                   <button id="reloadPendingUsersBtn" type="button" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
                 </div>
               </div>
+              <p id="rosterMatchInfo" class="hidden text-xs text-slate-600 mb-2" role="status" aria-live="polite"></p>
               <div class="overflow-auto bg-white rounded border">
                 <table class="min-w-full text-sm">
                   <thead class="bg-slate-100">
