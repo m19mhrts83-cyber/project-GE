@@ -89,7 +89,8 @@ def _creds(*, force_auth: bool = False, auth_console: bool = False):
             creds = flow.run_console(login_hint=login_hint)
         else:
             creds = flow.run_local_server(port=0, login_hint=login_hint)
-        TOKEN_WRITE.write_text(creds.to_json(), encoding="utf-8")
+        from jarvis_google_token_save import save_creds_keep_scopes
+        save_creds_keep_scopes(TOKEN_WRITE, creds)
         print(f"# wrote {TOKEN_WRITE}", file=sys.stderr)
     return creds
 
