@@ -1,0 +1,56 @@
+openapi: 3.1.0
+info:
+  title: Obsidian Daily Review Submit API
+  version: "1.0.0"
+  description: Submit one confirmed daily review to the private Mac-to-Obsidian handoff queue.
+servers:
+  - url: https://jarvis-dashboard-amber.vercel.app
+paths:
+  /api/obsidian-review/submit:
+    post:
+      operationId: submitDailyReview
+      summary: Queue a confirmed daily review for local Obsidian delivery
+      description: Accepted means queued only. It does not confirm Vault, Drive, or iPhone delivery.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [review_id, date, raw_log, tactical_review]
+              properties:
+                review_id:
+                  type: string
+                  format: uuid
+                  description: UUID v4; reuse the same value when retrying this submission.
+                date:
+                  type: string
+                  format: date
+                  description: Review date in Japan Standard Time.
+                raw_log:
+                  type: string
+                  maxLength: 180000
+                  description: Review conversation log visible in the current ChatGPT conversation.
+                tactical_review:
+                  type: string
+                  maxLength: 60000
+                  description: Confirmed tactical review and next actions.
+      responses:
+        "202":
+          description: Accepted into the temporary queue; local delivery is pending.
+        "200":
+          description: Duplicate review_id; existing queue item was not overwritten.
+        "400":
+          description: Invalid review payload.
+        "401":
+          description: Missing or invalid Bearer key.
+        "503":
+          description: Database or service configuration is missing.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer

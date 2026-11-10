@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { parseDecisionNote } from "@/lib/kurashiftDecision";
 
 type Action =
   | "confirm"
@@ -164,6 +165,8 @@ export async function POST(
 
   const prevStatus = String(row.status || "info");
   const { event_type, summary } = eventMeta(action);
+  // 判断メモ（理由は任意）。owner_decisions へは DB トリガーがこの行から写す
+  const decision = parseDecisionNote(body.decision);
   await supabase.from("kurashift_re_deal_events").insert({
     deal_id: id,
     event_type,
@@ -171,7 +174,16 @@ export async function POST(
     to_status: status,
     actor: "user",
     summary,
-    payload: { action },
+    payload: {
+      action,
+      reason_tags: decision?.reason_tags ?? [],
+      note: decision?.note ?? null,
+      scope: decision?.scope ?? "once",
+      decide_ms: decision?.decide_ms ?? null,
+      suggested_tags: decision?.suggested_tags ?? [],
+      same_as_last: decision?.same_as_last ?? false,
+      decided_by: user.email ?? user.id,
+    },
   });
 
   // 取込時に既読済みが本線。確認／対象外は未既読の残りだけキュー。

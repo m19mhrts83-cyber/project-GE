@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { writeCardDebitLifecycle } from "@/lib/cardDebitLifecycle";
 import type { TransferRailStatus } from "@/lib/cardSettlementBuffer";
+import {
+  MONEY_STATUS_ACTION,
+  appendMoneyDecision,
+  parseDecisionNote,
+} from "@/lib/kurashiftDecision";
 
 const ALLOWED: Record<string, string[]> = {
   draft: ["consulting", "approved", "cancelled"],
@@ -50,7 +55,7 @@ export async function PATCH(
 
   const { data: row, error: getErr } = await supabase
     .from("kurashift_money_ops")
-    .select("id, status, title, kind, assist_payload")
+    .select("id, status, title, kind, amount_jpy, assist_payload")
     .eq("id", id)
     .maybeSingle();
   if (getErr || !row) {
@@ -200,6 +205,31 @@ export async function PATCH(
       assistNext.plan_ready_due = due;
       patch.assist_payload = assistNext;
     }
+  }
+
+  // 判断の痕跡（ループウェア型）。理由は任意で、無くても from→to と時刻は必ず残す。
+  // 共有の判断ログ owner_decisions へは DB トリガーが last_decision を写す。
+  {
+    const note = parseDecisionNote(body.decision);
+    const base =
+      (patch.assist_payload as Record<string, unknown> | undefined) || prevAssist;
+    patch.assist_payload = appendMoneyDecision(base, {
+      at: new Date().toISOString(),
+      from: String(row.status || ""),
+      to: next,
+      action: MONEY_STATUS_ACTION[next] || "comment",
+      by: user.email ?? user.id,
+      reason_tags: note?.reason_tags ?? [],
+      note: note?.note ?? null,
+      scope: note?.scope ?? "once",
+      decide_ms: note?.decide_ms ?? null,
+      suggested_tags: note?.suggested_tags ?? [],
+      same_as_last: note?.same_as_last ?? false,
+      amount_jpy:
+        row.amount_jpy == null || !Number.isFinite(Number(row.amount_jpy))
+          ? null
+          : Number(row.amount_jpy),
+    });
   }
 
   const { data, error } = await supabase

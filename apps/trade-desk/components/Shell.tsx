@@ -1,5 +1,6 @@
 import TermGlossary from "@/components/TermGlossary";
 import Icon from "@/components/Icon";
+import FeedbackButton from "@/components/FeedbackButton";
 import { DASHBOARD_URL, LOAN_TRACKER_URL, LOOPWARE_DESK_URL } from "@/lib/format";
 
 const NAV = [
@@ -7,6 +8,7 @@ const NAV = [
   { href: "/themes", label: "テーマ", icon: "trend" },
   { href: "/stock-watch", label: "株式ウォッチ", icon: "watch" },
   { href: "/money-ops", label: "資金移動", icon: "transfer" },
+  { href: "/decisions", label: "判断ログ", icon: "decide" },
   { href: "/portfolio", label: "資産", icon: "wallet" },
   { href: "/household-bs", label: "家計B/S", icon: "pie" },
   { href: "/consultations", label: "相談", icon: "chat" },
@@ -106,6 +108,7 @@ export default function Shell({
               "/themes",
               "/stock-watch",
               "/money-ops",
+              "/decisions",
               "/portfolio",
               "/household-bs",
               "/consultations",
@@ -183,6 +186,7 @@ export default function Shell({
         <TermGlossary />
         {children}
       </main>
+      <FeedbackButton path={active} />
     </div>
   );
 }

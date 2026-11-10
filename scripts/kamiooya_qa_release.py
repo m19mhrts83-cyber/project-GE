@@ -98,7 +98,7 @@ def step_functions(names: list[str], dry: bool) -> None:
         if fn not in ALLOWED_FUNCTIONS:
             raise SystemExit(f"未登録の Edge Function: {fn}")
         cmd = ["npx", "--yes", "supabase@latest", "functions", "deploy", fn,
-               "--project-ref", PROJECT_REF, "--no-verify-jwt"]
+               "--project-ref", PROJECT_REF, "--no-verify-jwt", "--yes"]
         print(f"[2] deploy: {fn}")
         if dry:
             continue
