@@ -115,6 +115,7 @@
 - 秘密: `PROPERTY_GATE_ACTION_TOKEN`（署名本線）／`SLACK_BOT_TOKEN`（Bot投稿）／`TODOIST_API_TOKEN`（Vercel 実行・Cloud署名フォールバック）
 - URL署名検証は候補キーをすべて照合（Cloud=TODOIST・Mac/Vercel=PROPERTY_GATE の食い違いでも通る）
 - ヘルパー: `scripts/jarvis_todoist_313_slack_blocks.py`
+- 押した後: Bot 本線は先に受け取りを返し、Todoist 反映後に **押した行のボタンを「✅ 報告済み — 済んだ」等に差し替える**（他件のボタンは残す・失敗時はボタンを残して「❌ 失敗」を添える）。`apps/jarvis-dashboard/lib/t313DoneBlocks.ts`（2026-11-10 Slack FB）
 
 `#consult` 末尾: `次: …` ＋ `担当メモ` ＋ `橋渡し`  
 正本: [`38_Slack書き出し_FRIDAY_Jarvis_20261018.md`](../../38_Slack書き出し_FRIDAY_Jarvis_20261018.md) · [`36_`](../../36_Slack_consult手渡し_次の担当_20261018.md)
@@ -193,3 +194,4 @@ python3 scripts/jarvis_todoist_313_slack_ingest.py --dry-run
 | 2026-10-21 | 名称を **Todoist完了候補確認** に統一。Slack整形（件ごと空行）・タイトル＝Todoistリンク。**毎日20:00** のL1をlaunchd本線に |
 | 2026-10-22 | Slackに **313番号＋役割語**。完了✅／期日📅で記号区別・各最大5件・別投稿。`313_slack_ingest` で番号返信を拾う |
 | 2026-10-22 | L2ボタン: 完了／提案日へ延期（Block Kit＋`/api/g/t313`）。タイトルリンクは詳細のみ |
+| 2026-11-10 | Slack FB: ボタンを押してもぐるぐるだけで分からない → 押した行を「報告済み」表示に差し替え（Bot 本線・response_url） |

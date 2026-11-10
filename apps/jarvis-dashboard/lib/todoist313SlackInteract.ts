@@ -7,6 +7,7 @@ import {
   type Todoist313Action,
 } from "@/lib/todoist313SlackAction";
 import { postResponseUrl } from "@/lib/vendorReplySlackInteract";
+import { markT313RowDone, t313DoneLabel } from "@/lib/t313DoneBlocks";
 
 export type T313BlockResult =
   | {
@@ -22,6 +23,10 @@ export type T313BlockResult =
 export async function handleT313BlockAction(opts: {
   value: string;
   responseUrl?: string;
+  /** 押されたメッセージの blocks と押した行の block_id（あれば行を「報告済み」に差し替える） */
+  messageBlocks?: Array<Record<string, unknown>>;
+  blockId?: string;
+  messageText?: string;
 }): Promise<T313BlockResult> {
   const parsed = parseT313ButtonValue(opts.value);
   if (!parsed) {
@@ -54,13 +59,28 @@ export async function handleT313BlockAction(opts: {
     },
   ];
 
-  // 一覧メッセージ全体を消さない（他件のボタンを残す）→ ephemeral
+  // 押した行だけ「報告済み」に差し替える（他件のボタンは残す）。
+  // 行が見つからないとき（古い形式の投稿など）は従来どおり ephemeral。
+  const updated = markT313RowDone(
+    opts.messageBlocks || [],
+    opts.blockId || "",
+    t313DoneLabel(parsed.action, result.ok, parsed.due),
+    result.ok,
+  );
   if (opts.responseUrl) {
-    await postResponseUrl(opts.responseUrl, {
-      response_type: "ephemeral",
-      text: `${icon} ${title}\n${result.message}`,
-      replace_original: false,
-    });
+    if (updated) {
+      await postResponseUrl(opts.responseUrl, {
+        replace_original: true,
+        text: opts.messageText || `${icon} ${title}`,
+        blocks: updated,
+      });
+    } else {
+      await postResponseUrl(opts.responseUrl, {
+        response_type: "ephemeral",
+        text: `${icon} ${title}\n${result.message}`,
+        replace_original: false,
+      });
+    }
   }
 
   if (!result.ok) {
