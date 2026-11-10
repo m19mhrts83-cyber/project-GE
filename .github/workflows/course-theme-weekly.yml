@@ -8,12 +8,6 @@ on:
   schedule:
     - cron: "0 21 * * 0" # 毎週月曜 6:00 JST
   workflow_dispatch:
-  # 作り始めの確認用（main に入る前に1回目の回を作る）。マージ前に外す。
-  push:
-    branches: [claude/project-thread-eziqnx]
-    paths:
-      - scripts/course_theme/weekly_round.py
-      - .github/workflows/course-theme-weekly.yml
 
 permissions:
   contents: read
