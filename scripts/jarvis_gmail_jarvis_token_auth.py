@@ -56,7 +56,8 @@ def main() -> int:
         creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), GMAIL_SCOPES_215)
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
-            TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
+            from jarvis_google_token_save import save_creds_keep_scopes
+            save_creds_keep_scopes(TOKEN_PATH, creds)
             print(f"refreshed: {TOKEN_PATH.name}")
 
     if not creds or not creds.valid or args.force:
@@ -76,7 +77,8 @@ def main() -> int:
                     f"ブラウザが開きます。アカウントは必ず {hint} を選んでください。"
                 ),
             )
-        TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
+        from jarvis_google_token_save import save_creds_keep_scopes
+        save_creds_keep_scopes(TOKEN_PATH, creds)
         os.chmod(TOKEN_PATH, 0o600)
         print(f"saved: {TOKEN_PATH}")
 

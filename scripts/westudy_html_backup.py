@@ -287,12 +287,14 @@ def extract_refs(html: str, base_url: str) -> dict[str, Any]:
 
     def absolutize(items: list[str]) -> list[str]:
         out: list[str] = []
+        seen: set[str] = set()  # 重複判定は set で O(1)（list の in は O(n)）
         for raw in items:
             raw = raw.strip()
             if not raw or raw.startswith(("data:", "javascript:", "mailto:", "tel:", "#", "blob:")):
                 continue
             u, _ = urldefrag(urljoin(base_url, raw))
-            if urlsplit(u).scheme in ("http", "https") and u not in out:
+            if urlsplit(u).scheme in ("http", "https") and u not in seen:
+                seen.add(u)
                 out.append(u)
         return out
 
@@ -764,7 +766,8 @@ class SiteBackup:
         self.external_docs = set(d["external_docs"])
         self.screenshots = d["screenshots"]
         self.rest_nonce = d.get("rest_nonce")
-        self.queue = deque(retry + [u for u in d["queue"] if u not in retry])
+        retry_set = set(retry)  # 残りキュー×再試行の二重ループを避ける
+        self.queue = deque(retry + [u for u in d["queue"] if u not in retry_set])
         self.seen = set(d["seen"])
         log(f"途中から再開: 取得済み {len(self.pages)} ページ / 残り {len(self.queue)} ページ")
         return True
@@ -1009,7 +1012,8 @@ def deliver_gdrive(dest: dict[str, Any], zip_path: Path, summary: dict[str, Any]
     creds = Credentials.from_authorized_user_file(str(token))
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        token.write_text(creds.to_json(), encoding="utf-8")
+        from jarvis_google_token_save import save_creds_keep_scopes
+        save_creds_keep_scopes(token, creds)
     svc = build("drive", "v3", credentials=creds, cache_discovery=False)
     parent = dest["folder_id"]
     sub = (dest.get("subfolder") or "").strip()

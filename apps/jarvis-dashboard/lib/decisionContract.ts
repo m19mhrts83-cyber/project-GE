@@ -30,6 +30,7 @@ export const SURFACES = [
   "zaim_category", // Zaim 費目の仕分け確認
   "rule_review", // ルール候補の採用・取り消し
   "draft_review", // チャットで作った下書きの版直し（松野さんの直し・ひとこと。scripts/jarvis_draft_decision_log.py）
+  "weekly_pick", // 日曜夜の「今週の9件」（選んだ／見送った／残った理由／確定。scripts/jarvis_todoist_weekly_pick.py が反映）
 ] as const;
 export type Surface = (typeof SURFACES)[number];
 
@@ -97,6 +98,11 @@ export const ACTIONS = [
   "merge",
   "reschedule",
   "skip",
+  // 今週の9件（weekly_pick）
+  "pick", // 今週やる（曜日に置いた）
+  "defer", // おすすめに出たが今週は見送り（候補に残す）
+  "left", // 先週残ったものの振り返り（理由と次の手）
+  "commit", // その週の割付を確定（反映の単位）
 ] as const;
 export type Action = (typeof ACTIONS)[number];
 
@@ -113,6 +119,7 @@ const OUTCOME_OF: Record<string, Outcome> = {
   good: "take",
   rule_accept: "take",
   next_good: "take",
+  pick: "take",
   create: "take",
   done: "take",
   close: "take",
@@ -130,11 +137,14 @@ const OUTCOME_OF: Record<string, Outcome> = {
   snoozed: "later",
   reschedule: "later",
   rule_once: "later",
+  defer: "later",
   meh: "note",
   none_fit: "note",
   comment: "note",
   revise: "note",
   rule_revert: "note",
+  left: "note",
+  commit: "note",
 };
 
 export function outcomeOf(action: string): Outcome {
@@ -170,6 +180,27 @@ export const STAY_REASON_TAGS = {
   waiting: "誰かの返事待ち",
 } as const;
 
+/** 今週の9件：選んだ理由 */
+export const PICK_REASON_TAGS = {
+  deadline: "締切が近い",
+  waiting_other: "相手を待たせている",
+  partner_money: "パートナー・お金の仕事",
+  carried: "先週から残っている",
+  small: "小さくすぐ終わる",
+  interest: "興味・勢いがある",
+  inlet: "入口で待っている",
+  planned: "前の週の見通しで置いていた",
+} as const;
+
+/** 今週の9件：残った理由 */
+export const LEFT_REASON_TAGS = {
+  no_time: "時間が足りなかった",
+  waiting: "相手待ち・材料待ち",
+  too_big: "大きすぎた・気が重い",
+  lower_priority: "優先が下がった",
+  ai_dev: "AI開発に時間を使った",
+} as const;
+
 /** 送った後の手応え */
 export const QUALITY = ["good", "meh", "none_fit"] as const;
 
@@ -180,6 +211,8 @@ const KNOWN_TAGS = new Set<string>([
   ...Object.keys(MAIL_REASON_TAGS),
   ...Object.keys(DEAL_REASON_TAGS),
   ...Object.keys(STAY_REASON_TAGS),
+  ...Object.keys(PICK_REASON_TAGS),
+  ...Object.keys(LEFT_REASON_TAGS),
   "hesitate",
 ]);
 

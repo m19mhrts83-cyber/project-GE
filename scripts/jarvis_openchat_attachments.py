@@ -7,6 +7,7 @@ No QR login, AI calls, OneDrive binary copies or member-facing publication.
 from __future__ import annotations
 import argparse
 import base64
+from collections import deque
 import hashlib
 import json
 import os
@@ -268,9 +269,9 @@ def scan(cl, queue, routes_file, *, pages=2, active_threads=None, thread_limit=1
         threads=set();raw=active.get(route.rid,[]) if isinstance(active,dict) else []
         if isinstance(raw,dict):raw=raw.get('thread_mids',[])
         if isinstance(raw,list):threads.update(t for t in raw if isinstance(t,str))
-        todo=[''];seen=set()
+        todo=deque(['']);seen=set()  # 先頭取り出しは deque.popleft で O(1)
         while todo:
-            thread=todo.pop(0)
+            thread=todo.popleft()
             if thread in seen:continue
             seen.add(thread)
             key=hashlib.sha256(('backward-v3\0'+route.square_chat_mid+'\0'+thread).encode()).hexdigest()

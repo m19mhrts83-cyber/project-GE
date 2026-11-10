@@ -23,6 +23,7 @@ npm run dev   # http://127.0.0.1:3004
 - `/` ハブ
 - `/312?topic=seed-aoba` 扱いを決める（S05）
 - `/313?task=<todoist_id>` 片付ける
+- `/week` 今週の9件（日曜の夜。振り返り→カレンダーに置く→確定）
 - `/drafts` 下書きを直す（箇所を選んで声でダメ出し → ダメ出しは箇所ごとに即記録 → 「まとめて直す」で Mac の Cursor（定額）が新しい版 → 差分。判断ログ surface=draft_review。従量課金の API キーは不要）
 - `/312?tab=misses` 提案を仕分ける（いろんなソースの候補を 採る／見送る／保留 → コメント → 最後に選ばなかった理由）
 
@@ -33,6 +34,25 @@ npm run dev   # http://127.0.0.1:3004
   - reflect（30分ごと）: 「既存タスクへ追記」「別タスクを作る」を選んだものだけ Todoist へ反映し `reflected_todoist_id` に記録
 - 画面: `/312` は `/api/topics`（鍵が要る）の本物のお題を見本の前に並べる。決めると status=decided
 - 試す: `python3 scripts/jarvis_todoist_312_collect.py --dry-run --hours 240`
+
+## 今週の9件（`/week`・日曜の夜）
+
+入口（312）→ **今週の9件** → 出口（313）→ 週1のレビュー、の真ん中。2026-11-10 松野さん決定。
+
+- 決まりごと: 確定は目の前の1週間（月・水・金に3件ずつ）。火・木は派生・追加の空け、土日は残りの片付け。
+  次の週は候補の順番だけ、2〜3週先は締切・支払い・行事の日付だけ見る。外との約束・行事の期日は外さない
+- 手順: ① 先週の結果と「残った理由・次の手」→ ② おすすめ9件と選ぶ理由（AI案）を直して3週間カレンダーの月・水・金に置く
+  （候補をタップ→マスをタップ、またはカードの 月/水/金）。入口で残った話題もここで 今週やる／入れる／見送る → ③ 確定
+- 材料: `scripts/jarvis_todoist_weekly_pick.py --mode snapshot`（`.github/workflows/todoist-weekly-pick.yml`、日曜 17:00 JST）
+  → `sync_meta.weekly_pick_snapshot`。カレンダーは Mac の `scripts/jarvis_weekly_pick_calendar.py --publish`
+  （`scripts/install_weekly_pick_calendar_launchd.sh`、日曜 16:30・毎朝 6:30）→ `sync_meta.weekly_pick_calendar`
+- 判断ログ: `owner_decisions` surface=`weekly_pick`（pick／defer／left／commit）。AI案の理由（ai_proposal）と選んだ理由（final_text・reason_tags）、
+  AI案の曜日（payload.ai_day）と置いた曜日（payload.day）が残る
+- 反映: 同じスクリプトの `--mode reflect`（30分ごと）が commit の plan を Todoist へ（期日を入れる／外す、入口の話題を 🦾依頼 で作る、
+  やめる・AIへはコメントだけ）。反映したら action=done（target_type=weekly_commit）を足す。312 はタスクを閉じない
+- 下書き: 端末の localStorage（`weekpick:v1:<週>`）に自動保存。確定し直すと新しい行が増え、最後の確定だけ反映
+- 試す: `python3 scripts/jarvis_todoist_weekly_pick.py --mode snapshot --dry-run`、テスト `npm test`（tests/weekPick.test.ts）と
+  `python3 -m unittest scripts/tests/test_todoist_weekly_pick.py`
 
 ## 毎日の仕分け → 週1のレビュー → Slack
 
