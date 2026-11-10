@@ -88,3 +88,15 @@ test('スイッチがオフなら今までどおり（今のモデル・使い�
   assert.equal(f.semanticBodies[0].answer_tier, undefined);
   assert.equal(f.cache.size, 0);
 });
+
+test('「より詳しく調べる」(deep): 上位のモデルで答え、使い回しの読み書きをしない', async () => {
+  const f = fixture('owner'), token = await login(f);
+  await ask(f, token, 1, '火災保険の保険料を下げるには'); await Promise.all(f.tasks);
+  assert.equal(f.cache.size, 1);
+  const r = await f.request('/chat-sessions/mine/answer-jobs', { request_id: '11111119-1111-4111-8111-111111111111', mode: 'deep', query: '火災保険の保険料を下げるには' }, token);
+  assert.ok(r.ok);
+  await Promise.all(f.tasks);
+  assert.equal(f.semanticBodies.length, 2); // 同じ日の同じ質問でも使い回さない
+  assert.equal(f.semanticBodies[1].answer_tier, undefined); // 上位のモデル
+  assert.equal([...f.cache.values()][0].hits, 0);
+});

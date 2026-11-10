@@ -193,7 +193,8 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       return !!(u&&u.status==='approved'&&u.authVersion===job.auth_version&&sessionActive(job.user_id,parent,u)&&owner===job.user_id);
     },
     execute:async(job,signal)=>{
-      if(job.mode!=='semantic'){
+      // deep = (1)の「より詳しく調べる」。意味検索を上位のモデルで、使い回しなしで答える。
+      if(job.mode!=='semantic'&&job.mode!=='deep'){
         const result=compactAnswerResult(await backend('POST','/chat-sessions/'+job.chat_id+(job.mode==='fast'?'/messages-fast':'/messages'),{content:job.query,actor_user_id:job.user_id},signal));
         if(!result.answer.trim())throw new Error('empty_answer');return result;
       }
@@ -207,8 +208,9 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         if(flag&&flag.stage==='all')saving=true;
         else if(flag&&['owner','reviewers'].includes(flag.stage)){const u=await deps.member(job.user_id);saving=!!u&&featureAllowed(flag,{id:u.id,email:u.email});}
       }catch{saving=false;}
-      const key=saving?await queryKey(job.query):'';
-      if(saving){
+      const deep=job.mode==='deep';
+      const key=saving&&!deep?await queryKey(job.query):'';
+      if(saving&&!deep){
         try{
           const row=(await rest('qa_answer_cache?query_hash=eq.'+key+'&select=result,created_at,hits&limit=1'))[0];
           if(row&&fresh(row)&&cacheable(String(row.result?.answer||''))){
@@ -219,14 +221,14 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
           }
         }catch{/* 使い回しが読めなくても答えは作る */}
       }
-      const tier=saving?answerTier(job.query):'standard';
+      const tier=saving&&!deep?answerTier(job.query):'standard';
       const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{})}),signal}));
       const result=await response.json();
       if(!response.ok){if(signal.aborted)throw signal.reason;throw new UpstreamError(result?.code==='semantic_disabled'?'semantic_disabled':'operation_failed',503);}
       const answer=String(result.answer||'').trim();if(!answer)throw new Error('empty_answer');
       await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'assistant',content:answer},signal);
       const compact=compactAnswerResult(result);
-      if(saving&&cacheable(answer)){
+      if(saving&&!deep&&cacheable(answer)){
         await rest('qa_answer_cache?on_conflict=query_hash',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({query_hash:key,query:job.query.slice(0,4000),result:compact,tier,hits:0,created_at:new Date().toISOString(),last_hit_at:null})}).catch(()=>{});
       }
       return compact;
