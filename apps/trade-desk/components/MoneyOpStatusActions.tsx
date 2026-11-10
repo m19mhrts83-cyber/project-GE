@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import DecisionNotePanel from "@/components/DecisionNotePanel";
+import type { DecisionNote } from "@/lib/kurashiftDecision";
 
 const ALLOWED: Record<string, string[]> = {
   draft: ["consulting", "approved", "cancelled"],
@@ -11,6 +13,9 @@ const ALLOWED: Record<string, string[]> = {
   done: ["cancelled"],
   cancelled: ["draft"],
 };
+
+/** 判断メモを出す遷移（お金の判断そのもの）。実行中へ・草案に戻すは進み具合なので出さない */
+const NEEDS_NOTE = new Set(["approved", "consulting", "cancelled", "done"]);
 
 const LABELS: Record<string, string> = {
   consulting: "相談中へ",
@@ -36,26 +41,39 @@ export default function MoneyOpStatusActions({
   const nexts = ALLOWED[status] || [];
   const isCardBuffer = kind === "card_settlement_buffer";
 
-  async function setStatus(next: string) {
+  const [pending, setPending] = useState<string | null>(null);
+  const labelOf = (s: string) =>
+    s === "done" && !isCardBuffer ? "完了" : LABELS[s] || s;
+
+  function hintFor(next: string): string | undefined {
     if (next === "approved") {
-      const ok = window.confirm(
-        "この資金移動を承認しますか？\n（承認＝計画合意のみ。記帳はしません。\n次: Jarvisが入力 → あなたが最終画面確認 → OTP＋実行ボタン。\n送金用Chromeは完了後に閉じます）"
-      );
-      if (!ok) return;
+      return "承認＝計画合意のみ（記帳はしません）。\n次: Jarvisが入力 → あなたが最終画面確認 → OTP＋実行ボタン。送金用Chromeは完了後に閉じます。";
     }
     if (next === "done" && isCardBuffer) {
-      const ok = window.confirm(
-        "寄せ完了としてウォッチを消しますか？\n（銀行側の送金が済んだ前提。引落日そのものの完了ではありません）"
-      );
-      if (!ok) return;
+      return "寄せ完了としてウォッチを消します（銀行側の送金が済んだ前提。引落日そのものの完了ではありません）。";
     }
+    if (next === "cancelled") return "この資金移動をやめます。";
+    if (next === "consulting") return "決めきれないので相談に回します。何が引っかかったかを残すと次の案が良くなります。";
+    return undefined;
+  }
+
+  function onPick(next: string) {
+    if (NEEDS_NOTE.has(next)) {
+      setPending(next);
+      setMsg(null);
+      return;
+    }
+    void setStatus(next, null);
+  }
+
+  async function setStatus(next: string, decision: DecisionNote | null) {
     setBusy(true);
     setMsg(null);
     try {
       const res = await fetch(`/api/money-ops/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: next }),
+        body: JSON.stringify({ status: next, decision }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -64,8 +82,9 @@ export default function MoneyOpStatusActions({
         setMsg(
           next === "done" && isCardBuffer
             ? "寄せ完了・ウォッチ解除"
-            : `${next} に更新`
+            : `${labelOf(next)} にしました（判断ログに記録）`
         );
+        setPending(null);
         router.refresh();
       }
     } catch (e) {
@@ -88,14 +107,27 @@ export default function MoneyOpStatusActions({
               ? "btn primary"
               : "btn"
           }
-          disabled={busy}
-          onClick={() => setStatus(s)}
+          disabled={busy || pending !== null}
+          onClick={() => onPick(s)}
           style={{ fontSize: 12, padding: "4px 8px" }}
         >
-          {s === "done" && !isCardBuffer ? "完了" : LABELS[s] || s}
+          {labelOf(s)}
         </button>
       ))}
       {msg ? <span className="meta">{msg}</span> : null}
+      {pending ? (
+        <div style={{ flexBasis: "100%" }}>
+          <DecisionNotePanel
+            title={`「${labelOf(pending)}」にします`}
+            hint={hintFor(pending)}
+            tagKind="money"
+            confirmLabel={pending === "approved" ? "承認する" : "決める"}
+            busy={busy}
+            onConfirm={(d) => void setStatus(pending, d)}
+            onCancel={() => setPending(null)}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
