@@ -74,7 +74,8 @@ def drive_service(token_name: str) -> Any:
     creds = Credentials.from_authorized_user_file(str(token_path))
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        token_path.write_text(creds.to_json(), encoding="utf-8")
+        from jarvis_google_token_save import save_creds_keep_scopes
+        save_creds_keep_scopes(token_path, creds)
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
