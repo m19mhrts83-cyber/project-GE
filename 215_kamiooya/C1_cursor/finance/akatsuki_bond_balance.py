@@ -329,6 +329,15 @@ def _click_bond_navigation(page) -> bool:
     return False
 
 
+def otp_min_internal_date_ms(sent_ms: int, *, clicked_send: bool) -> int:
+    """認証コードメールとして受け付ける最小の受信時刻。
+
+    今回「送信」を押したなら、その少し前（時計ずれ 5 秒）以降だけ。直前の試行のメールは拾わない。
+    すでに入力画面だった（送信済みで開いた）ときだけ、従来どおり 60 秒さかのぼる。
+    """
+    return sent_ms - (5_000 if clicked_send else 60_000)
+
+
 def _maybe_complete_email_otp(page) -> None:
     """ログイン後のメール認証（送信→Gmail OTP→入力）。コードはチャットに出さない。"""
     body = ""
@@ -345,10 +354,13 @@ def _maybe_complete_email_otp(page) -> None:
     # すでに認証コード入力欄がある場合は送信済み（ステップ2）
     otp_input = page.locator("input[name='mailOtp'], input[placeholder*='認証コード']")
     sent_ms = int(time.time() * 1000)
+    clicked_send = False
     if otp_input.count() == 0:
         send = page.locator("button:has-text('送信'), button[value*='Send' i]")
         if send.count() > 0:
+            sent_ms = int(time.time() * 1000)
             send.first.click()
+            clicked_send = True
             page.wait_for_load_state("domcontentloaded")
             page.wait_for_timeout(2000)
             body_after = ""
@@ -369,15 +381,25 @@ def _maybe_complete_email_otp(page) -> None:
         os.environ.get("AKATSUKI_OTP_GMAIL_QUERY")
         or f'to:{to_email} (あかつき OR starmf OR 認証コード) newer_than:1d'
     )
+    # 2026-11-10: 直前の試行で届いた古い認証コードを拾って弾かれていた（数分おきの再実行で必ず失敗）。
+    # 共通ポーラは既定で 180 秒さかのぼるため、ここで「今回の送信より後のメールだけ」に絞る。
+    prev_skew = os.environ.get("SOLAR_LOAN_OTP_GMAIL_CLOCK_SKEW_MS")
+    os.environ["SOLAR_LOAN_OTP_GMAIL_CLOCK_SKEW_MS"] = (
+        os.environ.get("AKATSUKI_OTP_CLOCK_SKEW_MS") or "0"
+    )
     try:
         from solar_gmail_otp import poll_solar_otp_from_gmail
 
         code = poll_solar_otp_from_gmail(
             to_email=to_email,
-            min_internal_date_ms=sent_ms - 60_000,
+            min_internal_date_ms=otp_min_internal_date_ms(sent_ms, clicked_send=clicked_send),
             max_wait_s=180,
         )
     finally:
+        if prev_skew is None:
+            os.environ.pop("SOLAR_LOAN_OTP_GMAIL_CLOCK_SKEW_MS", None)
+        else:
+            os.environ["SOLAR_LOAN_OTP_GMAIL_CLOCK_SKEW_MS"] = prev_skew
         if prev_q is None:
             os.environ.pop("SOLAR_LOAN_OTP_GMAIL_QUERY", None)
         else:
@@ -404,6 +426,12 @@ def _maybe_complete_email_otp(page) -> None:
     go.first.click()
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(1500)
+    try:
+        still_otp = "認証コード入力" in (page.title() or "") or "認証コード入力" in page.inner_text("body")
+    except Exception:
+        still_otp = False
+    if still_otp:
+        raise RuntimeError("あかつき証券: メール認証コードが通りませんでした（古いコードの可能性。数分おいて再実行）")
 
 
 def fetch_bond_balance(
