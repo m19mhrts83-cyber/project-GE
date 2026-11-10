@@ -108,6 +108,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       return {events,chunks,sources,jobs};
     },
     referenceMetadata:async()=>rest('rpc/qa_reference_metadata',{method:'POST',body:'{}'}),
+    featureFlags:async()=>rest('qa_feature_flags?select=feature,stage,owner_ids,reviewer_ids&limit=100'),
     semanticConfig:async()=>{
       const r=await backend('POST','/semantic-search-config',{});
       if(r?.url!==c.projectUrl+'/functions/v1/semantic-search' || typeof r.secret!=='string' ||
