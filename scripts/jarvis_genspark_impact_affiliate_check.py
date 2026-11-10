@@ -120,7 +120,9 @@ def build_service():
     creds = Credentials.from_authorized_user_file(str(tok_path), scopes)
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        tok_path.write_text(creds.to_json(), encoding="utf-8")
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from jarvis_gmail_token_persist import save_gmail_token  # 既存の gmail.* を落とさない
+        save_gmail_token(tok_path, creds)
     if not creds or not creds.valid:
         raise SystemExit(f"token 無効: {tok_path}")
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
