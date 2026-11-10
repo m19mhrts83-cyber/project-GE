@@ -320,6 +320,7 @@ export async function applyT312Action(opts: {
 
   const r = await createTodoistTask(lane, {
     title,
+    mark: "requested",
     summary: summaryParts.join(" / ").slice(0, 1500),
     labels,
   });

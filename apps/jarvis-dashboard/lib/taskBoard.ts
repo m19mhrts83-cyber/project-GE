@@ -63,6 +63,8 @@ export async function createTask(
   }
   return createTodoistTask(lane, {
     title: input.title,
+    // ダッシュボードで松野さんがカードを昇格させた＝頼まれて入れた
+    mark: "requested",
     summary: summary || undefined,
     due: input.due,
   });
