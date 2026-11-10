@@ -1,4 +1,5 @@
 import type {AnswerActor} from './qaAnswerJobs.ts';
+import {featuresFor, type FeatureFlag} from './featureFlags.ts';
 // Shared gateway: the production adapter supplies persistent sessions and live membership checks.
 type Member = { id: string; email: string; role: string; status: string; authVersion: string; name?: string; member_no?: string; prefecture?: string };
 type Session = { uid: string; authVersion: string; expires: number };
@@ -16,6 +17,8 @@ export type GatewayDependencies = {
   referenceMetadata?(): Promise<unknown>;
   semanticConfig?(): Promise<{url: string; secret: string}>;
   publicAction?(path: string, input: Record<string, unknown>): Promise<unknown>;
+  // 段階公開スイッチ（lib/featureFlags.ts）。未設定なら全機能オフ。
+  featureFlags?(): Promise<FeatureFlag[]>;
   now?: () => number;
 };
 const approved = (u: Member | null): u is Member => !!u && u.status === 'approved' && ['user', 'admin', 'master_admin'].includes(u.role) && !!u.authVersion;
@@ -109,6 +112,12 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         if(req.method==='POST'&&!answerJob[2])return json(stripPrivate(await d.jobs.start(actor,answerJob[1],input)),202);
         if(req.method==='GET'&&answerJob[2])return json(stripPrivate(await d.jobs.get(actor,answerJob[1],answerJob[2])));
         return json({error:'invalid_answer_request'},400);
+      }
+      // 本人に見えている改善機能だけを返す。読めなければ全部オフ（今の画面のまま）。
+      if(path==='/features' && req.method==='GET'){
+        let flags:FeatureFlag[]=[];
+        try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
+        return json(featuresFor(Array.isArray(flags)?flags:[],{id:user.id,email:user.email}));
       }
       if(path==='/reference-metadata' && req.method==='GET' && d.referenceMetadata)return json(await d.referenceMetadata());
       // This legacy browser search credential is separate from every privileged server secret.
