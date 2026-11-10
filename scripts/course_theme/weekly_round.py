@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -39,7 +40,8 @@ def rest(path: str, method: str = "GET", body: object | None = None, prefer: str
 
 
 STR = {"type": "STRING"}
-INT = {"type": "INTEGER"}
+# 件数は文字列で受ける。INTEGER だと Gemini が桁の終わらない数字を出して JSON が読めなくなることがある（11/11 実測）。
+INT = {"type": "STRING", "description": "件数。半角数字だけ、5桁まで"}
 SCHEMA = {"type": "OBJECT", "required": ["ranking", "themes"], "properties": {
     "ranking": {"type": "ARRAY", "items": {"type": "OBJECT", "required": ["topic", "count"], "properties": {
         "topic": STR, "count": INT, "chatbot": INT, "forum": INT, "openchat": INT,
@@ -53,7 +55,7 @@ def gemini(prompt: str, tries: int = 3) -> dict:
         try:
             return _gemini_once(prompt)
         except (ValueError, KeyError, IndexError) as e:
-            print(f"Gemini の応答を読めませんでした（{i + 1}回目）: {type(e).__name__}", file=sys.stderr)
+            print(f"Gemini の応答を読めませんでした（{i + 1}回目）: {type(e).__name__} {str(e)[:120]}", file=sys.stderr)
     raise SystemExit("Gemini の応答を3回とも読めませんでした")
 
 
@@ -125,7 +127,8 @@ def clean(res: dict) -> tuple[list, list]:
 
     def n(v):
         try:
-            return max(0, int(round(float(v))))
+            digits = re.sub(r"[^0-9.]", "", str(v))[:6]
+            return min(99999, max(0, int(round(float(digits)))))
         except (TypeError, ValueError):
             return 0
 
