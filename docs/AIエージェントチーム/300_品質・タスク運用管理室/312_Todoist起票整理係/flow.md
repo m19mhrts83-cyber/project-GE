@@ -6,7 +6,6 @@
 - FlowForge（閲覧／編集）: [flow_M8SvKC1IDTDi496Vw-DgGjpD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD)
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
-- 見直し版の図（2026-11-10・Claude 作成。FlowForge との比較・説明用の控え）: [`docs/作業フロー_見直し版_20261110.html`](docs/作業フロー_見直し版_20261110.html)（元: https://claude.ai/artifact/M3hkXn8ABVFPVvqMM43iuR ）
 - 更新: 2026-11-07（ループウェア入口・apps/loopware）
 
 ## いまの結論（文字1行）
