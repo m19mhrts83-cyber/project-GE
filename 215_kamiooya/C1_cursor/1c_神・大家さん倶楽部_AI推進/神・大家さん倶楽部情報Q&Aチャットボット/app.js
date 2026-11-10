@@ -58,6 +58,8 @@ const App = {
     currentScreen: 'chat',
     returnScreen: null,
     semanticMode: false,
+    deepMode: false,
+    semanticForced: false,
     loadingCount: 0,
     sendAbortController: null,
     pendingAnswerRequest: null,
@@ -1290,6 +1292,7 @@ const App = {
     App.showMainView();
     await App.loadFeatures();
     App.renderFeaturePreviewBar();
+    App.applySearchModeUi();
     App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + (App.isStaffAdmin() || !App.state.viewAsMember ? App.state.currentUser.role : 'user として表示中') + ')';
 
     const isAdmin = App.isStaffAdmin();
@@ -2035,11 +2038,33 @@ const App = {
     App.updateSemanticModeButton();
   },
 
+  // (1) 使用量の削減が見える人は、意味検索がふだんの検索。ボタンは「より詳しく調べる」（上位のAI・使い回しなし）。2026-11-11
+  semanticBase: () => !!App.authGatewayBase && App.featureOn('cost_saving'),
+  semanticHintOld: '',
+  applySearchModeUi: () => {
+    const hint = document.getElementById('semanticModeHint');
+    if (hint && !App.semanticHintOld) App.semanticHintOld = hint.textContent;
+    if (App.semanticBase()) {
+      if (!App.state.semanticMode) App.state.semanticForced = true;
+      App.state.semanticMode = true;
+      if (hint) hint.textContent = 'ふだんは意味検索で、言い換えや関連事例まで探して手早く答えます。比較・手順・計算など詳しく知りたいときは「より詳しく調べる」をONにすると、上位のAIで時間をかけて答えます。';
+    } else {
+      if (App.state.semanticForced) App.state.semanticMode = false;
+      App.state.semanticForced = false;
+      App.state.deepMode = false;
+      if (hint && App.semanticHintOld) hint.textContent = App.semanticHintOld;
+    }
+    App.updateSemanticModeButton();
+  },
+  currentAnswerMode: (fast) => fast ? 'fast' : App.semanticBase() ? (App.state.deepMode ? 'deep' : 'semantic') : App.state.semanticMode ? 'semantic' : 'normal',
+
   updateSemanticModeButton: () => {
     const btn = App.elements.semanticModeToggle;
     if (!btn) return;
-    const on = !!App.state.semanticMode;
-    btn.textContent = '意味検索モード: ' + (on ? 'ON' : 'OFF');
+    const base = App.semanticBase();
+    const on = base ? !!App.state.deepMode : !!App.state.semanticMode;
+    btn.textContent = (base ? 'より詳しく調べる: ' : '意味検索モード: ') + (on ? 'ON' : 'OFF');
+    btn.title = base ? 'ONにすると、上位のAIで時間をかけて答えます（このタブのあいだだけ）' : '';
     btn.className =
       'shrink-0 px-3 py-1 rounded-full border ' +
       (on
@@ -2073,6 +2098,12 @@ const App = {
   },
 
   handleSemanticModeToggle: () => {
+    if (App.semanticBase()) {
+      App.state.deepMode = !App.state.deepMode;
+      App.updateSemanticModeButton();
+      App.showToast(App.state.deepMode ? 'より詳しく調べる: ON（上位のAIで時間をかけて答えます。このタブのみ）' : 'より詳しく調べる: OFF（ふだんの意味検索に戻しました）', App.state.deepMode ? 'success' : 'info');
+      return;
+    }
     const nextValue = !App.state.semanticMode;
     // オンにするたびに注意ダイアログを表示（了承後に有効化）
     if (nextValue) {
@@ -4898,7 +4929,7 @@ const App = {
     if(!App.state.currentUser||App.state.sendAbortController)return;
     const pending=App.state.pendingAnswerRequest||App.readPendingAnswer();if(!pending)return;
     App.state.pendingAnswerRequest=pending;App.state.currentSessionId=pending.sessionId;
-    App.state.semanticMode=pending.mode==='semantic';App.updateSemanticModeButton();
+    App.state.semanticMode=pending.mode==='semantic'||pending.mode==='deep';App.state.deepMode=pending.mode==='deep';App.updateSemanticModeButton();
     await App.sendQuestion(pending.query,true);
   },
 
@@ -4957,7 +4988,7 @@ const App = {
         try {
           if(App.authGatewayBase){
             const pending=App.state.pendingAnswerRequest||App.readPendingAnswer();
-            const mode=pending?pending.mode:(fast?'fast':App.state.semanticMode?'semantic':'normal');
+            const mode=pending?pending.mode:App.currentAnswerMode(fast);
             msgRes=await App.runAnswerJob(sessionId,questionText,mode,controller.signal);
           } else if (App.state.semanticMode && !fast) {
             // 意味検索: Raimo api ネスト障害を避け、Edge をブラウザから直接呼ぶ
