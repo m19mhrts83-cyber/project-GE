@@ -5,6 +5,7 @@
 
 - FlowForge（閲覧／編集）: [flow_M8SvKC1IDTDi496Vw-DgGjpD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD)
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
+- Nody 版の見直し（2026-11-10、FlowForge 版との比較用）: [flow_Nody版_20261110.md](./flow_Nody版_20261110.md) ／ 図つき [flow_Nody版_20261110.html](./flow_Nody版_20261110.html)
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
 - 更新: 2026-11-07（ループウェア入口・apps/loopware）
 
