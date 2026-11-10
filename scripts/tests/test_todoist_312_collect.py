@@ -161,6 +161,31 @@ class CommPick(unittest.TestCase):
         self.assertEqual(len(c.pick_comm([chat], set(), set())), 1)  # 問いかけは残る（判断は Nody で）
         self.assertEqual(c.comm_text(ask), "見積りを今週中にください")
 
+    def test_chatwork_greeting_only_skipped_and_title_is_the_ask(self):
+        cw = "<details>\n<summary>本文を開く</summary>\n\n松野真治さん\nCC：\nお疲れ様です。\nご対応ありがとうございます。\n\n(1)〜(5) すべて異存はございません。\nまた、エグゼ会員への先行展開ですが、\n来週中くらいに公開自体は可能でしょうか？\nロゴ_2 .png\n</details>\n\n**添付ファイル**: x.png"
+        ask = _item(16, channel="chatwork", subject="松野真治さん CC： お疲れ様です。", summary="", body_text=cw)
+        bye = _item(17, channel="chatwork", subject="かしこまりました", summary="", body_text="<details>\n<summary>本文を開く</summary>\n\nかしこまりました、\nご丁寧にありがとうございます♪\n</details>")
+        add = _item(18, channel="chatwork", subject="追加ですみません", summary="", body_text="追加ですみません\nよろしくお願いします")
+        got = c.pick_comm([ask, bye, add], set(), set())
+        self.assertEqual([g["id"] for g in got], [ask["id"]])
+        self.assertEqual(c.comm_text(ask), "また、エグゼ会員への先行展開ですが、来週中くらいに公開自体は可能でしょうか？")
+
+    def test_own_form_and_handled_and_signoff_skipped(self):
+        form = _item(19, channel="other", subject="空室対策のご相談", summary="", body_text="お世話になります。\n松野と申します。\n空室時の一般媒介のご相談先を探しております。ご検討ください",
+                     source_ref={"path": "p", "channel_raw": "こちらから相談（HPフォーム）"})
+        handled = _item(20, channel="other", subject="回答", summary="", body_text="回答あり。\n**対応**: 台帳に追加。ご確認ください")
+        signoff = _item(21, channel="chatwork", subject="x", summary="", body_text="別途ご案内させていただきますので、よろしくお願いします")
+        self.assertEqual(c.pick_comm([form, handled, signoff], set(), set()), [])
+
+    def test_mail_greeting_summary_uses_subject_and_ask(self):
+        it = _item(22, subject="山村不動産", summary="松野真治 様 山村不動産の山村と申します", body_text="松野真治 様\n山村不動産の山村と申します。\n先日の物件について、内見のご希望日を教えてください。")
+        self.assertEqual(c.comm_text(it), "山村不動産｜先日の物件について、内見のご希望日を教えてください。")
+
+    def test_chatwork_quote_and_tags_removed(self):
+        body = "[qt][qtmeta aid=1 time=2]前の発言です。ご確認ください[/qt]\n[To:123]松野さん\nまた、Q&Aの公開日を教えてください"
+        self.assertEqual(c.chat_ask_line(body), "また、Q&Aの公開日を教えてください")
+        self.assertIsNone(c.chat_ask_line("宜しくお願いします"))
+
     def test_self_only_promise(self):
         yes = _item(5, category="self", direction="outbound", body_text="見積書は明日お送りします。\n\n> 以前のメール\n> 確認します")
         no = _item(6, category="self", direction="outbound", body_text="ありがとうございました。\n> 確認します")
