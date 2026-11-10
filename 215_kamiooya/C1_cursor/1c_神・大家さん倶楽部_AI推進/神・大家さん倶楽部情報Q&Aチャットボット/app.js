@@ -174,7 +174,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', ranking_themes: '(4)質問ランキング・講座テーマ案' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -4368,10 +4368,100 @@ const App = {
     }
   },
 
+  // (4) 質問ランキング＋講座テーマ案。見えない人には枠ごと出さない。2026-11-11
+  themeChoiceLabel: { adopt: '✅ 採用', revise: '✏️ 直して採用', reject: '❌ 不採用' },
+  loadRankingThemes: async () => {
+    const box = document.getElementById('rankingThemes');
+    if (!box) return;
+    const show = App.isStaffAdmin() && App.featureOn('ranking_themes');
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const status = document.getElementById('rankingThemesStatus');
+    const btn = document.getElementById('reloadRankingThemesBtn');
+    if (btn && !btn.dataset.bound) { btn.dataset.bound = '1'; btn.addEventListener('click', function () { void App.loadRankingThemes(); }); }
+    status.textContent = '読み込み中…';
+    try {
+      const r = await App.apiClient('POST', '/admin/ranking-themes/list', {});
+      App.renderRankingThemes(r || {});
+    } catch (e) {
+      status.textContent = '取得できませんでした: ' + ((e && e.message) || String(e));
+    }
+  },
+  renderRankingThemes: (r) => {
+    const status = document.getElementById('rankingThemesStatus');
+    const list = document.getElementById('rankingList'), cards = document.getElementById('themeCards'), hist = document.getElementById('themeHistory');
+    const esc = App.escapeHtml;
+    const latest = r.latest;
+    if (!latest) {
+      status.textContent = 'まだ集計の回がありません（毎週月曜の朝に作られます）。';
+      list.innerHTML = ''; cards.innerHTML = ''; hist.innerHTML = '';
+      return;
+    }
+    const st = latest.stats || {};
+    status.textContent = String(latest.created_at || '').slice(0, 10) + ' の回（直近 ' + (latest.period_days || 120) + ' 日）／ チャットボット ' + (st.chatbot || 0) +
+      ' 件・コミュニティ ' + (st.forum || 0) + ' 件・オプチャ ' + (st.openchat || 0) + ' 件・既存講座 ' + (st.courses || 0) + ' 本';
+    list.innerHTML = (latest.ranking || []).map(function (x) {
+      const parts = [];
+      if (x.chatbot) parts.push('チャットボット ' + x.chatbot);
+      if (x.forum) parts.push('コミュニティ ' + x.forum);
+      if (x.openchat) parts.push('オプチャ ' + x.openchat);
+      return '<li><span class="font-medium">' + esc(x.topic) + '</span> <span class="text-slate-500">約 ' + x.count + ' 件' + (parts.length ? '（' + esc(parts.join('・')) + '）' : '') + '</span>' +
+        (x.examples && x.examples.length ? '<details class="text-xs text-slate-600"><summary>質問の例</summary><ul class="list-disc ml-4">' + x.examples.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></details>' : '') + '</li>';
+    }).join('') || '<li class="list-none text-slate-500">まだありません。</li>';
+    cards.innerHTML = (latest.themes || []).map(function (t) {
+      const d = t.decision;
+      return '<div class="border rounded p-2" data-theme="' + esc(t.id) + '">' +
+        '<div class="font-medium">' + esc(t.title) + '</div>' +
+        (t.target || t.format ? '<div class="text-xs text-slate-500">' + esc([t.target, t.format].filter(Boolean).join(' ／ ')) + '</div>' : '') +
+        (t.why ? '<div class="mt-1"><span class="text-slate-500">なぜ今：</span>' + esc(t.why) + '</div>' : '') +
+        (t.evidence ? '<div class="text-xs text-slate-600"><span class="text-slate-500">根拠：</span>' + esc(t.evidence) + '</div>' : '') +
+        (d ? '<div class="mt-1 text-xs bg-slate-50 rounded p-1">' + esc(App.themeChoiceLabel[d.choice] || d.choice) + (d.revised_title ? '：' + esc(d.revised_title) : '') + (d.reason ? ' ― ' + esc(d.reason) : '') + '</div>' : '') +
+        '<div class="mt-2 flex flex-wrap gap-1">' + ['adopt', 'revise', 'reject'].map(function (c) {
+          return '<button type="button" class="px-2 py-0.5 rounded border text-xs" data-choice="' + c + '">' + App.themeChoiceLabel[c] + '</button>';
+        }).join('') + '</div>' +
+        '<div class="theme-form hidden mt-2 space-y-1">' +
+        '<input type="text" maxlength="200" class="theme-title w-full border rounded px-2 py-1 text-sm hidden" placeholder="直した題名">' +
+        '<textarea maxlength="1000" rows="2" class="theme-reason w-full border rounded px-2 py-1 text-sm" placeholder="理由（次の案づくりに使います）"></textarea>' +
+        '<div class="flex gap-2 items-center"><button type="button" class="theme-save px-3 py-1 rounded bg-slate-800 text-white text-xs">保存</button><span class="theme-msg text-xs text-slate-500"></span></div></div></div>';
+    }).join('');
+    cards.querySelectorAll('[data-theme]').forEach(function (card) {
+      const form = card.querySelector('.theme-form'), title = card.querySelector('.theme-title'), reason = card.querySelector('.theme-reason');
+      const theme = (latest.themes || []).find(function (t) { return t.id === card.dataset.theme; }) || {};
+      let choice = '';
+      card.querySelectorAll('[data-choice]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          choice = b.dataset.choice;
+          card.querySelectorAll('[data-choice]').forEach(function (x) { x.classList.toggle('bg-slate-200', x === b); });
+          form.classList.remove('hidden');
+          title.classList.toggle('hidden', choice !== 'revise');
+          if (choice === 'revise' && !title.value) title.value = (theme.decision && theme.decision.revised_title) || theme.title || '';
+          if (!reason.value && theme.decision) reason.value = theme.decision.reason || '';
+        });
+      });
+      card.querySelector('.theme-save').addEventListener('click', async function () {
+        const msg = card.querySelector('.theme-msg');
+        if (choice === 'revise' && !title.value.trim()) { msg.textContent = '直した題名を入れてください'; return; }
+        msg.textContent = '保存中…';
+        try {
+          await App.apiClient('POST', '/admin/ranking-themes/decide', { round_id: latest.id, theme_id: theme.id, choice: choice, revised_title: title.value, reason: reason.value });
+          void App.loadRankingThemes();
+        } catch (e) {
+          msg.textContent = '保存できませんでした: ' + ((e && e.message) || String(e));
+        }
+      });
+    });
+    hist.innerHTML = (r.history || []).map(function (h) {
+      return '<div><span class="font-medium">' + esc(String(h.created_at || '').slice(0, 10)) + '</span>：' + (h.themes || []).map(function (t) {
+        return esc(t.title) + (t.decision ? '（' + esc(App.themeChoiceLabel[t.decision.choice] || '') + '）' : '（未判断）');
+      }).join('、') + '</div>';
+    }).join('') || '<div>まだありません。</div>';
+  },
+
   // Phase 13: 運営分析ダッシュボード（qa-analytics Edge）
   loadAnalytics: async () => {
     if (!App.isStaffAdmin()) return;
     void App.loadFeedbackAnalytics();
+    void App.loadRankingThemes();
     const statusEl = document.getElementById('analyticsStatus');
     const daysSelect = document.getElementById('analyticsDaysSelect');
     const days = daysSelect ? Number(daysSelect.value) || 14 : 14;

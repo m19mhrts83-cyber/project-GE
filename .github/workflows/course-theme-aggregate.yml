@@ -4,13 +4,9 @@
 # - 試作用。運営の了承後に週次化する
 name: course-theme aggregate (prototype)
 
+# 2026-11-11: 週次の本番は course-theme-weekly.yml。試作は手動実行だけ残す。
 on:
   workflow_dispatch:
-  push:
-    branches: [claude/project-thread-eziqnx]
-    paths:
-      - scripts/course_theme/**
-      - .github/workflows/course-theme-aggregate.yml
 
 permissions:
   contents: write
