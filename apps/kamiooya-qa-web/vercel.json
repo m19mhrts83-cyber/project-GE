@@ -3,16 +3,6 @@
   "framework": "nextjs",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
   "git": {
-    "deploymentEnabled": {
-      "codex/kamiooya-openchat-attachments": false,
-      "codex/kamiooya-auth-offline-review": false,
-      "codex/kamiooya-attachment-originals": false,
-      "codex/kamiooya-community-attachment-daily": false,
-      "codex/kamiooya-semantic-message-role": false,
-      "codex/kamiooya-qa-reliability-20261106": false,
-      "codex/kamiooya-search-efficiency-20261106": false,
-      "codex/kamiooya-search-mode-copy-20261106": false,
-      "codex/kamiooya-efficiency-audit-20261106": false
-    }
+    "deploymentEnabled": false
   }
 }
