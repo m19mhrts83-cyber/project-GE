@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createProductionAdapter} from '../lib/raimoAuthAdapter.ts';
 import {createRaimoAuthGateway} from '../lib/raimoAuthGateway.ts';
-import {normalizeQuery,answerTier,cacheable,queryKey,fresh,CACHE_TTL_MS} from '../lib/answerCost.ts';
+import {normalizeQuery,answerTier,cacheable,queryKey,fresh} from '../lib/answerCost.ts';
 
 test('質問の正規化・モデルの使い分け・使い回せる答え', async () => {
   assert.equal(normalizeQuery('  火災保険　の 保険料？ '), '火災保険 の 保険料');
@@ -14,8 +14,11 @@ test('質問の正規化・モデルの使い分け・使い回せる答え', as
   assert.equal(cacheable('参照内で確証が取れないため、お答えすることができません。'), false);
   assert.equal(cacheable('参考情報から読み取れる留意点は次のとおりです。' + 'x'.repeat(50)), false);
   assert.equal(cacheable('補償の範囲を見直し、水災の要否を地域のハザードで判断し、複数社で見積もりを取ります。'), true);
-  assert.equal(fresh({ created_at: new Date().toISOString() }), true);
-  assert.equal(fresh({ created_at: new Date(Date.now() - CACHE_TTL_MS - 1).toISOString() }), false);
+  // 同じ日（日本時間）だけ。11/10 23:59 JST に作った答えは 11/11 0:01 JST には使わない
+  const at = iso => Date.parse(iso);
+  assert.equal(fresh({ created_at: '2026-11-10T00:30:00+09:00' }, at('2026-11-10T23:50:00+09:00')), true);
+  assert.equal(fresh({ created_at: '2026-11-10T23:59:00+09:00' }, at('2026-11-11T00:01:00+09:00')), false);
+  assert.equal(fresh({ created_at: '2026-11-09T12:00:00+09:00' }, at('2026-11-10T12:00:00+09:00')), false);
 });
 
 function fixture(stage) {

@@ -1,9 +1,8 @@
 // (1) AI 使用量の削減（2026-11-10）。段階公開スイッチ cost_saving が見える人の質問だけに効く。
 // ・ふだんは軽いモデル（lite）で答え、詳しく調べる質問だけ今のモデル（standard）を使う
-// ・同じ質問への答えは一定期間使い回す（AI を呼ばない）
+// ・同じ日（日本時間）の同じ質問だけ答えを使い回す。日付が変われば、その日までに入った投稿も含めて作り直す（11/10 松野さん）
 // 判定は raimo-auth（サーバー）で行う。ブラウザからは選べない。
 export type AnswerTier = 'lite' | 'standard';
-export const CACHE_TTL_MS = 14 * 24 * 3600 * 1000; // 講義・投稿が増えるので2週間で作り直す
 
 // 表記ゆれだけを吸収する（全角半角・空白・末尾の「？」）。言い換えは別の質問として扱う。
 export function normalizeQuery(q: string): string {
@@ -28,7 +27,9 @@ export async function queryKey(q: string): Promise<string> {
   return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 }
 
+const jstDay = (t: number) => new Date(t + 9 * 3600 * 1000).toISOString().slice(0, 10);
+// 使い回せるのは「日本時間で同じ日」に作った答えだけ。
 export function fresh(row: { created_at?: string } | null | undefined, now = Date.now()): boolean {
   const t = Date.parse(String(row?.created_at || ''));
-  return Number.isFinite(t) && now - t < CACHE_TTL_MS;
+  return Number.isFinite(t) && t <= now && jstDay(t) === jstDay(now);
 }
