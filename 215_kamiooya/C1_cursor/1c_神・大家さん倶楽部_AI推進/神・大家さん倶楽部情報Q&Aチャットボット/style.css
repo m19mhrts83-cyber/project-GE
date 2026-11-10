@@ -282,3 +282,170 @@ body {
   position: relative;
   z-index: 1;
 }
+
+/* ==========================================================================
+   (5) ロゴに合わせたデザイン（案A: 紺を土台に、オレンジで目立たせる）2026-11-10
+   ロゴの色: 紺 #11366A / オレンジ #FE910B / 黄緑 #84C372（少しだけ）
+   段階公開スイッチ brand_theme が見える人だけ、<html class="theme-brand"> で効く。
+   既存の Tailwind の青系クラスを、ここで紺・オレンジに読み替える。
+   ========================================================================== */
+:root.theme-brand {
+  --brand-navy: #11366a;
+  --brand-navy-deep: #0a2248;
+  --brand-navy-mid: #1d4f91;
+  --brand-navy-soft: #e9eff8;
+  --brand-navy-line: #c8d5ea;
+  --brand-orange: #fe910b;
+  --brand-orange-deep: #e57700;
+  --brand-orange-light: #ffb347;
+  --brand-orange-soft: #fff4e5;
+  --brand-green: #84c372;
+  --brand-grad-navy: linear-gradient(135deg, #0a2248 0%, #11366a 55%, #1d4f91 100%);
+  --brand-grad-orange: linear-gradient(135deg, #ffa62b 0%, #fe910b 50%, #f07d00 100%);
+  --main: var(--brand-navy);
+  --accent: var(--brand-orange);
+}
+
+.theme-brand body {
+  background: #f4f6fb;
+}
+
+/* 文字色 */
+.theme-brand .text-blue-900,
+.theme-brand .text-blue-800 { color: var(--brand-navy) !important; }
+.theme-brand .text-blue-700,
+.theme-brand .text-blue-600 { color: var(--brand-navy-mid) !important; }
+.theme-brand .border-blue-200 { border-color: var(--brand-navy-line) !important; }
+.theme-brand .bg-blue-50 { background-color: var(--brand-navy-soft) !important; }
+.theme-brand .hover\:bg-blue-50:hover { background-color: var(--brand-orange-soft) !important; }
+
+/* 紺のボタン・帯（2番手の操作） */
+.theme-brand .bg-blue-900,
+.theme-brand .bg-blue-700 {
+  background: var(--brand-grad-navy) !important;
+  border-color: var(--brand-navy) !important;
+}
+.theme-brand .hover\:bg-blue-600:hover { background: var(--brand-navy-mid) !important; }
+
+/* オレンジのボタン（いちばん押してほしい操作） */
+.theme-brand .bg-blue-600,
+.theme-brand #sendMessageBtn,
+.theme-brand #newChatBtn,
+.theme-brand #loginForm button[type="submit"],
+.theme-brand #registerForm button[type="submit"] {
+  background: var(--brand-grad-orange) !important;
+  color: #fff !important;
+  border: none;
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(150, 70, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(254, 145, 11, 0.35);
+  transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+}
+.theme-brand .bg-blue-600:hover,
+.theme-brand #sendMessageBtn:hover,
+.theme-brand #newChatBtn:hover,
+.theme-brand #loginForm button[type="submit"]:hover,
+.theme-brand #registerForm button[type="submit"]:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 4px 12px rgba(254, 145, 11, 0.45);
+}
+.theme-brand .bg-blue-600:active,
+.theme-brand #sendMessageBtn:active,
+.theme-brand #newChatBtn:active { transform: translateY(1px); }
+
+/* 上の帯（ヘッダー）: 紺のグラデーション＋オレンジの細線 */
+.theme-brand #mainView > header {
+  background: var(--brand-grad-navy) !important;
+  border-bottom: 3px solid var(--brand-orange);
+  box-shadow: 0 2px 10px rgba(10, 34, 72, 0.25);
+}
+.theme-brand #mainView > header h2 { letter-spacing: 0.04em; }
+.theme-brand #logoutBtn {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+}
+.theme-brand #logoutBtn:hover { background: rgba(255, 255, 255, 0.22) !important; }
+
+/* ログイン画面: 紺のグラデーション背景に白いカード */
+.theme-brand #authView,
+.theme-brand #forgotPasswordView,
+.theme-brand #resetPasswordView,
+.theme-brand #masterTransferView {
+  background:
+    radial-gradient(circle at 85% 15%, rgba(254, 145, 11, 0.28) 0, rgba(254, 145, 11, 0) 38%),
+    radial-gradient(circle at 10% 90%, rgba(132, 195, 114, 0.18) 0, rgba(132, 195, 114, 0) 35%),
+    var(--brand-grad-navy);
+}
+.theme-brand #authView > div,
+.theme-brand #forgotPasswordView > div,
+.theme-brand #resetPasswordView > div,
+.theme-brand #masterTransferView > div {
+  border-top: 4px solid var(--brand-orange);
+  box-shadow: 0 20px 50px rgba(5, 20, 45, 0.35);
+}
+.theme-brand #showRegisterTabBtn.bg-slate-200,
+.theme-brand #showLoginTabBtn.bg-slate-200 { background: var(--brand-navy-soft) !important; color: var(--brand-navy) !important; }
+.theme-brand .login-screen-admin-btn { color: #64748b; }
+
+/* 入力欄のフォーカス */
+.theme-brand input:focus,
+.theme-brand textarea:focus,
+.theme-brand select:focus {
+  outline: none;
+  border-color: var(--brand-orange) !important;
+  box-shadow: 0 0 0 3px rgba(254, 145, 11, 0.2);
+}
+
+/* サイドバー: 選択中のメニューに左のオレンジ線 */
+.theme-brand #sidebar { background: linear-gradient(180deg, #ffffff 0%, #f7f9fd 100%); }
+.theme-brand .screen-tab.bg-slate-100 {
+  background: var(--brand-navy-soft) !important;
+  color: var(--brand-navy) !important;
+  box-shadow: inset 3px 0 0 var(--brand-orange);
+}
+.theme-brand .screen-tab:hover { background: var(--brand-navy-soft) !important; }
+.theme-brand .session-item.active {
+  border-color: var(--brand-orange);
+  background: var(--brand-orange-soft);
+}
+
+/* チャット */
+.theme-brand #chatMessages {
+  background: linear-gradient(180deg, #f6f8fc 0%, #eef2f9 100%) !important;
+}
+.theme-brand .chat-bubble { border-radius: 14px; box-shadow: 0 1px 2px rgba(17, 54, 106, 0.06); }
+.theme-brand .chat-user {
+  background: var(--brand-grad-navy);
+  border-color: var(--brand-navy);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.theme-brand .chat-user a { color: #ffd59a; }
+.theme-brand .chat-assistant {
+  border-color: #dde4f0;
+  border-left: 3px solid var(--brand-orange);
+  border-bottom-left-radius: 4px;
+}
+.theme-brand .chat-assistant .md-body a { color: var(--brand-navy-mid); }
+.theme-brand .chat-assistant .md-body h1,
+.theme-brand .chat-assistant .md-body h2,
+.theme-brand .chat-assistant .md-body h3 { color: var(--brand-navy); }
+.theme-brand .chat-assistant .md-body blockquote { border-left-color: var(--brand-orange-light); }
+.theme-brand #suggestedQuestions button {
+  border-color: var(--brand-navy-line) !important;
+  color: var(--brand-navy);
+  background: #fff !important;
+}
+.theme-brand #suggestedQuestions button:hover {
+  border-color: var(--brand-orange) !important;
+  background: var(--brand-orange-soft) !important;
+}
+.theme-brand #semanticModeToggle.bg-blue-900 { background: var(--brand-grad-navy) !important; }
+
+/* 一覧の表の見出し */
+.theme-brand table > thead { background: var(--brand-navy-soft); color: var(--brand-navy); }
+.theme-brand table > thead th { border-bottom: 2px solid var(--brand-orange); }
+
+/* お知らせ */
+.theme-brand .toast.info { background: var(--brand-navy); }
+.theme-brand .toast.success { background: #3f8a32; }

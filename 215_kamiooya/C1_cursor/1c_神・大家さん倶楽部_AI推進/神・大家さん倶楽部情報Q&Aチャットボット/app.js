@@ -172,7 +172,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', brand_theme: '(5)ロゴに合わせたデザイン' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -187,6 +187,13 @@ const App = {
       App.state.featureViewNew = localStorage.getItem('qa_feature_view_new') !== '0';
       App.state.viewAsMember = localStorage.getItem('qa_view_as_member') === '1';
     } catch (e) { /* ignore */ }
+  },
+  // (5) ロゴに合わせたデザイン。見える人だけ <html class="theme-brand">。
+  // ログイン前の画面にも出せるよう、この端末で一度見えた人は覚えておく（見えない人がログインしたら消す）。
+  applyBrandTheme: () => {
+    const on = App.featureOn('brand_theme');
+    document.documentElement.classList.toggle('theme-brand', on);
+    try { if (on) localStorage.setItem('qa_brand_theme', '1'); else localStorage.removeItem('qa_brand_theme'); } catch (e) { /* ignore */ }
   },
   renderFeaturePreviewBar: () => {
     const bar = document.getElementById('featurePreviewBar');
@@ -1286,6 +1293,7 @@ const App = {
     App.showMainView();
     await App.loadFeatures();
     App.renderFeaturePreviewBar();
+    App.applyBrandTheme();
     App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + (App.isStaffAdmin() || !App.state.viewAsMember ? App.state.currentUser.role : 'user として表示中') + ')';
 
     const isAdmin = App.isStaffAdmin();

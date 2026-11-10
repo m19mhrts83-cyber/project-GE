@@ -11,6 +11,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
+  <!-- (5) ロゴに合わせたデザイン: この端末で見えていた人は、ログイン画面から同じ色で出す -->
+  <script>try{if(localStorage.getItem('qa_brand_theme')==='1')document.documentElement.classList.add('theme-brand');}catch(e){}</script>
 </head>
 <body class="bg-slate-100 text-slate-800">
   <div id="appRoot" class="min-h-screen">
