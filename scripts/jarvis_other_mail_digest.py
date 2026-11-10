@@ -197,7 +197,8 @@ def rule_digest(items: list[dict[str, Any]]) -> dict[str, Any]:
     # kind 未設定は従来どおり両方にカウント
     unset = [it for it in items if (it.get("kind") or "mail") not in ("mail", "skim")]
     mail_items = mail_items + [it for it in unset if (it.get("priority") or "").lower() in ("high", "attention", "med")]
-    skim_items = skim_items + [it for it in unset if it not in mail_items]
+    mail_ids = {id(it) for it in mail_items}  # dict 同士の比較を全件で繰り返さない
+    skim_items = skim_items + [it for it in unset if id(it) not in mail_ids]
 
     by_genre: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for it in items:
