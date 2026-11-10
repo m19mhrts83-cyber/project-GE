@@ -11,6 +11,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
+  <!-- (5) ロゴに合わせた配色: この端末で見えていた人は、ログイン画面から同じ色で出す（applyTheme が覚える） -->
+  <script>try{if(localStorage.getItem('qa_design_theme')==='1')document.documentElement.classList.add('theme-a');}catch(e){}</script>
   <!-- (5) ロゴに合わせた配色・案A（2026-11-10 松野さん決定）。スイッチ design_theme が見える人だけ html.theme-a が付く。
        紺 #11366A を土台、オレンジ #FE910B で目立たせる、黄緑 #84C372 は少しだけ。 -->
   <style>
@@ -40,8 +42,19 @@
   <div id="appRoot" class="min-h-screen">
     <!-- 認証エリア -->
     <section id="authView" class="min-h-screen flex items-center justify-center p-4">
-      <div class="w-full max-w-md bg-white shadow-lg rounded-xl p-6">
-        <h1 class="text-xl font-bold text-center text-blue-900 mb-2">神・大家さん倶楽部Q&A</h1>
+      <!-- (5) ロゴに合わせたデザインが見える人だけ表示（それ以外は display:none） -->
+      <aside class="brand-hero brand-only" aria-hidden="true">
+        <div class="brand-hero-copy">
+          <span class="brand-hero-kicker">会員専用 AIアシスタント</span>
+          <p class="brand-hero-title">講義と仲間の知恵を、<br><em>すぐ引き出せる</em>Q&amp;A。</p>
+          <p class="brand-hero-lead">講義の動画・コミュニティ・オプチャの内容から、根拠つきで答えます。</p>
+          <p class="brand-hero-points-label">全4分野の神スキル</p>
+          <div class="brand-hero-points"><span><i class="fa-solid fa-key"></i>購入</span><span><i class="fa-solid fa-door-open"></i>空室対策</span><span><i class="fa-solid fa-screwdriver-wrench"></i>修繕</span><span><i class="fa-solid fa-handshake"></i>売却</span></div>
+        </div>
+      </aside>
+      <div class="auth-card w-full max-w-md bg-white shadow-lg rounded-xl p-6">
+        <div class="brand-logo brand-only" role="img" aria-label="神・大家さん倶楽部"></div>
+        <h1 class="text-xl font-bold text-center text-blue-900 mb-2"><span class="brand-hide">神・大家さん倶楽部Q&A</span><span class="brand-only-inline">Q&amp;Aチャットボット</span></h1>
         <p class="text-sm text-slate-500 text-center mb-6">ログインまたは新規登録</p>
 
         <div class="flex gap-2 mb-4">
@@ -202,7 +215,7 @@
           <button id="sidebarToggleBtn" class="md:hidden">
             <i class="fa-solid fa-bars"></i>
           </button>
-          <h2 class="font-bold">神・大家さん倶楽部Q&Aチャットボット</h2>
+          <h2 class="font-bold"><span class="app-title-main">神・大家さん倶楽部</span><span class="app-title-sub">Q&amp;Aチャットボット</span></h2>
         </div>
         <div class="flex items-center gap-4">
           <span id="currentUserLabel" class="text-sm"></span>
