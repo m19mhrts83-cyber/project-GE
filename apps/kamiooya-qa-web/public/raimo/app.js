@@ -4136,9 +4136,39 @@ const App = {
     }
   },
 
+  // (2) 回答の評価の一覧。見えない人には枠ごと出さない。2026-11-10
+  loadFeedbackAnalytics: async () => {
+    const box = document.getElementById('feedbackAnalytics');
+    if (!box) return;
+    const show = App.isStaffAdmin() && App.featureOn('answer_feedback');
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const summary = document.getElementById('feedbackSummary'), list = document.getElementById('feedbackList');
+    const btn = document.getElementById('reloadFeedbackBtn');
+    if (btn && !btn.dataset.bound) { btn.dataset.bound = '1'; btn.addEventListener('click', function () { void App.loadFeedbackAnalytics(); }); }
+    summary.textContent = '読み込み中…'; list.innerHTML = '';
+    try {
+      const r = await App.apiClient('POST', '/admin/answer-feedback/list', {});
+      const rows = (r && Array.isArray(r.feedback)) ? r.feedback : [];
+      const count = { great: 0, good: 0, bad: 0 };
+      rows.forEach(function (x) { if (count[x.rating] != null) count[x.rating]++; });
+      summary.textContent = '🌟超いいね ' + count.great + ' ／ 👍いいね ' + count.good + ' ／ 👎悪いね ' + count.bad + '（全 ' + rows.length + ' 件）';
+      const icon = { great: '🌟', good: '👍', bad: '👎' };
+      list.innerHTML = rows.length ? rows.map(function (x) {
+        return '<div class="border rounded p-2"><div class="text-xs text-slate-500">' + (icon[x.rating] || '') + ' ' + App.escapeHtml(String(x.updated_at || '').replace('T', ' ').slice(0, 16)) + '</div>' +
+          '<div><span class="text-slate-500">質問：</span>' + App.escapeHtml(x.question || '') + '</div>' +
+          (x.comment ? '<div><span class="text-slate-500">意見：</span>' + App.escapeHtml(x.comment) + '</div>' : '') +
+          '<details class="text-xs text-slate-600"><summary>回答の冒頭</summary>' + App.escapeHtml(x.answer || '') + '</details></div>';
+      }).join('') : '<p class="text-slate-500">まだ評価はありません。</p>';
+    } catch (e) {
+      summary.textContent = '取得できませんでした: ' + ((e && e.message) || String(e));
+    }
+  },
+
   // Phase 13: 運営分析ダッシュボード（qa-analytics Edge）
   loadAnalytics: async () => {
     if (!App.isStaffAdmin()) return;
+    void App.loadFeedbackAnalytics();
     const statusEl = document.getElementById('analyticsStatus');
     const daysSelect = document.getElementById('analyticsDaysSelect');
     const days = daysSelect ? Number(daysSelect.value) || 14 : 14;

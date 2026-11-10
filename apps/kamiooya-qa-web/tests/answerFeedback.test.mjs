@@ -46,3 +46,21 @@ test('入力の検査', () => {
   assert.equal(parseFeedback({ chat_id: 'c1', message_id: 'm2', rating: 'bad', comment: 5 }).comment, '');
   assert.throws(() => feedbackRow('o1', { chat_id: 'c1', message_id: 'zz', rating: 'good', comment: '' }, messages), e => e.status === 404);
 });
+
+test('評価の一覧は「管理者」かつ「スイッチで見える人」だけ。会員のIDは返さない', async () => {
+  const origin2 = 'https://offline.example';
+  const users = { o1: { ...owner }, a1: { ...admin }, u1: { id: 'u1', email: 'owner2@example.test', role: 'user', status: 'approved', authVersion: '1' } };
+  const tokens = new Map([['a'.repeat(64), 'o1'], ['b'.repeat(64), 'a1'], ['c'.repeat(64), 'u1']]);
+  const handler = createRaimoAuthGateway({ origin: origin2, member: async id => users[id] || null,
+    sessions: { get: async t => tokens.has(t) ? { uid: tokens.get(t), authVersion: '1', expires: Date.now() + 60000 } : null, put: async () => {}, delete: async () => {} },
+    authenticate: async () => null, allowLogin: async () => true, chatOwner: async () => null, forward: async () => ({}), attachmentSession: async () => ({}),
+    featureFlags: async () => [{ feature: 'answer_feedback', stage: 'owner', owner_ids: ['owner@example.test', 'owner2@example.test'] }],
+    listFeedback: async () => [{ user_id: 'secret-user', rating: 'bad', comment: 'c', question: 'q', answer: 'a', updated_at: 't' }] });
+  const post = t => handler(new Request('https://g.example/admin/answer-feedback/list', { method: 'POST', headers: { Origin: origin2, Authorization: 'Bearer ' + t }, body: '{}' }));
+  const ok = await post('a'.repeat(64));
+  assert.equal(ok.status, 200);
+  const body = await ok.json();
+  assert.deepEqual(body, { feedback: [{ rating: 'bad', comment: 'c', question: 'q', answer: 'a', updated_at: 't' }] });
+  assert.equal((await post('b'.repeat(64))).status, 404); // 管理者でも名指しが無い
+  assert.equal((await post('c'.repeat(64))).status, 403); // 名指しでも一般会員
+});

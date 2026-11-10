@@ -21,6 +21,7 @@ export type GatewayDependencies = {
   // 段階公開スイッチ（lib/featureFlags.ts）。未設定なら全機能オフ。
   featureFlags?(): Promise<FeatureFlag[]>;
   saveFeedback?(row: Record<string, unknown>): Promise<void>;
+  listFeedback?(): Promise<unknown[]>;
   now?: () => number;
 };
 const approved = (u: Member | null): u is Member => !!u && u.status === 'approved' && ['user', 'admin', 'master_admin'].includes(u.role) && !!u.authVersion;
@@ -132,6 +133,16 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         const chat=await d.forward('GET','/chat-sessions/'+f.chat_id,{actor_user_id:user.id}) as {messages?:unknown};
         await d.saveFeedback(feedbackRow(user.id,f,Array.isArray(chat?.messages)?chat.messages:[]));
         return json({ok:true});
+      }
+      // (2) 評価の一覧（運営分析）。管理者で、かつスイッチで見える人だけ。会員の名前・IDは返さない。
+      if(path==='/admin/answer-feedback/list' && req.method==='POST'){
+        let flags:FeatureFlag[]=[];
+        try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
+        requireFeature(Array.isArray(flags)?flags:[],'answer_feedback',{id:user.id,email:user.email});
+        if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
+        if(!d.listFeedback)return json({error:'feature_not_available'},404);
+        const rows=(await d.listFeedback()).map((r:any)=>({rating:r.rating,comment:r.comment,question:r.question,answer:String(r.answer||'').slice(0,400),updated_at:r.updated_at}));
+        return json({feedback:rows});
       }
       if(path==='/reference-metadata' && req.method==='GET' && d.referenceMetadata)return json(await d.referenceMetadata());
       // This legacy browser search credential is separate from every privileged server secret.
