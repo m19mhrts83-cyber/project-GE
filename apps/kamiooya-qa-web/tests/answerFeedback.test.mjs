@@ -60,7 +60,7 @@ test('評価の一覧は「管理者」かつ「スイッチで見える人」�
   const ok = await post('a'.repeat(64));
   assert.equal(ok.status, 200);
   const body = await ok.json();
-  assert.deepEqual(body, { feedback: [{ rating: 'bad', reasons: [], comment: 'c', question: 'q', answer: 'a', updated_at: 't' }] });
+  assert.deepEqual(body, { feedback: [{ rating: 'bad', reasons: [], comment: 'c', question: 'q', answer: 'a', updated_at: 't', sources: [] }], sources_top: [], source_clicks: 0 });
   assert.equal((await post('b'.repeat(64))).status, 404); // 管理者でも名指しが無い
   assert.equal((await post('c'.repeat(64))).status, 403); // 名指しでも一般会員
 });

@@ -1,6 +1,7 @@
 import type {AnswerActor} from './qaAnswerJobs.ts';
 import {featuresFor, requireFeature, type FeatureFlag} from './featureFlags.ts';
 import {parseFeedback, feedbackRow} from './answerFeedback.ts';
+import {parseSourceClick, sourceClickRow, summarizeSourceClicks} from './sourceClicks.ts';
 import {matchPending} from './rosterMatch.ts';
 // Shared gateway: the production adapter supplies persistent sessions and live membership checks.
 type Member = { id: string; email: string; role: string; status: string; authVersion: string; name?: string; member_no?: string; prefecture?: string };
@@ -25,6 +26,8 @@ export type GatewayDependencies = {
   roster?: { has(hashes:string[]): Promise<Set<string>>; meta(): Promise<{synced_at?:string;row_count?:number}> };
   saveFeedback?(row: Record<string, unknown>): Promise<void>;
   listFeedback?(): Promise<unknown[]>;
+  saveSourceClick?(row: Record<string, unknown>): Promise<void>;
+  listSourceClicks?(): Promise<unknown[]>;
   now?: () => number;
 };
 const approved = (u: Member | null): u is Member => !!u && u.status === 'approved' && ['user', 'admin', 'master_admin'].includes(u.role) && !!u.authVersion;
@@ -137,6 +140,18 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         await d.saveFeedback(feedbackRow(user.id,f,Array.isArray(chat?.messages)?chat.messages:[]));
         return json({ok:true});
       }
+      // (2) 判断ログの補足: 答えの根拠を開いたら記録する。スイッチ answer_feedback と同じ人だけ。
+      if(path==='/answer-source-click' && req.method==='POST'){
+        let flags:FeatureFlag[]=[];
+        try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
+        requireFeature(Array.isArray(flags)?flags:[],'answer_feedback',{id:user.id,email:user.email});
+        if(!d.saveSourceClick)return json({error:'feature_not_available'},404);
+        const s=parseSourceClick(input);
+        if(await d.chatOwner(s.chat_id)!==user.id)return json({error:'forbidden'},403);
+        const chat=await d.forward('GET','/chat-sessions/'+s.chat_id,{actor_user_id:user.id}) as {messages?:unknown};
+        await d.saveSourceClick(sourceClickRow(user.id,s,Array.isArray(chat?.messages)?chat.messages:[]));
+        return json({ok:true});
+      }
       // (2) 評価の一覧（運営分析）。管理者で、かつスイッチで見える人だけ。会員の名前・IDは返さない。
       // (3) 承認待ちの人を名簿と照合。管理者で、かつスイッチ auto_approval で見える人だけ。名簿の中身は返さない。
       if(path==='/admin/users/pending/roster-match' && req.method==='POST'){
@@ -156,8 +171,12 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         requireFeature(Array.isArray(flags)?flags:[],'answer_feedback',{id:user.id,email:user.email});
         if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
         if(!d.listFeedback)return json({error:'feature_not_available'},404);
-        const rows=(await d.listFeedback()).map((r:any)=>({rating:r.rating,reasons:Array.isArray(r.reasons)?r.reasons:[],comment:r.comment,question:r.question,answer:String(r.answer||'').slice(0,400),updated_at:r.updated_at}));
-        return json({feedback:rows});
+        let clicks:unknown[]=[];
+        try{clicks=d.listSourceClicks?await d.listSourceClicks():[];}catch{clicks=[];}
+        const sc=summarizeSourceClicks(Array.isArray(clicks)?clicks as any[]:[]);
+        const rows=(await d.listFeedback()).map((r:any)=>({rating:r.rating,reasons:Array.isArray(r.reasons)?r.reasons:[],comment:r.comment,question:r.question,answer:String(r.answer||'').slice(0,400),updated_at:r.updated_at,
+          sources:(sc.byMessage.get(String(r.chat_id??'')+'/'+String(r.message_id??''))||[]).map(x=>({kind:x.kind,title:x.title,label:x.label}))}));
+        return json({feedback:rows,sources_top:sc.top,source_clicks:Array.isArray(clicks)?clicks.length:0});
       }
       if(path==='/reference-metadata' && req.method==='GET' && d.referenceMetadata)return json(await d.referenceMetadata());
       // This legacy browser search credential is separate from every privileged server secret.

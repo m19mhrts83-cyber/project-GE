@@ -56,6 +56,8 @@ for (const source of sources) {
     assert.equal(targets[1].closed,true);assert.equal(errors.length,1);
     const html=app.renderCitationsPanel([{kind:'openchat',openchatId:sid,chatTitle:'修繕',snippet:'見積.pdf',citationLabel:'LINEオプチャ1'}],'m','LINEオプチャ1');
     assert.ok(html.includes('data-openchat-source-id="'+sid+'"'));assert.ok(html.includes('本文で引用した根拠'));
+    // 根拠を開いた記録用に、どの根拠かと回答IDを持たせる
+    assert.ok(html.includes('data-src-kind="openchat" data-src-key="'+sid+'" data-src-title="修繕" data-src-label="LINEオプチャ1"'));assert.ok(html.includes('data-message-id="m"'));
   });
   test(source.pathname + ': LINE source table renders its own attachment and filename search preserves source identity',async()=>{
     const id='a'.repeat(64),sid='oc_'+id,requests=[];

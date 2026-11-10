@@ -2405,7 +2405,11 @@ const App = {
     if(!citations||!citations.length)return '';
     const esc=App.escapeHtml;
     const badge=c=>c.citationLabel?'<strong class="text-blue-900">['+esc(c.citationLabel)+']</strong> ':'';
-    const attrs=c=>' id="'+esc(App.citationAnchor(c,messageId))+'" class="mb-2 scroll-mt-4"';
+    // 根拠を開いたら判断ログに残すため、どの根拠かを li に持たせる（(2) answer_feedback が見える人だけ送る）
+    const src=c=>{const key=c.kind==='video_chunk'?(c.chunkKey||c.videoTitle):c.kind==='openchat'?c.openchatId:c.commentId;
+      const title=c.kind==='video_chunk'?(c.videoTitle||'動画')+' ・ '+App.formatMmSs(c.startSec||0):c.kind==='lesson'?(c.lessonTitle||c.topicTitle||'講座ページ'):c.kind==='openchat'?[c.chatTitle||'LINEオプチャ',c.threadTitle].filter(Boolean).join(' / '):'コミュニティ投稿 #'+(c.commentId||'')+(c.postedAt?'（'+App.citationDateLabel(c)+'）':'');
+      return key?' data-src-kind="'+esc(c.kind)+'" data-src-key="'+esc(key)+'" data-src-title="'+esc(title)+'" data-src-label="'+esc(c.citationLabel||'')+'"':'';};
+    const attrs=c=>' id="'+esc(App.citationAnchor(c,messageId))+'" class="mb-2 scroll-mt-4"'+src(c);
     const db=(kind,key)=>' <button type="button" class="citation-db-link text-blue-700 underline" data-kind="'+esc(kind)+'" data-key="'+esc(key||'')+'">本文を見る</button>';
     const dated=(list,item)=>App.groupReferencesByDate(list).map(g=>'<div class="font-medium text-slate-700 mt-2">'+esc(g.label)+'</div><ul class="citations-list mb-2">'+g.items.map(item).join('')+'</ul>').join('');
     const comments=citations.filter(c=>c.kind==='comment');
@@ -2420,10 +2424,10 @@ const App = {
       const anchor='<a class="text-blue-700 underline" href="#'+esc(App.citationAnchor(c,messageId))+'">'+esc(c.citationLabel)+'</a>';
       if(c.kind==='video_chunk'){
         const page=App.safeReferenceUrl(c.videoPageUrl),u=page||App.safeReferenceUrl(App.withVideoTimeUrl(c.videoUrl,c.startSec||0));const title=esc(c.videoTitle||'動画タイトル未登録')+' ・ '+esc(App.formatMmSs(c.startSec||0));
-        return '<li class="mb-1">'+anchor+' ・ '+(u?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+title+(page?' 元動画ページを開く':' から再生')+'</a>':title)+'</li>';
+        return '<li class="mb-1"'+src(c)+'>'+anchor+' ・ '+(u?'<a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(u)+'">'+title+(page?' 元動画ページを開く':' から再生')+'</a>':title)+'</li>';
       }
-      if(c.kind==='lesson')return '<li class="mb-1">'+anchor+' ・ '+esc(c.lessonTitle||c.topicTitle||'講座ページ')+db('lesson',c.commentId)+'</li>';
-      return '<li class="mb-1">'+anchor+' ・ '+esc(App.citationDateLabel(c))+db(c.kind,c.commentId||c.openchatId)+'</li>';
+      if(c.kind==='lesson')return '<li class="mb-1"'+src(c)+'>'+anchor+' ・ '+esc(c.lessonTitle||c.topicTitle||'講座ページ')+db('lesson',c.commentId)+'</li>';
+      return '<li class="mb-1"'+src(c)+'>'+anchor+' ・ '+esc(App.citationDateLabel(c))+db(c.kind,c.commentId||c.openchatId)+'</li>';
     }).join('')+'</ul>');
     if(videos.length){
       const rows=videos.map(c=>{
@@ -2446,7 +2450,7 @@ const App = {
       return '<li'+attrs(c)+'>'+badge(c)+esc(c.lessonTitle||c.topicTitle||c.commentId||'講座')+db('lesson',c.commentId)+(url?' <a class="text-blue-700 underline" target="_blank" rel="noopener noreferrer" href="'+esc(url)+'">講座を開く</a>':'')+'<div class="text-slate-600">'+esc(c.snippet||'')+'</div></li>';
     }).join('')+'</ul>');
     const note=citations.some(c=>c.referenceSelection==='provided-context')?'<p class="text-slate-600 mb-2">回答作成時の参考候補です。本文中の使用箇所が明示されていない情報も含みます。</p>':'';
-    return '<div class="citations-panel mt-3 border-t pt-2 text-xs">'+note+parts.join('')+'</div>';
+    return '<div class="citations-panel mt-3 border-t pt-2 text-xs" data-message-id="'+esc(messageId||'')+'">'+note+parts.join('')+'</div>';
   },
 
   cleanOpenchatDisplayText: (value) => {
@@ -3415,6 +3419,7 @@ const App = {
       });
     });
     area.querySelectorAll('.answer-feedback').forEach(App.bindFeedbackBox);
+    area.querySelectorAll('.citations-panel').forEach(App.bindSourceClicks);
     area.scrollTop = area.scrollHeight;
     area.querySelectorAll('.citation-attachments').forEach(function (container) {
       App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：');
@@ -4220,6 +4225,40 @@ const App = {
     }
   },
 
+  // (2) 判断ログの補足: 「本文を見る」や元ページのリンクを押したら、参考にした根拠として記録する。
+  // 同じ画面で同じ根拠は1回だけ送る。送れなくても画面の動きは変えない。2026-11-10
+  bindSourceClicks: (panel) => {
+    if (!panel || panel.dataset.srcBound) return;
+    panel.dataset.srcBound = '1';
+    panel.addEventListener('click', function (event) {
+      const el = event.target && event.target.closest ? event.target.closest('a,button') : null;
+      if (!el || !panel.contains(el)) return;
+      const href = String(el.getAttribute('href') || '');
+      if (href.charAt(0) === '#') return; // 一覧の中を移動するだけのリンクは数えない
+      const li = el.closest('[data-src-kind]');
+      if (!li) return;
+      void App.logSourceClick(panel.getAttribute('data-message-id') || '', {
+        kind: li.getAttribute('data-src-kind') || '', source_key: li.getAttribute('data-src-key') || '',
+        title: li.getAttribute('data-src-title') || '', label: li.getAttribute('data-src-label') || '',
+        action: el.classList.contains('citation-db-link') ? 'open_text' : 'open_link'
+      });
+    });
+  },
+
+  logSourceClick: async (msgId, s) => {
+    const chatId = App.state.currentSessionId;
+    if (!chatId || !msgId || !s.kind || !s.source_key || !App.featureOn('answer_feedback')) return;
+    const seen = App.state.sourceClicksSent || (App.state.sourceClicksSent = {});
+    const key = chatId + '/' + msgId + '/' + s.kind + '/' + s.source_key;
+    if (seen[key]) return;
+    seen[key] = true;
+    try {
+      await App.apiClient('POST', '/answer-source-click', Object.assign({ chat_id: String(chatId), message_id: String(msgId) }, s));
+    } catch (e) {
+      delete seen[key];
+    }
+  },
+
   // (2) 回答の評価の一覧。見えない人には枠ごと出さない。2026-11-10
   loadFeedbackAnalytics: async () => {
     const box = document.getElementById('feedbackAnalytics');
@@ -4252,12 +4291,22 @@ const App = {
           }).join('') + '</ul></div>';
         }).join('');
       }
+      // よく参考にされた根拠（開いた人の数が多い順）。評価を付けていない回答で開いたものも含む。
+      const topBox = document.getElementById('feedbackSources');
+      if (topBox) {
+        const top = Array.isArray(r && r.sources_top) ? r.sources_top : [];
+        const kindLabel = { comment: 'コミュニティ', openchat: 'LINEオプチャ', lesson: '講座', video_chunk: '動画' };
+        topBox.innerHTML = '<div class="font-medium">📎 参考にされた根拠（開いた人の多い順）</div>' + (top.length ? '<ol class="list-decimal ml-5 text-slate-600">' + top.map(function (t) {
+          return '<li>' + App.escapeHtml((kindLabel[t.kind] || '') + '：' + (t.title || '')) + ' ― ' + t.people + ' 人・' + t.answers + ' 回答</li>';
+        }).join('') + '</ol>' : '<p class="text-slate-500">まだ記録はありません。会員が答えの「本文を見る」や元ページのリンクを押すと、ここに出ます。</p>');
+      }
       const icon = { great: '🌟', good: '👍', bad: '👎' };
       list.innerHTML = rows.length ? rows.map(function (x) {
         return '<div class="border rounded p-2"><div class="text-xs text-slate-500">' + (icon[x.rating] || '') + ' ' + App.escapeHtml(String(x.updated_at || '').replace('T', ' ').slice(0, 16)) + '</div>' +
           '<div><span class="text-slate-500">質問：</span>' + App.escapeHtml(x.question || '') + '</div>' +
           (Array.isArray(x.reasons) && x.reasons.length ? '<div><span class="text-slate-500">理由：</span>' + x.reasons.map(function (c) { return App.escapeHtml(App.feedbackReasonLabel(c)); }).join('、') + '</div>' : '') +
           (x.comment ? '<div><span class="text-slate-500">その他：</span>' + App.escapeHtml(x.comment) + '</div>' : '') +
+          (Array.isArray(x.sources) && x.sources.length ? '<div><span class="text-slate-500">開いた根拠：</span>' + x.sources.map(function (c) { return App.escapeHtml((c.label ? '[' + c.label + '] ' : '') + (c.title || '')); }).join('、') + '</div>' : '') +
           '<details class="text-xs text-slate-600"><summary>回答の冒頭</summary>' + App.escapeHtml(x.answer || '') + '</details></div>';
       }).join('') : '<p class="text-slate-500">まだ評価はありません。</p>';
     } catch (e) {
