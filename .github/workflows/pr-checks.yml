@@ -85,4 +85,6 @@ jobs:
           python-version: "3.11"
       # Dashboard投影・Gmail処理の純粋関数テストもモジュールをimportする。
       - run: pip install requests pyyaml supabase google-api-python-client python-dotenv pillow
+      # オプチャ常駐監視のランナー（launchd/open_chat_watch_runner.sh）は Mac の zsh 前提。テストで実際に動かすため入れる
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
       - run: python -m unittest discover -s scripts/tests -v
