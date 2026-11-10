@@ -78,12 +78,30 @@ def axa_web_hours_ok(now: datetime | None = None) -> tuple[bool, str]:
     return True, ""
 
 
+def akatsuki_early_morning_skip(
+    msg: str, now: datetime | None = None
+) -> tuple[bool, str]:
+    """あかつき証券は 5:00–5:30 にログイン画面（#branchNo）が出ない。
+
+    2026-08〜11 のログで 5:01–5:17 の実行は全て `waiting for locator("#branchNo")` で落ち、
+    日中は同じコードで通る。この時間帯のこの落ち方だけ「時間外」として後で取り直す。
+    それ以外の時間・それ以外の落ち方は従来どおり error（画面変更を隠さない）。
+    """
+    n = now or datetime.now(JST)
+    hm = n.hour * 60 + n.minute
+    if 5 * 60 <= hm < 5 * 60 + 30 and "#branchNo" in (msg or ""):
+        return True, "あかつき証券は早朝 5:00–5:30 はログイン画面が出ない（時間外・日中に再実行）"
+    return False, ""
+
+
 def rec_from_exc(exc: BaseException) -> dict[str, Any]:
     msg = str(exc)[:300]
     hours = (
         "サービス時間外",
         "時間外／メンテナンス",
         "時間外/メンテナンス",
+        "メンテナンス中",  # マネーフォワード早朝メンテ（Bloomo 評価）
+        "サービス停止中",  # ソニー生命 お客さまWEB の全面停止（2026-11・サイト側）
         "5:00–8:00",
         "9:00–17:30",
         "8:00–24:00",
@@ -639,7 +657,13 @@ def fetch_akatsuki() -> dict[str, Any]:
     cmd = [py_exe(), str(script), "--headless", "--json"]
     if env_file.is_file():
         cmd += ["--env-file", str(env_file)]
-    data = run_json_script(cmd, timeout=180)
+    try:
+        data = run_json_script(cmd, timeout=180)
+    except Exception as exc:
+        skip, reason = akatsuki_early_morning_skip(str(exc))
+        if skip:
+            return {"status": "skipped", "reason": reason}
+        raise
     cost = data.get("cost_jpy")
     pl = data.get("pl_jpy")
     if cost is None and pl is not None:

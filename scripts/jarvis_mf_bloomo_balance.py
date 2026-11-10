@@ -82,16 +82,48 @@ def login_with_password(page, email: str, password: str) -> None:
     page.wait_for_timeout(3000)
 
 
+def _needs_login(url: str) -> bool:
+    return "sign_in" in (url or "") or "id.moneyforward" in (url or "") or (
+        "accounts.google.com" in (url or "")
+    )
+
+
+def is_maintenance_page(title: str, body: str) -> bool:
+    """マネーフォワード側のメンテナンス画面（早朝に出る）。失敗ではなく時間外扱いにする。"""
+    text = f"{title or ''}\n{body or ''}"
+    return "メンテナンス中" in text or "under maintenance" in text.lower()
+
+
+def auto_relogin(page, email: str, *, wait_sec: int = 45) -> bool:
+    """セッション切れを、ワンクリック画面（MF のアカウント選択→Google のアカウント選択）だけで戻す。
+
+    パスワード・パスキー・2段階認証は _advance_login が触らない（人の操作に任せる）。
+    プロファイルに Google のログインが残っていれば、人手なしで口座一覧まで戻る。
+    """
+    advanced_for: set[str] = set()
+    for _ in range(max(1, wait_sec // 3)):
+        url = page.url or ""
+        if _logged_in_url(url):
+            return True
+        if url not in advanced_for and _advance_login(page, email):
+            advanced_for.add(url)
+            print(f"# login: advanced at {url[:80]}", file=sys.stderr, flush=True)
+        page.wait_for_timeout(3000)
+    return _logged_in_url(page.url or "")
+
+
 def ensure_logged_in(page) -> None:
     page.goto(ACCOUNTS_URL, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(1500)
-    if "sign_in" in page.url or "id.moneyforward" in page.url:
+    if _needs_login(page.url):
         email, password = creds()
         if email and password:
             login_with_password(page, email, password)
             page.goto(ACCOUNTS_URL, wait_until="domcontentloaded", timeout=60000)
             page.wait_for_timeout(1500)
-        if "sign_in" in page.url or "id.moneyforward" in page.url:
+        # 2026-11-10: セッション切れが5週間「未ログイン」のまま残った。--save-session と同じ
+        # ワンクリック前進を通常取得でも試す（本人確認が出たら止まる）。
+        if _needs_login(page.url) and not auto_relogin(page, email):
             raise RuntimeError(
                 "MF 未ログイン。--save-session でブラウザプロファイルにログインするか、"
                 "MONEYFORWARD_EMAIL/PASSWORD を .env.jarvis_private に設定してください"
@@ -113,6 +145,12 @@ def fetch_bloomo_value(page) -> tuple[int, str]:
     note = f"url={page.url}"
     if value is None:
         save_debug(page, "bloomo_fail")
+        try:
+            title = page.title()
+        except Exception:
+            title = ""
+        if is_maintenance_page(title, body):
+            raise RuntimeError("マネーフォワードがメンテナンス中（時間をおいて再実行）")
         raise RuntimeError("ブルーモ資産総額が見つかりません（mf_bloomo_debug を確認）")
     if "/accounts/show/" in page.url:
         print(f"# MONEYFORWARD_BLOOMO_SHOW_URL={page.url}", file=sys.stderr)
