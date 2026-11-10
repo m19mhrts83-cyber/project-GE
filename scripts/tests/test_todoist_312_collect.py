@@ -110,5 +110,168 @@ class LinkToken(unittest.TestCase):
         self.assertRegex(sig, r"^[A-Za-z0-9_-]{20,}$")
 
 
+
+# ---- 台帳（comm_items）からの入口 ------------------------------------------------
+from unittest import mock  # noqa: E402
+
+
+def _item(i, **kw):
+    row = {
+        "id": f"00000000-0000-0000-0000-00000000000{i}",
+        "channel": "gmail",
+        "account": "estate",
+        "category": "inquiry",
+        "direction": "inbound",
+        "occurred_at": "2026-11-08T09:08:00+09:00",
+        "subject": "空室のご相談",
+        "summary": "見積りの確認をお願いしたい",
+        "body_text": "",
+        "work_status": "new",
+        "context_header": "山田不動産｜y@example.jp｜gmail(estate)｜相手→自分｜2026-11-08 09:08",
+        "source_ref": {"source": "triage_items", "account": "estate", "gmail_thread_id": "th1"},
+    }
+    row.update(kw)
+    return row
+
+
+class CommPick(unittest.TestCase):
+    def test_new_inbound_is_picked(self):
+        self.assertEqual(len(c.pick_comm([_item(1)], set(), set())), 1)
+
+    def test_needs_reply_only_when_triage_pending(self):
+        it = _item(2, work_status="needs_reply")
+        self.assertEqual(c.pick_comm([it], set(), set()), [])  # 閉じ残し
+        self.assertEqual(len(c.pick_comm([it], {it["id"]}, set())), 1)
+
+    def test_done_and_known_are_skipped(self):
+        self.assertEqual(c.pick_comm([_item(3, work_status="done")], set(), set()), [])
+        it = _item(4)
+        self.assertEqual(c.pick_comm([it], set(), {f"comm_items:{it['id']}"}), [])
+
+    def test_auto_reply_skipped(self):
+        self.assertEqual(c.pick_comm([_item(10, subject="お問い合わせありがとうございます（自動返信）")], set(), set()), [])
+
+    def test_own_line_and_thanks_skipped(self):
+        own = _item(11, channel="line", subject="(件名なし)", summary="", body_text="<details>\n<summary>本文</summary>\n\n2026/11/08 12:38  松野真治  資料を送ります")
+        thanks = _item(12, channel="line", subject="(件名なし)", summary="", body_text="2026/11/08 12:38  岡田  いつもありがとうございます！")
+        ask = _item(13, channel="line", subject="(件名なし)", summary="", body_text="2026/11/08 12:38  岡田  見積りを今週中にください")
+        chat = _item(14, channel="line", subject="(件名なし)", summary="", body_text="2026/11/08 06:50  岡田  昨晩の地震は大丈夫でしたか、こちらは揺れました")
+        talk = _item(15, channel="line", subject="(件名なし)", summary="", body_text="2026/11/08 06:50  岡田  自宅は被害ありませんでした")
+        self.assertEqual([x["id"] for x in c.pick_comm([own, thanks, ask, talk], set(), set())], [ask["id"]])
+        self.assertEqual(len(c.pick_comm([chat], set(), set())), 1)  # 問いかけは残る（判断は Nody で）
+        self.assertEqual(c.comm_text(ask), "見積りを今週中にください")
+
+    def test_self_only_promise(self):
+        yes = _item(5, category="self", direction="outbound", body_text="見積書は明日お送りします。\n\n> 以前のメール\n> 確認します")
+        no = _item(6, category="self", direction="outbound", body_text="ありがとうございました。\n> 確認します")
+        got = c.pick_comm([yes, no], set(), set())
+        self.assertEqual([g["id"] for g in got], [yes["id"]])
+        self.assertIn("お送りします", c.comm_text(yes))
+
+    def test_origin_links_back(self):
+        self.assertEqual(c.comm_origin(_item(7)), "https://mail.google.com/mail/u/matsuno.estate@gmail.com/#all/th1")
+        md = _item(8, source_ref={"path": "215/P102/5.やり取り.md", "heading": "### 2026/11/08｜ミニテック"})
+        self.assertTrue(c.comm_origin(md).startswith("215/P102/5.やり取り.md"))
+
+    def test_comm_topic_shape(self):
+        topic, props, info = c.comm_topic(_item(9), [], NOW)
+        self.assertEqual(topic["source_kind"], "comm")
+        self.assertEqual(topic["source_ref"], f"comm_items:{_item(9)['id']}")
+        self.assertEqual(topic["comm_item_id"], _item(9)["id"])
+        self.assertEqual([p["label"] for p in props], list(c.LABELS))
+        self.assertNotIn("Slack", props[2]["body"])
+        self.assertIn("相手：山田不動産", topic["topic_text"])
+
+
+class SlackUnchanged(unittest.TestCase):
+    """台帳を足しても Slack 由来の文面・反映は変わらない。"""
+
+    def test_slack_proposals_text_unchanged(self):
+        props = c.build_proposals(text=REAL_315, kind="request", permalink="https://x/p1", when="11/2 9:00", match=None, now=NOW)
+        self.assertIn("説明：Slack の依頼から起票。", props[2]["body"])
+        m = {"id": "1", "content": "315 健全化", "due": {"date": "2026-11-20"}}
+        p2 = c.build_proposals(text=REAL_315, kind="request", permalink="https://x/p1", when="11/2 9:00", match=m, now=NOW)[1]["body"]
+        self.assertIn("追記文：11/2 9:00 の Slack で松野さんから依頼あり。", p2)
+
+    def test_consult_lines_without_comm_unchanged(self):
+        made = [{"kind": "request", "title": "315 健全化", "link": "https://x/p1"}]
+        self.assertEqual(
+            c.consult_lines(made, []),
+            ["【相談】312 Todoist起票整理｜起票候補 1件", "", "1. [依頼] 315 健全化  <https://x/p1|元の発言>"],
+        )
+
+    def test_consult_lines_with_comm(self):
+        made = [{"kind": "request", "title": "315 健全化", "link": "https://x/p1"}]
+        comm = [{"label": "メール", "title": "空室のご相談", "link": "https://mail.google.com/x"}]
+        lines = c.consult_lines(made, comm)
+        self.assertEqual(lines[0], "【相談】312 Todoist起票整理｜起票候補 2件（Slack 1件・メール等 1件）")
+        self.assertEqual(lines[3], "2. [メール] 空室のご相談  <https://mail.google.com/x|元のメール>")
+
+    def _reflect(self, topic):
+        calls = []
+
+        def fake_sb(path, params=None, method="GET", body=None, prefer=""):
+            calls.append((path, method, params, body))
+            if path == "task_loop_decisions" and method == "GET":
+                return [{"id": "d1", "topic_id": "t1", "choice": "use", "chosen_index": 3, "final_text": None}]
+            if path == "task_loop_topics":
+                return [topic]
+            if path == "task_loop_proposals":
+                return [{"topic_id": "t1", "proposal_index": 3, "label": "別タスクを作る", "body": "タイトル：空室の相談\n期限：記載なし"}]
+            if path == "comm_items" and method == "GET":
+                return [{"id": "c1", "account": "estate", "source_ref": {"account": "estate", "gmail_thread_id": "th1"}}]
+            return []
+
+        todo = []
+
+        def fake_todoist(path, method="GET", body=None):
+            todo.append((path, body))
+            return {"id": "T9"} if path == "tasks" else {}
+
+        with mock.patch.object(c, "sb", side_effect=fake_sb), mock.patch.object(c, "todoist", side_effect=fake_todoist):
+            c.reflect(dry=False)
+        return calls, todo
+
+    def test_reflect_slack_topic_unchanged(self):
+        calls, todo = self._reflect({"id": "t1", "source_kind": "slack", "source_ref": "https://slack/p1", "todoist_task_ids": [], "topic_text": "x"})
+        self.assertIn("出典: https://slack/p1", todo[0][1]["description"])
+        self.assertFalse(any(p in ("comm_items", "comm_links") for p, *_ in calls))
+        topics_q = [prm for p, m, prm, _ in calls if p == "task_loop_topics"][0]
+        self.assertEqual(topics_q["source_kind"], "in.(slack,comm)")
+
+    def test_reflect_comm_topic_links_back(self):
+        calls, todo = self._reflect(
+            {"id": "t1", "source_kind": "comm", "source_ref": "comm_items:c1", "comm_item_id": "c1", "todoist_task_ids": [], "topic_text": "x"}
+        )
+        self.assertIn("出典: https://mail.google.com/mail/u/matsuno.estate@gmail.com/#all/th1", todo[0][1]["description"])
+        links = [b for p, m, _, b in calls if p == "comm_links" and m == "POST"]
+        self.assertEqual(links[0]["target_type"], "todoist_task")
+        self.assertEqual(links[0]["target_id"], "T9")
+        patch = [(prm, b) for p, m, prm, b in calls if p == "comm_items" and m == "PATCH"][0]
+        self.assertEqual(patch[1], {"work_status": "waiting"})
+        self.assertEqual(patch[0]["work_status"], "in.(new,needs_reply)")
+
+
+class CommSwitch(unittest.TestCase):
+    def test_off_by_default_and_wednesday_only(self):
+        with mock.patch.object(c, "comm_candidates") as cc, mock.patch.object(c, "active_tasks", return_value=[]), \
+             mock.patch.object(c, "slack_messages", return_value=[]), mock.patch.object(c, "sb", return_value=[]):
+            c.collect(hours=1, max_items=5, dry=True, now=NOW)  # 既定 comm_max=0
+            cc.assert_not_called()
+            c.collect(hours=1, max_items=5, dry=True, now=NOW, comm_max=5)  # NOW は月曜
+            cc.assert_not_called()
+            wed = NOW + timedelta(days=2)
+            cc.return_value = []
+            c.collect(hours=1, max_items=5, dry=True, now=wed, comm_max=5)
+            cc.assert_called_once()
+
+    def test_comm_failure_does_not_stop_slack(self):
+        wed = NOW + timedelta(days=2)
+        with mock.patch.object(c, "comm_candidates", side_effect=RuntimeError("db down")), \
+             mock.patch.object(c, "active_tasks", return_value=[]), mock.patch.object(c, "slack_messages", return_value=[]), \
+             mock.patch.object(c, "sb", return_value=[]):
+            self.assertEqual(c.collect(hours=1, max_items=5, dry=True, now=wed, comm_max=5), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,7 @@ name: 312 Todoist起票整理 — 起こりを拾う／Todoistへ反映
 # collect … 月・水・金 20:30 JST: Slack の松野さんの発言から『起こり』を拾い、Nody（/312）のお題にして #consult に1通
 # reflect … 30分ごと（7:00〜24:00 JST）: Nody で「既存タスクへ追記」「別タスクを作る」を選んだものだけ Todoist へ
 # 止める: リポジトリ変数 JARVIS_TODOIST_312_COLLECT_DISABLE=1（collect の #consult 投稿だけ止める）
+# 台帳（comm_items）から拾う: リポジトリ変数 JARVIS_312_COMM_MAX（未設定・0＝止め。お試しは 5。水曜の回だけ拾う）
 
 on:
   schedule:
@@ -47,6 +48,7 @@ jobs:
           SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
           LOOPWARE_ACCESS_KEY: ${{ secrets.LOOPWARE_ACCESS_KEY }}
           JARVIS_TODOIST_312_COLLECT_DISABLE: ${{ vars.JARVIS_TODOIST_312_COLLECT_DISABLE }}
+          COMM_MAX: ${{ vars.JARVIS_312_COMM_MAX }}
           SCHEDULE: ${{ github.event.schedule }}
           IN_MODE: ${{ github.event.inputs.mode }}
           IN_HOURS: ${{ github.event.inputs.hours }}
@@ -59,4 +61,5 @@ jobs:
           ARGS=(--mode "$MODE")
           if [[ -n "${IN_HOURS:-}" ]]; then ARGS+=(--hours "$IN_HOURS"); fi
           if [[ "${IN_DRY:-false}" == "true" ]]; then ARGS+=(--dry-run); fi
+          if [[ "$MODE" == "collect" && -n "${COMM_MAX:-}" ]]; then ARGS+=(--comm-max "$COMM_MAX"); fi
           python scripts/jarvis_todoist_312_collect.py "${ARGS[@]}"
