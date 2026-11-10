@@ -174,7 +174,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -189,6 +189,10 @@ const App = {
       App.state.featureViewNew = localStorage.getItem('qa_feature_view_new') !== '0';
       App.state.viewAsMember = localStorage.getItem('qa_view_as_member') === '1';
     } catch (e) { /* ignore */ }
+  },
+  // (5) ロゴに合わせた配色（案A）。見た目だけなので画面側の切り替えで足りる（色は index.html の html.theme-a）。
+  applyTheme: () => {
+    if (document.documentElement) document.documentElement.classList.toggle('theme-a', App.featureOn('design_theme'));
   },
   renderFeaturePreviewBar: () => {
     const bar = document.getElementById('featurePreviewBar');
@@ -1291,6 +1295,7 @@ const App = {
     }
     App.showMainView();
     await App.loadFeatures();
+    App.applyTheme();
     App.renderFeaturePreviewBar();
     App.applySearchModeUi();
     App.elements.currentUserLabel.textContent = App.state.currentUser.email + ' (' + (App.isStaffAdmin() || !App.state.viewAsMember ? App.state.currentUser.role : 'user として表示中') + ')';
@@ -1345,6 +1350,7 @@ const App = {
     App.state.attachmentDetailCommentId = '';
     App.state.features = {};
     App.state.feedbackByMessage = {};
+    if (document.documentElement) document.documentElement.classList.remove('theme-a');
     const featureBar = document.getElementById('featurePreviewBar');
     if (featureBar) featureBar.classList.add('hidden');
     App.state.currentUser = null;
