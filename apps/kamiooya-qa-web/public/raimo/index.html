@@ -260,6 +260,8 @@
                 <i class="fa-solid fa-database mr-1"></i>参照データ（回答の根拠を一覧で見る）
               </p>
               <div class="ml-3 pl-2 border-l-2 border-slate-200 space-y-0.5 text-sm">
+                <!-- まとめてキーワード検索（2026-11-11）: スイッチ keyword_all が見える人だけ -->
+                <button id="allSearchTabBtn" data-screen="allSearch" class="screen-tab hidden w-full text-left px-3 py-1.5 rounded hover:bg-slate-100 font-semibold text-blue-900"><i class="fa-solid fa-magnifying-glass mr-1"></i>まとめて検索（全データ）</button>
                 <button data-screen="comments" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">westudy コミュニティコメント</button>
                 <button data-screen="knowledge" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">westudy 動画文字起こし</button>
                 <button data-screen="lessons" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">westudy 講座ページ説明文</button>
@@ -670,6 +672,22 @@
                 <input id="deleteCommentIdLikeInput" class="border rounded-md px-3 py-2 min-w-[230px] flex-1" placeholder="comment_id 部分一致（任意）" />
                 <button id="deleteCommentsBtn" class="px-4 py-2 rounded bg-red-600 text-white">削除実行</button>
               </div>
+            </div>
+          </section>
+
+          <!-- まとめてキーワード検索（2026-11-11）: 全データソースをキーワードで同時に探す。AIは使わない。スイッチ keyword_all が見える人だけ -->
+          <section id="allSearchScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
+            <div id="allSearchBox" class="w-full max-w-4xl space-y-3">
+              <div class="bg-white rounded border p-4">
+                <h3 class="font-semibold mb-1">まとめてキーワード検索</h3>
+                <p class="text-sm text-slate-500 mb-3">コミュニティコメント・動画文字起こし・講座ページ説明文・LINEオプチャを、キーワードでまとめて探します。空白で区切ると、すべての語を含むものだけ出します。</p>
+                <form id="allSearchForm" class="flex gap-2">
+                  <input id="allSearchInput" type="search" class="flex-1 min-w-0 border rounded-md px-3 py-2" placeholder="例: 原状回復 費用" />
+                  <button type="submit" class="px-4 py-2 rounded bg-blue-900 text-white shrink-0">検索</button>
+                </form>
+                <p id="allSearchMeta" class="text-xs text-slate-500 mt-2"></p>
+              </div>
+              <div id="allSearchResults" class="space-y-3"></div>
             </div>
           </section>
 
