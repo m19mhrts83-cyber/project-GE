@@ -731,7 +731,7 @@
                 <div class="flex flex-wrap items-end justify-between gap-3">
                   <div>
                     <h3 class="font-semibold mb-1">運営分析ダッシュボード</h3>
-                    <p class="text-sm text-slate-500">通常検索と意味検索の利用比率・日次推移・質問傾向（直近）</p>
+                    <p class="text-sm text-slate-500">意味検索と「より詳しく調べる」の利用比率・日次推移・質問傾向（直近）</p>
                   </div>
                   <div class="flex flex-wrap gap-2 items-end">
                     <label class="text-xs text-slate-500">
@@ -807,7 +807,7 @@
 
               <div class="bg-white rounded border p-4 overflow-auto">
                 <h4 class="font-semibold mb-1 text-sm">費用の実測（週次）</h4>
-                <p class="text-xs text-slate-500 mb-3">週は月曜始まり（日本時間）。意味検索は Gemini の実トークン数から計算、通常検索は件数×単価目安。AI Studio の請求額と見比べてください。</p>
+                <p class="text-xs text-slate-500 mb-3">週は月曜始まり（日本時間）。意味検索・より詳しく調べるは Gemini の実トークン数から計算、通常検索（切替前の会員）は件数×単価目安。AI Studio の請求額と見比べてください。</p>
                 <div id="analyticsMetering" class="space-y-3 text-sm"></div>
               </div>
 
@@ -823,8 +823,9 @@
                     <tr>
                       <th class="p-2 text-left">質問</th>
                       <th class="p-2 text-left">合計</th>
-                      <th class="p-2 text-left">通常</th>
                       <th class="p-2 text-left">意味</th>
+                      <th class="p-2 text-left">より詳しく</th>
+                      <th id="analyticsTopNormalTh" class="p-2 text-left hidden">通常（切替前）</th>
                     </tr>
                   </thead>
                   <tbody id="analyticsTopQueriesBody"></tbody>

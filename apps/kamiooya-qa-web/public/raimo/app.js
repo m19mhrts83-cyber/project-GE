@@ -4845,7 +4845,7 @@ const App = {
   // (2) 評価した答えの作り方（11/11）。軽いモデルや使い回しで悪いねが多いかを見分ける。
   answerMakeLabel: (x) => {
     if (!x || !x.answer_mode) return '不明（記録前の評価）';
-    const mode = { semantic: '意味検索', deep: 'より詳しく調べる', normal: '通常検索', fast: '高速' }[x.answer_mode] || x.answer_mode;
+    const mode = { semantic: '意味検索', deep: 'より詳しく調べる', normal: '通常検索（切替前）', fast: '高速' }[x.answer_mode] || x.answer_mode;
     const tier = x.answer_mode === 'semantic' ? (x.answer_tier === 'lite' ? '・ライト版' : '・上位版') : '';
     return mode + tier + (x.answer_model ? '（' + x.answer_model + '）' : '') + (x.answer_reused ? '・使い回し' : '');
   },
@@ -4934,7 +4934,7 @@ const App = {
     try {
       const r = await App.apiClient('POST', '/admin/conversation-signals/list', {});
       const labels = (r && r.labels) || {}, counts = (r && r.counts) || {}, chats = (r && Array.isArray(r.chats)) ? r.chats : [];
-      const modeLabel = { semantic: '意味検索', deep: 'より詳しく', normal: '通常', fast: '高速' };
+      const modeLabel = { semantic: '意味検索', deep: 'より詳しく', normal: '通常（切替前）', fast: '高速' };
       summary.innerHTML = App.escapeHtml('会話 ' + (r.total_chats || 0) + ' 件のうち、目印のある会話 ' + (r.flagged || 0) + ' 件') +
         '<ul class="text-slate-600 mt-1">' + Object.keys(labels).filter(function (k) { return counts[k]; }).map(function (k) {
           return '<li>' + App.escapeHtml(labels[k]) + '：' + counts[k] + ' 件</li>';
@@ -5124,16 +5124,24 @@ const App = {
       '<div class="bg-white rounded border p-3"><div class="text-xs text-slate-500">合計</div><div class="text-2xl font-semibold">' +
       App.escapeHtml(String(t.total || 0)) +
       '</div></div>' +
-      '<div class="bg-white rounded border p-3"><div class="text-xs text-slate-500">通常検索</div><div class="text-2xl font-semibold">' +
-      App.escapeHtml(String(t.normal || 0)) +
-      '</div><div class="text-xs text-slate-500 mt-1">' +
-      App.escapeHtml(pct(t.normal_ratio)) +
-      '</div></div>' +
       '<div class="bg-white rounded border p-3 border-blue-200"><div class="text-xs text-blue-700">意味検索</div><div class="text-2xl font-semibold text-blue-900">' +
       App.escapeHtml(String(t.semantic || 0)) +
       '</div><div class="text-xs text-blue-600 mt-1">' +
       App.escapeHtml(pct(t.semantic_ratio)) +
       '</div></div>' +
+      '<div class="bg-white rounded border p-3 border-amber-200"><div class="text-xs text-amber-700">より詳しく調べる</div><div class="text-2xl font-semibold text-amber-900">' +
+      App.escapeHtml(String(t.deep || 0)) +
+      '</div><div class="text-xs text-amber-700 mt-1">' +
+      App.escapeHtml(pct(t.deep_ratio)) +
+      '</div></div>' +
+      // 通常検索は、新しいモードに切り替わる前の会員がいる間だけ出す（2026-11-11）
+      (Number(t.normal) > 0
+        ? '<div class="bg-white rounded border p-3"><div class="text-xs text-slate-500">通常検索（切替前）</div><div class="text-2xl font-semibold">' +
+          App.escapeHtml(String(t.normal || 0)) +
+          '</div><div class="text-xs text-slate-500 mt-1">' +
+          App.escapeHtml(pct(t.normal_ratio)) +
+          '</div></div>'
+        : '') +
       '<div class="bg-white rounded border p-3 ' +
       (Number(t.failed) > 0 ? 'border-amber-300' : '') +
       '"><div class="text-xs text-amber-700">失敗・停止</div><div class="text-2xl font-semibold">' +
@@ -5168,10 +5176,9 @@ const App = {
           '<div class="text-xl font-semibold mt-1">' +
           App.escapeHtml(String(billableTotal)) +
           '</div>' +
-          '<div class="text-xs text-slate-500 mt-1">通常 ' +
-          App.escapeHtml(String(g.billable_normal || 0)) +
-          ' / 意味 ' +
+          '<div class="text-xs text-slate-500 mt-1">意味・より詳しく ' +
           App.escapeHtml(String(g.billable_semantic || 0)) +
+          (Number(g.billable_normal) > 0 ? ' / 通常（切替前） ' + App.escapeHtml(String(g.billable_normal || 0)) : '') +
           '</div></div>' +
           '<div class="rounded border p-3 bg-slate-50">' +
           '<div class="text-xs text-slate-500">想定課金（USD）</div>' +
@@ -5210,32 +5217,40 @@ const App = {
         .map(function (d) {
           const n = Number(d.normal) || 0;
           const s = Number(d.semantic) || 0;
+          const dp = Number(d.deep) || 0;
           const nw = ((n / maxDaily) * 100).toFixed(1);
           const sw = ((s / maxDaily) * 100).toFixed(1);
+          const dw = ((dp / maxDaily) * 100).toFixed(1);
           return (
             '<div>' +
             '<div class="flex justify-between text-xs text-slate-500 mb-1">' +
             '<span>' +
             App.escapeHtml(d.day || '') +
             '</span>' +
-            '<span>通常 ' +
-            n +
-            ' / 意味 ' +
+            '<span>意味 ' +
             s +
+            ' / より詳しく ' +
+            dp +
+            (n > 0 ? ' / 通常（切替前） ' + n : '') +
             '（計 ' +
-            (Number(d.total) || n + s) +
+            (Number(d.total) || n + s + dp) +
             '）</span>' +
             '</div>' +
             '<div class="flex h-3 rounded-full overflow-hidden bg-slate-100 border">' +
-            '<div class="bg-slate-400" style="width:' +
-            nw +
-            '%" title="通常 ' +
-            n +
-            '"></div>' +
             '<div class="bg-blue-600" style="width:' +
             sw +
             '%" title="意味 ' +
             s +
+            '"></div>' +
+            '<div class="bg-amber-500" style="width:' +
+            dw +
+            '%" title="より詳しく ' +
+            dp +
+            '"></div>' +
+            '<div class="bg-slate-400" style="width:' +
+            nw +
+            '%" title="通常（切替前） ' +
+            n +
             '"></div>' +
             '</div></div>'
           );
@@ -5244,9 +5259,12 @@ const App = {
     }
 
     const top = data.top_queries || [];
+    const showNormal = top.some(function (q) { return Number(q.normal) > 0; });
+    const normalTh = document.getElementById('analyticsTopNormalTh');
+    if (normalTh) normalTh.classList.toggle('hidden', !showNormal);
     topBody.innerHTML =
       top.length === 0
-        ? '<tr><td class="p-2 text-slate-500" colspan="4">なし</td></tr>'
+        ? '<tr><td class="p-2 text-slate-500" colspan="5">なし</td></tr>'
         : top
             .map(function (q) {
               return (
@@ -5260,11 +5278,13 @@ const App = {
                 App.escapeHtml(String(q.count || 0)) +
                 '</td>' +
                 '<td class="p-2">' +
-                App.escapeHtml(String(q.normal || 0)) +
+                App.escapeHtml(String(q.semantic || 0)) +
                 '</td>' +
                 '<td class="p-2">' +
-                App.escapeHtml(String(q.semantic || 0)) +
-                '</td></tr>'
+                App.escapeHtml(String(q.deep || 0)) +
+                '</td>' +
+                (showNormal ? '<td class="p-2">' + App.escapeHtml(String(q.normal || 0)) + '</td>' : '') +
+                '</tr>'
               );
             })
             .join('');
@@ -5278,7 +5298,7 @@ const App = {
         : recent
             .map(function (ev) {
               const mode = String(ev.search_mode || '');
-              const modeLabel = mode === 'semantic' ? '意味' : mode === 'normal' ? '通常' : mode;
+              const modeLabel = { semantic: '意味', deep: 'より詳しく', normal: '通常（切替前）', openchat_list: 'オプチャ一覧' }[mode] || mode;
               const st = String(ev.result_status || 'ok');
               const stLabel =
                 st === 'ok'
@@ -5366,13 +5386,13 @@ const App = {
     el.innerHTML =
       '<div class="grid grid-cols-2 md:grid-cols-4 gap-3">' +
       card('成功質問数', num(m.questions), '利用者 ' + (m.period_users == null ? '—' : num(m.period_users)) + ' 人') +
-      card('Gemini 費用（期間）', yen(m.total_jpy_low) + '〜' + yen(m.total_jpy_high), '通常検索の幅で上下') +
+      card('Gemini 費用（期間）', yen(m.total_jpy_low) + '〜' + yen(m.total_jpy_high), '通常検索（切替前）の幅で上下') +
       card('1問あたり', perQ, '試算は1.5〜6円') +
       card('意味検索 1問の実費', semPerQ, '実測 ' + num(m.semantic_metered) + ' 問') +
       '</div>' +
       '<table class="w-full text-xs mt-2"><thead class="bg-slate-50 text-slate-600"><tr>' +
-      '<th class="p-2 text-left">週</th><th class="p-2 text-right">質問</th><th class="p-2 text-right">通常</th>' +
-      '<th class="p-2 text-right">意味</th><th class="p-2 text-right">利用者</th>' +
+      '<th class="p-2 text-left">週</th><th class="p-2 text-right">質問</th><th class="p-2 text-right">通常（切替前）</th>' +
+      '<th class="p-2 text-right">意味・より詳しく</th><th class="p-2 text-right">利用者</th>' +
       '<th class="p-2 text-right">入力トークン</th><th class="p-2 text-right">出力トークン</th>' +
       '<th class="p-2 text-right">費用（円）</th></tr></thead><tbody>' +
       (weekly.length === 0
@@ -5401,7 +5421,7 @@ const App = {
           ' 単価: 入力 $' + (m.price_usd_per_m ? m.price_usd_per_m.input : 0.5) +
           '／出力 $' + (m.price_usd_per_m ? m.price_usd_per_m.output : 3) +
           '（100万トークンあたり）、1USD≒' + (m.usd_jpy || 150) +
-          '円。週の利用者数は通常・意味の多い方。'
+          '円。週の利用者数は通常（切替前）と意味・より詳しくの多い方。'
       ) +
       '</p>';
   },
