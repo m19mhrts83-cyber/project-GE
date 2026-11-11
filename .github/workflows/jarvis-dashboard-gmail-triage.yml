@@ -190,6 +190,16 @@ jobs:
           fi
           python scripts/jarvis_gha_partner_triage.py "${ARGS[@]}"
 
+      # ボット（Grok など）の受付の表 → 台帳へ本登録。失敗しても本線は止めない
+      - name: Comm intake (bots) → comm_items
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        continue-on-error: true
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          PYTHONPATH: ${{ github.workspace }}/scripts
+        run: python scripts/jarvis_comm_hub.py ingest-intake --apply
+
       # Autofix は Fail(attention/warn) のときだけ Cloud Agent。抑制: repo Variable/Secret
       # JARVIS_OPS_FAIL_AUTOFIX_DISABLE=1（了承後）。正本: docs/AIエージェントチーム/34_定期実行とAI使用量_20261017.md
       - name: Ops fail watch (Vercel / GHA) + autofix
