@@ -5427,6 +5427,28 @@ const App = {
     }catch(e){/* ignore */}
     return App.ANSWER_DURATION_DEFAULTS[mode]||60;
   },
+  // 待っている間のおすすめ講座（11/11 松野さん、いけともさんの事例）。質問の言葉と講座タイトルの重なりで最大3件。
+  // データは画面に同梱している講座一覧（WESTUDY_COURSE_CATALOG）だけを使い、AIも追加の通信も使わない。
+  answerWaitCourses: (query) => {
+    const cat=window.WESTUDY_COURSE_CATALOG||{};const q=String(query||'').replace(/[\s、。？！?!・「」（）()]/g,'');
+    if(q.length<2)return [];
+    const grams=new Set();for(let i=0;i<q.length-1;i++){const g=q.slice(i,i+2);if(!/^[ぁ-ん]{2}$/.test(g))grams.add(g);}
+    if(!grams.size)return [];
+    const seen=new Set();const rows=[];
+    Object.keys(cat).forEach((url)=>{
+      const v=cat[url]||{};if(!v.title||/はじめに/.test(v.course||''))return;
+      const text=String(v.title)+' '+String(v.section||'');let score=0;grams.forEach((g)=>{if(text.indexOf(g)>=0)score+=1;});
+      const key=String(v.title).replace(/\s+/g,'');if(score>=2&&!seen.has(key)){seen.add(key);rows.push({url:url,title:String(v.title),course:String(v.course||''),score:score});}
+    });
+    return rows.sort((a,b)=>b.score-a.score).slice(0,3);
+  },
+  answerWaitCoursesHtml: () => {
+    const p=App.state.pendingAnswerRequest;const list=App.answerWaitCourses(p&&p.query);
+    if(!list.length)return '';
+    const esc=(t)=>App.escapeHtml?App.escapeHtml(t):String(t).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    return '<div class="search-motion-courses"><div class="search-motion-courses-title"><i class="fa-solid fa-circle-play" aria-hidden="true"></i> 待っている間に（関連しそうな講座）</div><ul>'+
+      list.map((r)=>'<li><a href="'+esc(r.url)+'" target="_blank" rel="noopener">'+esc(r.title)+'</a><span>'+esc(r.course.replace(/^神大家/,''))+'</span></li>').join('')+'</ul></div>';
+  },
   renderAnswerSearchMotion: (deep) => {
     const list=document.getElementById('chatMessages');if(!list)return;
     const mode=App.answerModeKey(),est=App.estimateAnswerSeconds(mode);
@@ -5441,8 +5463,8 @@ const App = {
     const ratio=sec/est;const idx=ratio<0.15?0:ratio<0.35?1:ratio<0.55?2:3;
     // 進み具合の帯: 目安までに9割、超えたらゆっくり近づくだけ（100%にはしない）
     const pct=ratio<=1?Math.round(ratio*90):Math.min(98,Math.round(90+8*(1-Math.exp(-(ratio-1)*1.5))));
-    const left=est-sec;
-    const remain=left>60?'あと約'+Math.ceil(left/60)+'分':left>10?'あと約'+(Math.ceil(left/10)*10)+'秒':left>0?'まもなく':'もう少しお待ちください（混み合うと数分かかることがあります）';
+    // 秒数ではなく言葉で進み具合を伝える（11/11 松野さん「ゲージで進んでる感が出ればいい」）
+    const remain=ratio<0.3?'調べ始めました':ratio<0.6?'半分ほど進みました':ratio<0.9?'もうすぐまとまります':ratio<=1?'まもなくお届けします':'もう少しお待ちください（混み合うと少し長くかかります）';
     let card=document.getElementById('answerWorkingCard');
     if(!card){
       card=document.createElement('div');card.id='answerWorkingCard';card.setAttribute('role','status');card.setAttribute('aria-live','polite');
@@ -5454,7 +5476,7 @@ const App = {
           '<ol class="search-motion-steps">'+steps.map((s,i)=>'<li data-step="'+i+'"><i class="'+(s.icon.indexOf('fa-brands')===0?s.icon:'fa-solid '+s.icon)+'" aria-hidden="true"></i><span>'+s.label+'</span></li>').join('')+'</ol>'+
           '<div class="search-motion-progress" aria-hidden="true"><div data-progress></div></div>'+
           '<div class="search-motion-meta"><span data-remain></span><span data-elapsed></span></div>'+
-        '</div></div>';
+        '</div>'+App.answerWaitCoursesHtml()+'</div>';
     }
     if(card.parentNode!==list||list.lastElementChild!==card){list.appendChild(card);list.scrollTop=list.scrollHeight;}
     card.querySelectorAll('[data-step]').forEach((li)=>{const i=Number(li.getAttribute('data-step'));li.classList.toggle('is-done',i<idx);li.classList.toggle('is-active',i===idx);});
