@@ -5105,6 +5105,7 @@ const App = {
     const dailyEl = document.getElementById('analyticsDailyBars');
     const topBody = document.getElementById('analyticsTopQueriesBody');
     const recentBody = document.getElementById('analyticsRecentBody');
+    App.renderAnalyticsBrand(data);
     if (!cards || !dailyEl || !topBody || !recentBody) return;
 
     if (!data || !data.totals) {
@@ -5318,6 +5319,180 @@ const App = {
               );
             })
             .join('');
+  },
+
+  // 運営分析の新しい見た目（2026-11-11 松野さん「味気ないので、見やすく把握しやすく、動きもつけて」）。
+  // 配色(design_theme)と同じスイッチの人だけ。数字はカウントアップ、グラフは下から伸びる。動きを減らす設定の端末では動かさない。
+  // 表記: 意味=semantic、より詳しく=deep、通常(normal)は切替前の会員の分で、0件なら出さない。
+  renderAnalyticsBrand: (data) => {
+    const root = document.getElementById('analyticsBrand');
+    if (!root) return;
+    if (!document.documentElement.classList.contains('theme-a')) { root.innerHTML = ''; return; }
+    const esc = App.escapeHtml;
+    const num = (n) => Number(n || 0);
+    const fmt = (n) => num(n).toLocaleString('ja-JP');
+    if (!data || !data.totals) {
+      root.innerHTML = '<div class="ab-empty"><i class="fa-solid fa-chart-column"></i><p>まだ表示できるデータがありません。<br>上の「再取得」を押すと最新の数字を読み込みます。</p></div>';
+      return;
+    }
+    const t = data.totals;
+    const days = num(data.range_days) || (data.daily || []).length || 0;
+    const semantic = num(t.semantic), deep = num(t.deep), normal = num(t.normal);
+    const total = num(t.total) || semantic + deep + normal;
+    const failed = num(t.failed);
+    const okCount = Math.max(0, total - failed);
+    const series = [
+      { key: 'semantic', label: '意味', note: 'ふだんの検索（言い換えも探す）', cls: 'ab-c1', value: semantic },
+      { key: 'deep', label: 'より詳しく', note: '上位のAIで時間をかけて答える', cls: 'ab-c2', value: deep },
+    ];
+    if (normal > 0) series.push({ key: 'normal', label: '通常（切替前）', note: 'まだ新しい検索に切り替わっていない方', cls: 'ab-c3', value: normal });
+    const pctOf = (v) => (total > 0 ? Math.round((v / total) * 1000) / 10 : 0);
+    const daily = (data.daily || []).map((d) => {
+      const o = { day: String(d.day || ''), semantic: num(d.semantic), deep: num(d.deep), normal: num(d.normal) };
+      o.total = num(d.total) || o.semantic + o.deep + o.normal;
+      return o;
+    });
+    const wd = ['日', '月', '火', '水', '木', '金', '土'];
+    const dayLabel = (s, withWeek) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+      if (!m) return s;
+      const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      return Number(m[2]) + '/' + Number(m[3]) + (withWeek ? '（' + wd[dt.getDay()] + '）' : '');
+    };
+    const peak = daily.reduce((a, d) => (!a || d.total > a.total ? d : a), null);
+    const activeDays = daily.filter((d) => d.total > 0).length;
+    const avg = days > 0 ? total / days : 0;
+    const half = Math.floor(daily.length / 2);
+    const sumOf = (arr) => arr.reduce((s, d) => s + d.total, 0);
+    const firstHalf = sumOf(daily.slice(0, half)), secondHalf = sumOf(daily.slice(daily.length - half));
+    let trend = '';
+    if (half >= 3 && firstHalf + secondHalf > 0) {
+      if (secondHalf > firstHalf * 1.15) trend = '<span class="ab-trend ab-trend-up"><i class="fa-solid fa-arrow-trend-up"></i> 後半のほうが増えています</span>';
+      else if (secondHalf < firstHalf * 0.85) trend = '<span class="ab-trend ab-trend-down"><i class="fa-solid fa-arrow-trend-down"></i> 後半のほうが減っています</span>';
+      else trend = '<span class="ab-trend"><i class="fa-solid fa-arrow-right"></i> 前半と後半はほぼ同じです</span>';
+    }
+    const countUp = (v, digits) => '<span class="ab-count" data-to="' + v + '" data-digits="' + (digits || 0) + '">' + (digits ? Number(v).toFixed(digits) : fmt(v)) + '</span>';
+
+    // 1) ひと目でわかるまとめ
+    const lead =
+      '<div class="ab-lead">' +
+      '<div class="ab-lead-icon"><i class="fa-solid fa-lightbulb"></i></div>' +
+      '<div><p class="ab-lead-title">この' + esc(String(days)) + '日間のまとめ</p>' +
+      '<p class="ab-lead-text">質問は <b>' + fmt(total) + '件</b>、1日あたり <b>約' + esc(avg.toFixed(1)) + '件</b> でした。' +
+      (peak && peak.total > 0 ? 'いちばん多かったのは <b>' + esc(dayLabel(peak.day, true)) + 'の' + fmt(peak.total) + '件</b> です。' : '') +
+      (failed > 0 ? 'うまく答えられなかった質問が <b class="ab-warn-text">' + fmt(failed) + '件</b> あります。' : 'うまく答えられなかった質問はありません。') +
+      '</p>' + trend + '</div></div>';
+
+    // 2) 大きな数字のカード
+    const kpi = (icon, label, valueHtml, unit, sub, cls) =>
+      '<div class="ab-kpi ' + (cls || '') + '"><div class="ab-kpi-head"><span class="ab-kpi-icon"><i class="fa-solid ' + icon + '"></i></span>' + esc(label) + '</div>' +
+      '<div class="ab-kpi-value">' + valueHtml + '<span class="ab-kpi-unit">' + esc(unit) + '</span></div>' +
+      '<div class="ab-kpi-sub">' + sub + '</div></div>';
+    const kpis =
+      '<div class="ab-kpis">' +
+      kpi('fa-comments', '質問の合計', countUp(total), '件', '1日あたり 約' + esc(avg.toFixed(1)) + '件', 'ab-kpi-main') +
+      kpi('fa-magnifying-glass', '意味', countUp(semantic), '件', '全体の ' + esc(String(pctOf(semantic))) + '%', 'ab-kpi-c1') +
+      kpi('fa-book-open-reader', 'より詳しく', countUp(deep), '件', '全体の ' + esc(String(pctOf(deep))) + '%', 'ab-kpi-c2') +
+      kpi(failed > 0 ? 'fa-triangle-exclamation' : 'fa-circle-check', '答えられなかった', countUp(failed), '件',
+        failed > 0 ? '停止・上限・エラーの合計' : 'すべて答えられました', failed > 0 ? 'ab-kpi-warn' : 'ab-kpi-good') +
+      '</div>';
+
+    // 3) 使われ方の割合（ドーナツ）
+    const R = 15.915; // 円周 100
+    let offset = 0;
+    const arcs = total > 0
+      ? series.filter((s) => s.value > 0).map((s) => {
+          const p = (s.value / total) * 100;
+          const gap = p > 2 ? 0.8 : 0;
+          const a = '<circle class="ab-arc ' + s.cls + '" r="' + R + '" cx="21" cy="21" transform="rotate(-90 21 21)" stroke-dasharray="0 100" data-dash="' + Math.max(0, p - gap).toFixed(2) + '" stroke-dashoffset="' + (-offset).toFixed(2) + '"><title>' + esc(s.label) + ' ' + fmt(s.value) + '件</title></circle>';
+          offset += p;
+          return a;
+        }).join('')
+      : '';
+    const donut =
+      '<div class="ab-card ab-mix"><h4 class="ab-h"><i class="fa-solid fa-chart-pie"></i> 検索の使われ方</h4>' +
+      '<div class="ab-mix-body"><div class="ab-donut"><svg viewBox="0 0 42 42" role="img" aria-label="検索の使われ方の割合">' +
+      '<circle r="' + R + '" cx="21" cy="21" class="ab-arc-bg"></circle>' + arcs + '</svg>' +
+      '<div class="ab-donut-center"><span class="ab-donut-num">' + countUp(okCount) + '<small>件</small></span><span>答えられた質問</span></div></div>' +
+      '<ul class="ab-legend">' + series.map((s) =>
+        '<li><span class="ab-swatch ' + s.cls + '"></span><div><div class="ab-legend-name">' + esc(s.label) + '<b>' + fmt(s.value) + '件</b><em>' + esc(String(pctOf(s.value))) + '%</em></div>' +
+        '<div class="ab-legend-note">' + esc(s.note) + '</div></div></li>').join('') + '</ul></div></div>';
+
+    // 4) 日ごとの件数（積み上げ棒）
+    const maxDay = Math.max(1, ...daily.map((d) => d.total));
+    const step = maxDay <= 5 ? 1 : maxDay <= 10 ? 2 : maxDay <= 25 ? 5 : maxDay <= 50 ? 10 : Math.ceil(maxDay / 50) * 10;
+    const top = Math.ceil(maxDay / step) * step;
+    const grid = [];
+    for (let v = 0; v <= top; v += step) grid.push(v);
+    const labelEvery = daily.length <= 14 ? 1 : daily.length <= 31 ? 3 : daily.length <= 60 ? 7 : 14;
+    const cols = daily.map((d, i) => {
+      const segs = series.map((s) => d[s.key] > 0 ? '<i class="' + s.cls + '" style="height:' + ((d[s.key] / top) * 100).toFixed(2) + '%"></i>' : '').join('');
+      return '<button type="button" class="ab-col' + (peak && d === peak && d.total > 0 ? ' is-peak' : '') + '" data-i="' + i + '" style="--d:' + Math.min(i * 30, 900) + 'ms" aria-label="' + esc(dayLabel(d.day, true) + ' 合計' + d.total + '件') + '">' +
+        '<span class="ab-stack">' + segs + (peak && d === peak && d.total > 0 ? '<em class="ab-peak">最多 ' + fmt(d.total) + '</em>' : '') + '</span>' +
+        '<span class="ab-xlab">' + (i % labelEvery === 0 || i === daily.length - 1 ? esc(dayLabel(d.day, false)) : '') + '</span></button>';
+    }).join('');
+    const chart = daily.length === 0
+      ? '<p class="ab-muted">この期間のデータはありません</p>'
+      : '<p class="ab-readout" aria-live="polite"></p>' +
+        '<div class="ab-chart"><div class="ab-grid">' + grid.map((v) => '<div style="bottom:' + ((v / top) * 100).toFixed(2) + '%"><span>' + v + '</span></div>').join('') + '</div>' +
+        '<div class="ab-cols' + (labelEvery === 1 && daily.length > 7 ? ' ab-cols-many' : '') + '">' + cols + '</div></div>' +
+        '<ul class="ab-legend ab-legend-row">' + series.map((s) => '<li><span class="ab-swatch ' + s.cls + '"></span>' + esc(s.label) + '</li>').join('') + '</ul>';
+    const dailyCard =
+      '<div class="ab-card ab-daily"><h4 class="ab-h"><i class="fa-solid fa-chart-column"></i> 日ごとの質問の数</h4>' +
+      '<p class="ab-muted">棒にふれる（タップする）と、その日の内訳が出ます。質問があった日は ' + fmt(activeDays) + '日／' + fmt(daily.length) + '日。</p>' + chart + '</div>';
+
+    // 5) よく聞かれた質問（横棒）
+    const tq = (data.top_queries || []).slice(0, 10);
+    const tqMax = Math.max(1, ...tq.map((q) => num(q.count)));
+    const ranking = tq.length === 0
+      ? '<p class="ab-muted">まだありません</p>'
+      : '<ol class="ab-rank">' + tq.map((q, i) =>
+          '<li style="--d:' + (i * 70) + 'ms"><span class="ab-rank-no' + (i < 3 ? ' is-top' : '') + '">' + (i + 1) + '</span>' +
+          '<div class="ab-rank-main"><div class="ab-rank-q" title="' + esc(q.query || '') + '">' + esc(q.query || '') + '</div>' +
+          '<div class="ab-rank-bar"><i style="width:' + ((num(q.count) / tqMax) * 100).toFixed(1) + '%"></i></div></div>' +
+          '<span class="ab-rank-n">' + fmt(q.count) + '<small>回</small></span></li>').join('') + '</ol>';
+    const rankCard =
+      '<div class="ab-card ab-ranking"><h4 class="ab-h"><i class="fa-solid fa-ranking-star"></i> よく聞かれた質問（同じ文の多い順・上位10）</h4>' + ranking + '</div>';
+
+    root.innerHTML = lead + kpis + '<div class="ab-row">' + donut + rankCard + '</div>' + dailyCard;
+
+    // 棒にふれたら内訳を出す（ふれていないときは、いちばん多い日）
+    const readout = root.querySelector('.ab-readout');
+    const showDay = (d) => {
+      if (!readout || !d) return;
+      readout.innerHTML = '<b>' + esc(dayLabel(d.day, true)) + '</b> 合計 <b>' + fmt(d.total) + '件</b>' +
+        series.map((s) => '<span><span class="ab-swatch ' + s.cls + '"></span>' + esc(s.label) + ' ' + fmt(d[s.key]) + '件</span>').join('');
+    };
+    showDay(peak || daily[daily.length - 1]);
+    root.querySelectorAll('.ab-col').forEach((b) => {
+      const d = daily[Number(b.getAttribute('data-i'))];
+      const on = () => { root.querySelectorAll('.ab-col.is-on').forEach((x) => x.classList.remove('is-on')); b.classList.add('is-on'); showDay(d); };
+      b.addEventListener('mouseenter', on); b.addEventListener('focus', on); b.addEventListener('click', on);
+    });
+
+    // 動き: 次の描画で伸ばす・数える
+    let reduce = false;
+    try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* ignore */ }
+    const finish = () => {
+      root.classList.add('is-in');
+      root.querySelectorAll('.ab-arc[data-dash]').forEach((c) => c.setAttribute('stroke-dasharray', c.getAttribute('data-dash') + ' 100'));
+    };
+    if (reduce) { finish(); return; }
+    root.classList.remove('is-in');
+    requestAnimationFrame(() => requestAnimationFrame(finish));
+    const start = performance.now(), dur = 1100;
+    const counters = Array.from(root.querySelectorAll('.ab-count'));
+    counters.forEach((el) => { el.textContent = '0'; });
+    const tick = (now) => {
+      const p = Math.min(1, (now - start) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      counters.forEach((el) => {
+        const to = Number(el.getAttribute('data-to')) || 0, dg = Number(el.getAttribute('data-digits')) || 0;
+        el.textContent = dg ? (to * e).toFixed(dg) : Math.round(to * e).toLocaleString('ja-JP');
+      });
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   },
 
   // 費用の実測（週次）: qa-analytics の metering を表示
