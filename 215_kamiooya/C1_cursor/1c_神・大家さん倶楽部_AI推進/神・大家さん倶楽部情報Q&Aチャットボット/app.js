@@ -176,7 +176,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -4920,6 +4920,39 @@ const App = {
     }
   },
 
+  // うまくいかなかった可能性のある会話。見えない人には枠ごと出さない。2026-11-11
+  loadSignalsAnalytics: async () => {
+    const box = document.getElementById('signalsAnalytics');
+    if (!box) return;
+    const show = App.isStaffAdmin() && App.featureOn('conversation_signals');
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const summary = document.getElementById('signalsSummary'), list = document.getElementById('signalsList');
+    const btn = document.getElementById('reloadSignalsBtn');
+    if (btn && !btn.dataset.bound) { btn.dataset.bound = '1'; btn.addEventListener('click', function () { void App.loadSignalsAnalytics(); }); }
+    summary.textContent = '読み込み中…'; list.innerHTML = '';
+    try {
+      const r = await App.apiClient('POST', '/admin/conversation-signals/list', {});
+      const labels = (r && r.labels) || {}, counts = (r && r.counts) || {}, chats = (r && Array.isArray(r.chats)) ? r.chats : [];
+      const modeLabel = { semantic: '意味検索', deep: 'より詳しく', normal: '通常', fast: '高速' };
+      summary.innerHTML = App.escapeHtml('会話 ' + (r.total_chats || 0) + ' 件のうち、目印のある会話 ' + (r.flagged || 0) + ' 件') +
+        '<ul class="text-slate-600 mt-1">' + Object.keys(labels).filter(function (k) { return counts[k]; }).map(function (k) {
+          return '<li>' + App.escapeHtml(labels[k]) + '：' + counts[k] + ' 件</li>';
+        }).join('') + '</ul>';
+      list.innerHTML = chats.length ? chats.map(function (c) {
+        const who = c.member ? ((c.member.member_no ? c.member.member_no + ' ' : '') + (c.member.name || '')) : '';
+        return '<div class="border rounded p-2"><div class="text-xs text-slate-500">' + App.escapeHtml(String(c.last_at || '').replace('T', ' ').slice(0, 16) + (who ? '　' + who : '')) + '</div>' +
+          '<div class="text-xs"><span class="text-slate-500">目印：</span>' + c.signals.map(function (s) { return App.escapeHtml(labels[s] || s); }).join('、') + '</div>' +
+          '<ol class="list-decimal ml-5 mt-1">' + c.turns.map(function (t) {
+            return '<li><div>' + App.escapeHtml(t.question) + ' <span class="text-xs text-slate-500">（' + App.escapeHtml(modeLabel[t.mode] || t.mode) + '）</span>' +
+              (t.signals.length ? ' <span class="text-xs text-orange-700">' + t.signals.map(function (s) { return App.escapeHtml(labels[s] || s); }).join('、') + '</span>' : '') + '</div>' +
+              (t.answer ? '<details class="text-xs text-slate-600"><summary>回答の冒頭</summary>' + App.escapeHtml(t.answer) + '</details>' : '') + '</li>';
+          }).join('') + '</ol></div>';
+      }).join('') : '<p class="text-slate-500">目印のある会話はありません。</p>';
+    } catch (e) {
+      summary.textContent = '取得できませんでした: ' + ((e && e.message) || String(e));
+    }
+  },
   // (4) 質問ランキング＋講座テーマ案。見えない人には枠ごと出さない。2026-11-11
   themeChoiceLabel: { adopt: '✅ 採用', revise: '✏️ 直して採用', reject: '❌ 不採用' },
   loadRankingThemes: async () => {
@@ -5013,6 +5046,7 @@ const App = {
   loadAnalytics: async () => {
     if (!App.isStaffAdmin()) return;
     void App.loadFeedbackAnalytics();
+    void App.loadSignalsAnalytics();
     void App.loadRankingThemes();
     const statusEl = document.getElementById('analyticsStatus');
     const daysSelect = document.getElementById('analyticsDaysSelect');
