@@ -204,7 +204,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         const rounds=(await d.themeRounds(5) as any[]).filter(r=>r&&typeof r.id==='string');
         const decisions=rounds.length?await d.themeDecisions(rounds.map(r=>r.id)) as any[]:[];
         return json({latest:rounds[0]?shapeRound(rounds[0],decisions):null,
-          history:rounds.slice(1).map(r=>{const s=shapeRound(r,decisions);return {id:s.id,created_at:s.created_at,themes:s.themes.map(x=>({id:x.id,title:x.title,decision:x.decision}))};})});
+          history:rounds.slice(1).map(r=>{const s=shapeRound(r,decisions);return {id:s.id,created_at:s.created_at,themes:s.themes.map((x:any)=>({id:x.id,title:x.title,decision:x.decision}))};})});
       }
       if(path==='/admin/answer-feedback/list' && req.method==='POST'){
         let flags:FeatureFlag[]=[];
