@@ -143,6 +143,71 @@ def fetch_bucho_messages(svc, *, days: int, max_results: int) -> list[dict[str, 
 BUCHO_LABEL = "Grok部長"
 
 
+# ------------------------------------------------------------ 台帳の受付窓口への中継（既定オフ）
+# JARVIS_GROK_INTAKE_RELAY=1 かつ COMM_INTAKE_URL / COMM_INTAKE_KEY があるときだけ、
+# 読んだ日報を POST /api/comm-intake に送る（送り手は鍵で決まる。メール経由は grokmail の鍵を想定）。
+# メールの反映（--mark・YAML）はこれまでどおり。中継に失敗しても止めない。
+
+
+def intake_relay_enabled() -> bool:
+    return (
+        (os.environ.get("JARVIS_GROK_INTAKE_RELAY") or "").strip().lower() in ("1", "true", "yes", "on")
+        and bool((os.environ.get("COMM_INTAKE_URL") or "").strip())
+        and bool((os.environ.get("COMM_INTAKE_KEY") or "").strip())
+    )
+
+
+def intake_item_from_mail(msg: dict[str, Any]) -> dict[str, Any]:
+    from email.utils import parsedate_to_datetime
+
+    try:
+        occurred = parsedate_to_datetime(msg.get("date") or "").astimezone(timezone.utc).isoformat()
+    except (TypeError, ValueError):
+        occurred = now_iso()
+    subject = str(msg.get("subject") or "").strip() or BUCHO_PREFIX
+    return {
+        "bot_item_id": f"mail:{msg['id']}",
+        "kind": "agent",
+        "occurred_at": occurred,
+        "title": subject[:300],
+        "summary": str(msg.get("body") or "")[:4000],
+        "refs": {"gmail_message_id": msg["id"], "via": "mail"},
+        "source": "Grok部長日報",
+    }
+
+
+def relay_to_intake(items: list[dict[str, Any]]) -> dict[str, Any]:
+    """受付窓口へ送る。戻り値は件数だけ（鍵・本文はログに出さない）。"""
+    import urllib.error
+    import urllib.request
+
+    out: dict[str, Any] = {"sent": 0, "accepted": 0}
+    for i in range(0, len(items), 20):
+        chunk = items[i : i + 20]
+        req = urllib.request.Request(
+            (os.environ.get("COMM_INTAKE_URL") or "").strip(),
+            data=json.dumps({"items": chunk}, ensure_ascii=False).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {(os.environ.get('COMM_INTAKE_KEY') or '').strip()}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                body = json.loads(resp.read().decode("utf-8") or "{}")
+                out["sent"] += len(chunk)
+                out["accepted"] += int(body.get("accepted") or 0)
+                out["status"] = resp.status
+        except urllib.error.HTTPError as e:
+            out.update({"status": e.code, "error": "http_error"})
+            break
+        except Exception as e:  # noqa: BLE001
+            out["error"] = type(e).__name__
+            break
+    return out
+
+
 def _keep_inbox() -> bool:
     return os.environ.get("JARVIS_GROK_BUCHO_KEEP_INBOX", "").strip() in ("1", "true", "yes")
 
@@ -238,6 +303,7 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
                 return
             print(f"# grok_bucho archive soft-fail id={msg.get('id')}: {e}", file=sys.stderr)
 
+    relay_items: list[dict[str, Any]] = []
     for msg in messages:
         mid = msg["id"]
         if mid in processed and not reprocess:
@@ -275,6 +341,7 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
             entry["ok"] = True
 
         results.append(entry)
+        relay_items.append(intake_item_from_mail(msg))
         if not dry_run:
             processed.add(mid)
             if entry.get("ok"):
@@ -283,6 +350,14 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
     if not dry_run and results:
         state["processed_ids"] = sorted(processed)[-500:]
         save_state(state)
+
+    relay: dict[str, Any] = {"enabled": intake_relay_enabled()}
+    if relay["enabled"] and not dry_run:
+        relay.update(relay_to_intake(relay_items))
+        if relay.get("error"):
+            print(f"# grok_bucho intake relay soft-fail: {relay}", file=sys.stderr)
+    elif relay["enabled"]:
+        relay["would_send"] = len(relay_items)
 
     summary = {
         "ok": True,
@@ -294,6 +369,7 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
         "discovery_added": total_discovery_added,
         "dry_run": dry_run,
         "archived": archived,
+        "intake_relay": relay,
         "results": results,
     }
 

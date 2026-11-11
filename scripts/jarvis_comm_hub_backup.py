@@ -8,6 +8,7 @@ GHA が止まったときだけ代わりに動く。heartbeat（sync_meta の jo
   - 今日の突き合わせ（job_ok:comm_reconcile）がまだで、JST RECONCILE_AFTER_H 時以降
       → reconcile を #ai-hub に3行（source=backup）
   - 台帳書き込みが ALERT_H 時間より古い → #ops に1日1回「台帳 止まっています」
+  - 毎回: ボットの受付の表（comm_intake）の new を台帳へ本登録（ingest-intake。失敗しても続ける）
 新しいメールは取り込まないので、予備はあくまで「止まっている間の穴埋め」と「気づかせる」役。
 """
 from __future__ import annotations
@@ -76,6 +77,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         return 0
     rc = 0
+    # 受付の表（ボット）は毎回取り込む（GHA と両方で走っても external_id で1行にまとまる）
+    try:
+        st = hub.ingest_intake(sb, apply=True)
+        st.pop("reasons", None)
+        print(f"# comm backup ingest-intake: {st}")
+    except Exception as e:  # noqa: BLE001
+        print(f"# comm backup ingest-intake soft-fail: {type(e).__name__}: {e}")
     if "link_pending" in acts:
         st = hub.link_pending(sb, apply=True)
         st.pop("_closed_items", None)

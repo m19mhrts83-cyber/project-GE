@@ -82,6 +82,10 @@ export async function middleware(request: NextRequest) {
   if (path === "/api/job-recovery/status" || path === "/api/job-recovery/run") {
     return NextResponse.next({ request });
   }
+  // 台帳の受付窓口（ボット。COMM_INTAKE_KEYS の鍵を route で確認）
+  if (path === "/api/comm-intake") {
+    return NextResponse.next({ request });
+  }
   const isAuth = path.startsWith("/login") || path.startsWith("/auth");
   if (!user && !isAuth) {
     const url = request.nextUrl.clone();
