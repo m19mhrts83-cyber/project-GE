@@ -2,6 +2,7 @@ import type {AnswerActor} from './qaAnswerJobs.ts';
 import {featuresFor, requireFeature, type FeatureFlag} from './featureFlags.ts';
 import {parseFeedback, feedbackRow} from './answerFeedback.ts';
 import {feedbackMetaColumns, type AnswerMeta} from './answerMeta.ts';
+import {publicChangeLog} from './changeLog.ts';
 import {parseSourceClick, sourceClickRow, summarizeSourceClicks} from './sourceClicks.ts';
 import {matchPending} from './rosterMatch.ts';
 import {parseThemeDecision, shapeRound, decisionRow} from './rankingThemes.ts';
@@ -28,6 +29,7 @@ export type GatewayDependencies = {
   roster?: { has(hashes:string[]): Promise<Set<string>>; meta(): Promise<{synced_at?:string;row_count?:number}> };
   saveFeedback?(row: Record<string, unknown>): Promise<void>;
   answerMeta?(userId: string, chatId: string, answer: string): Promise<AnswerMeta | null>;
+  listChangeLog?(): Promise<unknown[]>;
   listFeedback?(): Promise<unknown[]>;
   saveSourceClick?(row: Record<string, unknown>): Promise<void>;
   listSourceClicks?(): Promise<unknown[]>;
@@ -135,6 +137,14 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
         return json(featuresFor(Array.isArray(flags)?flags:[],{id:user.id,email:user.email}));
       }
+      // 改善履歴。スイッチ change_log が見える人だけ（11/11）。
+      if(path==='/change-log' && req.method==='GET'){
+        let flags:FeatureFlag[]=[];
+        try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
+        requireFeature(Array.isArray(flags)?flags:[],'change_log',{id:user.id,email:user.email});
+        if(!d.listChangeLog)return json({error:'feature_not_available'},404);
+        return json({entries:publicChangeLog(await d.listChangeLog() as any[])});
+      }
       // (2) 回答の評価。スイッチで見えない人には「無い」と同じ 404。本文はサーバーが本人のチャットから引く。
       if(path==='/answer-feedback' && req.method==='POST'){
         let flags:FeatureFlag[]=[];
@@ -194,7 +204,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         const rounds=(await d.themeRounds(5) as any[]).filter(r=>r&&typeof r.id==='string');
         const decisions=rounds.length?await d.themeDecisions(rounds.map(r=>r.id)) as any[]:[];
         return json({latest:rounds[0]?shapeRound(rounds[0],decisions):null,
-          history:rounds.slice(1).map(r=>{const s=shapeRound(r,decisions);return {id:s.id,created_at:s.created_at,themes:s.themes.map(x=>({id:x.id,title:x.title,decision:x.decision}))};})});
+          history:rounds.slice(1).map(r=>{const s=shapeRound(r,decisions);return {id:s.id,created_at:s.created_at,themes:s.themes.map((x:any)=>({id:x.id,title:x.title,decision:x.decision}))};})});
       }
       if(path==='/admin/answer-feedback/list' && req.method==='POST'){
         let flags:FeatureFlag[]=[];
