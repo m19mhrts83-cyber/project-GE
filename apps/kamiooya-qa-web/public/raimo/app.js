@@ -150,6 +150,8 @@ const App = {
   init: () => {
     App.cacheElements();
     App.bindEvents();
+    // この端末で配色が見えていた人は、ログイン画面のタブから新しいアイコンにする
+    if (document.documentElement.classList.contains('theme-a')) App.applyAppIcon(true);
     App.hydrateSemanticMode();
     const resetToken = App.parseResetPasswordTokenFromHash();
     if (resetToken) {
@@ -197,7 +199,41 @@ const App = {
     if (document.documentElement) document.documentElement.classList.toggle('theme-a', on);
     // アプリ名「神大家AIナビ」（2026-11-11 目黒さん「一旦これで」）。配色と同じスイッチの人だけ。
     document.title = on ? '神大家AIナビ' : '神・大家さん倶楽部Q&Aチャットボット';
+    App.applyAppIcon(on);
     try { if (on) localStorage.setItem('qa_design_theme', '1'); else localStorage.removeItem('qa_design_theme'); } catch (e) { /* ignore */ }
+  },
+  // タブのアイコン（2026-11-11 松野さん「ラ」の字は LINE っぽいので変えたい）。配色と同じスイッチの人だけ。
+  // 案1「神」の字 / 案2 家マーク。APP_ICON_CHOICE で切り替え。
+  APP_ICON_CHOICE: 'kami',
+  APP_ICONS: {
+    kami: "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%2311366A%22/%3E%3Crect x=%2210%22 y=%2252%22 width=%2244%22 height=%225%22 rx=%222.5%22 fill=%22%23FE910B%22/%3E%3Ctext x=%2232%22 y=%2245%22 text-anchor=%22middle%22 font-family=%22'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif%22 font-weight=%22700%22 font-size=%2240%22 fill=%22%23fff%22%3E%E7%A5%9E%3C/text%3E%3C/svg%3E",
+    ie: "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%2311366A%22/%3E%3Cpath d=%22M32 11 L56 32 H49 V54 H15 V32 H8 Z%22 fill=%22%23FE910B%22/%3E%3Crect x=%2227%22 y=%2238%22 width=%2210%22 height=%2216%22 rx=%221.5%22 fill=%22%2311366A%22/%3E%3Crect x=%2219%22 y=%2236%22 width=%226%22 height=%226%22 fill=%22%23fff%22/%3E%3Crect x=%2239%22 y=%2236%22 width=%226%22 height=%226%22 fill=%22%23fff%22/%3E%3C/svg%3E",
+  },
+  applyAppIcon: (on) => {
+    const head = document.head;
+    if (!head) return;
+    let link = document.getElementById('appIconLink');
+    if (!on) { if (link) link.remove(); document.querySelectorAll('link[data-app-icon-hidden]').forEach((l) => { l.rel = l.getAttribute('data-app-icon-hidden'); l.removeAttribute('data-app-icon-hidden'); }); return; }
+    document.querySelectorAll('link[rel~="icon"]').forEach((l) => { if (l.id !== 'appIconLink') { l.setAttribute('data-app-icon-hidden', l.rel); l.rel = 'x-icon-off'; } });
+    if (!link) { link = document.createElement('link'); link.id = 'appIconLink'; link.rel = 'icon'; link.type = 'image/svg+xml'; head.appendChild(link); }
+    link.href = App.APP_ICONS[App.APP_ICON_CHOICE] || App.APP_ICONS.kami;
+  },
+  // 文字の大きさ（標準/大/特大）。年配の会員にも読みやすく（2026-11-11 松野さん）。端末ごとに覚える。
+  applyTextSize: (size) => {
+    const v = (size === 'l' || size === 'xl') ? size : 'm';
+    const root = document.documentElement;
+    if (root) { if (v === 'm') root.removeAttribute('data-text-size'); else root.setAttribute('data-text-size', v); }
+    try { if (v === 'm') localStorage.removeItem('qa_text_size'); else localStorage.setItem('qa_text_size', v); } catch (e) { /* ignore */ }
+    document.querySelectorAll('[data-text-size-btn]').forEach((b) => b.setAttribute('aria-pressed', b.getAttribute('data-text-size-btn') === v ? 'true' : 'false'));
+  },
+  initTextSize: () => {
+    let cur = 'm';
+    try { cur = localStorage.getItem('qa_text_size') || 'm'; } catch (e) { /* ignore */ }
+    App.applyTextSize(cur);
+    document.addEventListener('click', (ev) => {
+      const b = ev.target && ev.target.closest ? ev.target.closest('[data-text-size-btn]') : null;
+      if (b) App.applyTextSize(b.getAttribute('data-text-size-btn'));
+    });
   },
   renderFeaturePreviewBar: () => {
     const bar = document.getElementById('featurePreviewBar');
@@ -381,6 +417,7 @@ const App = {
     if(resumeAnswerBtn)resumeAnswerBtn.addEventListener('click',()=>App.resumePendingAnswer());
     const retryAttachmentsBtn=document.getElementById('retryAttachmentsBtn');
     if(retryAttachmentsBtn)retryAttachmentsBtn.addEventListener('click',()=>{if(!App.state.attachmentLoading&&App.state.currentUser)void App.initializeAttachments('','',App.state.attachmentGeneration);});
+    App.initTextSize();
     document.getElementById('logoutBtn').addEventListener('click', App.logout);
     document.getElementById('newChatBtn').addEventListener('click', App.createNewChatPlaceholder);
     App.elements.messageForm.addEventListener('submit', App.handleSendMessage);

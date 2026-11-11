@@ -13,6 +13,8 @@
     <link rel="stylesheet" href="style.css" />
   <!-- (5) ロゴに合わせた配色: この端末で見えていた人は、ログイン画面から同じ色で出す（applyTheme が覚える） -->
   <script>try{if(localStorage.getItem('qa_design_theme')==='1')document.documentElement.classList.add('theme-a');}catch(e){}</script>
+  <!-- 文字の大きさ（標準/大/特大、2026-11-11 松野さん「50代・60代にも優しく、選べるように」）。端末ごとに覚える。配色と同じスイッチの人だけ効く -->
+  <script>try{var t=localStorage.getItem('qa_text_size');if(t==='l'||t==='xl')document.documentElement.setAttribute('data-text-size',t);}catch(e){}</script>
   <!-- (5) ロゴに合わせた配色・案A（2026-11-10 松野さん決定）。スイッチ design_theme が見える人だけ html.theme-a が付く。
        紺 #11366A を土台、オレンジ #FE910B で目立たせる、黄緑 #84C372 は少しだけ。 -->
   <style>
@@ -53,6 +55,7 @@
         </div>
       </aside>
       <div class="auth-card w-full max-w-md bg-white shadow-lg rounded-xl p-6">
+        <div class="text-size-switch text-size-switch--card brand-only-flex" role="group" aria-label="文字の大きさ"><span class="text-size-label">文字</span><button type="button" data-text-size-btn="m" aria-label="文字の大きさ 標準">標準</button><button type="button" data-text-size-btn="l" aria-label="文字の大きさ 大">大</button><button type="button" data-text-size-btn="xl" aria-label="文字の大きさ 特大">特大</button></div>
         <div class="brand-logo brand-only" role="img" aria-label="神・大家さん倶楽部"></div>
         <h1 class="text-xl font-bold text-center text-blue-900 mb-2"><span class="brand-hide">神・大家さん倶楽部Q&A</span><span class="brand-only-inline">神大家AIナビ</span></h1>
         <p class="text-sm text-slate-500 text-center mb-6">ログインまたは新規登録</p>
@@ -218,6 +221,7 @@
           <h2 class="font-bold"><span class="brand-hide"><span class="app-title-main">神・大家さん倶楽部</span><span class="app-title-sub">Q&amp;Aチャットボット</span></span><span class="brand-only-inline">神大家AIナビ</span></h2>
         </div>
         <div class="flex items-center gap-4">
+          <div class="text-size-switch text-size-switch--header brand-only-flex" role="group" aria-label="文字の大きさ"><span class="text-size-label">文字</span><button type="button" data-text-size-btn="m" aria-label="文字の大きさ 標準">標準</button><button type="button" data-text-size-btn="l" aria-label="文字の大きさ 大">大</button><button type="button" data-text-size-btn="xl" aria-label="文字の大きさ 特大">特大</button></div>
           <span id="currentUserLabel" class="text-sm"></span>
           <button id="logoutBtn" class="px-3 py-1 rounded bg-blue-700 hover:bg-blue-600">ログアウト</button>
         </div>

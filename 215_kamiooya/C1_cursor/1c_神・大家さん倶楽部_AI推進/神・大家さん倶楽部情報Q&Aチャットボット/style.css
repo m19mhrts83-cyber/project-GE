@@ -528,3 +528,32 @@ body {
 
 /* #327 のヘッダー下の細線（.theme-strip）は、上の帯の border-bottom と二重になるので出さない */
 .theme-a .theme-strip { display: none !important; }
+
+/* 文字の大きさ（2026-11-11）。Tailwind は rem 指定なので、html の文字サイズを変えると画面全体が大きくなる。
+   標準=16px / 大=18px / 特大=20px。配色(design_theme)と同じスイッチの人だけ。 */
+.brand-only-flex { display: none; }
+.theme-a .brand-only-flex { display: inline-flex; }
+html.theme-a[data-text-size="l"] { font-size: 112.5%; }
+html.theme-a[data-text-size="xl"] { font-size: 125%; }
+html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { line-height: 1.75; }
+.text-size-switch { align-items: center; gap: 2px; border-radius: 9999px; padding: 2px; font-size: 0.8rem; white-space: nowrap; }
+.text-size-switch button { min-width: 2.4em; padding: 0.25em 0.6em; border-radius: 9999px; line-height: 1.2; cursor: pointer; }
+.text-size-switch button[aria-pressed="true"] { font-weight: 700; }
+.text-size-label { padding: 0 0.4em 0 0.6em; opacity: 0.85; }
+.text-size-switch--header { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.text-size-switch--header button[aria-pressed="true"] { background: var(--k-orange, #FE910B); color: #fff; }
+.text-size-switch--card { display: none; }
+.theme-a .text-size-switch--card { display: flex; width: max-content; margin: 0 0 12px auto; background: #eef3fa; color: #11366A; }
+.text-size-switch--card button[aria-pressed="true"] { background: #11366A; color: #fff; }
+@media (max-width: 640px) {
+  .theme-a #currentUserLabel { display: none; }
+  /* スマホの上の帯は、文字サイズを変えても1行に収まるよう px で固定 */
+  .theme-a #mainView > header { padding: 10px 12px; }
+  .theme-a #mainView > header h2 { white-space: nowrap; font-size: 16px; }
+  .theme-a #mainView > header .gap-3 { gap: 8px; }
+  .theme-a #mainView > header .gap-4 { gap: 6px; }
+  .theme-a #logoutBtn { padding: 4px 8px; font-size: 12px; white-space: nowrap; }
+  .text-size-switch--header { font-size: 12px; }
+  .text-size-switch--header button { min-width: 0; padding: 4px 7px; }
+  .text-size-switch--header .text-size-label { display: none; }
+}
