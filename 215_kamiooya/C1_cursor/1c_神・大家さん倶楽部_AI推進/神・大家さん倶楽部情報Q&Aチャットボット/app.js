@@ -5795,6 +5795,9 @@ const App = {
           }
         }
       }
+      // 答えが届いたら、画面の描き直しより先に「探しています」を閉じる。
+      // （描き直しで一度消えたカードを1秒ごとの更新がまた出してしまい、2回終わるように見えていた。11/11 松野さん）
+      App.renderAnswerWorkingCard(false);
 
       const used = App.parseUsedSources(
         (msgRes && (msgRes.usedSources || msgRes.used_sources)) || ''
