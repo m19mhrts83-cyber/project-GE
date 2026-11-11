@@ -141,6 +141,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     },
     listFeedback:async()=>rest('qa_answer_feedback?select=chat_id,message_id,rating,reasons,comment,question,answer,updated_at,answer_mode,answer_tier,answer_model,answer_reused&order=updated_at.desc&limit=200'),
     saveSourceClick:async row=>{await rest('qa_answer_source_clicks?on_conflict=user_id,chat_id,message_id,kind,source_key',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
+    listRecentJobs:async()=>rest('qa_answer_jobs?'+new URLSearchParams({select:'user_id,chat_id,mode,query,status,error_code,created_at,answer:result->>answer',created_at:'gte.'+new Date(Date.now()-30*86400000).toISOString(),order:'created_at.desc',limit:'2000'})),
     listSourceClicks:async()=>rest('qa_answer_source_clicks?select=user_id,chat_id,message_id,kind,source_key,title,label&order=clicked_at.desc&limit=1000'),
     // (2) 答えの作り方（モデル・使い回し）。評価のときに本文のハッシュで引く。11/11
     answerMeta:async(userId,chatId,answer)=>{
