@@ -5363,6 +5363,7 @@ const App = {
     if(!on){stop();App.state.answerWorkingSince=0;return;}
     if(!App.state.answerWorkingSince)App.state.answerWorkingSince=Date.now();
     const deep=(App.state.pendingAnswerRequest&&App.state.pendingAnswerRequest.mode==='deep')||!!App.state.deepMode;
+    if(document.documentElement.classList.contains('theme-a')){App.renderAnswerSearchMotion(deep);if(!App.state.answerWorkingTimer)App.state.answerWorkingTimer=window.setInterval(()=>App.renderAnswerSearchMotion(deep),1000);return;}
     const draw=()=>{
       const list=document.getElementById('chatMessages');if(!list)return;
       let card=document.getElementById('answerWorkingCard');
@@ -5383,6 +5384,65 @@ const App = {
     if(!App.state.answerWorkingTimer)App.state.answerWorkingTimer=window.setInterval(draw,1000);
   },
 
+  // 回答待ちの「探しています」アニメーションと残り時間の目安（2026-11-11 松野さん「待ってますよ感」「あとどれくらいか」）。
+  // 配色(design_theme)と同じスイッチの人だけ。サーバーは途中経過を返さないので、段階は時間に合わせた目安の表示。
+  // 残り時間は、この端末で過去にかかった時間（質問の種類ごと最大10回の中央値）か、全体の実測から決めた初期値で出す。
+  ANSWER_DURATION_DEFAULTS: { normal: 60, semantic: 25, deep: 90 },
+  answerModeKey: () => {
+    const p=App.state.pendingAnswerRequest;const m=p&&p.mode?p.mode:(App.state.deepMode?'deep':(App.state.semanticMode?'semantic':'normal'));
+    return (m==='deep'||m==='semantic')?m:'normal';
+  },
+  recordAnswerDuration: (mode,ms) => {
+    try{
+      const key=(mode==='deep'||mode==='semantic')?mode:'normal';const sec=Math.round(ms/1000);
+      if(!(sec>=3&&sec<=330))return;
+      const all=JSON.parse(localStorage.getItem('qa_answer_durations')||'{}');
+      const list=Array.isArray(all[key])?all[key]:[];list.push(sec);all[key]=list.slice(-10);
+      localStorage.setItem('qa_answer_durations',JSON.stringify(all));
+    }catch(e){/* ignore */}
+  },
+  estimateAnswerSeconds: (mode) => {
+    try{
+      const list=(JSON.parse(localStorage.getItem('qa_answer_durations')||'{}')[mode])||[];
+      if(list.length>=3){const v=list.slice().sort((a,b)=>a-b);return Math.max(10,v[Math.floor(v.length/2)]);}
+    }catch(e){/* ignore */}
+    return App.ANSWER_DURATION_DEFAULTS[mode]||60;
+  },
+  renderAnswerSearchMotion: (deep) => {
+    const list=document.getElementById('chatMessages');if(!list)return;
+    const mode=App.answerModeKey(),est=App.estimateAnswerSeconds(mode);
+    const sec=Math.floor((Date.now()-App.state.answerWorkingSince)/1000);
+    const steps=[
+      {icon:'fa-comments',label:'コミュニティの投稿を探しています'},
+      {icon:'fa-circle-play',label:'講義動画の内容を探しています'},
+      {icon:'fa-brands fa-line',label:'LINEオプチャを探しています'},
+      {icon:'fa-pen-to-square',label:'見つかった情報をまとめています'},
+    ];
+    // 目安時間の 15% / 35% / 55% で次の段階へ。最後の「まとめ」は回答が届くまで続く。
+    const ratio=sec/est;const idx=ratio<0.15?0:ratio<0.35?1:ratio<0.55?2:3;
+    // 進み具合の帯: 目安までに9割、超えたらゆっくり近づくだけ（100%にはしない）
+    const pct=ratio<=1?Math.round(ratio*90):Math.min(98,Math.round(90+8*(1-Math.exp(-(ratio-1)*1.5))));
+    const left=est-sec;
+    const remain=left>60?'あと約'+Math.ceil(left/60)+'分':left>10?'あと約'+(Math.ceil(left/10)*10)+'秒':left>0?'まもなく':'もう少しお待ちください（混み合うと数分かかることがあります）';
+    let card=document.getElementById('answerWorkingCard');
+    if(!card){
+      card=document.createElement('div');card.id='answerWorkingCard';card.setAttribute('role','status');card.setAttribute('aria-live','polite');
+      card.className='search-motion-wrap';
+      card.innerHTML='<div class="search-motion">'+
+        '<div class="search-motion-bar"><span></span><span></span><span></span><b>'+(deep?'より詳しく調べています':'神大家AIナビが調べています')+'</b></div>'+
+        '<div class="search-motion-body">'+
+          '<div class="search-motion-scan" aria-hidden="true"><div class="search-motion-lines"><i></i><i></i><i></i><i></i></div><div class="search-motion-glass"><i class="fa-solid fa-magnifying-glass"></i></div></div>'+
+          '<ol class="search-motion-steps">'+steps.map((s,i)=>'<li data-step="'+i+'"><i class="'+(s.icon.indexOf('fa-brands')===0?s.icon:'fa-solid '+s.icon)+'" aria-hidden="true"></i><span>'+s.label+'</span></li>').join('')+'</ol>'+
+          '<div class="search-motion-progress" aria-hidden="true"><div data-progress></div></div>'+
+          '<div class="search-motion-meta"><span data-remain></span><span data-elapsed></span></div>'+
+        '</div></div>';
+    }
+    if(card.parentNode!==list||list.lastElementChild!==card){list.appendChild(card);list.scrollTop=list.scrollHeight;}
+    card.querySelectorAll('[data-step]').forEach((li)=>{const i=Number(li.getAttribute('data-step'));li.classList.toggle('is-done',i<idx);li.classList.toggle('is-active',i===idx);});
+    const bar=card.querySelector('[data-progress]');if(bar)bar.style.width=pct+'%';
+    const r=card.querySelector('[data-remain]');if(r)r.textContent=remain;
+    const el=card.querySelector('[data-elapsed]');if(el)el.textContent='経過 '+(sec>=60?Math.floor(sec/60)+'分':'')+(sec%60)+'秒';
+  },
   answerPollDelay: (ms,signal) => new Promise((resolve,reject)=>{
     const cancel=()=>{window.clearTimeout(timer);const error=new Error('aborted');error.name='AbortError';reject(error);};
     const timer=window.setTimeout(()=>{signal.removeEventListener('abort',cancel);resolve();},ms);
@@ -5406,7 +5466,7 @@ const App = {
         if(!current()){const error=new Error('aborted');error.name='AbortError';throw error;}
         if(!state)state=await call('GET','/chat-sessions/'+sessionId+'/answer-jobs/'+pending.jobId);
         if(!current()){const error=new Error('aborted');error.name='AbortError';throw error;}
-        if(state.status==='done'&&state.result)return state.result;
+        if(state.status==='done'&&state.result){App.recordAnswerDuration(mode,Date.now()-(pending.startedAt||pollStartedAt));return state.result;}
         if(state.status==='failed'){
           App.clearPendingAnswer();
           throw new Error(state.error==='answer_timeout'?'回答の作成が制限時間に達しました。履歴を確認してから再試行してください。':state.error==='semantic_disabled'?'意味検索は一時停止中です。':'回答を作成できませんでした。履歴を確認してから再試行してください。');
