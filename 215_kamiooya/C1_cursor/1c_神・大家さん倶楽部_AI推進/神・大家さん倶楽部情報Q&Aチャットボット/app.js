@@ -195,6 +195,8 @@ const App = {
   applyTheme: () => {
     const on = App.featureOn('design_theme');
     if (document.documentElement) document.documentElement.classList.toggle('theme-a', on);
+    // アプリ名「神大家AIナビ」（2026-11-11 目黒さん「一旦これで」）。配色と同じスイッチの人だけ。
+    document.title = on ? '神大家AIナビ' : '神・大家さん倶楽部Q&Aチャットボット';
     try { if (on) localStorage.setItem('qa_design_theme', '1'); else localStorage.removeItem('qa_design_theme'); } catch (e) { /* ignore */ }
   },
   renderFeaturePreviewBar: () => {
