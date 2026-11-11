@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {handleSemanticSearch} from './handler.ts';
+import {handleSemanticSearch,normalizeHistory,contextualSearchQuery,buildAnswerPrompt} from './handler.ts';
 
 Deno.test('LINE filename browse and exact attachment source reads use ready rows without AI calls',async()=>{
  const keys=['GEMINI_API_KEY','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SEMANTIC_SEARCH_SHARED_SECRET','SEMANTIC_SEARCH_DISABLED'];
@@ -122,4 +122,15 @@ Deno.test('failed LINE retrieval is explicit and cannot generate a silently inco
   }
   assert.equal(generationCalls,0);assert.equal(events.length,2);assert.ok(events.every(event=>event.result_status==='error'));
  }finally{globalThis.fetch=originalFetch;keys.forEach((k,i)=>saved[i]===undefined?Deno.env.delete(k):Deno.env.set(k,saved[i]!));}
+});
+
+Deno.test('chat_context: previous turns steer the search text and the answer prompt',()=>{
+ const history=normalizeHistory([{question:'外壁塗装の時期は？',answer:'10〜15年が目安'},{question:''},'bad',{question:'x'.repeat(900),answer:'y'.repeat(3000)}]);
+ assert.equal(history.length,2);assert.equal(history[1].question.length,500);assert.equal(history[1].answer.length,1500);
+ assert.equal(contextualSearchQuery('また詳しく',[]),'また詳しく');
+ const q=contextualSearchQuery('また詳しく調べて',[{question:'外壁塗装の時期は？',answer:''}]);
+ assert.ok(q.startsWith('外壁塗装の時期は？'));assert.ok(q.endsWith('また詳しく調べて'));
+ const prompt=buildAnswerPrompt('また詳しく調べて','[コミュニティ1] 外壁',[{question:'外壁塗装の時期は？',answer:'10〜15年が目安'}]);
+ assert.ok(prompt.includes('(1) 質問: 外壁塗装の時期は？'));assert.ok(prompt.includes('直前の質問のテーマ'));
+ assert.ok(!buildAnswerPrompt('外壁','[コミュニティ1] 外壁').includes('これまでのやり取り'));
 });
