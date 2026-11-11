@@ -84,6 +84,7 @@ test('chat_context: the owner sends the previous turns (oldest first) and skips 
  await f.request('/chat-sessions/mine/answer-jobs',input('semantic'),token);await Promise.all(f.tasks);
  assert.deepEqual(f.semanticInputs[0].history,[{question:'1問目: 外壁塗装の時期は？',answer:'10〜15年…'},{question:'2問目: 修繕費の相場は？',answer:'外壁は…'}]);
  assert.equal(cache.length,0); // 文脈つきの答えは使い回さない・保存しない
+ assert.equal(f.semanticInputs[0].clarify,true); // 調べる前の言い直し・聞き返しを頼む
 });
 test('chat_context: deep mode also carries the previous turns',async()=>{
  const f=fixture({flags:owner,prior}),token=await login(f);
@@ -95,5 +96,6 @@ test('chat_context: off or not named means no history (unchanged behaviour)',asy
   const f=fixture({flags,prior}),token=await login(f);
   await f.request('/chat-sessions/mine/answer-jobs',input('deep'),token);await Promise.all(f.tasks);
   assert.equal(f.semanticInputs[0].history,undefined);
+  assert.equal(f.semanticInputs[0].clarify,undefined);
  }
 });

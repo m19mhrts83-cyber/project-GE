@@ -257,7 +257,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         }catch{/* 使い回しが読めなくても答えは作る */}
       }
       const tier=saving&&!deep?answerTier(job.query):'standard';
-      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{}),...(history.length?{history}:{})}),signal}));
+      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{}),...(history.length?{history}:{}),...(withContext?{clarify:true}:{})}),signal}));
       const result=await response.json();
       if(!response.ok){if(signal.aborted)throw signal.reason;throw new UpstreamError(result?.code==='semantic_disabled'?'semantic_disabled':'operation_failed',503);}
       const answer=String(result.answer||'').trim();if(!answer)throw new Error('empty_answer');
@@ -266,7 +266,8 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       // 実際に答えたモデル（軽いモデルが使えず今のモデルに戻った場合もそちら）。古い意味検索は返さないので空＝不明。
       const answerModel=typeof result.answerModel==='string'?result.answerModel:'';
       await recordMeta(job,answer,{mode:deep?'deep':'semantic',tier,model:answerModel,reused:false});
-      if(reuse&&cacheable(answer)){
+      // 聞き返し（【確認】）は質問した人だけへの返事なので使い回さない。
+      if(reuse&&cacheable(answer)&&result.clarification!==true){
         await rest('qa_answer_cache?on_conflict=query_hash',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({query_hash:key,query:job.query.slice(0,4000),result:{...compact,answerModel},tier,hits:0,created_at:new Date().toISOString(),last_hit_at:null})}).catch(()=>{});
       }
       return compact;

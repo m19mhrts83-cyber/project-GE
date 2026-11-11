@@ -53,6 +53,8 @@ type SemanticSearchRequest = {
   user_id?: string;
   /** 同じチャットの直前のやり取り（古い順）。スイッチ chat_context の人だけ、サーバーが付ける（2026-11-11）。 */
   history?: unknown;
+  /** 調べる前にAIが質問を言い直す／意図が読めなければ聞き返す（スイッチ chat_context の人だけ、2026-11-11）。 */
+  clarify?: boolean;
 };
 
 export type ChatTurn = { question: string; answer: string };
@@ -70,6 +72,50 @@ export function normalizeHistory(value: unknown): ChatTurn[] {
 export function contextualSearchQuery(query: string, history: ChatTurn[]): string {
   if (!history.length) return query;
   return [...history.map((t) => t.question), query].join("\n").slice(-1200);
+}
+
+// 聞き返しの答えの目印。次の質問では続けて聞き返さない（聞き返しは続けて1回まで）。
+export const CLARIFY_MARK = "【確認】";
+
+export type QueryPlan = { action: "search" | "ask"; searchQuery: string; ask: string; options: string[] };
+
+export function buildPlanPrompt(query: string, history: ChatTurn[], allowAsk: boolean): string {
+  return [
+    "あなたは神・大家さん倶楽部（不動産投資の会員コミュニティ）のQ&A検索の前処理係です。",
+    "会員の今回の質問を、検索に使う1文の質問に言い直してください。答えそのものは書かないこと。",
+    "",
+    "【ルール】",
+    "1. 「それ」「法人での事例」「もっと詳しく」のように対象が省略されていたら、これまでのやり取りから補って、単独で意味が通る質問にする（例: 前がバックファイナンスの話なら「法人でのバックファイナンスの事例」）。",
+    "2. 今回の質問が前と別の話題なら、前の話題を混ぜない。",
+    allowAsk
+      ? "3. やり取りを読んでも何について知りたいのかが本当に決められないとき（候補が2つ以上あり、どれかで答えが大きく変わるとき）だけ action を ask にし、短い確認の質問と、選べる候補を2〜4個つける。少しでも推測できるなら ask にせず search にする。"
+      : "3. 今回は聞き返さない。必ず action を search にする。",
+    "4. 次のJSONだけを返す: {\"action\":\"search\"または\"ask\",\"search_query\":\"言い直した質問\",\"ask\":\"確認の質問（askのときだけ）\",\"options\":[\"候補1\",\"候補2\"]}",
+    "",
+    "【これまでのやり取り（古い順）】",
+    ...(history.length ? history.flatMap((t, i) => [`(${i + 1}) 質問: ${t.question}`, `(${i + 1}) 回答の冒頭: ${t.answer.slice(0, 300) || "（記録なし）"}`]) : ["（なし。これが最初の質問）"]),
+    "",
+    "【今回の質問】",
+    query,
+  ].join("\n");
+}
+
+export function parsePlan(text: string, query: string, allowAsk: boolean): QueryPlan | null {
+  let raw: Record<string, unknown>;
+  try { raw = JSON.parse(String(text || "").replace(/^```(?:json)?\s*|\s*```$/g, "")); } catch { return null; }
+  if (!raw || typeof raw !== "object") return null;
+  const searchQuery = asString(raw.search_query).trim().slice(0, 300) || query;
+  const ask = asString(raw.ask).trim().slice(0, 300);
+  const options = (Array.isArray(raw.options) ? raw.options : []).map((o) => asString(o).trim().slice(0, 100)).filter(Boolean).slice(0, 4);
+  if (allowAsk && raw.action === "ask" && ask) return { action: "ask", searchQuery, ask, options };
+  return { action: "search", searchQuery, ask: "", options: [] };
+}
+
+export function clarificationAnswer(plan: QueryPlan): string {
+  return [
+    `${CLARIFY_MARK}${plan.ask}`,
+    ...(plan.options.length ? ["", ...plan.options.map((o, i) => `${i + 1}. ${o}`), "", "番号か言葉でお知らせください。続けて調べます。"] : ["", "お知らせいただければ、続けて調べます。"]),
+  ].join("\n");
 }
 
 type CommentRow = {
@@ -305,7 +351,7 @@ function buildAnswerContext(
   return parts.join("\n\n");
 }
 
-export function buildAnswerPrompt(query: string, answerContext: string, history: ChatTurn[] = []): string {
+export function buildAnswerPrompt(query: string, answerContext: string, history: ChatTurn[] = [], rewritten = ""): string {
   const followUp = history.length ? [
     "",
     "【このチャットのこれまでのやり取り（古い順）】",
@@ -339,6 +385,7 @@ export function buildAnswerPrompt(query: string, answerContext: string, history:
     "",
     "質問:",
     query,
+    ...(rewritten && rewritten !== query ? ["", "（省略を補った質問: " + rewritten + "）"] : []),
   ].join("\n");
 }
 
@@ -371,7 +418,8 @@ async function summarizeAnswer(
   usage?: GeminiUsage,
   signal?: AbortSignal,
   lite = false,
-  history: ChatTurn[] = []
+  history: ChatTurn[] = [],
+  rewritten = ""
 ): Promise<string> {
   const trimmed = answerContext.trim();
   if (!trimmed) return REFUSAL;
@@ -384,7 +432,7 @@ async function summarizeAnswer(
     signal,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: buildAnswerPrompt(query, trimmed, history) }] }],
+      contents: [{ role: "user", parts: [{ text: buildAnswerPrompt(query, trimmed, history, rewritten) }] }],
       generationConfig: {
         temperature: 0.2,
         maxOutputTokens: 8192,
@@ -425,6 +473,30 @@ async function summarizeAnswer(
     ].join("\n");
   }
   return text;
+}
+
+// 調べる前の言い直し・聞き返し。軽いモデルで1回だけ。失敗したら null（今までどおりの検索に戻す）。
+async function planQuery(query: string, history: ChatTurn[], usage: GeminiUsage, signal?: AbortSignal): Promise<QueryPlan | null> {
+  const apiKey = (Deno.env.get("GEMINI_API_KEY") || "").trim();
+  if (!apiKey) return null;
+  const allowAsk = !(history.length && history[history.length - 1].answer.startsWith(CLARIFY_MARK));
+  const model = /^[a-z0-9.\-]{3,60}$/.test(GEMINI_LITE_MODEL) ? GEMINI_LITE_MODEL : GEMINI_ANSWER_MODEL;
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST", signal, headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: buildPlanPrompt(query, history, allowAsk) }] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 512, responseMimeType: "application/json" },
+      }),
+    });
+    if (!response.ok) { await response.text().catch(() => ""); return null; }
+    const payload = await response.json();
+    addUsageMetadata(usage, payload?.usageMetadata);
+    return parsePlan(asString(payload?.candidates?.[0]?.content?.parts?.[0]?.text), query, allowAsk);
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    return null;
+  }
 }
 
 function mapOpenchatRow(row: Record<string, unknown>): OpenchatRow {
@@ -672,16 +744,31 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
     const skipAnswer = body?.skip_answer === true;
     const liteAnswer = body?.answer_tier === "lite";
 
+    // 調べる前に、省略を補った質問に言い直す。意図が読めなければ調べずに聞き返す（chat_context の人だけ）。
+    let plan: QueryPlan | null = null;
+    if (body?.clarify === true && !skipAnswer) {
+      plan = await planQuery(query, history, geminiUsage, req.signal);
+      if (plan?.action === "ask") {
+        const answer = clarificationAnswer(plan);
+        await logSearchEvent(sb, { ...baseEvent, comment_hit_count: 0, chunk_hit_count: 0, result_status: "ok",
+          used_sources: '{"comment_ids":[],"chunk_keys":[],"openchat_ids":[]}', ...usageColumns(geminiUsage), meta: { clarification: true } });
+        return json({ answer, clarification: true, usedSources: '{"comment_ids":[],"chunk_keys":[],"openchat_ids":[]}',
+          relatedComments: [], relatedChunks: [], relatedSources: [], relatedOpenchat: [], referenceLabels: {}, referenceSelection: "provided-context",
+          answerModel: geminiUsage.calls > 0 ? geminiUsage.model : "", hitCount: 0 });
+      }
+    }
+    const vectorQuery = plan ? plan.searchQuery : searchQuery;
+
     // Keyword retrieval does not depend on the vector. Start it immediately,
     // while retaining its rejection for the eventual join (including embed failure).
     const retrievalStarted=performance.now();
     const keywordResult=Promise.resolve(sb.rpc("search_openchat_keyword", {
-      query_text: query.slice(0, 80), match_count: openchatLimit,
+      query_text: (plan ? plan.searchQuery : query).slice(0, 80), match_count: openchatLimit,
     }));
     void keywordResult.catch(()=>{});
     const embeddingStarted=performance.now();
-    const cached=await queryEmbeddingCache.get(await embeddingKey(GEMINI_EMBED_MODEL,'RETRIEVAL_QUERY',GEMINI_EMBED_DIM,searchQuery),
-      signal=>{embeddingProviderCalls++;return embedQuery(searchQuery,signal);},req.signal);
+    const cached=await queryEmbeddingCache.get(await embeddingKey(GEMINI_EMBED_MODEL,'RETRIEVAL_QUERY',GEMINI_EMBED_DIM,vectorQuery),
+      signal=>{embeddingProviderCalls++;return embedQuery(vectorQuery,signal);},req.signal);
     const embedding=cached.values;
     const embeddingMs=Math.round(performance.now()-embeddingStarted);
 
@@ -783,7 +870,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       openchatsForAnswer
     );
     const retrievalMs=Math.round(performance.now()-retrievalStarted);
-    const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext, geminiUsage, req.signal, liteAnswer, history);
+    const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext, geminiUsage, req.signal, liteAnswer, history, plan ? plan.searchQuery : "");
 
     const referenceLabels=labelAnswerSources(commentsForAnswer,chunksForAnswer,openchatsForAnswer);
     const knownLabels=new Set([...Object.values(referenceLabels.comments),...Object.values(referenceLabels.chunks),...Object.values(referenceLabels.openchats)]);
@@ -823,7 +910,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       used_sources: usedSources,
       result_status: "ok",
       ...usageColumns(geminiUsage),
-      meta:{embedding_cache_hit:cached.cacheHit,embedding_ms:embeddingMs,embedding_provider_calls:embeddingProviderCalls,retrieval_ms:retrievalMs},
+      meta:{...(plan?{rewritten_query:plan.searchQuery}:{}),embedding_cache_hit:cached.cacheHit,embedding_ms:embeddingMs,embedding_provider_calls:embeddingProviderCalls,retrieval_ms:retrievalMs},
     });
 
     return json({
