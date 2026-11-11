@@ -132,37 +132,73 @@ Deno.serve(async (req) => {
   const weeklyRows: WeeklyRow[] | null = weeklyRes.error ? null : (weeklyRes.data as WeeklyRow[]) || [];
 
   const rows = events || [];
+
+  // 「より詳しく調べる」(deep) は記録上は意味検索(semantic)なので、回答ジョブ(qa_answer_jobs.mode='deep')と
+  // 同じチャット・同じ質問・10分以内で突き合わせて見分ける。読めなければ今までどおり意味検索に数える。2026-11-11
+  const DEEP_WINDOW_MS = 10 * 60 * 1000;
+  const deepJobs: Record<string, number[]> = {};
+  try {
+    const { data: jobs } = await sb
+      .from("qa_answer_jobs")
+      .select("chat_id,query,created_at")
+      .eq("mode", "deep")
+      .gte("created_at", new Date(Date.parse(since) - DEEP_WINDOW_MS).toISOString())
+      .lt("created_at", until || "9999-12-31T00:00:00Z")
+      .limit(5000);
+    for (const j of jobs || []) {
+      const k = asString(j.chat_id) + "\u0000" + asString(j.query).slice(0, 2000);
+      (deepJobs[k] ||= []).push(Date.parse(asString(j.created_at)));
+    }
+  } catch {
+    /* 突き合わせできなくても集計は出す */
+  }
+  const isDeep = (row: Record<string, unknown>): boolean => {
+    if (asString(row.search_mode) !== "semantic") return false;
+    const times = deepJobs[asString(row.session_id) + "\u0000" + asString(row.query_text)];
+    if (!times) return false;
+    const t = Date.parse(asString(row.created_at));
+    return times.some((jt) => t >= jt && t - jt <= DEEP_WINDOW_MS);
+  };
+  const modeOf = (row: Record<string, unknown>): string => (isDeep(row) ? "deep" : asString(row.search_mode));
+
   let normal = 0;
   let semantic = 0;
+  let deep = 0;
+  let deepOk = 0;
   let failed = 0;
   let disabled = 0;
   let billableNormal = 0;
   let billableSemantic = 0;
-  const byDay: Record<string, { normal: number; semantic: number }> = {};
-  const queryCounts: Record<string, { count: number; semantic: number; normal: number }> = {};
+  const byDay: Record<string, { normal: number; semantic: number; deep: number }> = {};
+  const queryCounts: Record<string, { count: number; semantic: number; normal: number; deep: number }> = {};
 
   for (const row of rows) {
-    const mode = asString(row.search_mode);
+    const mode = modeOf(row);
     const status = asString(row.result_status) || "ok";
     if (status !== "ok") failed += 1;
     if (status === "disabled") disabled += 1;
     if (mode === "semantic") semantic += 1;
+    else if (mode === "deep") deep += 1;
     else if (mode === "normal") normal += 1;
     if (status === "ok") {
-      if (mode === "semantic") billableSemantic += 1;
+      // 費用の試算・実測では、より詳しくも意味検索（同じ Gemini の実トークン）として数える
+      if (mode === "semantic" || mode === "deep") billableSemantic += 1;
       else if (mode === "normal") billableNormal += 1;
+      if (mode === "deep") deepOk += 1;
     }
 
     const day = asString(row.created_at).slice(0, 10) || "unknown";
-    if (!byDay[day]) byDay[day] = { normal: 0, semantic: 0 };
+    if (!byDay[day]) byDay[day] = { normal: 0, semantic: 0, deep: 0 };
     if (mode === "semantic") byDay[day].semantic += 1;
+    else if (mode === "deep") byDay[day].deep += 1;
     else if (mode === "normal") byDay[day].normal += 1;
 
     const q = asString(row.query_text).trim().replace(/\s+/g, " ").slice(0, 120);
     if (q) {
-      if (!queryCounts[q]) queryCounts[q] = { count: 0, semantic: 0, normal: 0 };
+      if (!queryCounts[q]) queryCounts[q] = { count: 0, semantic: 0, normal: 0, deep: 0 };
       queryCounts[q].count += 1;
       if (mode === "semantic") queryCounts[q].semantic += 1;
+      else if (mode === "deep") queryCounts[q].deep += 1;
       else queryCounts[q].normal += 1;
     }
   }
@@ -187,14 +223,17 @@ Deno.serve(async (req) => {
     }
   }
 
-  const total = normal + semantic;
+  // 週次集計の意味検索には、より詳しくも入っているので分けて出す（費用の billableSemantic はそのまま）
+  if (weeklyRows) semantic = Math.max(0, semantic - deep);
+  const total = normal + semantic + deep;
   const daily = Object.keys(byDay)
     .sort()
     .map((day) => ({
       day,
       normal: byDay[day].normal,
       semantic: byDay[day].semantic,
-      total: byDay[day].normal + byDay[day].semantic,
+      deep: byDay[day].deep,
+      total: byDay[day].normal + byDay[day].semantic + byDay[day].deep,
     }));
 
   const topQueries = Object.entries(queryCounts)
@@ -205,7 +244,7 @@ Deno.serve(async (req) => {
   const recent = rows.slice(0, 40).map((row) => ({
     id: row.id,
     created_at: row.created_at,
-    search_mode: row.search_mode,
+    search_mode: modeOf(row),
     query_text: asString(row.query_text).slice(0, 200),
     comment_hit_count: row.comment_hit_count,
     chunk_hit_count: row.chunk_hit_count,
@@ -339,9 +378,12 @@ Deno.serve(async (req) => {
       total,
       normal,
       semantic,
+      deep,
+      deep_ok: deepOk,
       failed,
       disabled,
       semantic_ratio: total > 0 ? Number((semantic / total).toFixed(4)) : 0,
+      deep_ratio: total > 0 ? Number((deep / total).toFixed(4)) : 0,
       normal_ratio: total > 0 ? Number((normal / total).toFixed(4)) : 0,
     },
     gemini_estimate: geminiEstimate,
