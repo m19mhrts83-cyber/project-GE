@@ -125,6 +125,18 @@ export default function HubPage() {
         <Icon name="next" size={18} />
       </Link>
 
+      <div className="eyebrow">資料</div>
+      <Link className="glass nav-card" href="/slides">
+        <span className="ico">
+          <Icon name="list" size={22} />
+        </span>
+        <span className="txt">
+          <strong>資料づくり</strong>
+          <span className="meta">構成案を選ぶ／直しから次回の基準を決める</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
       <div className="eyebrow">LOOP</div>
       <div className="glass loop">
         <div><span className="mono">01</span>AIが案</div>
