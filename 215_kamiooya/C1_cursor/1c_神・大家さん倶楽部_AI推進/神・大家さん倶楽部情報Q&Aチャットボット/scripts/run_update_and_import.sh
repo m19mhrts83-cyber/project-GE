@@ -71,6 +71,8 @@ usage() {
   WESTUDY_USER, WESTUDY_PASS
   CHATBOT_OUTPUT_ROOT（任意。未設定時は OneDrive 固定パス）
   WESTUDY_SKIP_LESSONS=1（任意。コメントだけ取得し、lesson説明は週次まで維持）
+  WESTUDY_LESSON_MODE=new（任意。毎日の新着確認。目次だけ見て、まだ無い lesson の説明だけ取って足す。
+    既存 lesson の更新・削除は週次フルで拾う。動画の文字起こしは Mac の kamiooya_video_weekly.py が続けて行う）
   Supabase（任意・設定時は step2 実行）:
     SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY（推奨）
   Raimo（任意・設定時は step3 実行。RAIMO_* が正。LIMO_* も可）:
@@ -105,6 +107,10 @@ fi
 BUILD_DELTA_SCRIPT="$SCRIPT_DIR/build_delta_csv.py"
 STATE_DELTA="${CHATBOT_STATE_ROOT:-$OUTPUT_ROOT/state}/westudy_comment_ids.json"
 SKIP_LESSONS="${WESTUDY_SKIP_LESSONS:-0}"
+LESSON_MODE="${WESTUDY_LESSON_MODE:-full}"   # full | new | skip
+if [[ "$SKIP_LESSONS" == "1" ]]; then
+  LESSON_MODE="skip"
+fi
 
 echo "==> step1: WeStudy更新パイプライン（フォーラム）"
 "$PIPELINE_SCRIPT" --defer-state-update "$@"
@@ -116,22 +122,39 @@ LESSON_STATE="${CHATBOT_STATE_ROOT:-$OUTPUT_ROOT/state}/westudy_lesson_ids.json"
 LESSON_OUTPUT_DIR="$OUTPUT_ROOT/exports/lessons"
 mkdir -p "$LESSON_OUTPUT_DIR"
 
-if [[ "$SKIP_LESSONS" == "1" ]]; then
+# lesson の state は取込が済んでから確定する（取込前に進めると、失敗した新着が二度と拾われない）
+LESSON_STATE_PENDING="$LESSON_STATE.pending"
+rm -f "$LESSON_STATE_PENDING"
+LESSON_SCRAPE_ARGS=( --output-root "$LESSON_OUTPUT_DIR" )
+LESSON_DELTA_ARGS=()
+if [[ "$LESSON_MODE" == "new" ]]; then
+  LESSON_SCRAPE_ARGS+=( --new-only-state "$LESSON_STATE" )
+  LESSON_DELTA_ARGS+=( --add-only )
+fi
+
+if [[ "$LESSON_MODE" == "skip" ]]; then
   echo "==> step1b: 日次コメントモードのためlesson説明収集はスキップ（週次で更新）"
 elif [[ -f "$LESSON_SCRAPER" && -f "$LESSON_DELTA_SCRIPT" ]]; then
-  echo "==> step1b: WeStudy lesson 説明テキスト収集"
+  if [[ "$LESSON_MODE" == "new" ]]; then
+    echo "==> step1b: WeStudy lesson 新着確認（目次だけ見て、新しい lesson の説明だけ取る）"
+  else
+    echo "==> step1b: WeStudy lesson 説明テキスト収集"
+  fi
   LESSON_FULL="$LESSON_OUTPUT_DIR/lesson_full_${RUN_ID}.csv"
-  if "$PYTHON" "$LESSON_SCRAPER" --output-root "$LESSON_OUTPUT_DIR"; then
+  if "$PYTHON" "$LESSON_SCRAPER" "${LESSON_SCRAPE_ARGS[@]}"; then
     # lesson_full_*.csv の最新を探す
     LESSON_FULL="$(ls -1t "$LESSON_OUTPUT_DIR"/lesson_full_*.csv 2>/dev/null | head -n 1 || true)"
     if [[ -n "$LESSON_FULL" && -f "$LESSON_FULL" ]]; then
       LESSON_DELTA="$LESSON_OUTPUT_DIR/lesson_delta_${RUN_ID}.csv"
       echo "==> step1c: lesson 差分CSV生成"
+      if [[ -f "$LESSON_STATE" ]]; then
+        cp "$LESSON_STATE" "$LESSON_STATE_PENDING"
+      fi
       "$PYTHON" "$LESSON_DELTA_SCRIPT" \
         --full "$LESSON_FULL" \
-        --state "$LESSON_STATE" \
+        --state "$LESSON_STATE_PENDING" \
         --delta "$LESSON_DELTA" \
-        --update-state
+        --update-state "${LESSON_DELTA_ARGS[@]}"
     else
       echo "lesson full CSV が見つかりません。lesson 差分はスキップします。"
     fi
@@ -175,8 +198,10 @@ run_supabase_healthcheck_touch() {
   fi
   echo "==> step1.5: Supabase 疎通確認 + 心拍 (--touch)"
   local sync_note="westudy-weekly"
-  if [[ "$SKIP_LESSONS" == "1" ]]; then
+  if [[ "$LESSON_MODE" == "skip" ]]; then
     sync_note="westudy-daily-comments"
+  elif [[ "$LESSON_MODE" == "new" ]]; then
+    sync_note="westudy-daily-new-lessons"
   fi
   if ! "$PYTHON" "$HEALTHCHECK_SCRIPT" --touch --note "${sync_note}:${RUN_ID}"; then
     if [[ "${SUPABASE_FAIL_OPEN:-0}" == "1" ]]; then
@@ -202,12 +227,64 @@ commit_state_after_success() {
     --update-state
 }
 
+# --- lesson delta の Supabase / Raimo 取込（フォーラム取込のあと。フォーラム差分0件でも行う） ---
+import_lesson_delta() {
+  LESSON_DELTA_FILE=""
+  if [[ "$LESSON_MODE" == "skip" ]]; then
+    return 0
+  fi
+  LESSON_DELTA_FILE="${LESSON_DELTA:-}"
+  if [[ -z "$LESSON_DELTA_FILE" || ! -f "$LESSON_DELTA_FILE" ]]; then
+    return 0
+  fi
+  local rows
+  rows="$("$PYTHON" - <<'PY' "$LESSON_DELTA_FILE"
+import csv, sys
+path = sys.argv[1]
+with open(path, newline='', encoding='utf-8-sig', errors='replace') as f:
+    print(sum(1 for _ in csv.DictReader(f)))
+PY
+  )"
+  echo "LESSON_DELTA_ROWS=$rows"
+  if [[ "$rows" -le 0 ]]; then
+    echo "lesson 差分0件。lesson 取込はスキップします。"
+    commit_lesson_state
+    return 0
+  fi
+  local supabase_ok=1
+  echo "==> step4: lesson delta を Supabase へ upsert ($rows 件)"
+  if [[ -n "${SUPABASE_URL:-}" && ( -n "${SUPABASE_SERVICE_ROLE_KEY:-}" || -n "${SUPABASE_ANON_KEY:-}" ) ]]; then
+    if ! "$PYTHON" "$UPLOAD_SUPABASE_SCRIPT" --csv "$LESSON_DELTA_FILE"; then
+      echo "⚠️ lesson Supabase取込失敗（lesson の state は進めず、次回もう一度取り込む）" >&2
+      supabase_ok=0
+    fi
+  fi
+  if [[ -n "${RAIMO_APP_URL:-}" ]]; then
+    echo "==> step5: lesson delta を Raimo へ取込"
+    "$PYTHON" "$UPLOAD_RAIMO_SCRIPT" \
+      --csv "$LESSON_DELTA_FILE" \
+      --screenshot-dir "$OUTPUT_ROOT/exports/logs" || echo "⚠️ lesson Raimo取込失敗" >&2
+  fi
+  if [[ "$supabase_ok" -eq 1 ]]; then
+    commit_lesson_state
+  fi
+}
+
+commit_lesson_state() {
+  if [[ -f "$LESSON_STATE_PENDING" ]]; then
+    mv "$LESSON_STATE_PENDING" "$LESSON_STATE"
+    echo "lesson state 更新: $LESSON_STATE"
+  fi
+}
+
 # 差分0でも Free 休止防止のため心拍は必ず試みる
 run_supabase_healthcheck_touch || exit $?
 
 if [[ "$DELTA_ROWS" -le 0 ]]; then
   echo "差分0件（ヘッダのみ）のため、Supabase/Raimo取込はスキップします（心拍は実施済み）。"
   commit_state_after_success || true
+  import_lesson_delta
+  echo "delta(lesson): ${LESSON_DELTA_FILE:-なし}"
   echo "log: $LOG_FILE"
   exit 0
 fi
@@ -259,6 +336,7 @@ if [[ -z "${RAIMO_APP_URL:-}" || ( "$RAIMO_APP_OK" -ne 1 && "$RAIMO_PORTAL_OK" -
   if [[ "$SUPABASE_CONFIGURED" -eq 1 ]]; then
     echo "Raimo用環境変数が不足のため Raimo 取込はスキップします（Supabase のみ実行）。"
     commit_state_after_success
+    import_lesson_delta
     echo "完了: Supabase取込まで実行しました"
     echo "delta: $LATEST_DELTA"
     echo "log:   $LOG_FILE"
@@ -302,35 +380,7 @@ fi
 
 commit_state_after_success
 
-# --- lesson delta の Supabase 取込（フォーラム取込成功後） ---
-LESSON_DELTA_FILE=""
-if [[ "$SKIP_LESSONS" != "1" ]]; then
-  LESSON_DELTA_FILE="${LESSON_DELTA:-}"
-  if [[ -z "$LESSON_DELTA_FILE" ]]; then
-    LESSON_DELTA_FILE="$(ls -1t "$OUTPUT_ROOT"/exports/lessons/lesson_delta_*.csv 2>/dev/null | head -n 1 || true)"
-  fi
-fi
-if [[ -n "$LESSON_DELTA_FILE" && -f "$LESSON_DELTA_FILE" ]]; then
-  LESSON_DELTA_ROWS="$("$PYTHON" - <<'PY' "$LESSON_DELTA_FILE"
-import csv, sys
-path = sys.argv[1]
-with open(path, newline='', encoding='utf-8-sig', errors='replace') as f:
-    print(sum(1 for _ in csv.DictReader(f)))
-PY
-  )"
-  if [[ "$LESSON_DELTA_ROWS" -gt 0 ]]; then
-    echo "==> step4: lesson delta を Supabase へ upsert ($LESSON_DELTA_ROWS 件)"
-    if [[ "$SUPABASE_CONFIGURED" -eq 1 ]]; then
-      "$PYTHON" "$UPLOAD_SUPABASE_SCRIPT" --csv "$LESSON_DELTA_FILE" || echo "⚠️ lesson Supabase取込失敗" >&2
-    fi
-    echo "==> step5: lesson delta を Raimo へ取込"
-    "$PYTHON" "$UPLOAD_RAIMO_SCRIPT" \
-      --csv "$LESSON_DELTA_FILE" \
-      --screenshot-dir "$OUTPUT_ROOT/exports/logs" || echo "⚠️ lesson Raimo取込失敗" >&2
-  else
-    echo "lesson 差分0件。lesson 取込はスキップします。"
-  fi
-fi
+import_lesson_delta
 
 if [[ "$RAIMO_IMPORT_OK" -eq 1 ]]; then
   echo "完了: 抽出〜Supabase/Raimo取込まで実行しました"
