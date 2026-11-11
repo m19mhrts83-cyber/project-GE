@@ -35,6 +35,7 @@ export const SURFACES = [
   "slide_plan", // 資料：作る前の選択（構成案・観点）
   "slide_fix", // 資料：作った後の直し（直す前と後）
   "slide_rule", // 資料：次回反映案の採否
+  "kotoba", // ことばの棚：拾った言葉を残す／いらない／迷う・ひとこと（ダッシュボード /kotoba）
 ] as const;
 export type Surface = (typeof SURFACES)[number];
 
