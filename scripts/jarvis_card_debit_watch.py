@@ -628,6 +628,8 @@ def merge_vpass_fetch(state: dict[str, Any], fetched: dict[str, Any]) -> dict[st
     if not row.get("due_date_manual") and fetched.get("due_date"):
         row["due_date"] = fetched["due_date"]
         row["due_source"] = "vpass_web"
+    if isinstance(fetched.get("amount_confirmed"), bool):
+        row["amount_confirmed"] = fetched["amount_confirmed"]
     row["vpass_fetched_at"] = fetched.get("fetched_at") or now_iso()
     row["updated_at"] = now_iso()
     row["source"] = "vpass_web"
@@ -691,8 +693,18 @@ def merge_scan(state: dict[str, Any], scanned: list[dict[str, Any]]) -> dict[str
             "source": "gmail_payment_notice",
         }
         # 手動 due が無いときだけ、新しい通知の推定 due で更新
+        # ただし同じ（新しくない）通知を読み直しただけなら、state にある
+        # より先の引落日（Vpass 取得分など）を古い日付で巻き戻さない。
         if not prev.get("due_date_manual"):
-            row["due_date"] = hit.get("due_date") or due
+            hit_due = _ymd(hit.get("due_date"))
+            prev_due = _ymd(prev.get("due_date"))
+            notice_is_newer = bool(
+                hit_notice and (prev_notice is None or hit_notice > prev_notice)
+            )
+            if prev_due and hit_due and prev_due > hit_due and not notice_is_newer:
+                row["due_date"] = prev.get("due_date")
+            else:
+                row["due_date"] = hit.get("due_date") or due
         cards[cid] = row
     state["cards"] = cards
     return state

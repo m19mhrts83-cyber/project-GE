@@ -15,6 +15,10 @@ on:
     - cron: "0 20 * * *" # 05:00 JST
   workflow_dispatch:
     inputs:
+      recovery_actor:
+        description: "復旧窓口からの再実行のとき押した人（hawk / banto）。通常は空"
+        required: false
+        default: ""
       dry_run:
         description: "Supabase / OneDrive へ書かず候補数だけ出す"
         required: false
@@ -186,6 +190,16 @@ jobs:
           fi
           python scripts/jarvis_gha_partner_triage.py "${ARGS[@]}"
 
+      # ボット（Grok など）の受付の表 → 台帳へ本登録。失敗しても本線は止めない
+      - name: Comm intake (bots) → comm_items
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        continue-on-error: true
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          PYTHONPATH: ${{ github.workspace }}/scripts
+        run: python scripts/jarvis_comm_hub.py ingest-intake --apply
+
       # Autofix は Fail(attention/warn) のときだけ Cloud Agent。抑制: repo Variable/Secret
       # JARVIS_OPS_FAIL_AUTOFIX_DISABLE=1（了承後）。正本: docs/AIエージェントチーム/34_定期実行とAI使用量_20261017.md
       - name: Ops fail watch (Vercel / GHA) + autofix
@@ -200,3 +214,13 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/jarvis_ops_fail_watch.py --push --autofix
+
+      - name: Finish (heartbeat / 復旧窓口の結果)
+        if: ${{ always() }}
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_WEBHOOK_AI_TEAM_HUB: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_HUB }}
+          RECOVERY_ACTOR: ${{ github.event.inputs.recovery_actor || '' }}
+          DRY: ${{ github.event.inputs.dry_run || 'false' }}
+        run: bash scripts/jarvis_job_finish.sh comm_write "${{ job.status }}"

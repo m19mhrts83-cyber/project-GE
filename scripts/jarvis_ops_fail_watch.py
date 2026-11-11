@@ -101,6 +101,28 @@ def _vercel_status_key(s: dict[str, Any]) -> str:
     return f"{ctx}|{sha}"[:240]
 
 
+def _is_deploy_quota_text(text: str) -> bool:
+    """Hobby の1日100デプロイ（api-deployments-free-per-day）。コード修正では直らない。"""
+    low = (text or "").lower()
+    if "api-deployments-free-per-day" in low:
+        return True
+    return "resource is limited" in low and "more than 100" in low
+
+
+def _gha_run_is_deploy_quota(run_id: str) -> bool:
+    """失敗ログが日次デプロイ上限だけかを見る。取得できないときはコード失敗として残す。"""
+    try:
+        proc = subprocess.run(
+            ["gh", "run", "view", str(run_id), "--log-failed"],
+            text=True,
+            capture_output=True,
+            timeout=90,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return False
+    return _is_deploy_quota_text((proc.stdout or "") + (proc.stderr or ""))
+
+
 def _is_rate_limit_status(s: dict[str, Any]) -> bool:
     """Hobby の Deployment rate limited。コード修正では直らない。"""
     desc = str(s.get("description") or "").lower()
@@ -383,6 +405,55 @@ def check_gha_workflows(*, resolved_run_ids: set[str] | None = None) -> dict[str
                     resolved_run_ids=sorted(resolved_run_ids),
                 ),
             }
+        quota_fails: list[dict[str, Any]] = []
+        real_fails: list[dict[str, Any]] = []
+        for f in unresolved:
+            rid = str(f.get("databaseId") or "")
+            if (
+                f.get("workflow") == "trade-desk-deploy.yml"
+                and rid
+                and _gha_run_is_deploy_quota(rid)
+            ):
+                quota_fails.append(f)
+            else:
+                real_fails.append(f)
+        if quota_fails and not real_fails:
+            bits = [
+                f"{f.get('workflow')}: {f.get('displayTitle') or f.get('conclusion')}"
+                for f in quota_fails
+            ]
+            return {
+                "id": "gha_workflow_fail",
+                "title": "GitHub Actions（Vercel日次上限）",
+                "category": "ops",
+                "level": "info",
+                "summary": (
+                    "trade-desk の本番デプロイは Hobby の1日100件上限。"
+                    " コード失敗ではない。本番は直前の成功デプロイのまま。"
+                    " 約24時間後に workflow を再実行する。"
+                    " " + " / ".join(bits)
+                )[:400],
+                "detail": quota_fails[0].get("url"),
+                "source": "ops_fail_watch",
+                "cursor_prompt": (
+                    "api-deployments-free-per-day はコード修正では直らない。"
+                    " ビルドは通っている。本番URLの生存を確認し、約24時間後に"
+                    " trade-desk-deploy を再実行する。autofix 不要。"
+                ),
+                "status": "active",
+                "checked_at": now_iso(),
+                "payload": _ephemeral_payload(
+                    show_banner=True,
+                    deploy_quota_only=True,
+                    fails=quota_fails,
+                    fail_run_ids=[
+                        str(f.get("databaseId"))
+                        for f in quota_fails
+                        if f.get("databaseId") is not None
+                    ],
+                ),
+            }
+        unresolved = real_fails
         bits = [
             f"{f.get('workflow')}: {f.get('displayTitle') or f.get('conclusion')}"
             for f in unresolved
@@ -551,7 +622,11 @@ def collect_items(
         fixed: list[dict[str, Any]] = []
         for it in items:
             if it.get("id") in AUTOFIX_IDS:
-                if (it.get("level") or "") in ("attention", "warn"):
+                pl0 = it.get("payload") if isinstance(it.get("payload"), dict) else {}
+                # 日次上限は attention にしないが、--note では run を対応済みにして再通知しない
+                if (it.get("level") or "") in ("attention", "warn") or pl0.get(
+                    "deploy_quota_only"
+                ):
                     it = _resolve_fail_item(it, note=note)
                 else:
                     pl = dict(it.get("payload") or {})

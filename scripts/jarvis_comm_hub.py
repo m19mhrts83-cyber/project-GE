@@ -18,6 +18,10 @@ migration: apps/jarvis-dashboard/supabase/migrations/20261104_comm_hub.sql
   python scripts/jarvis_comm_hub.py dedupe --dry-run   # 二重記載の整理（--apply で削除）
   python scripts/jarvis_comm_hub.py link-pending --dry-run   # /partner の未返信を台帳へつなぐ（--apply）
   python scripts/jarvis_comm_hub.py search --party partner:P102_ミニテック --query エアコン
+
+  # メール（パートナー以外）: 要確認→inquiry、自分の送信→self（中身は jarvis_comm_hub_mail.py）
+  python scripts/jarvis_comm_hub.py ingest-mail-triage --days 14 --apply
+  python scripts/jarvis_comm_hub.py ingest-mail-sent --account admin --account estate --days 3 --apply
 """
 from __future__ import annotations
 
@@ -472,7 +476,7 @@ def _triage_entry(t: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def link_pending(sb, *, apply: bool) -> dict[str, int]:
+def _link_unlinked(sb, *, apply: bool) -> dict[str, int]:
     """台帳とつながっていない未返信（/partner の pending）を台帳へつなぐ。
 
     1. 同じ鍵（dedupe_key）の行 → 2. 同じ相手・チャネル・日時の受信が1行だけ → 3. 無ければ新規
@@ -558,6 +562,351 @@ def link_pending(sb, *, apply: bool) -> dict[str, int]:
     for tid, iid in link_rows:
         sb.table("triage_items").update({"comm_item_id": iid}).eq("id", tid).execute()
     link_items(sb, [{"item_id": iid, "target_type": "triage_item", "target_id": tid} for tid, iid in link_rows])
+    return stats
+
+
+# triage 側の状態 → 台帳の work_status（閉じ残しを戻すとき）
+TRIAGE_CLOSED_TO_WORK = {"sent": "done", "todoist": "done", "skipped": "no_action", "info": "no_action"}
+
+
+def _paged(q_factory, page: int = 500) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    start = 0
+    while True:
+        batch = q_factory().range(start, start + page - 1).execute().data or []
+        out.extend(batch)
+        if len(batch) < page:
+            return out
+        start += page
+
+
+def _triage_links_by_item(sb, item_ids: list[str]) -> tuple[dict[str, set[str]], dict[str, dict[str, Any]]]:
+    """comm_item_id → つながる triage id の集合と、triage id → {status, lane}（lane を問わない）。
+
+    つながりは comm_links（triage_item）と triage_items.comm_item_id の両方から拾う。
+    """
+    ids = sorted(set(i for i in item_ids if i))
+    targets: dict[str, set[str]] = {i: set() for i in ids}
+    for i in range(0, len(ids), 100):
+        chunk = ids[i : i + 100]
+        for l in (
+            sb.table("comm_links").select("item_id,target_id").eq("target_type", "triage_item")
+            .in_("item_id", chunk).execute().data or []
+        ):
+            targets[str(l["item_id"])].add(str(l["target_id"]))
+        for t in (
+            sb.table("triage_items").select("id,comm_item_id").in_("comm_item_id", chunk).execute().data or []
+        ):
+            targets[str(t["comm_item_id"])].add(str(t["id"]))
+    tids = sorted({t for v in targets.values() for t in v})
+    info: dict[str, dict[str, Any]] = {}
+    for i in range(0, len(tids), 100):
+        for t in sb.table("triage_items").select("id,status,lane").in_("id", tids[i : i + 100]).execute().data or []:
+            info[str(t["id"])] = {"status": str(t.get("status") or ""), "lane": t.get("lane")}
+    return targets, info
+
+
+def _triage_status_by_item(sb, item_ids: list[str]) -> dict[str, list[str]]:
+    """comm_item_id → つながる triage の status 一覧。triage 行が見つからないリンクは "missing"（閉じない）。"""
+    targets, info = _triage_links_by_item(sb, item_ids)
+    return {
+        iid: [(info.get(t) or {}).get("status", "missing") for t in sorted(ts)] for iid, ts in targets.items()
+    }
+
+
+def resolved_work_status(statuses: list[str]) -> str | None:
+    """つながる triage がすべて閉じていれば戻し先の work_status。1つでも未決なら None。"""
+    if not statuses or any(s not in TRIAGE_CLOSED_TO_WORK for s in statuses):
+        return None
+    return "done" if any(TRIAGE_CLOSED_TO_WORK[s] == "done" for s in statuses) else "no_action"
+
+
+def close_resolved(sb, *, apply: bool) -> dict[str, Any]:
+    """台帳で needs_reply のまま、triage 側は sent / todoist / skipped / info で閉じた行を戻す。
+
+    pending・未知の状態・triage 行が見つからないリンクが1つでもあれば触らない。
+    リンクが無い needs_reply も触らない（人が台帳で直接つけた可能性）。
+    """
+    rows = _paged(
+        lambda: sb.table("comm_items").select("id,party_id,subject,occurred_at,work_status")
+        .eq("work_status", "needs_reply").order("id")
+    )
+    by_item = _triage_status_by_item(sb, [str(r["id"]) for r in rows])
+    targets: list[dict[str, Any]] = []
+    for r in rows:
+        ws = resolved_work_status(by_item.get(str(r["id"])) or [])
+        if ws:
+            targets.append({**r, "to": ws, "triage": by_item[str(r["id"])]})
+    stats: dict[str, Any] = {
+        "needs_reply": len(rows),
+        "to_done": sum(1 for t in targets if t["to"] == "done"),
+        "to_no_action": sum(1 for t in targets if t["to"] == "no_action"),
+        "items": targets,
+    }
+    if apply:
+        for ws in ("done", "no_action"):
+            ids = [str(t["id"]) for t in targets if t["to"] == ws]
+            for i in range(0, len(ids), 100):
+                (
+                    sb.table("comm_items").update({"work_status": ws})
+                    .in_("id", ids[i : i + 100]).eq("work_status", "needs_reply").execute()
+                )
+    return stats
+
+
+def reconcile_counts(sb) -> dict[str, int]:
+    """毎朝の突き合わせ用の数え方（読み取りのみ）。
+
+    a = /partner の未返信（triage lane=partner・status=pending）
+    b = 台帳 needs_reply のうち、partner の pending triage につながる行
+    b_general = 台帳 needs_reply のうち、general の pending triage にだけつながる行（数えるが一致判定には使わない）
+    stale = 台帳 needs_reply だが、つながる triage がすべて閉じている行（閉じ残し）
+    unlinked = 台帳 needs_reply で triage につながらない行
+    a_unlinked = a のうち台帳とつながっていない行
+    reverse = partner の pending triage なのに台帳が needs_reply 以外（done 等）の行
+    一致 = a == b かつ a_unlinked / stale / reverse が 0。
+    """
+    pend = _paged(
+        lambda: sb.table("triage_items").select("id,comm_item_id")
+        .eq("status", "pending").eq("lane", "partner").order("id")
+    )
+    nr = _paged(lambda: sb.table("comm_items").select("id").eq("work_status", "needs_reply").order("id"))
+    targets, info = _triage_links_by_item(sb, [str(r["id"]) for r in nr])
+
+    def pending_lanes(iid: str) -> set[str]:
+        return {
+            str((info.get(t) or {}).get("lane"))
+            for t in targets.get(iid, set())
+            if (info.get(t) or {}).get("status") == "pending"
+        }
+
+    statuses = {
+        iid: [(info.get(t) or {}).get("status", "missing") for t in ts] for iid, ts in targets.items()
+    }
+    nr_ids = {str(r["id"]) for r in nr}
+    pend_items = {str(t["comm_item_id"]) for t in pend if t.get("comm_item_id")}
+    return {
+        "a": len(pend),
+        "b": sum(1 for i in nr_ids if "partner" in pending_lanes(i)),
+        "b_general": sum(1 for i in nr_ids if pending_lanes(i) and "partner" not in pending_lanes(i)),
+        "needs_reply_total": len(nr),
+        "a_unlinked": sum(1 for t in pend if not t.get("comm_item_id")),
+        "stale": sum(1 for v in statuses.values() if resolved_work_status(v)),
+        "unlinked": sum(1 for v in statuses.values() if not v),
+        "reverse": len(pend_items - nr_ids),
+    }
+
+
+def reconcile_ok(c: dict[str, int]) -> bool:
+    return c["a"] == c["b"] and c["a_unlinked"] == 0 and c["stale"] == 0 and c["reverse"] == 0
+
+
+# ------------------------------------------------------------ 受付の表（comm_intake）→ 台帳
+
+# 受付の kind → comm_items.category（skim は台帳に入れない）
+INTAKE_KIND_TO_CATEGORY = {
+    "partner": "partner",
+    "property": "property",
+    "inquiry": "inquiry",
+    "self": "self",
+    "agent": "agent",
+}
+# 銀行・認証系は台帳に入れない（送金・OTP・銀行 IB は Jarvis 専属）
+INTAKE_BLOCK_RE = re.compile(
+    r"認証コード|確認コード|ワンタイム|OTP|one[- ]?time|2段階|二段階|パスワード|password|暗証|ログイン(通知|のお知らせ)"
+    r"|口座番号|振込|振り込み|入出金|残高|引落|引き落とし|銀行|バンク|カード番号|セキュリティコード",
+    re.IGNORECASE,
+)
+
+
+def _load_party_index(sb) -> dict[str, str]:
+    """party_id / partner_folder / 名前 → party_id。"""
+    out: dict[str, str] = {}
+    for r in _paged(lambda: sb.table("comm_parties").select("party_id,name,partner_folder").order("party_id")):
+        pid = str(r["party_id"])
+        out[pid] = pid
+        if r.get("partner_folder"):
+            out[f"folder:{r['partner_folder']}"] = pid
+        if r.get("name"):
+            out[f"name:{str(r['name']).strip()}"] = pid
+    return out
+
+
+def intake_to_item(intake: dict[str, Any], parties: dict[str, str]) -> tuple[dict[str, Any] | None, str | None]:
+    """受付1行 → (comm_items 行, None) か (None, 入れない理由)。"""
+    p = intake.get("payload") or {}
+    bot = str(intake.get("source_bot") or "")
+    bid = str(intake.get("bot_item_id") or "")
+    kind = str(p.get("kind") or "").lower()
+    if kind == "skim":
+        return None, "skim（読み流し）は台帳に入れない"
+    category = INTAKE_KIND_TO_CATEGORY.get(kind)
+    if not category:
+        return None, f"kind が不明: {kind or '(空)'}"
+    title = str(p.get("title") or "").strip()
+    summary = str(p.get("summary") or "")
+    if not title:
+        return None, "title が空"
+    if INTAKE_BLOCK_RE.search(f"{title}\n{summary}"):
+        return None, "銀行・認証系は台帳に入れない"
+    try:
+        occurred = datetime.fromisoformat(re.sub(r"\.[0-9]+", "", str(p.get("occurred_at") or "")).replace("Z", "+00:00"))
+    except ValueError:
+        return None, "occurred_at が読めない"
+    if occurred.tzinfo is None:
+        occurred = occurred.replace(tzinfo=JST)
+    refs = p.get("refs") if isinstance(p.get("refs"), dict) else {}
+    party_id = None
+    for k in (
+        str(refs.get("party_id") or ""),
+        f"folder:{refs.get('partner_folder')}" if refs.get("partner_folder") else "",
+        f"name:{str(refs.get('partner') or '').strip()}" if refs.get("partner") else "",
+    ):
+        if k and k in parties:
+            party_id = parties[k]
+            break
+    source_label = str(p.get("source") or bot)
+    header = f"{source_label}｜{bot}｜{kind}｜{occurred.astimezone(JST):%Y-%m-%d %H:%M}"
+    return (
+        {
+            "channel": "other",
+            "account": f"bot:{bot}",
+            "external_id": f"intake:{bot}:{bid}",
+            "thread_key": f"bot:{bot}|{refs.get('thread') or kind}",
+            "occurred_at": occurred.isoformat(),
+            "direction": "inbound",
+            "party_id": party_id,
+            "category": category,
+            "tags": [f"bot:{bot}", f"kind:{kind}"],
+            "ingest_status": "ready",
+            # agent（ボットの日報など）は知らせだけ。対応が要るものは kind を property 等で送ってもらう
+            "work_status": "no_action" if kind == "agent" else "new",
+            "subject": title[:500],
+            "summary": summary[:500] or None,
+            "body_text": summary[:BODY_MAX] or None,
+            "context_header": header,
+            "source_ref": {"source": "comm_intake", "intake_id": intake.get("id"), "bot": bot, "refs": refs},
+            "payload": {"source": source_label},
+        },
+        None,
+    )
+
+
+def ingest_intake(sb, *, apply: bool, limit: int = 200) -> dict[str, Any]:
+    """受付の表の new を取込ゲート→名簿→分類して comm_items に本登録する。"""
+    rows = (
+        sb.table("comm_intake").select("id,source_bot,bot_item_id,payload,received_at,status")
+        .eq("status", "new").order("received_at").range(0, limit - 1).execute().data
+        or []
+    )
+    stats: dict[str, Any] = {"new": len(rows), "ingested": 0, "rejected": 0, "reasons": {}}
+    if not rows:
+        return stats
+    parties = _load_party_index(sb)
+    ok: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for r in rows:
+        item, why = intake_to_item(r, parties)
+        if item is None:
+            stats["rejected"] += 1
+            stats["reasons"][why] = stats["reasons"].get(why, 0) + 1
+            if apply:
+                sb.table("comm_intake").update(
+                    {"status": "rejected", "error": why, "updated_at": datetime.now(ZoneInfo("UTC")).isoformat()}
+                ).eq("id", r["id"]).execute()
+            continue
+        ok.append((r, item))
+    stats["ingested"] = len(ok)
+    if not apply or not ok:
+        return stats
+    ids = insert_items(sb, [i for _r, i in ok])
+    now = datetime.now(ZoneInfo("UTC")).isoformat()
+    for r, item in ok:
+        iid = ids.get(item["external_id"])
+        upd = (
+            {"status": "ingested", "ingested_item_id": iid, "error": None, "updated_at": now}
+            if iid
+            else {"error": "comm_items に見つからない（次の回に再試行）", "updated_at": now}
+        )
+        sb.table("comm_intake").update(upd).eq("id", r["id"]).execute()
+    return stats
+
+
+# ------------------------------------------------------------ heartbeat（sync_meta に相乗り）
+
+
+def write_heartbeat(sb, job: str, source: str, *, now: datetime | None = None) -> str:
+    """sync_meta に job_ok:<job> = {"at", "source"} を書く（GHA は scripts/jarvis_job_finish.sh が同じ形で書く）。"""
+    at = (now or datetime.now(ZoneInfo("UTC"))).astimezone(ZoneInfo("UTC")).strftime("%Y-%m-%dT%H:%M:%SZ")
+    value = json.dumps({"at": at, "source": source}, ensure_ascii=False)
+    sb.table("sync_meta").upsert(
+        [{"key": f"job_ok:{job}", "value": value, "updated_at": at}], on_conflict="key"
+    ).execute()
+    return at
+
+
+def read_heartbeat(sb, job: str) -> dict[str, Any] | None:
+    """job_ok:<job> → {"at": datetime(UTC), "source": str}。無ければ None。"""
+    r = sb.table("sync_meta").select("key,value,updated_at").eq("key", f"job_ok:{job}").execute()
+    rows = r.data or []
+    if not rows:
+        return None
+    raw = rows[0].get("value") or ""
+    try:
+        v = json.loads(raw)
+    except (TypeError, ValueError):
+        v = {"at": rows[0].get("updated_at") or raw, "source": "?"}
+    try:
+        at = datetime.fromisoformat(re.sub(r"\.[0-9]+", "", str(v.get("at") or "")).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=ZoneInfo("UTC"))
+    return {"at": at.astimezone(ZoneInfo("UTC")), "source": str(v.get("source") or "?")}
+
+
+def _source_label(source: str) -> str:
+    if source.startswith("gha:"):
+        return f"窓口・{source[4:]}"
+    return {"gha": "GHA", "backup": "予備"}.get(source, source)
+
+
+def reconcile_slack_text(c: dict[str, int], *, source: str, last_write: dict[str, Any] | None) -> str:
+    """#ai-hub 用の3行（iPhone 前提・空行なし）。1行目が「台帳 ✅／⚠️」の目印。"""
+    ok = reconcile_ok(c)
+    now = datetime.now(JST).strftime("%m/%d %H:%M")
+    mark = "✅" if ok else "⚠️"
+    l1 = f"1 台帳 {mark} {now}（{_source_label(source)}）突き合わせ {'一致' if ok else '不一致'}"
+    l2 = (
+        f"2 未返信 /partner {c['a']}件・台帳 {c['b']}件"
+        f"（閉じ残し{c['stale']}・逆向き{c['reverse']}・つながり無し{c['a_unlinked']}・general {c['b_general']}）"
+    )
+    if last_write:
+        w = last_write["at"].astimezone(JST).strftime("%m/%d %H:%M")
+        l3 = f"3 台帳の最終書き込み {w}（{_source_label(last_write['source'])}）"
+    else:
+        l3 = "3 台帳の最終書き込み 記録なし"
+    return "\n".join([l1, l2, l3])
+
+
+def post_slack(text: str, channel: str = "hub") -> int:
+    """既存の jarvis_slack_webhook_post.py に渡す（Webhook。許可待ちが起きない）。"""
+    import subprocess
+
+    script = Path(__file__).resolve().parent / "jarvis_slack_webhook_post.py"
+    r = subprocess.run(
+        [sys.executable, str(script), "--channel", channel, "--text", text, "--signal", "off", "--no-fb-footer"],
+        check=False,
+    )
+    return r.returncode
+
+
+def link_pending(sb, *, apply: bool) -> dict[str, Any]:
+    """未返信を台帳へつなぎ（_link_unlinked）、続けて閉じ残しを戻す（close_resolved）。"""
+    stats: dict[str, Any] = dict(_link_unlinked(sb, apply=apply))
+    cr = close_resolved(sb, apply=apply)
+    stats["closed_done"] = cr["to_done"]
+    stats["closed_no_action"] = cr["to_no_action"]
+    stats["_closed_items"] = cr["items"]
     return stats
 
 
@@ -729,8 +1078,51 @@ def cmd_link_pending(args: argparse.Namespace) -> int:
     mode = "apply" if args.apply else "dry-run"
     print(
         f"📒 comm link-pending {mode} pending_unlinked={stats['pending_unlinked']} "
-        f"matched={stats['matched']} created={stats['created']} skipped={stats['skipped']}"
+        f"matched={stats['matched']} created={stats['created']} skipped={stats['skipped']} "
+        f"closed_done={stats['closed_done']} closed_no_action={stats['closed_no_action']}"
     )
+    if args.list:
+        for t in stats["_closed_items"]:
+            print(
+                f"  {str(t.get('occurred_at'))[:10]} {t.get('party_id')} "
+                f"{(t.get('subject') or '(件名なし)')[:40]} → {t['to']} ({','.join(t['triage'])})"
+            )
+    return 0
+
+
+def cmd_reconcile(args: argparse.Namespace) -> int:
+    sb = client()
+    if getattr(args, "once_per_day", False):
+        hb = read_heartbeat(sb, "comm_reconcile")
+        if hb and hb["at"].astimezone(JST).date() == datetime.now(JST).date():
+            print(f"⏭ comm reconcile: 今日はもう済み（{hb['at'].astimezone(JST):%H:%M} {hb['source']}）")
+            return 0
+    c = reconcile_counts(sb)
+    ok = reconcile_ok(c)
+    print(f"📒 comm reconcile {'一致' if ok else '不一致'} " + " ".join(f"{k}={v}" for k, v in c.items()))
+    if getattr(args, "slack", False):
+        text = reconcile_slack_text(c, source=args.source, last_write=read_heartbeat(sb, "comm_write"))
+        rc = post_slack(text)
+        if rc != 0:
+            return rc
+        write_heartbeat(sb, "comm_reconcile", args.source)
+    return 0
+
+
+def cmd_ingest_intake(args: argparse.Namespace) -> int:
+    try:
+        st = ingest_intake(client(), apply=bool(args.apply), limit=args.limit)
+    except Exception as e:  # noqa: BLE001 — 本線（台帳書き込み・予備）を止めない
+        print(f"# comm intake soft-fail: {type(e).__name__}: {e}", file=sys.stderr)
+        return 0
+    mode = "apply" if args.apply else "dry-run"
+    print(f"📥 comm ingest-intake {mode} new={st['new']} ingested={st['ingested']} rejected={st['rejected']} reasons={st['reasons']}")
+    return 0
+
+
+def cmd_heartbeat(args: argparse.Namespace) -> int:
+    at = write_heartbeat(client(), args.job, args.source)
+    print(f"💓 job_ok:{args.job} {at} {args.source}")
     return 0
 
 
@@ -765,7 +1157,26 @@ def main(argv: list[str] | None = None) -> int:
     g5 = s5.add_mutually_exclusive_group()
     g5.add_argument("--dry-run", action="store_true")
     g5.add_argument("--apply", action="store_true")
+    s5.add_argument("--list", action="store_true", help="閉じ残しで戻す行を一覧表示")
     s5.set_defaults(func=cmd_link_pending)
+
+    s6 = sub.add_parser("reconcile", help="毎朝の突き合わせ（pending の triage につながる needs_reply で数える・読み取りのみ）")
+    s6.add_argument("--slack", action="store_true", help="#ai-hub に3行で投稿し、job_ok:comm_reconcile を書く")
+    s6.add_argument("--source", default="gha", help="gha / backup / gha:<押した人>")
+    s6.add_argument("--once-per-day", action="store_true", help="今日の job_ok:comm_reconcile があれば何もしない")
+    s6.set_defaults(func=cmd_reconcile)
+
+    s8 = sub.add_parser("ingest-intake", help="受付の表（comm_intake）の new を台帳へ本登録（失敗しても exit 0）")
+    s8.add_argument("--limit", type=int, default=200)
+    g8 = s8.add_mutually_exclusive_group()
+    g8.add_argument("--dry-run", action="store_true")
+    g8.add_argument("--apply", action="store_true")
+    s8.set_defaults(func=cmd_ingest_intake)
+
+    s7 = sub.add_parser("heartbeat", help="sync_meta に job_ok:<job> を書く")
+    s7.add_argument("--job", required=True)
+    s7.add_argument("--source", default="backup")
+    s7.set_defaults(func=cmd_heartbeat)
 
     s3 = sub.add_parser("search")
     s3.add_argument("--party", action="append")
@@ -775,7 +1186,18 @@ def main(argv: list[str] | None = None) -> int:
     s3.add_argument("--limit", type=int, default=30)
     s3.set_defaults(func=cmd_search)
 
-    args = ap.parse_args(argv)
+    # チャネル追加の共通入口: メール（パートナー以外）
+    for name, target in (("ingest-mail-triage", "ingest-triage"), ("ingest-mail-sent", "ingest-sent")):
+        sm = sub.add_parser(name, add_help=False, help=f"jarvis_comm_hub_mail.py {target} へ渡す")
+        sm.set_defaults(func=None, mail_cmd=target)
+
+    args, rest = ap.parse_known_args(argv)
+    if getattr(args, "mail_cmd", None):
+        import jarvis_comm_hub_mail
+
+        return jarvis_comm_hub_mail.main([args.mail_cmd, *rest])
+    if rest:
+        ap.error(f"unrecognized arguments: {' '.join(rest)}")
     return int(args.func(args) or 0)
 
 

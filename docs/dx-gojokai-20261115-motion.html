@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第10回 互助会 動くスライド（5枚目・17枚目）</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+  /* NotebookLM マスタースタイル（cute-illustration）に寄せた色。白背景・黒の細線・水彩風の淡色 */
+  :root{ --ink:#2a2a2a; --paper:#fff; --cream:#fdf3dc; --blue:#d9e9f5; --orange:#fbd9b5; --green:#d7ecd2; --yellow:#fff1a8; --red:#d24b3e; --ok:#3f9a52; --muted:#777; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#eee;color:var(--ink);font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic UI",sans-serif;overflow:hidden}
+  .viewport{position:absolute;inset:0 0 56px 0;display:grid;place-items:center}
+  .slide{display:none;position:relative;width:min(100vw,calc((100vh - 56px)*16/9));aspect-ratio:16/9;background:var(--paper);container-type:inline-size;overflow:hidden}
+  .slide.active{display:block}
+  .slide svg{position:absolute;inset:0;width:100%;height:100%}
+  .chapter{position:absolute;top:3cqw;right:3.5cqw;font-size:1.5cqw;color:var(--muted);font-weight:700}
+  .title{position:absolute;left:5cqw;top:4cqw;right:20cqw;font-size:3.6cqw;font-weight:900;line-height:1.3;margin:0}
+  .mk{background:linear-gradient(transparent 55%,var(--yellow) 55%)}
+  .text{position:absolute;font-size:1.9cqw;line-height:1.5;font-weight:700}
+  .small{font-size:1.4cqw;font-weight:500;color:#555}
+  .box{position:absolute;border:.25cqw solid var(--ink);border-radius:1.4cqw;padding:1.4cqw 1.6cqw;font-size:1.75cqw;font-weight:700;line-height:1.45;background:var(--cream)}
+  .box.blue{background:var(--blue)} .box.green{background:var(--green)} .box.orange{background:var(--orange)}
+  .box .t{font-size:2.1cqw;font-weight:900;display:block;margin-bottom:.4cqw}
+  .chk{color:var(--ok);font-weight:900}
+  .shime{position:absolute;left:5cqw;right:5cqw;bottom:2.6cqw;text-align:center;font-size:2.1cqw;font-weight:900}
+  .shime span{background:linear-gradient(transparent 50%,var(--yellow) 50%);padding:0 .4em}
+  .stairlab{position:absolute;text-align:center;font-size:1.45cqw;font-weight:700;line-height:1.35}
+  .stairlab b{display:block;font-size:2cqw;font-weight:900}
+  /* 手順で現れる */
+  [data-at]{opacity:0;transform:translateY(1.2cqw);transition:opacity .55s ease,transform .55s ease}
+  [data-at].on{opacity:1;transform:none}
+  svg [data-at]{transform:none}
+  .draw{stroke-dasharray:400;stroke-dashoffset:400;transition:stroke-dashoffset 1s ease .1s,opacity .3s}
+  .draw.on{stroke-dashoffset:0}
+  .flash.on{animation:flash 1.2s ease 2}
+  @keyframes flash{50%{background:var(--yellow)}}
+  .bounce.on{animation:bounce .8s ease 2}
+  @keyframes bounce{50%{transform:translateY(-1.2cqw)}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  /* 操作バー */
+  .bar{position:fixed;left:0;right:0;bottom:0;height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 16px;background:#fff;border-top:1.5px dashed #bbb;font-size:13px;color:var(--muted)}
+  .bar button{font:inherit;color:var(--ink);background:#fff;border:2px solid var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer}
+  .bar button:hover,.bar button:focus-visible{background:var(--yellow);outline:none}
+  .dots{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  .dots button{width:30px;height:30px;padding:0}
+  .dots button.on{background:var(--yellow)}
+  .btns{display:flex;gap:8px}
+</style>
+</head>
+<body>
+<div class="viewport">
+
+<!-- 5枚目：AIの使い方は5段階で進化してきた -->
+<section class="slide" data-steps="5" data-name="5枚目 AI進化といま地点">
+  <svg viewBox="0 0 1600 900" aria-hidden="true" id="art5"></svg>
+  <div class="chapter">②AI進化といま地点</div>
+  <h1 class="title"><span class="mk">AI活用は5段階で進化してきた</span></h1>
+  <div class="stairlab" style="left:6.25cqw;top:44.85cqw;width:17cqw" data-at="1"><b>①プロンプト</b>頼み方を学んだ</div>
+  <div class="stairlab" style="left:23.25cqw;top:37.85cqw;width:17cqw" data-at="2"><b>②コンテキスト</b>LINE・メール・記録を<br>1か所に集めた</div>
+  <div class="stairlab" style="left:40.25cqw;top:30.85cqw;width:17cqw" data-at="3"><b>③ハーネス</b>Todoist・Slackなどの<br>道具をAIにつないだ</div>
+  <div class="stairlab" style="left:57.25cqw;top:23.85cqw;width:17cqw" data-at="4"><b>④ループ</b>ボタンで押した判断が<br>記録に残り次に活きる</div>
+  <div class="stairlab" style="left:74.25cqw;top:16.85cqw;width:17cqw" data-at="5"><b>⑤グラフ</b>作業と判断の<br>関門をつなぐ</div>
+  <div class="text small" style="left:5cqw;bottom:2.6cqw">出典：いけともさん ループウェア講座 Day1（2026-11-07）</div>
+</section>
+
+<!-- 17枚目：1社員1フォルダ -->
+<section class="slide" data-steps="6" data-name="17枚目 1社員1フォルダ">
+  <svg viewBox="0 0 1600 900" aria-hidden="true" id="art17"></svg>
+  <div class="chapter">④初学者講座</div>
+  <h1 class="title"><span class="mk">1社員1フォルダ</span></h1>
+  <div class="text" style="left:5cqw;top:10cqw;right:52cqw" data-at="1">業務ごとに1フォルダ＝AI社員1人の席</div>
+  <div class="box" style="left:52cqw;top:11cqw;width:41cqw" data-at="2"><span class="t">席に書いておく3つ</span>①作業手順（何をどうやるか）<br>②実行権限（お金・送信・削除は人が確認）<br>③報告先（メール・Slackなど）</div>
+  <div class="box blue" style="left:52cqw;top:26.5cqw;width:41cqw" data-at="4">Cursor・Claude Codeなど<br>いろいろなAIが同じ席を見て働ける</div>
+  <div class="box green flash" style="left:52cqw;top:37cqw;width:41cqw" data-at="5"><span class="chk">✓</span> 指示書を1行直す＝最初の「改修」</div>
+  <div class="text small" style="right:4cqw;bottom:6.2cqw;font-size:1.2cqw" data-at="2">出典：いけともさん AIエージェントチーム構築術 Day1（2026-10-03）</div>
+  <div class="shime" data-at="6"><span>フォルダはAI社員の席。手順・権限・報告先がそろえば働ける</span></div>
+</section>
+
+</div>
+
+<div class="bar">
+  <span id="label"></span>
+  <div class="dots" id="dots" aria-label="手順へ移動"></div>
+  <div class="btns">
+    <button id="prev" aria-label="前へ">◀</button>
+    <button id="next" aria-label="次へ">▶</button>
+    <button id="swap" aria-label="スライドを切り替え">5枚目／17枚目</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var S='stroke="#2a2a2a" stroke-width="3"', F='font-family="Zen Maru Gothic,sans-serif" font-weight="700"';
+  function person(x,y,k,c,attr){
+    return '<g transform="translate('+x+','+y+') scale('+k+')" '+(attr||'')+'>'+
+      '<path d="M-38 120 Q-40 60 0 58 Q40 60 38 120 Z" fill="'+c+'" '+S+'/>'+
+      '<circle cx="0" cy="20" r="40" fill="#fde9d6" '+S+'/>'+
+      '<path d="M-40 14 Q-36 -24 0 -22 Q36 -24 40 14 Q20 -2 -6 4 Q-26 8 -40 14Z" fill="#5a4636" '+S+'/>'+
+      '<circle cx="-13" cy="24" r="3.5" fill="#2a2a2a"/><circle cx="13" cy="24" r="3.5" fill="#2a2a2a"/>'+
+      '<path d="M-8 40 Q0 48 8 40" fill="none" '+S+' stroke-linecap="round"/>'+
+      '<path d="M30 80 Q60 60 70 20" fill="none" '+S+' stroke-linecap="round"/></g>';
+  }
+  function robot(x,y,k){
+    return '<g transform="translate('+x+','+y+') scale('+k+')">'+
+      '<line x1="0" y1="-30" x2="0" y2="-8" '+S+'/><circle cx="0" cy="-34" r="7" fill="#fff1a8" '+S+'/>'+
+      '<rect x="-42" y="-8" width="84" height="66" rx="22" fill="#d7ecd2" '+S+'/>'+
+      '<circle cx="-15" cy="22" r="4" fill="#2a2a2a"/><circle cx="15" cy="22" r="4" fill="#2a2a2a"/>'+
+      '<path d="M-9 38 Q0 45 9 38" fill="none" '+S+' stroke-linecap="round"/>'+
+      '<path d="M-34 60 L34 60 L30 118 L-30 118Z" fill="#d7ecd2" '+S+'/></g>';
+  }
+  function folder(x,y,w,h,label){
+    return '<g transform="translate('+x+','+y+')">'+
+      '<path d="M0 30 Q0 0 30 0 L'+(w*.35)+' 0 L'+(w*.42)+' 30 Z" fill="#fbd9b5" '+S+'/>'+
+      '<rect x="0" y="28" width="'+w+'" height="'+h+'" rx="18" fill="#fdf3dc" '+S+'/>'+
+      '<rect x="'+(w/2-110)+'" y="44" width="220" height="44" rx="10" fill="#fff" stroke="#2a2a2a" stroke-width="2.5"/>'+
+      '<text x="'+(w/2)+'" y="75" text-anchor="middle" font-size="26" '+F+' fill="#2a2a2a">'+label+'</text></g>';
+  }
+  function doc(x,y,label,fill){
+    return '<g transform="translate('+x+','+y+')">'+
+      '<path d="M0 0 L70 0 L92 22 L92 110 L0 110 Z" fill="'+fill+'" '+S+'/>'+
+      '<path d="M14 40 H76 M14 58 H76 M14 76 H56" stroke="#2a2a2a" stroke-width="2.5" stroke-linecap="round"/>'+
+      '<text x="46" y="140" text-anchor="middle" font-size="24" '+F+' fill="#2a2a2a">'+label+'</text></g>';
+  }
+
+  // 5枚目：階段（左下から右上へ）
+  var fills=['#fdf3dc','#d9e9f5','#fbd9b5','#fff1a8','#d7ecd2'], st='';
+  for(var i=0;i<5;i++){
+    var x=100+i*272, top=820-(i+1)*112;
+    st+='<g data-at="'+(i+1)+'"><path d="M'+x+' 820 L'+x+' '+top+' L'+(x+272)+' '+top+' L'+(x+272)+' 820 Z" fill="'+fills[i]+'" '+S+' stroke-linejoin="round"/>'+'</g>';
+  }
+  document.getElementById('art5').innerHTML='<line x1="60" y1="820" x2="1540" y2="820" '+S+'/>'+st;
+
+  // 17枚目
+  document.getElementById('art17').innerHTML=
+    '<g data-at="1">'+folder(110,330,620,420,'修繕受付係')+'</g>'+
+    '<g data-at="2">'+doc(170,470,'①手順','#fff1a8')+doc(320,470,'②権限','#d9e9f5')+doc(470,470,'③報告先','#d7ecd2')+'</g>'+
+    '<g data-at="3">'+robot(640,600,1)+'</g>'+
+    '<g data-at="4">'+
+      '<rect x="60" y="225" width="170" height="54" rx="12" fill="#fff" stroke="#2a2a2a" stroke-width="2.5"/><text x="145" y="261" text-anchor="middle" font-size="26" '+F+'>Cursor</text>'+
+      '<rect x="560" y="225" width="200" height="54" rx="12" fill="#fff" stroke="#2a2a2a" stroke-width="2.5"/><text x="660" y="261" text-anchor="middle" font-size="26" '+F+'>Claude Code</text>'+
+      '<path class="draw" data-at="4" d="M150 282 Q170 330 260 360 M660 282 Q640 330 560 360" fill="none" '+S+'/></g>'+
+    '<g data-at="5"><rect x="166" y="500" width="100" height="20" rx="4" fill="#fff1a8" opacity=".9"/><text x="216" y="440" text-anchor="middle" font-size="40" fill="#3f9a52">✓</text></g>';
+
+  // 操作
+  var slides=[].slice.call(document.querySelectorAll('.slide')), si=0, cur=0;
+  var dots=document.getElementById('dots'), label=document.getElementById('label');
+  function N(){return +slides[si].dataset.steps}
+  function render(){
+    slides.forEach(function(s,i){s.classList.toggle('active',i===si)});
+    slides[si].querySelectorAll('[data-at]').forEach(function(el){el.classList.toggle('on',+el.getAttribute('data-at')<=cur)});
+    dots.innerHTML='';
+    for(var i=0;i<=N();i++){var b=document.createElement('button');b.textContent=i;b.dataset.i=i;if(i===cur)b.className='on';b.onclick=function(){cur=+this.dataset.i;render()};dots.appendChild(b);}
+    label.textContent=slides[si].dataset.name+'　手順'+cur+'／'+N();
+  }
+  function go(d){cur=Math.max(0,Math.min(N(),cur+d));render()}
+  function swap(){si=(si+1)%slides.length;cur=0;render()}
+  document.getElementById('prev').onclick=function(){go(-1)};
+  document.getElementById('next').onclick=function(){go(1)};
+  document.getElementById('swap').onclick=swap;
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){go(1);e.preventDefault()}
+    if(e.key==='ArrowLeft'||e.key==='PageUp'){go(-1);e.preventDefault()}
+    if(e.key==='Tab'&&!e.shiftKey&&document.activeElement===document.body){swap();e.preventDefault()}
+  });
+  document.querySelector('.viewport').addEventListener('click',function(){go(1)});
+  // #s17 で17枚目から開く
+  if(location.hash==='#s17'){si=1}
+  render();
+})();
+</script>
+</body>
+</html>

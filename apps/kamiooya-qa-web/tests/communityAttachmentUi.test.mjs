@@ -63,7 +63,7 @@ for (const source of sources) {
     const id='a'.repeat(64),sid='oc_'+id,requests=[];
     const row={id:sid,chat_title:'修繕',content:'【LINE添付・内容未解析】見積.pdf'};
     const app=load(source,async(url,opts)=>{requests.push(JSON.parse(opts.body));return {ok:true,text:async()=>JSON.stringify({relatedOpenchat:[row]})};});
-    const slot=new Element();slot.getAttribute=()=>sid;
+    const slot=new Element();slot.getAttribute=k=>k==='data-openchat-source-id'?sid:'';
     const tbody={innerHTML:'',querySelectorAll:()=>[slot]};
     app.elements.openchatTableBody=tbody;app.elements.openchatSearchInput={value:'見積.pdf'};
     app.elements.openchatAttachmentsOnly={checked:true};app.elements.openchatTitleFilter={value:''};
@@ -143,6 +143,21 @@ for (const source of sources) {
     assert.equal(app.attachmentDisplayName({content_type:'audio/mp4'}),'音声（ファイル名未取得）');
     assert.equal(app.attachmentDisplayName({original_name:'file'}),'添付ファイル（ファイル名未取得）');
     assert.equal(app.attachmentDisplayName({original_name:'写真 01.jpg'}),'写真 01.jpg');
+  });
+  test(source.pathname + ': attachment names read as date_author_content', () => {
+    const app=load(source);
+    const meta={when:'2025-03-12 21:05:00',who:'1234 山田 太郎'};
+    assert.equal(app.attachmentDisplayName({original_name:'IMG_5575.jpeg',content_type:'image/jpeg'},meta,0),'2025-03-12_山田太郎_画像.jpeg');
+    assert.equal(app.attachmentDisplayName({original_name:'S__6856725.jpg',content_type:'image/jpeg'},meta,2),'2025-03-12_山田太郎_画像2.jpg');
+    assert.equal(app.attachmentDisplayName({original_name:'a5fc32959dfdecf8236006bef07e5f21.pdf',content_type:'application/pdf'},meta,0),'2025-03-12_山田太郎_PDF.pdf');
+    assert.equal(app.attachmentDisplayName({original_name:'37D1FF52-6D32-4D62-83A2-81239BC13A1F.jpg'},meta,0),'2025-03-12_山田太郎_画像.jpg');
+    assert.equal(app.attachmentDisplayName({original_name:'image',content_type:'image/jpeg'},{when:'',who:'たろう'},1),'日付不明_たろう_画像1.jpg');
+    assert.equal(app.attachmentDisplayName({original_name:'収支シミュレーション.xlsx'},meta,0),'2025-03-12_山田太郎_収支シミュレーション.xlsx');
+    const box=new Element();
+    app.state.attachmentIndex={'7':[{id:'a',original_name:'IMG_1.jpg',content_type:'image/jpeg'},{id:'b',original_name:'IMG_2.jpg',content_type:'image/jpeg'},{id:'c',original_name:'見積書.pdf'}]};
+    app.appendAttachmentLinks(box,'7','添付：','',meta);
+    const names=box.children[0].children.slice(1).map(x=>x.textContent);
+    assert.deepEqual(names,['2025-03-12_山田太郎_画像1.jpg','2025-03-12_山田太郎_画像2.jpg','2025-03-12_山田太郎_見積書.pdf']);
   });
 
 }

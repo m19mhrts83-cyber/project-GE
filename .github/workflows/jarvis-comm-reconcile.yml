@@ -1,0 +1,62 @@
+name: Jarvis Comm Hub Reconcile
+
+# コミュニケーション台帳の毎日の突き合わせ（読み取り）→ #ai-hub に3行（Webhook）。
+# 昼の台帳書き込み（Jarvis Dashboard Gmail triage）が終わったら走る。schedule は保険。
+# 1日1回だけ投稿（job_ok:comm_reconcile が今日なら skip）。Mac launchd の予備が同じ判断で代走する。
+on:
+  workflow_run:
+    workflows: ["Jarvis Dashboard Gmail Triage"]
+    types: [completed]
+  schedule:
+    - cron: "30 5 * * *" # 14:30 JST（保険）
+  workflow_dispatch:
+    inputs:
+      recovery_actor:
+        description: "復旧窓口からの再実行のとき押した人（hawk / banto）。通常は空"
+        required: false
+        default: ""
+
+concurrency:
+  group: jarvis-comm-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -q supabase pyyaml requests
+
+      - name: Reconcile → #ai-hub
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_WEBHOOK_AI_TEAM_HUB: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_HUB }}
+          SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
+          ACTOR: ${{ github.event.inputs.recovery_actor || '' }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SLACK_WEBHOOK_AI_TEAM_HUB:-}" ]]; then
+            echo "::error::SLACK_WEBHOOK_AI_TEAM_HUB がありません（#report に落ちないよう止める）"
+            exit 1
+          fi
+          if [[ -n "$ACTOR" ]]; then
+            python scripts/jarvis_comm_hub.py reconcile --slack --source "gha:${ACTOR}"
+          else
+            python scripts/jarvis_comm_hub.py reconcile --slack --source gha --once-per-day
+          fi
+
+      - name: Finish (復旧窓口の結果)
+        if: ${{ always() }}
+        env:
+          SLACK_WEBHOOK_AI_TEAM_HUB: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_HUB }}
+          RECOVERY_ACTOR: ${{ github.event.inputs.recovery_actor || '' }}
+        run: bash scripts/jarvis_job_finish.sh comm_reconcile "${{ job.status }}"
