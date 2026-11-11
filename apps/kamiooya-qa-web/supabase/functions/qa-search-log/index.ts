@@ -16,6 +16,10 @@ type LogBody = {
   result_status?: string;
   error_message?: string;
   secret?: string;
+  /** keyword のとき: データソースごとの当たり件数 */
+  hits?: Record<string, unknown>;
+  term_count?: number;
+  has_or?: boolean;
 };
 
 function corsHeaders(): HeadersInit {
@@ -60,8 +64,8 @@ Deno.serve(async (req) => {
   }
 
   const mode = asString(body?.search_mode).trim();
-  if (mode !== "normal" && mode !== "semantic") {
-    return json({ errorMessage: "search_mode must be normal or semantic" }, 400);
+  if (mode !== "normal" && mode !== "semantic" && mode !== "keyword") {
+    return json({ errorMessage: "search_mode must be normal, semantic or keyword" }, 400);
   }
 
   const queryText = asString(body?.query_text || body?.query).trim().slice(0, 2000);
@@ -78,6 +82,35 @@ Deno.serve(async (req) => {
   const sb = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // キーワード検索（全データ）はチャットの質問と別の表に入れる（費用の実測・質問ランキングに混ぜない）。2026-11-12
+  if (mode === "keyword") {
+    const hitsIn = body?.hits && typeof body.hits === "object" ? body.hits : {};
+    const hits: Record<string, number> = {};
+    let hitTotal = 0;
+    for (const key of ["comments", "openchat", "lessons", "knowledge"]) {
+      const n = Number((hitsIn as Record<string, unknown>)[key]);
+      if (Number.isFinite(n) && n >= 0) {
+        hits[key] = Math.floor(n);
+        hitTotal += Math.floor(n);
+      }
+    }
+    const kwStatusRaw = asString(body?.result_status).trim() || "ok";
+    const kwStatus = ["ok", "partial", "error"].includes(kwStatusRaw) ? kwStatusRaw : "ok";
+    const termCount = Number(body?.term_count);
+    const { error: kwError } = await sb.from("qa_keyword_search_events").insert({
+      query_text: queryText.slice(0, 500),
+      session_id: asString(body?.session_id) || null,
+      user_id: asString(body?.user_id) || null,
+      term_count: Number.isFinite(termCount) ? Math.max(0, Math.floor(termCount)) : null,
+      has_or: body?.has_or === true,
+      hit_total: hitTotal,
+      hits,
+      result_status: kwStatus,
+    });
+    if (kwError) return json({ errorMessage: kwError.message }, 500);
+    return json({ ok: true });
+  }
 
   const statusRaw = asString(body?.result_status).trim() || "ok";
   const resultStatus = ["ok", "error", "disabled", "rate_limited"].includes(statusRaw)
