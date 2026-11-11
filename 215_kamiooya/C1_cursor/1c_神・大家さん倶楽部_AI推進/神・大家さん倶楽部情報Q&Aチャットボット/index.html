@@ -727,7 +727,7 @@
           <!-- 管理者: 運営分析（Phase 13） -->
           <section id="adminAnalyticsScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
             <div class="w-full max-w-5xl space-y-4">
-              <div class="bg-white rounded border p-4">
+              <div class="bg-white rounded border p-4 analytics-head">
                 <div class="flex flex-wrap items-end justify-between gap-3">
                   <div>
                     <h3 class="font-semibold mb-1">運営分析ダッシュボード</h3>
@@ -754,6 +754,8 @@
                 </div>
                 <p id="analyticsStatus" class="text-xs text-slate-500 mt-2"></p>
               </div>
+              <!-- 運営分析の新しい見た目（design_theme の人だけ。2026-11-11）。中身は app.js の renderAnalyticsBrand -->
+              <div id="analyticsBrand" class="brand-only analytics-brand"></div>
               <!-- (2) 回答の評価（段階公開スイッチ answer_feedback が見える管理者だけ） -->
               <div id="feedbackAnalytics" class="hidden bg-white rounded border p-4">
                 <div class="flex items-center justify-between gap-2">
@@ -797,26 +799,26 @@
                 <details class="mt-3 text-sm"><summary class="text-slate-600">これまでの判断</summary><div id="themeHistory" class="mt-1 space-y-1 text-slate-600"></div></details>
               </div>
 
-              <div id="analyticsSummaryCards" class="grid grid-cols-2 md:grid-cols-5 gap-3"></div>
+              <div id="analyticsSummaryCards" class="grid grid-cols-2 md:grid-cols-5 gap-3 analytics-classic"></div>
 
-              <div class="bg-white rounded border p-4">
+              <div class="bg-white rounded border p-4 analytics-cost">
                 <h4 class="font-semibold mb-1 text-sm">Gemini 利用・想定課金（試算）</h4>
                 <p class="text-xs text-slate-500 mb-3">期間内の成功質問数 × 単価目安。Google請求額そのものではありません。</p>
                 <div id="analyticsGeminiEstimate" class="space-y-2 text-sm"></div>
               </div>
 
-              <div class="bg-white rounded border p-4 overflow-auto">
+              <div class="bg-white rounded border p-4 overflow-auto analytics-cost">
                 <h4 class="font-semibold mb-1 text-sm">費用の実測（週次）</h4>
                 <p class="text-xs text-slate-500 mb-3">週は月曜始まり（日本時間）。意味検索・より詳しく調べるは Gemini の実トークン数から計算、通常検索（切替前の会員）は件数×単価目安。AI Studio の請求額と見比べてください。</p>
                 <div id="analyticsMetering" class="space-y-3 text-sm"></div>
               </div>
 
-              <div class="bg-white rounded border p-4">
+              <div class="bg-white rounded border p-4 analytics-classic">
                 <h4 class="font-semibold mb-3 text-sm">日次推移</h4>
                 <div id="analyticsDailyBars" class="space-y-2"></div>
               </div>
 
-              <div class="bg-white rounded border p-4 overflow-auto">
+              <div class="bg-white rounded border p-4 overflow-auto analytics-classic">
                 <h4 class="font-semibold mb-3 text-sm">よくある質問</h4>
                 <table class="min-w-full text-sm">
                   <thead class="bg-slate-100">
@@ -832,7 +834,7 @@
                 </table>
               </div>
 
-              <div class="bg-white rounded border p-4 overflow-auto">
+              <div class="bg-white rounded border p-4 overflow-auto analytics-recent">
                 <h4 class="font-semibold mb-3 text-sm">直近イベント</h4>
                 <table class="min-w-full text-sm">
                   <thead class="bg-slate-100">
