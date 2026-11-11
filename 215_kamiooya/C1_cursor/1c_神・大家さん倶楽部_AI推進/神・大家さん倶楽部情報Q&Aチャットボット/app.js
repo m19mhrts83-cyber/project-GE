@@ -4615,6 +4615,8 @@ const App = {
     box.innerHTML = '';
     App.state.allSearchOcDone = false;
     App.state.allSearchStartedAt = Date.now();
+    App.state.allSearchResult = null;
+    App.state.allSearchPendingTerms = terms;
     App.startAllSearchProgress(seq);
     const ocTask = App.allSearchOpenchat(query).then(function (r) { return r; }, function (e) { return { error: (e && e.message) || String(e) }; })
       .then(function (r) { if (current()) App.state.allSearchOcDone = true; return r; });
@@ -4668,7 +4670,7 @@ const App = {
           '<div class="search-motion-progress" aria-hidden="true"><div data-progress></div></div>' +
           '<div class="search-motion-meta"><span data-remain></span><span data-elapsed></span></div>' +
           '<p data-first class="mt-2 text-sm text-slate-500"></p>' +
-        '</div></div></div>';
+        '</div>' + App.allSearchCoursesHtml() + '</div></div>';
       card = document.getElementById('allSearchWorkingCard');
     }
     card.querySelectorAll('[data-step]').forEach(function (li) {
@@ -4683,6 +4685,16 @@ const App = {
     const r = card.querySelector('[data-remain]'); if (r) r.textContent = words;
     const el = card.querySelector('[data-elapsed]'); if (el) el.textContent = '経過 ' + (sec >= 60 ? Math.floor(sec / 60) + '分' : '') + (sec % 60) + '秒';
     const f = card.querySelector('[data-first]'); if (f) f.textContent = st.firstLoad ? 'はじめての検索では、全データの読み込みに少し時間がかかります。2回目からはすぐに結果が出ます。' : '';
+  },
+  // おすすめ講座（11/11 松野さん「Q&Aチャットと同じく」）。回答待ちと同じ選び方（answerWaitCourses）で、検索の言葉から最大3件。
+  allSearchCoursesHtml: () => {
+    const res = App.state.allSearchResult;
+    const terms = res ? res.terms : (App.state.allSearchPendingTerms || []);
+    const list = App.answerWaitCourses((terms || []).join(''));
+    if (!list.length) return '';
+    const esc = App.escapeHtml;
+    return '<div class="search-motion-courses"><div class="search-motion-courses-title"><i class="fa-solid fa-circle-play" aria-hidden="true"></i> 関連しそうな講座</div><ul>' +
+      list.map(function (r) { return '<li><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.title) + '</a><span>' + esc(r.course.replace(/^神大家/, '')) + '</span></li>'; }).join('') + '</ul></div>';
   },
   startAllSearchProgress: (seq) => {
     App.stopAllSearchProgress();
@@ -4777,7 +4789,8 @@ const App = {
           '</td><td class="px-3 py-2 text-right whitespace-nowrap font-bold">' + esc(x.count) + '</td></tr>';
       }).join('') +
       '</tbody></table></div>';
-    box.innerHTML = table + parts.join('');
+    const courses = App.allSearchCoursesHtml();
+    box.innerHTML = table + (courses ? '<div class="bg-white rounded border overflow-hidden">' + courses + '</div>' : '') + parts.join('');
     if (App.elements.allSearchMeta) {
       const pending = !res.openchat;
       const how = res.query.length > 1 && res.query.every(function (g) { return g.length === 1; })
