@@ -14,6 +14,8 @@ WeStudy lesson ページの説明テキストを収集するスクレイパー�
   python3 westudy_lesson_pages.py
   python3 westudy_lesson_pages.py --show          # ブラウザ表示
   python3 westudy_lesson_pages.py --output-root /tmp/lesson_out
+  python3 westudy_lesson_pages.py --new-only-state state/westudy_lesson_ids.json
+      # 毎日の新着確認: コース目次（5ページ）だけ見て、state に無い lesson だけ本文を取る
 """
 
 from __future__ import annotations
@@ -481,8 +483,23 @@ def slug_from_url(url: str) -> str:
     return m.group(1) if m else url.split("/")[-1]
 
 
-def run_scrape(headless: bool = True) -> list[dict]:
-    """全タブ → 全セクション → 全 lesson を巡回し、説明テキストを収集。"""
+def load_known_ids(state_path: Path | None) -> set[str] | None:
+    """build_lesson_delta_csv.py の state（{"lessons": {comment_id: hash}}）から既知の ID を読む。"""
+    if state_path is None:
+        return None
+    try:
+        data = json.loads(state_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return set()
+    return set((data.get("lessons") or {}).keys())
+
+
+def run_scrape(headless: bool = True, known_ids: set[str] | None = None) -> list[dict]:
+    """全タブ → 全セクション → 全 lesson を巡回し、説明テキストを収集。
+
+    known_ids を渡すと、その comment_id（lesson_desc_{slug}）の lesson は本文を取りに行かない
+    （毎日の新着確認用。目次ページだけ見るので数分で終わる）。
+    """
     global driver, _HEADLESS
     _HEADLESS = headless
     driver = create_driver(headless=headless)
@@ -495,6 +512,9 @@ def run_scrape(headless: bool = True) -> list[dict]:
 
         for tab in COURSE_TABS:
             lessons = collect_sections_and_lessons(tab)
+            if known_ids is not None:
+                lessons = [L for L in lessons if f"lesson_desc_{slug_from_url(L['url'])}" not in known_ids]
+                log(f"  新着候補: {len(lessons)} レッスン（取込済みは飛ばす）")
             for i, lesson in enumerate(lessons):
                 lesson_url = lesson["url"]
                 slug = slug_from_url(lesson_url)
@@ -562,6 +582,8 @@ def main():
     parser.add_argument("--output-root", type=str, default=None,
                         help="出力先ルート（既定: ProgramCode/outputs/westudy_lessons/）")
     parser.add_argument("--dry-run", action="store_true", help="取得のみ（CSV出力しない）")
+    parser.add_argument("--new-only-state", type=str, default=None,
+                        help="この state JSON に無い lesson だけ本文を取る（毎日の新着確認）")
     args = parser.parse_args()
 
     global RUN_ID, OUTPUT_ROOT
@@ -578,7 +600,8 @@ def main():
 
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 
-    rows = run_scrape(headless=not args.show)
+    known = load_known_ids(Path(args.new_only_state).expanduser()) if args.new_only_state else None
+    rows = run_scrape(headless=not args.show, known_ids=known)
 
     if args.dry_run:
         log(f"dry-run: {len(rows)} 件取得（CSV未出力）")
