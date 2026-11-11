@@ -595,3 +595,7 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 .search-motion-courses li { display: flex; flex-direction: column; gap: 1px; }
 .search-motion-courses a { color: #1E4F8F; text-decoration: underline; text-underline-offset: 3px; font-size: 0.95rem; line-height: 1.5; }
 .search-motion-courses li span { font-size: 0.75rem; color: #94a3b8; }
+
+/* 文の区切りでだけ折り返す（11/11 松野さん「切り位置が気に入らない」） */
+.brand-hero-lead .nobr { white-space: nowrap; }
+@media (max-width: 640px) { .theme-a .brand-hero-lead { font-size: min(0.95rem, 3.6vw); } }
