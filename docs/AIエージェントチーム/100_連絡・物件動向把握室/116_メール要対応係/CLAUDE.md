@@ -80,6 +80,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 | 日付 | 変更 |
 |---|---|
+| 2026-11-11 | Chatwork カードの先頭に「Chatworkで返信」URL ボタン（連絡先一覧.yaml の folder＋ルーム名で `#!rid` を引く。決まらなければ Chatwork トップ）。送信はアプリで本人、ここでは開くだけ。受け口は `action_id=mail_action_open_app` を 200 で素通し（Slack FB 11/10） |
 | 2026-11-07 | 昼 GHA に `SLACK_SIGNING_SECRET` を渡す（従来は未設定で URL ボタンに落ち、リンク先で再度押す二度手間）。以後アプリ内ボタンで即完了・カード置換 |
 | 2026-10-23 | 同一内容の多重投稿防止: gmail_id / 件名キー dedupe、digest を sync_meta 共有、健全性 #ops 6h クールダウン |
 | 2026-10-20 | 本線ダイジェスト＝短索引、カードはスレ（Bot）。下書き全文をSlackから外す。見るストレス低減 |

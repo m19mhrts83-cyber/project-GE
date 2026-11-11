@@ -286,6 +286,11 @@ export async function POST(request: NextRequest) {
       return new NextResponse("", { status: 200 });
     }
 
+    // 「Chatworkで返信」等の URL ボタン: 開くのはアプリ側。ここでは受け取りだけ返す（警告マークを出さない）
+    if (actionId === "mail_action_open_app") {
+      return new NextResponse("", { status: 200 });
+    }
+
     if (parseT313ButtonValue(value) && responseUrl) {
       // 先に受け取りを返し（Slack の3秒待ち・ぐるぐるを短く）、
       // Todoist 反映後に response_url で押した行を「報告済み」に差し替える
