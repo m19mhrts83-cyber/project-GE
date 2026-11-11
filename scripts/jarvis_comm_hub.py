@@ -711,6 +711,10 @@ INTAKE_KIND_TO_CATEGORY = {
     "self": "self",
     "agent": "agent",
 }
+# topic（種類の印）のうち、agent でも「やること」（work_status=new）にするもの。
+# それ以外の agent（日報など）は知らせだけ（no_action）。payload.needs_action で個別に上書きできる。
+INTAKE_ACTIONABLE_TOPICS = frozenset({"repair_vendor", "dev_card"})
+INTAKE_TOPIC_RE = re.compile(r"^[a-z0-9_]{1,40}$")
 # 銀行・認証系は台帳に入れない（送金・OTP・銀行 IB は Jarvis 専属）
 INTAKE_BLOCK_RE = re.compile(
     r"認証コード|確認コード|ワンタイム|OTP|one[- ]?time|2段階|二段階|パスワード|password|暗証|ログイン(通知|のお知らせ)"
@@ -756,6 +760,16 @@ def intake_to_item(intake: dict[str, Any], parties: dict[str, str]) -> tuple[dic
     if occurred.tzinfo is None:
         occurred = occurred.replace(tzinfo=JST)
     refs = p.get("refs") if isinstance(p.get("refs"), dict) else {}
+    topic = str(p.get("topic") or "").lower()
+    if topic and not INTAKE_TOPIC_RE.match(topic):
+        topic = ""
+    needs_action = p.get("needs_action")
+    if isinstance(needs_action, bool):
+        work_status = "new" if needs_action else "no_action"
+    elif kind == "agent":
+        work_status = "new" if topic in INTAKE_ACTIONABLE_TOPICS else "no_action"
+    else:
+        work_status = "new"
     party_id = None
     for k in (
         str(refs.get("party_id") or ""),
@@ -772,21 +786,21 @@ def intake_to_item(intake: dict[str, Any], parties: dict[str, str]) -> tuple[dic
             "channel": "other",
             "account": f"bot:{bot}",
             "external_id": f"intake:{bot}:{bid}",
-            "thread_key": f"bot:{bot}|{refs.get('thread') or kind}",
+            "thread_key": f"bot:{bot}|{refs.get('thread') or topic or kind}",
             "occurred_at": occurred.isoformat(),
             "direction": "inbound",
             "party_id": party_id,
             "category": category,
-            "tags": [f"bot:{bot}", f"kind:{kind}"],
+            "tags": [f"bot:{bot}", f"kind:{kind}"] + ([f"topic:{topic}"] if topic else []),
             "ingest_status": "ready",
-            # agent（ボットの日報など）は知らせだけ。対応が要るものは kind を property 等で送ってもらう
-            "work_status": "no_action" if kind == "agent" else "new",
+            # agent（日報など）は知らせだけ。修繕候補・開発カードなど topic が「やること」なら new
+            "work_status": work_status,
             "subject": title[:500],
             "summary": summary[:500] or None,
             "body_text": summary[:BODY_MAX] or None,
             "context_header": header,
             "source_ref": {"source": "comm_intake", "intake_id": intake.get("id"), "bot": bot, "refs": refs},
-            "payload": {"source": source_label},
+            "payload": {"source": source_label, **({"topic": topic} if topic else {})},
         },
         None,
     )

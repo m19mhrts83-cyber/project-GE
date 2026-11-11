@@ -57,6 +57,27 @@ class IntakeToItemTests(unittest.TestCase):
         self.assertEqual(item["category"], "agent")
         self.assertEqual(item["work_status"], "no_action")
 
+    def test_topic_decides_action_for_agent(self):
+        # 修繕候補・開発カードは agent でも「やること」
+        for t in ("repair_vendor", "dev_card"):
+            item, _ = hub.intake_to_item(intake(f"t-{t}", kind="agent", topic=t), PARTIES)
+            self.assertEqual(item["work_status"], "new", t)
+            self.assertIn(f"topic:{t}", item["tags"])
+            self.assertEqual(item["payload"]["topic"], t)
+            self.assertTrue(item["thread_key"].endswith(f"|{t}"))
+        # 日報は知らせだけ
+        item, _ = hub.intake_to_item(intake("t-d", kind="agent", topic="daily_report"), PARTIES)
+        self.assertEqual(item["work_status"], "no_action")
+        # needs_action で個別に上書き
+        item, _ = hub.intake_to_item(intake("t-n1", kind="agent", topic="daily_report", needs_action=True), PARTIES)
+        self.assertEqual(item["work_status"], "new")
+        item, _ = hub.intake_to_item(intake("t-n2", kind="property", topic="property_research", needs_action=False), PARTIES)
+        self.assertEqual(item["work_status"], "no_action")
+        # 形が崩れた topic は無視（tag にも出さない）
+        item, _ = hub.intake_to_item(intake("t-x", kind="agent", topic="Bad Topic!"), PARTIES)
+        self.assertEqual(item["work_status"], "no_action")
+        self.assertFalse(any(t.startswith("topic:") for t in item["tags"]))
+
     def test_gate_rejects(self):
         for p, frag in [
             ({"kind": "skim"}, "skim"),
