@@ -150,6 +150,8 @@ const App = {
   init: () => {
     App.cacheElements();
     App.bindEvents();
+    // この端末で配色が見えていた人は、ログイン画面のタブから新しいアイコンにする
+    if (document.documentElement.classList.contains('theme-a')) App.applyAppIcon(true);
     App.hydrateSemanticMode();
     const resetToken = App.parseResetPasswordTokenFromHash();
     if (resetToken) {
@@ -174,7 +176,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -197,7 +199,41 @@ const App = {
     if (document.documentElement) document.documentElement.classList.toggle('theme-a', on);
     // アプリ名「神大家AIナビ」（2026-11-11 目黒さん「一旦これで」）。配色と同じスイッチの人だけ。
     document.title = on ? '神大家AIナビ' : '神・大家さん倶楽部Q&Aチャットボット';
+    App.applyAppIcon(on);
     try { if (on) localStorage.setItem('qa_design_theme', '1'); else localStorage.removeItem('qa_design_theme'); } catch (e) { /* ignore */ }
+  },
+  // タブのアイコン（2026-11-11 松野さん「ラ」の字は LINE っぽいので変えたい）。配色と同じスイッチの人だけ。
+  // 案1「神」の字 / 案2 家マーク。APP_ICON_CHOICE で切り替え。
+  APP_ICON_CHOICE: 'kami',
+  APP_ICONS: {
+    kami: "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%2311366A%22/%3E%3Crect x=%2210%22 y=%2252%22 width=%2244%22 height=%225%22 rx=%222.5%22 fill=%22%23FE910B%22/%3E%3Ctext x=%2232%22 y=%2245%22 text-anchor=%22middle%22 font-family=%22'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif%22 font-weight=%22700%22 font-size=%2240%22 fill=%22%23fff%22%3E%E7%A5%9E%3C/text%3E%3C/svg%3E",
+    ie: "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%2311366A%22/%3E%3Cpath d=%22M32 11 L56 32 H49 V54 H15 V32 H8 Z%22 fill=%22%23FE910B%22/%3E%3Crect x=%2227%22 y=%2238%22 width=%2210%22 height=%2216%22 rx=%221.5%22 fill=%22%2311366A%22/%3E%3Crect x=%2219%22 y=%2236%22 width=%226%22 height=%226%22 fill=%22%23fff%22/%3E%3Crect x=%2239%22 y=%2236%22 width=%226%22 height=%226%22 fill=%22%23fff%22/%3E%3C/svg%3E",
+  },
+  applyAppIcon: (on) => {
+    const head = document.head;
+    if (!head) return;
+    let link = document.getElementById('appIconLink');
+    if (!on) { if (link) link.remove(); document.querySelectorAll('link[data-app-icon-hidden]').forEach((l) => { l.rel = l.getAttribute('data-app-icon-hidden'); l.removeAttribute('data-app-icon-hidden'); }); return; }
+    document.querySelectorAll('link[rel~="icon"]').forEach((l) => { if (l.id !== 'appIconLink') { l.setAttribute('data-app-icon-hidden', l.rel); l.rel = 'x-icon-off'; } });
+    if (!link) { link = document.createElement('link'); link.id = 'appIconLink'; link.rel = 'icon'; link.type = 'image/svg+xml'; head.appendChild(link); }
+    link.href = App.APP_ICONS[App.APP_ICON_CHOICE] || App.APP_ICONS.kami;
+  },
+  // 文字の大きさ（標準/大/特大）。年配の会員にも読みやすく（2026-11-11 松野さん）。端末ごとに覚える。
+  applyTextSize: (size) => {
+    const v = (size === 'l' || size === 'xl') ? size : 'm';
+    const root = document.documentElement;
+    if (root) { if (v === 'm') root.removeAttribute('data-text-size'); else root.setAttribute('data-text-size', v); }
+    try { if (v === 'm') localStorage.removeItem('qa_text_size'); else localStorage.setItem('qa_text_size', v); } catch (e) { /* ignore */ }
+    document.querySelectorAll('[data-text-size-btn]').forEach((b) => b.setAttribute('aria-pressed', b.getAttribute('data-text-size-btn') === v ? 'true' : 'false'));
+  },
+  initTextSize: () => {
+    let cur = 'm';
+    try { cur = localStorage.getItem('qa_text_size') || 'm'; } catch (e) { /* ignore */ }
+    App.applyTextSize(cur);
+    document.addEventListener('click', (ev) => {
+      const b = ev.target && ev.target.closest ? ev.target.closest('[data-text-size-btn]') : null;
+      if (b) App.applyTextSize(b.getAttribute('data-text-size-btn'));
+    });
   },
   renderFeaturePreviewBar: () => {
     const bar = document.getElementById('featurePreviewBar');
@@ -291,6 +327,10 @@ const App = {
     App.elements.knowledgeTableBody = document.getElementById('knowledgeTableBody');
     App.elements.knowledgeSearchInput = document.getElementById('knowledgeSearchInput');
     App.elements.knowledgeListMeta = document.getElementById('knowledgeListMeta');
+    App.elements.allSearchForm = document.getElementById('allSearchForm');
+    App.elements.allSearchInput = document.getElementById('allSearchInput');
+    App.elements.allSearchMeta = document.getElementById('allSearchMeta');
+    App.elements.allSearchResults = document.getElementById('allSearchResults');
     App.elements.pendingUsersTableBody = document.getElementById('pendingUsersTableBody');
     App.elements.pendingUsersSelectAll = document.getElementById('pendingUsersSelectAll');
     App.elements.bulkApprovePendingUsersBtn = document.getElementById('bulkApprovePendingUsersBtn');
@@ -381,6 +421,7 @@ const App = {
     if(resumeAnswerBtn)resumeAnswerBtn.addEventListener('click',()=>App.resumePendingAnswer());
     const retryAttachmentsBtn=document.getElementById('retryAttachmentsBtn');
     if(retryAttachmentsBtn)retryAttachmentsBtn.addEventListener('click',()=>{if(!App.state.attachmentLoading&&App.state.currentUser)void App.initializeAttachments('','',App.state.attachmentGeneration);});
+    App.initTextSize();
     document.getElementById('logoutBtn').addEventListener('click', App.logout);
     document.getElementById('newChatBtn').addEventListener('click', App.createNewChatPlaceholder);
     App.elements.messageForm.addEventListener('submit', App.handleSendMessage);
@@ -490,6 +531,24 @@ const App = {
     if (App.elements.commentDetailDialog) {
       App.elements.commentDetailDialog.addEventListener('click', function (ev) {
         if (ev.target === App.elements.commentDetailDialog) App.closeCommentDetailDialog();
+      });
+    }
+    if (App.elements.allSearchForm) {
+      App.elements.allSearchForm.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        void App.runAllSearch();
+      });
+    }
+    if (App.elements.allSearchResults) {
+      App.elements.allSearchResults.addEventListener('click', App.onAllSearchResultClick);
+    }
+    const allSearchBox = document.getElementById('allSearchBox');
+    if (allSearchBox) {
+      allSearchBox.addEventListener('click', function (ev) {
+        const ex = ev.target && ev.target.closest ? ev.target.closest('.all-search-example') : null;
+        if (!ex || !App.elements.allSearchInput) return;
+        App.elements.allSearchInput.value = ex.getAttribute('data-q') || '';
+        void App.runAllSearch();
       });
     }
     document.querySelectorAll('.screen-tab').forEach(function (btn) {
@@ -1307,6 +1366,9 @@ const App = {
 
     const changeLogTab = document.getElementById('changeLogTabBtn');
     if (changeLogTab) changeLogTab.classList.toggle('hidden', !App.featureOn('change_log'));
+    const allSearchTab = document.getElementById('allSearchTabBtn');
+    if (allSearchTab) allSearchTab.classList.toggle('hidden', !App.featureOn('keyword_all'));
+    if (!App.featureOn('keyword_all') && App.state.currentScreen === 'allSearch') App.switchScreen('chat');
     const isAdmin = App.isStaffAdmin();
     const adminNav = document.getElementById('adminNavSection');
     if (adminNav) adminNav.classList.toggle('hidden', !isAdmin);
@@ -1397,7 +1459,8 @@ const App = {
       adminMembers: 'adminMembersScreen',
       adminData: 'adminDataScreen',
       adminAnalytics: 'adminAnalyticsScreen',
-      changeLog: 'changeLogScreen'
+      changeLog: 'changeLogScreen',
+      allSearch: 'allSearchScreen'
     };
     const targetId = map[screenName];
     if (targetId) {
@@ -1434,6 +1497,9 @@ const App = {
       });
     }
     if (screenName === 'changeLog') void App.loadChangeLog();
+    if (screenName === 'allSearch' && App.elements.allSearchInput) setTimeout(function () { App.elements.allSearchInput.focus(); }, 0);
+    // キーワード検索（全データ）を開いたら、言葉を入れている間に一覧データを先に読み込んでおく（初回の待ち時間を減らす）
+    if (screenName === 'allSearch' && App.featureOn('keyword_all')) { void App.ensureReferenceData('comments'); void App.ensureReferenceData('knowledge'); }
     if (screenName === 'adminAnalytics') {
       App.loadAnalytics().catch(function (err) {
         App.showToast((err && err.message) || '分析データの取得に失敗しました', 'error');
@@ -1453,6 +1519,7 @@ const App = {
       lessons: 'westudy 講座ページ説明文',
       knowledge: 'westudy 動画文字起こし',
       openchat: 'LINEオプチャ',
+      allSearch: 'キーワード検索（全データ）',
       adminUsers: 'ユーザ承認',
       adminUserList: 'ユーザ一覧',
       adminAdminList: '管理者一覧',
@@ -1878,6 +1945,7 @@ const App = {
         let previous=after;
         for(const row of part){const id=Number(row.id);if(!Number.isSafeInteger(id)||id<=previous)throw new Error('コメント一覧の順序を確認できませんでした');previous=id;}
         rows.push(...part);
+        App.state.commentsLoadedCount=rows.length;
         if(part.length<500)break;
         after=previous;
         if(page===99)throw new Error('コメント一覧の上限を超えました');
@@ -1886,6 +1954,7 @@ const App = {
     if(!current())return;
     rows.sort((a,b)=>String(b.posted_at||'').localeCompare(String(a.posted_at||''))||Number(b.id)-Number(a.id));
     App.state.comments = rows.map(App.enrichCommentCategory);
+    try{localStorage.setItem('qa_comments_total',String(rows.length));}catch(e){/* ignore */}
     App.renderCommentCategoryFilterOptions();
     App.renderCommentTable();
     App.renderLessonCourseTabFilterOptions();
@@ -4382,6 +4451,397 @@ const App = {
     }
   },
 
+  // キーワード検索（全データ）（11/11 松野さん）。年配の方も使う前提で、説明と例を画面に出し、文字は大きめ。コミュニティ・講座ページ・動画文字起こし・LINEオプチャを
+  // 1つの入力欄から同時にキーワードで探し、データソースごとに並べる。AI は呼ばない（費用は増えない）。
+  // スイッチ keyword_all が見える人だけ。中身は各一覧と同じデータ（会員が一覧で見られるもの）だけ。
+  allSearchPerGroup: 20,
+  allSearchMaxPerGroup: 200,
+  allSearchNormalize: (v) => {
+    const t = String(v == null ? '' : v);
+    return (typeof t.normalize === 'function' ? t.normalize('NFKC') : t).toLowerCase();
+  },
+  // 書き方: 空白（全角も）で区切る → すべての語を含むもの（AND）。
+  // 「または」「OR」「|」で区切る → どれかを含むもの（OR）。例「敷金 または 保証金」「原状回復 費用 または 退去 費用」。
+  allSearchOrPattern: /\s+(?:または|or)\s+|\s*\|\s*/,
+  allSearchQuery: (q) => {
+    return App.allSearchNormalize(q).trim().split(App.allSearchOrPattern).map(function (part) {
+      const seen = {};
+      return part.split(/\s+/).map(function (x) { return x.trim(); }).filter(function (x) {
+        if (!x || x === 'または' || x === 'or' || seen[x]) return false;
+        seen[x] = true;
+        return true;
+      }).slice(0, 8);
+    }).filter(function (g) { return g.length; }).slice(0, 5);
+  },
+  // 印を付ける語（全部の語を1回ずつ）
+  allSearchTerms: (q) => {
+    const seen = {};
+    const out = [];
+    App.allSearchQuery(q).forEach(function (g) { g.forEach(function (t) { if (!seen[t]) { seen[t] = true; out.push(t); } }); });
+    return out;
+  },
+  // terms は語の並び（AND）か、語の並びの並び（OR でつないだ AND）
+  allSearchMatches: (parts, terms) => {
+    if (!terms || !terms.length) return false;
+    const hay = App.allSearchNormalize((parts || []).map(function (x) { return x == null ? '' : String(x); }).join(' \n '));
+    const groups = Array.isArray(terms[0]) ? terms : [terms];
+    return groups.some(function (g) { return g.length && g.every(function (t) { return hay.indexOf(t) !== -1; }); });
+  },
+  // 最初に当たった語のまわりを切り出し、当たった語に印を付ける（HTML は全部エスケープしてから）。
+  allSearchSnippetHtml: (text, terms, width) => {
+    const raw = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+    const w = width || 140;
+    const norm = App.allSearchNormalize(raw);
+    // NFKC で長さが変わる文字があると位置がずれるので、ずれないときだけ位置を使う。
+    let pos = -1;
+    if (norm.length === raw.length) {
+      (terms || []).forEach(function (t) {
+        const i = norm.indexOf(t);
+        if (i !== -1 && (pos === -1 || i < pos)) pos = i;
+      });
+    }
+    let start = pos > 40 ? pos - 40 : 0;
+    let piece = raw.slice(start, start + w);
+    const head = start > 0 ? '…' : '';
+    const tail = start + w < raw.length ? '…' : '';
+    const esc = App.escapeHtml;
+    if (norm.length !== raw.length || !terms || !terms.length) return esc(head + piece + tail);
+    const pnorm = norm.slice(start, start + w);
+    const mark = new Array(piece.length).fill(false);
+    terms.forEach(function (t) {
+      let i = pnorm.indexOf(t);
+      while (i !== -1 && t.length) {
+        for (let k = i; k < i + t.length && k < mark.length; k++) mark[k] = true;
+        i = pnorm.indexOf(t, i + t.length);
+      }
+    });
+    let out = '', buf = '', on = false;
+    const flush = function () {
+      if (!buf) return;
+      out += on ? '<mark class="bg-yellow-200 rounded px-0.5">' + esc(buf) + '</mark>' : esc(buf);
+      buf = '';
+    };
+    for (let k = 0; k < piece.length; k++) {
+      if (mark[k] !== on) { flush(); on = mark[k]; }
+      buf += piece[k];
+    }
+    flush();
+    return esc(head) + out + esc(tail);
+  },
+  allSearchLocalGroups: (terms) => {
+    const limit = App.allSearchMaxPerGroup;
+    const pick = function (rows, toParts) {
+      const hits = [];
+      let total = 0;
+      for (const row of rows) {
+        if (!App.allSearchMatches(toParts(row), terms)) continue;
+        total++;
+        if (hits.length < limit) hits.push(row);
+      }
+      return { rows: hits, total: total };
+    };
+    const comments = pick(App.communityCommentRows(), function (row) {
+      const a = App.parseWeStudyAuthorName(App.commentField(row, 'author_name'));
+      return [App.commentField(row, 'content'), a.raw, a.authorName, App.commentField(row, 'forum_category')];
+    });
+    const lessons = pick(App.lessonCommentRows(), function (row) {
+      return [App.commentField(row, 'course_tab'), App.commentField(row, 'section_name'),
+        App.commentField(row, 'lesson_title') || App.commentField(row, 'topic_title'), App.commentField(row, 'content')];
+    });
+    const sources = App.state.knowledgeSources || {};
+    const knowledge = pick(App.state.knowledgeChunks || [], function (ch) {
+      const src = sources[ch.source_key] || {};
+      const info = App.knowledgeReferenceInfo(src);
+      return [ch.content, info.title, info.course, info.section];
+    });
+    return { comments: comments, lessons: lessons, knowledge: knowledge };
+  },
+  // LINEオプチャは一覧と同じくサーバーで探す（全件を画面に持たないため）。サーバーには一番長い語を渡し、
+  // 残りの語は戻ってきた中で絞る。サーバーは新しい順に最大200件までなので、件数は「200件以上」と出す。
+  allSearchOpenchat: async (query) => {
+    const cfg = await App.resolveSemanticConfig();
+    const lists = await Promise.all(query.map(function (g) { return App.allSearchOpenchatOne(cfg, g.slice().sort(function (a, b) { return b.length - a.length; })[0]); }));
+    const seen = {};
+    const rows = [];
+    let capped = false;
+    lists.forEach(function (list) {
+      if (list.length >= 200) capped = true;
+      list.forEach(function (r) {
+        const id = String(r.id || '');
+        if (seen[id] || !App.allSearchMatches([r.content, r.chat_title, r.sender_name, r.thread_title], query)) return;
+        seen[id] = true;
+        rows.push(r);
+      });
+    });
+    rows.sort(function (a, b) { return String(b.posted_at || '').localeCompare(String(a.posted_at || '')); });
+    return { rows: rows, total: rows.length, capped: capped };
+  },
+  allSearchOpenchatOne: async (cfg, first) => {
+    const response = await fetch(cfg.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Semantic-Shared-Secret': cfg.secret },
+      body: JSON.stringify({
+        list_openchat: true,
+        query: first,
+        openchat_limit: 40,
+        session_id: App.state.currentSessionId || undefined,
+        user_id: (App.state.currentUser && App.state.currentUser.id) || undefined
+      })
+    });
+    const text = await response.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
+    if (!response.ok) throw new Error(data.errorMessage || data.message || data.error || 'LINEオプチャの検索に失敗しました');
+    return App.normalizeRelatedList(data.relatedOpenchat || []);
+  },
+  runAllSearch: async () => {
+    if (!App.featureOn('keyword_all')) return;
+    const input = App.elements.allSearchInput;
+    const meta = App.elements.allSearchMeta;
+    const box = App.elements.allSearchResults;
+    if (!input || !box) return;
+    const q = String(input.value || '').trim();
+    const query = App.allSearchQuery(q);
+    const terms = App.allSearchTerms(q);
+    if (!query.length) {
+      if (meta) meta.textContent = '調べたい言葉を入れてから「検索」を押してください。';
+      box.innerHTML = '';
+      return;
+    }
+    const seq = (App.state.allSearchSeq || 0) + 1;
+    App.state.allSearchSeq = seq;
+    const current = function () { return App.state.allSearchSeq === seq; };
+    if (meta) meta.textContent = '';
+    box.innerHTML = '';
+    App.state.allSearchOcDone = false;
+    App.state.allSearchStartedAt = Date.now();
+    App.state.allSearchResult = null;
+    App.state.allSearchPendingTerms = terms;
+    App.startAllSearchProgress(seq);
+    const ocTask = App.allSearchOpenchat(query).then(function (r) { return r; }, function (e) { return { error: (e && e.message) || String(e) }; })
+      .then(function (r) { if (current()) App.state.allSearchOcDone = true; return r; });
+    const local = await Promise.all([App.ensureReferenceData('comments'), App.ensureReferenceData('knowledge')])
+      .then(function () { return App.allSearchLocalGroups(query); }, function (e) { return { error: (e && e.message) || String(e) }; });
+    if (!current()) return;
+    App.stopAllSearchProgress();
+    const groups = local.error ? { comments: local, lessons: local, knowledge: local } : local;
+    App.state.allSearchResult = { terms: terms, query: query, groups: groups, openchat: null, expanded: {} };
+    App.renderAllSearchResults();
+    const oc = await ocTask;
+    if (!current()) return;
+    App.state.allSearchResult.openchat = oc;
+    App.renderAllSearchResults();
+  },
+  // 検索中の「進んでいます」表示（11/11 松野さん）。回答待ちと同じ見た目（search-motion）で、
+  // こちらは実際の進み具合（読み込んだ件数・区分ごとの済み）をそのまま出す。初回だけ一覧データの読み込みで時間がかかる。
+  allSearchProgressState: () => {
+    const ready = App.state.referenceReady || {};
+    let est = 22000;
+    try { const v = Number(localStorage.getItem('qa_comments_total')); if (v > 0) est = v; } catch (e) { /* ignore */ }
+    const loaded = ready.comments ? est : Math.min(est, Number(App.state.commentsLoadedCount || 0));
+    const steps = [
+      { icon: 'fa-solid fa-comments', done: !!ready.comments,
+        label: ready.comments ? 'WeStudy コミュニティコメント・講座ページ説明文を読み込みました' : 'WeStudy コミュニティコメント・講座ページ説明文を読み込んでいます',
+        detail: ready.comments ? '' : (loaded ? loaded.toLocaleString('ja-JP') + ' / 約' + est.toLocaleString('ja-JP') + '件' : '') },
+      { icon: 'fa-solid fa-circle-play', done: !!ready.knowledge,
+        label: ready.knowledge ? 'WeStudy 動画文字起こしを読み込みました' : 'WeStudy 動画文字起こしを読み込んでいます', detail: '' },
+      { icon: 'fa-brands fa-line', done: !!App.state.allSearchOcDone,
+        label: App.state.allSearchOcDone ? 'LINEオプチャを探しました' : 'LINEオプチャを探しています', detail: '' },
+      { icon: 'fa-solid fa-magnifying-glass', done: false, label: 'キーワードに合うものを選んでいます', detail: '' }
+    ];
+    const pct = Math.round(60 * (loaded / est) + (ready.knowledge ? 20 : 0) + (App.state.allSearchOcDone ? 15 : 0));
+    let active = steps.findIndex(function (x) { return !x.done; });
+    if (active < 0) active = steps.length - 1;
+    return { steps: steps, pct: Math.min(97, pct), active: active, firstLoad: !ready.comments };
+  },
+  renderAllSearchProgress: () => {
+    const box = App.elements.allSearchResults;
+    if (!box) return;
+    const st = App.allSearchProgressState();
+    const sec = Math.floor((Date.now() - (App.state.allSearchStartedAt || Date.now())) / 1000);
+    const words = st.pct < 30 ? '探し始めました' : st.pct < 60 ? '半分ほど進みました' : st.pct < 90 ? 'もうすぐ結果が出ます' : 'まもなく表示します';
+    let card = document.getElementById('allSearchWorkingCard');
+    if (!card) {
+      box.innerHTML = '<div id="allSearchWorkingCard" class="search-motion-wrap" role="status" aria-live="polite"><div class="search-motion">' +
+        '<div class="search-motion-bar"><span></span><span></span><span></span><b>全データからキーワードを探しています</b></div>' +
+        '<div class="search-motion-body">' +
+          '<div class="search-motion-scan" aria-hidden="true"><div class="search-motion-lines"><i></i><i></i><i></i><i></i></div><div class="search-motion-glass"><i class="fa-solid fa-magnifying-glass"></i></div></div>' +
+          '<ol class="search-motion-steps">' + st.steps.map(function (x, i) { return '<li data-step="' + i + '"><i class="' + x.icon + '" aria-hidden="true"></i><span data-label></span><small data-detail class="ml-auto text-xs whitespace-nowrap"></small></li>'; }).join('') + '</ol>' +
+          '<div class="search-motion-progress" aria-hidden="true"><div data-progress></div></div>' +
+          '<div class="search-motion-meta"><span data-remain></span><span data-elapsed></span></div>' +
+          '<p data-first class="mt-2 text-sm text-slate-500"></p>' +
+        '</div>' + App.allSearchCoursesHtml() + '</div></div>';
+      card = document.getElementById('allSearchWorkingCard');
+    }
+    card.querySelectorAll('[data-step]').forEach(function (li) {
+      const i = Number(li.getAttribute('data-step'));
+      const x = st.steps[i];
+      li.classList.toggle('is-done', x.done);
+      li.classList.toggle('is-active', !x.done && i === st.active);
+      li.querySelector('[data-label]').textContent = x.label;
+      li.querySelector('[data-detail]').textContent = x.detail;
+    });
+    const bar = card.querySelector('[data-progress]'); if (bar) bar.style.width = st.pct + '%';
+    const r = card.querySelector('[data-remain]'); if (r) r.textContent = words;
+    const el = card.querySelector('[data-elapsed]'); if (el) el.textContent = '経過 ' + (sec >= 60 ? Math.floor(sec / 60) + '分' : '') + (sec % 60) + '秒';
+    const f = card.querySelector('[data-first]'); if (f) f.textContent = st.firstLoad ? 'はじめての検索では、全データの読み込みに少し時間がかかります。2回目からはすぐに結果が出ます。' : '';
+  },
+  // おすすめ講座（11/11 松野さん「Q&Aチャットと同じく」）。回答待ちと同じ選び方（answerWaitCourses）で、検索の言葉から最大3件。
+  allSearchCoursesHtml: () => {
+    const res = App.state.allSearchResult;
+    const terms = res ? res.terms : (App.state.allSearchPendingTerms || []);
+    const list = App.answerWaitCourses((terms || []).join(''));
+    if (!list.length) return '';
+    const esc = App.escapeHtml;
+    return '<div class="search-motion-courses"><div class="search-motion-courses-title"><i class="fa-solid fa-circle-play" aria-hidden="true"></i> 関連しそうな講座</div><ul>' +
+      list.map(function (r) { return '<li><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.title) + '</a><span>' + esc(r.course.replace(/^神大家/, '')) + '</span></li>'; }).join('') + '</ul></div>';
+  },
+  startAllSearchProgress: (seq) => {
+    App.stopAllSearchProgress();
+    App.renderAllSearchProgress();
+    App.state.allSearchProgressTimer = window.setInterval(function () {
+      if (App.state.allSearchSeq !== seq) { App.stopAllSearchProgress(); return; }
+      App.renderAllSearchProgress();
+    }, 400);
+  },
+  stopAllSearchProgress: () => {
+    if (App.state.allSearchProgressTimer) window.clearInterval(App.state.allSearchProgressTimer);
+    App.state.allSearchProgressTimer = null;
+  },
+  allSearchGroupDefs: [
+    // 並びと名前は松野さんの指定（11/11）
+    { key: 'comments', label: 'WeStudy コミュニティコメント', screen: 'comments' },
+    { key: 'openchat', label: 'LINEオプチャ', screen: 'openchat' },
+    { key: 'lessons', label: '講座ページ説明文', screen: 'lessons' },
+    { key: 'knowledge', label: 'WeStudy 動画文字起こし', screen: 'knowledge' }
+  ],
+  allSearchItemHtml: (kind, row, terms) => {
+    const esc = App.escapeHtml;
+    let head = '', body = '', attrs = '';
+    if (kind === 'comments') {
+      const cid = String(App.commentField(row, 'comment_id') || '').trim();
+      const a = App.parseWeStudyAuthorName(App.commentField(row, 'author_name'));
+      const d = App.referenceDateParts(App.commentField(row, 'posted_at'));
+      head = [d ? d.label : '', a.authorName || a.raw || '', String(App.commentField(row, 'forum_category') || '').trim()].filter(Boolean).join(' ・ ');
+      body = App.commentField(row, 'content');
+      attrs = 'data-kind="comment" data-id="' + esc(cid) + '"';
+    } else if (kind === 'lessons') {
+      const cid = String(App.commentField(row, 'comment_id') || '').trim();
+      head = [App.commentField(row, 'course_tab'), App.commentField(row, 'section_name'),
+        App.commentField(row, 'lesson_title') || App.commentField(row, 'topic_title')].map(function (x) { return String(x || '').trim(); }).filter(Boolean).join(' ＞ ');
+      body = App.commentField(row, 'content');
+      attrs = 'data-kind="lesson" data-id="' + esc(cid) + '"';
+    } else if (kind === 'knowledge') {
+      const src = (App.state.knowledgeSources || {})[row.source_key] || {};
+      const info = App.knowledgeReferenceInfo(src);
+      head = [info.course, info.title, App.formatMmSs(row.start_sec != null ? Number(row.start_sec) : 0) + '〜'].filter(Boolean).join(' ＞ ');
+      body = row.content;
+      attrs = 'data-kind="video_chunk" data-id="' + esc(String(row.chunk_key || '')) + '"';
+    } else {
+      const when = String(row.posted_at || row.postedAt || row.post_date || row.postDate || '').trim();
+      head = [row.chat_title || row.chatTitle, App.formatOpenchatDateTime(when), row.sender_name || row.senderName].map(function (x) { return String(x || '').trim(); }).filter(Boolean).join(' ・ ');
+      body = App.cleanOpenchatDisplayText(row.content);
+      attrs = 'data-kind="openchat" data-id="' + esc(String(row.id || '')) + '"';
+    }
+    return '<li><button type="button" class="all-search-item w-full text-left px-3 py-3 hover:bg-blue-50 border-t" ' + attrs + '>' +
+      '<div class="text-sm text-slate-600">' + esc(head) + '</div>' +
+      '<div class="text-base leading-relaxed text-slate-900">' + App.allSearchSnippetHtml(body, terms) + '</div></button></li>';
+  },
+  renderAllSearchResults: () => {
+    const res = App.state.allSearchResult;
+    const box = App.elements.allSearchResults;
+    if (!res || !box) return;
+    const esc = App.escapeHtml;
+    let sum = 0;
+    const summary = [];
+    const parts = App.allSearchGroupDefs.map(function (def) {
+      const g = def.key === 'openchat' ? res.openchat : res.groups[def.key];
+      let count = '', list = '';
+      if (!g) {
+        count = '探しています…';
+      } else if (g.error) {
+        count = '取得できませんでした';
+        list = '<p class="text-sm text-red-600 p-2">' + esc(g.error) + '</p>';
+      } else {
+        sum += g.total;
+        count = g.total + (g.capped ? '件以上' : '件');
+        const shown = res.expanded[def.key] ? g.rows.length : Math.min(App.allSearchPerGroup, g.rows.length);
+        list = g.rows.length
+          ? '<ul>' + g.rows.slice(0, shown).map(function (r) { return App.allSearchItemHtml(def.key, r, res.terms); }).join('') + '</ul>' +
+            (shown < g.rows.length ? '<button type="button" class="all-search-more m-3 px-4 py-2 rounded border border-blue-700 text-blue-800 text-base" data-group="' + def.key + '">続きを表示（あと' + (g.rows.length - shown) + '件）</button>' : '') +
+            (g.total > g.rows.length ? '<p class="text-sm text-slate-600 px-3 pb-3">数が多いので、最初の' + g.rows.length + '件だけ出しています。言葉を足すと絞り込めます。</p>' : '')
+          : '<p class="text-base text-slate-600 px-3 py-3">見つかりませんでした。</p>';
+      }
+      summary.push({ def: def, count: count, has: !!(g && !g.error && g.total) });
+      // 見出しはスクロールしても上に残す（sticky）。どの区分を見ているか分かるように。
+      return '<section id="allSearchGroup-' + def.key + '" class="bg-white rounded border scroll-mt-2">' +
+        '<div class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-100 border-b shadow-sm">' +
+        '<h4 class="font-bold text-base">' + esc(def.label) + ' <span class="text-blue-900">' + esc(count) + '</span></h4>' +
+        '<button type="button" class="all-search-open text-sm text-blue-700 underline shrink-0" data-screen-to="' + def.screen + '">この一覧を開く</button>' +
+        '</div>' + list + '</section>';
+    });
+    // 最初に4区分の件数の表。区分名を押すとその区分へ移動する。
+    const table = '<div class="bg-white rounded border">' +
+      '<table class="w-full text-base"><thead class="bg-slate-100"><tr><th class="text-left px-3 py-2">区分</th><th class="text-right px-3 py-2 whitespace-nowrap">件数</th></tr></thead><tbody>' +
+      summary.map(function (x) {
+        return '<tr class="border-t"><td class="px-3 py-2">' +
+          (x.has ? '<button type="button" class="all-search-jump text-blue-700 underline text-left" data-group="' + x.def.key + '">' + esc(x.def.label) + '</button>' : '<span class="text-slate-700">' + esc(x.def.label) + '</span>') +
+          '</td><td class="px-3 py-2 text-right whitespace-nowrap font-bold">' + esc(x.count) + '</td></tr>';
+      }).join('') +
+      '</tbody></table></div>';
+    const courses = App.allSearchCoursesHtml();
+    box.innerHTML = table + (courses ? '<div class="bg-white rounded border overflow-hidden">' + courses + '</div>' : '') + parts.join('');
+    if (App.elements.allSearchMeta) {
+      const pending = !res.openchat;
+      const how = res.query.length > 1 && res.query.every(function (g) { return g.length === 1; })
+        ? '「' + res.query.map(function (g) { return g[0]; }).join('」「') + '」のどれかを含む'
+        : res.query.map(function (g) { return '「' + g.join('」と「') + '」' + (g.length > 1 ? 'をすべて含む' : 'を含む'); }).join('もの、または');
+      App.elements.allSearchMeta.textContent = how + 'もの：' + sum + '件' + (pending ? '（LINEオプチャはまだ探しています）' : '') + '。表の区分名を押すとその区分へ移動します。気になる行を押すと、元の一覧で開きます。';
+    }
+  },
+  onAllSearchResultClick: (ev) => {
+    const t = ev.target && ev.target.closest ? ev.target : null;
+    if (!t) return;
+    const jump = t.closest('.all-search-jump');
+    if (jump) {
+      const sec = document.getElementById('allSearchGroup-' + jump.getAttribute('data-group'));
+      if (sec && sec.scrollIntoView) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const more = t.closest('.all-search-more');
+    if (more && App.state.allSearchResult) {
+      App.state.allSearchResult.expanded[more.getAttribute('data-group')] = true;
+      App.renderAllSearchResults();
+      return;
+    }
+    const open = t.closest('.all-search-open');
+    if (open && App.state.allSearchResult) {
+      // 各一覧の検索欄に入るのは1語だけ（一覧の検索は語を区切らない）。一番長い語を入れて開く。
+      const screen = open.getAttribute('data-screen-to');
+      const word = (App.state.allSearchResult.query[0] || []).slice().sort(function (a, b) { return b.length - a.length; })[0] || '';
+      const inputId = { comments: 'commentSearchInput', knowledge: 'knowledgeSearchInput', lessons: 'lessonSearchInput', openchat: 'openchatSearchInput' }[screen];
+      const el = App.elements[inputId];
+      if (el) el.value = word;
+      if (screen === 'openchat' && App.elements.openchatTitleFilter) App.elements.openchatTitleFilter.value = '';
+      if (screen === 'comments' && App.elements.commentAttachmentsOnly) App.elements.commentAttachmentsOnly.checked = false;
+      App.state.returnScreen = 'allSearch';
+      App.switchScreen(screen);
+      App.showDbReturnBar(screen);
+      if (screen === 'comments') App.renderCommentTable();
+      else if (screen === 'knowledge') App.renderKnowledgeTable();
+      else if (screen === 'lessons') App.renderLessonTable();
+      // オプチャは switchScreen が検索欄の語で読み込み直す
+      return;
+    }
+    const item = t.closest('.all-search-item');
+    if (!item) return;
+    const kind = item.getAttribute('data-kind');
+    const id = item.getAttribute('data-id') || '';
+    if (kind === 'video_chunk') App.openCitationInDb({ kind: 'video_chunk', chunkKey: id });
+    else if (kind === 'lesson') App.openCitationInDb({ kind: 'lesson', commentId: id });
+    else if (kind === 'openchat') App.openCitationInDb({ kind: 'openchat', openchatId: id });
+    else App.openCitationInDb({ kind: 'comment', commentId: id });
+  },
   // (2) 評価した答えの作り方（11/11）。軽いモデルや使い回しで悪いねが多いかを見分ける。
   answerMakeLabel: (x) => {
     if (!x || !x.answer_mode) return '不明（記録前の評価）';
@@ -4493,12 +4953,101 @@ const App = {
       summary.textContent = '取得できませんでした: ' + ((e && e.message) || String(e));
     }
   },
+  // (4) 質問ランキング＋講座テーマ案。見えない人には枠ごと出さない。2026-11-11
+  themeChoiceLabel: { adopt: '✅ 採用', revise: '✏️ 直して採用', reject: '❌ 不採用' },
+  loadRankingThemes: async () => {
+    const box = document.getElementById('rankingThemes');
+    if (!box) return;
+    const show = App.isStaffAdmin() && App.featureOn('ranking_themes');
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const status = document.getElementById('rankingThemesStatus');
+    const btn = document.getElementById('reloadRankingThemesBtn');
+    if (btn && !btn.dataset.bound) { btn.dataset.bound = '1'; btn.addEventListener('click', function () { void App.loadRankingThemes(); }); }
+    status.textContent = '読み込み中…';
+    try {
+      const r = await App.apiClient('POST', '/admin/ranking-themes/list', {});
+      App.renderRankingThemes(r || {});
+    } catch (e) {
+      status.textContent = '取得できませんでした: ' + ((e && e.message) || String(e));
+    }
+  },
+  renderRankingThemes: (r) => {
+    const status = document.getElementById('rankingThemesStatus');
+    const list = document.getElementById('rankingList'), cards = document.getElementById('themeCards'), hist = document.getElementById('themeHistory');
+    const esc = App.escapeHtml;
+    const latest = r.latest;
+    if (!latest) {
+      status.textContent = 'まだ集計の回がありません（毎週月曜の朝に作られます）。';
+      list.innerHTML = ''; cards.innerHTML = ''; hist.innerHTML = '';
+      return;
+    }
+    const st = latest.stats || {};
+    status.textContent = String(latest.created_at || '').slice(0, 10) + ' の回（直近 ' + (latest.period_days || 120) + ' 日）／ チャットボット ' + (st.chatbot || 0) +
+      ' 件・コミュニティ ' + (st.forum || 0) + ' 件・オプチャ ' + (st.openchat || 0) + ' 件・既存講座 ' + (st.courses || 0) + ' 本';
+    list.innerHTML = (latest.ranking || []).map(function (x) {
+      const parts = [];
+      if (x.chatbot) parts.push('チャットボット ' + x.chatbot);
+      if (x.forum) parts.push('コミュニティ ' + x.forum);
+      if (x.openchat) parts.push('オプチャ ' + x.openchat);
+      return '<li><span class="font-medium">' + esc(x.topic) + '</span> <span class="text-slate-500">約 ' + x.count + ' 件' + (parts.length ? '（' + esc(parts.join('・')) + '）' : '') + '</span>' +
+        (x.examples && x.examples.length ? '<details class="text-xs text-slate-600"><summary>質問の例</summary><ul class="list-disc ml-4">' + x.examples.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></details>' : '') + '</li>';
+    }).join('') || '<li class="list-none text-slate-500">まだありません。</li>';
+    cards.innerHTML = (latest.themes || []).map(function (t) {
+      const d = t.decision;
+      return '<div class="border rounded p-2" data-theme="' + esc(t.id) + '">' +
+        '<div class="font-medium">' + esc(t.title) + '</div>' +
+        (t.target || t.format ? '<div class="text-xs text-slate-500">' + esc([t.target, t.format].filter(Boolean).join(' ／ ')) + '</div>' : '') +
+        (t.why ? '<div class="mt-1"><span class="text-slate-500">なぜ今：</span>' + esc(t.why) + '</div>' : '') +
+        (t.evidence ? '<div class="text-xs text-slate-600"><span class="text-slate-500">根拠：</span>' + esc(t.evidence) + '</div>' : '') +
+        (d ? '<div class="mt-1 text-xs bg-slate-50 rounded p-1">' + esc(App.themeChoiceLabel[d.choice] || d.choice) + (d.revised_title ? '：' + esc(d.revised_title) : '') + (d.reason ? ' ― ' + esc(d.reason) : '') + '</div>' : '') +
+        '<div class="mt-2 flex flex-wrap gap-1">' + ['adopt', 'revise', 'reject'].map(function (c) {
+          return '<button type="button" class="px-2 py-0.5 rounded border text-xs" data-choice="' + c + '">' + App.themeChoiceLabel[c] + '</button>';
+        }).join('') + '</div>' +
+        '<div class="theme-form hidden mt-2 space-y-1">' +
+        '<input type="text" maxlength="200" class="theme-title w-full border rounded px-2 py-1 text-sm hidden" placeholder="直した題名">' +
+        '<textarea maxlength="1000" rows="2" class="theme-reason w-full border rounded px-2 py-1 text-sm" placeholder="理由（次の案づくりに使います）"></textarea>' +
+        '<div class="flex gap-2 items-center"><button type="button" class="theme-save px-3 py-1 rounded bg-slate-800 text-white text-xs">保存</button><span class="theme-msg text-xs text-slate-500"></span></div></div></div>';
+    }).join('');
+    cards.querySelectorAll('[data-theme]').forEach(function (card) {
+      const form = card.querySelector('.theme-form'), title = card.querySelector('.theme-title'), reason = card.querySelector('.theme-reason');
+      const theme = (latest.themes || []).find(function (t) { return t.id === card.dataset.theme; }) || {};
+      let choice = '';
+      card.querySelectorAll('[data-choice]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          choice = b.dataset.choice;
+          card.querySelectorAll('[data-choice]').forEach(function (x) { x.classList.toggle('bg-slate-200', x === b); });
+          form.classList.remove('hidden');
+          title.classList.toggle('hidden', choice !== 'revise');
+          if (choice === 'revise' && !title.value) title.value = (theme.decision && theme.decision.revised_title) || theme.title || '';
+          if (!reason.value && theme.decision) reason.value = theme.decision.reason || '';
+        });
+      });
+      card.querySelector('.theme-save').addEventListener('click', async function () {
+        const msg = card.querySelector('.theme-msg');
+        if (choice === 'revise' && !title.value.trim()) { msg.textContent = '直した題名を入れてください'; return; }
+        msg.textContent = '保存中…';
+        try {
+          await App.apiClient('POST', '/admin/ranking-themes/decide', { round_id: latest.id, theme_id: theme.id, choice: choice, revised_title: title.value, reason: reason.value });
+          void App.loadRankingThemes();
+        } catch (e) {
+          msg.textContent = '保存できませんでした: ' + ((e && e.message) || String(e));
+        }
+      });
+    });
+    hist.innerHTML = (r.history || []).map(function (h) {
+      return '<div><span class="font-medium">' + esc(String(h.created_at || '').slice(0, 10)) + '</span>：' + (h.themes || []).map(function (t) {
+        return esc(t.title) + (t.decision ? '（' + esc(App.themeChoiceLabel[t.decision.choice] || '') + '）' : '（未判断）');
+      }).join('、') + '</div>';
+    }).join('') || '<div>まだありません。</div>';
+  },
 
   // Phase 13: 運営分析ダッシュボード（qa-analytics Edge）
   loadAnalytics: async () => {
     if (!App.isStaffAdmin()) return;
     void App.loadFeedbackAnalytics();
     void App.loadSignalsAnalytics();
+    void App.loadRankingThemes();
     const statusEl = document.getElementById('analyticsStatus');
     const daysSelect = document.getElementById('analyticsDaysSelect');
     const days = daysSelect ? Number(daysSelect.value) || 14 : 14;
@@ -5045,6 +5594,7 @@ const App = {
     if(!on){stop();App.state.answerWorkingSince=0;return;}
     if(!App.state.answerWorkingSince)App.state.answerWorkingSince=Date.now();
     const deep=(App.state.pendingAnswerRequest&&App.state.pendingAnswerRequest.mode==='deep')||!!App.state.deepMode;
+    if(document.documentElement.classList.contains('theme-a')){App.renderAnswerSearchMotion(deep);if(!App.state.answerWorkingTimer)App.state.answerWorkingTimer=window.setInterval(()=>App.renderAnswerSearchMotion(deep),1000);return;}
     const draw=()=>{
       const list=document.getElementById('chatMessages');if(!list)return;
       let card=document.getElementById('answerWorkingCard');
@@ -5065,6 +5615,87 @@ const App = {
     if(!App.state.answerWorkingTimer)App.state.answerWorkingTimer=window.setInterval(draw,1000);
   },
 
+  // 回答待ちの「探しています」アニメーションと残り時間の目安（2026-11-11 松野さん「待ってますよ感」「あとどれくらいか」）。
+  // 配色(design_theme)と同じスイッチの人だけ。サーバーは途中経過を返さないので、段階は時間に合わせた目安の表示。
+  // 残り時間は、この端末で過去にかかった時間（質問の種類ごと最大10回の中央値）か、全体の実測から決めた初期値で出す。
+  ANSWER_DURATION_DEFAULTS: { normal: 60, semantic: 25, deep: 90 },
+  answerModeKey: () => {
+    const p=App.state.pendingAnswerRequest;const m=p&&p.mode?p.mode:(App.state.deepMode?'deep':(App.state.semanticMode?'semantic':'normal'));
+    return (m==='deep'||m==='semantic')?m:'normal';
+  },
+  recordAnswerDuration: (mode,ms) => {
+    try{
+      const key=(mode==='deep'||mode==='semantic')?mode:'normal';const sec=Math.round(ms/1000);
+      if(!(sec>=3&&sec<=330))return;
+      const all=JSON.parse(localStorage.getItem('qa_answer_durations')||'{}');
+      const list=Array.isArray(all[key])?all[key]:[];list.push(sec);all[key]=list.slice(-10);
+      localStorage.setItem('qa_answer_durations',JSON.stringify(all));
+    }catch(e){/* ignore */}
+  },
+  estimateAnswerSeconds: (mode) => {
+    try{
+      const list=(JSON.parse(localStorage.getItem('qa_answer_durations')||'{}')[mode])||[];
+      if(list.length>=3){const v=list.slice().sort((a,b)=>a-b);return Math.max(10,v[Math.floor(v.length/2)]);}
+    }catch(e){/* ignore */}
+    return App.ANSWER_DURATION_DEFAULTS[mode]||60;
+  },
+  // 待っている間のおすすめ講座（11/11 松野さん、いけともさんの事例）。質問の言葉と講座タイトルの重なりで最大3件。
+  // データは画面に同梱している講座一覧（WESTUDY_COURSE_CATALOG）だけを使い、AIも追加の通信も使わない。
+  answerWaitCourses: (query) => {
+    const cat=window.WESTUDY_COURSE_CATALOG||{};const q=String(query||'').replace(/[\s、。？！?!・「」（）()]/g,'');
+    if(q.length<2)return [];
+    const grams=new Set();for(let i=0;i<q.length-1;i++){const g=q.slice(i,i+2);if(!/^[ぁ-ん]{2}$/.test(g))grams.add(g);}
+    if(!grams.size)return [];
+    const seen=new Set();const rows=[];
+    Object.keys(cat).forEach((url)=>{
+      const v=cat[url]||{};if(!v.title||/はじめに/.test(v.course||''))return;
+      const text=String(v.title)+' '+String(v.section||'');let score=0;grams.forEach((g)=>{if(text.indexOf(g)>=0)score+=1;});
+      const key=String(v.title).replace(/\s+/g,'');if(score>=2&&!seen.has(key)){seen.add(key);rows.push({url:url,title:String(v.title),course:String(v.course||''),score:score});}
+    });
+    return rows.sort((a,b)=>b.score-a.score).slice(0,3);
+  },
+  answerWaitCoursesHtml: () => {
+    const p=App.state.pendingAnswerRequest;const list=App.answerWaitCourses(p&&p.query);
+    if(!list.length)return '';
+    const esc=(t)=>App.escapeHtml?App.escapeHtml(t):String(t).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    return '<div class="search-motion-courses"><div class="search-motion-courses-title"><i class="fa-solid fa-circle-play" aria-hidden="true"></i> 待っている間に（関連しそうな講座）</div><ul>'+
+      list.map((r)=>'<li><a href="'+esc(r.url)+'" target="_blank" rel="noopener">'+esc(r.title)+'</a><span>'+esc(r.course.replace(/^神大家/,''))+'</span></li>').join('')+'</ul></div>';
+  },
+  renderAnswerSearchMotion: (deep) => {
+    const list=document.getElementById('chatMessages');if(!list)return;
+    const mode=App.answerModeKey(),est=App.estimateAnswerSeconds(mode);
+    const sec=Math.floor((Date.now()-App.state.answerWorkingSince)/1000);
+    const steps=[
+      {icon:'fa-comments',label:'コミュニティの投稿を探しています'},
+      {icon:'fa-circle-play',label:'講義動画の内容を探しています'},
+      {icon:'fa-brands fa-line',label:'LINEオプチャを探しています'},
+      {icon:'fa-pen-to-square',label:'見つかった情報をまとめています'},
+    ];
+    // 目安時間の 15% / 35% / 55% で次の段階へ。最後の「まとめ」は回答が届くまで続く。
+    const ratio=sec/est;const idx=ratio<0.15?0:ratio<0.35?1:ratio<0.55?2:3;
+    // 進み具合の帯: 目安までに9割、超えたらゆっくり近づくだけ（100%にはしない）
+    const pct=ratio<=1?Math.round(ratio*90):Math.min(98,Math.round(90+8*(1-Math.exp(-(ratio-1)*1.5))));
+    // 秒数ではなく言葉で進み具合を伝える（11/11 松野さん「ゲージで進んでる感が出ればいい」）
+    const remain=ratio<0.3?'調べ始めました':ratio<0.6?'半分ほど進みました':ratio<0.9?'もうすぐまとまります':ratio<=1?'まもなくお届けします':'もう少しお待ちください（混み合うと少し長くかかります）';
+    let card=document.getElementById('answerWorkingCard');
+    if(!card){
+      card=document.createElement('div');card.id='answerWorkingCard';card.setAttribute('role','status');card.setAttribute('aria-live','polite');
+      card.className='search-motion-wrap';
+      card.innerHTML='<div class="search-motion">'+
+        '<div class="search-motion-bar"><span></span><span></span><span></span><b>'+(deep?'より詳しく調べています':'神大家AIナビが調べています')+'</b></div>'+
+        '<div class="search-motion-body">'+
+          '<div class="search-motion-scan" aria-hidden="true"><div class="search-motion-lines"><i></i><i></i><i></i><i></i></div><div class="search-motion-glass"><i class="fa-solid fa-magnifying-glass"></i></div></div>'+
+          '<ol class="search-motion-steps">'+steps.map((s,i)=>'<li data-step="'+i+'"><i class="'+(s.icon.indexOf('fa-brands')===0?s.icon:'fa-solid '+s.icon)+'" aria-hidden="true"></i><span>'+s.label+'</span></li>').join('')+'</ol>'+
+          '<div class="search-motion-progress" aria-hidden="true"><div data-progress></div></div>'+
+          '<div class="search-motion-meta"><span data-remain></span><span data-elapsed></span></div>'+
+        '</div>'+App.answerWaitCoursesHtml()+'</div>';
+    }
+    if(card.parentNode!==list||list.lastElementChild!==card){list.appendChild(card);list.scrollTop=list.scrollHeight;}
+    card.querySelectorAll('[data-step]').forEach((li)=>{const i=Number(li.getAttribute('data-step'));li.classList.toggle('is-done',i<idx);li.classList.toggle('is-active',i===idx);});
+    const bar=card.querySelector('[data-progress]');if(bar)bar.style.width=pct+'%';
+    const r=card.querySelector('[data-remain]');if(r)r.textContent=remain;
+    const el=card.querySelector('[data-elapsed]');if(el)el.textContent='経過 '+(sec>=60?Math.floor(sec/60)+'分':'')+(sec%60)+'秒';
+  },
   answerPollDelay: (ms,signal) => new Promise((resolve,reject)=>{
     const cancel=()=>{window.clearTimeout(timer);const error=new Error('aborted');error.name='AbortError';reject(error);};
     const timer=window.setTimeout(()=>{signal.removeEventListener('abort',cancel);resolve();},ms);
@@ -5088,7 +5719,7 @@ const App = {
         if(!current()){const error=new Error('aborted');error.name='AbortError';throw error;}
         if(!state)state=await call('GET','/chat-sessions/'+sessionId+'/answer-jobs/'+pending.jobId);
         if(!current()){const error=new Error('aborted');error.name='AbortError';throw error;}
-        if(state.status==='done'&&state.result)return state.result;
+        if(state.status==='done'&&state.result){App.recordAnswerDuration(mode,Date.now()-(pending.startedAt||pollStartedAt));return state.result;}
         if(state.status==='failed'){
           App.clearPendingAnswer();
           throw new Error(state.error==='answer_timeout'?'回答の作成が制限時間に達しました。履歴を確認してから再試行してください。':state.error==='semantic_disabled'?'意味検索は一時停止中です。':'回答を作成できませんでした。履歴を確認してから再試行してください。');

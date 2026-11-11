@@ -1,5 +1,5 @@
 #!/bin/zsh
-# 神大家 講座動画の週次取込（日曜 12:00）。字幕→Whisper→差分登録→Notta差し替え→誤記候補（AI 使用料ゼロ）
+# 神大家 講座動画の取込（毎日 12:00。日曜は週次フル、月〜土は新着レッスンだけ）。字幕→Whisper→差分登録→Notta差し替え→誤記候補（AI 使用料ゼロ）
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR"

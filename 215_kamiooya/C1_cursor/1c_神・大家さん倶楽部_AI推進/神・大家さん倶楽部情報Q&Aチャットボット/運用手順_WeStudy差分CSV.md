@@ -149,6 +149,12 @@ caffeinate -dimsu /path/to/.../scripts/run_westudy_pipeline.sh
 2. 差分CSV生成（**state 更新は Raimo 取込成功後**）  
 3. 差分が 1 件以上のときのみ Raimo 自動取込（0件ならスキップ）  
 
+### 講座動画の新着を毎日見る（2026-11-11）
+
+- リポジトリ変数 `KAMIOOYA_LESSON_DAILY=on` のとき、月〜土の 08:00（コメントの日次取込）でも **コース目次（5ページ）だけ見て、まだ無い lesson の説明だけ** 取って Supabase・Raimo に足す（`WESTUDY_LESSON_MODE=new`。`westudy_lesson_pages.py --new-only-state`、`build_lesson_delta_csv.py --add-only`）。既存 lesson の更新・削除は従来どおり日曜のフルで拾う。未設定・`off` なら平日は従来どおりコメントだけ。
+- 続けて Mac の `kamiooya_video_weekly.py`（launchd 毎日 12:00、`--mode auto`）が、取り込んでいない動画つきレッスンがあるコースだけ字幕→Whisper→登録→誤記候補を行う。新着が無い日は WeStudy にもログインせず終わる。日曜は従来の週次（基礎の旧フォルダ・Notta差し替えを含む）。新着が入った日だけ #ops に通知。
+- lesson の state（`westudy_lesson_ids.json`）は **Supabase 取込が済んでから** 確定する（失敗した新着を次回もう一度拾うため）。フォーラム差分0件の日も lesson は取り込む。
+
 **画像アーカイブは GHA に含めない**（admin Drive・Mac 日曜 08:00。`launchd/install_westudy_gdrive_archive_launchd.sh`）。
 
 いつでも手動実行する場合は、GitHub の **Actions** タブで **WeStudy Delta Import Weekly** を選び **Run workflow** から実行できます。
