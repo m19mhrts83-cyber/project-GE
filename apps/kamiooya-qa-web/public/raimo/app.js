@@ -174,7 +174,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', keyword_all: 'キーワード検索（全データ）' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -291,6 +291,10 @@ const App = {
     App.elements.knowledgeTableBody = document.getElementById('knowledgeTableBody');
     App.elements.knowledgeSearchInput = document.getElementById('knowledgeSearchInput');
     App.elements.knowledgeListMeta = document.getElementById('knowledgeListMeta');
+    App.elements.allSearchForm = document.getElementById('allSearchForm');
+    App.elements.allSearchInput = document.getElementById('allSearchInput');
+    App.elements.allSearchMeta = document.getElementById('allSearchMeta');
+    App.elements.allSearchResults = document.getElementById('allSearchResults');
     App.elements.pendingUsersTableBody = document.getElementById('pendingUsersTableBody');
     App.elements.pendingUsersSelectAll = document.getElementById('pendingUsersSelectAll');
     App.elements.bulkApprovePendingUsersBtn = document.getElementById('bulkApprovePendingUsersBtn');
@@ -490,6 +494,24 @@ const App = {
     if (App.elements.commentDetailDialog) {
       App.elements.commentDetailDialog.addEventListener('click', function (ev) {
         if (ev.target === App.elements.commentDetailDialog) App.closeCommentDetailDialog();
+      });
+    }
+    if (App.elements.allSearchForm) {
+      App.elements.allSearchForm.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        void App.runAllSearch();
+      });
+    }
+    if (App.elements.allSearchResults) {
+      App.elements.allSearchResults.addEventListener('click', App.onAllSearchResultClick);
+    }
+    const allSearchBox = document.getElementById('allSearchBox');
+    if (allSearchBox) {
+      allSearchBox.addEventListener('click', function (ev) {
+        const ex = ev.target && ev.target.closest ? ev.target.closest('.all-search-example') : null;
+        if (!ex || !App.elements.allSearchInput) return;
+        App.elements.allSearchInput.value = ex.getAttribute('data-q') || '';
+        void App.runAllSearch();
       });
     }
     document.querySelectorAll('.screen-tab').forEach(function (btn) {
@@ -1307,6 +1329,9 @@ const App = {
 
     const changeLogTab = document.getElementById('changeLogTabBtn');
     if (changeLogTab) changeLogTab.classList.toggle('hidden', !App.featureOn('change_log'));
+    const allSearchTab = document.getElementById('allSearchTabBtn');
+    if (allSearchTab) allSearchTab.classList.toggle('hidden', !App.featureOn('keyword_all'));
+    if (!App.featureOn('keyword_all') && App.state.currentScreen === 'allSearch') App.switchScreen('chat');
     const isAdmin = App.isStaffAdmin();
     const adminNav = document.getElementById('adminNavSection');
     if (adminNav) adminNav.classList.toggle('hidden', !isAdmin);
@@ -1397,7 +1422,8 @@ const App = {
       adminMembers: 'adminMembersScreen',
       adminData: 'adminDataScreen',
       adminAnalytics: 'adminAnalyticsScreen',
-      changeLog: 'changeLogScreen'
+      changeLog: 'changeLogScreen',
+      allSearch: 'allSearchScreen'
     };
     const targetId = map[screenName];
     if (targetId) {
@@ -1434,6 +1460,7 @@ const App = {
       });
     }
     if (screenName === 'changeLog') void App.loadChangeLog();
+    if (screenName === 'allSearch' && App.elements.allSearchInput) setTimeout(function () { App.elements.allSearchInput.focus(); }, 0);
     if (screenName === 'adminAnalytics') {
       App.loadAnalytics().catch(function (err) {
         App.showToast((err && err.message) || '分析データの取得に失敗しました', 'error');
@@ -1453,6 +1480,7 @@ const App = {
       lessons: 'westudy 講座ページ説明文',
       knowledge: 'westudy 動画文字起こし',
       openchat: 'LINEオプチャ',
+      allSearch: 'キーワード検索（全データ）',
       adminUsers: 'ユーザ承認',
       adminUserList: 'ユーザ一覧',
       adminAdminList: '管理者一覧',
@@ -4382,6 +4410,294 @@ const App = {
     }
   },
 
+  // キーワード検索（全データ）（11/11 松野さん）。年配の方も使う前提で、説明と例を画面に出し、文字は大きめ。コミュニティ・講座ページ・動画文字起こし・LINEオプチャを
+  // 1つの入力欄から同時にキーワードで探し、データソースごとに並べる。AI は呼ばない（費用は増えない）。
+  // スイッチ keyword_all が見える人だけ。中身は各一覧と同じデータ（会員が一覧で見られるもの）だけ。
+  allSearchPerGroup: 20,
+  allSearchMaxPerGroup: 200,
+  allSearchNormalize: (v) => {
+    const t = String(v == null ? '' : v);
+    return (typeof t.normalize === 'function' ? t.normalize('NFKC') : t).toLowerCase();
+  },
+  // 書き方: 空白（全角も）で区切る → すべての語を含むもの（AND）。
+  // 「または」「OR」「|」で区切る → どれかを含むもの（OR）。例「敷金 または 保証金」「原状回復 費用 または 退去 費用」。
+  allSearchOrPattern: /\s+(?:または|or)\s+|\s*\|\s*/,
+  allSearchQuery: (q) => {
+    return App.allSearchNormalize(q).trim().split(App.allSearchOrPattern).map(function (part) {
+      const seen = {};
+      return part.split(/\s+/).map(function (x) { return x.trim(); }).filter(function (x) {
+        if (!x || x === 'または' || x === 'or' || seen[x]) return false;
+        seen[x] = true;
+        return true;
+      }).slice(0, 8);
+    }).filter(function (g) { return g.length; }).slice(0, 5);
+  },
+  // 印を付ける語（全部の語を1回ずつ）
+  allSearchTerms: (q) => {
+    const seen = {};
+    const out = [];
+    App.allSearchQuery(q).forEach(function (g) { g.forEach(function (t) { if (!seen[t]) { seen[t] = true; out.push(t); } }); });
+    return out;
+  },
+  // terms は語の並び（AND）か、語の並びの並び（OR でつないだ AND）
+  allSearchMatches: (parts, terms) => {
+    if (!terms || !terms.length) return false;
+    const hay = App.allSearchNormalize((parts || []).map(function (x) { return x == null ? '' : String(x); }).join(' \n '));
+    const groups = Array.isArray(terms[0]) ? terms : [terms];
+    return groups.some(function (g) { return g.length && g.every(function (t) { return hay.indexOf(t) !== -1; }); });
+  },
+  // 最初に当たった語のまわりを切り出し、当たった語に印を付ける（HTML は全部エスケープしてから）。
+  allSearchSnippetHtml: (text, terms, width) => {
+    const raw = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+    const w = width || 140;
+    const norm = App.allSearchNormalize(raw);
+    // NFKC で長さが変わる文字があると位置がずれるので、ずれないときだけ位置を使う。
+    let pos = -1;
+    if (norm.length === raw.length) {
+      (terms || []).forEach(function (t) {
+        const i = norm.indexOf(t);
+        if (i !== -1 && (pos === -1 || i < pos)) pos = i;
+      });
+    }
+    let start = pos > 40 ? pos - 40 : 0;
+    let piece = raw.slice(start, start + w);
+    const head = start > 0 ? '…' : '';
+    const tail = start + w < raw.length ? '…' : '';
+    const esc = App.escapeHtml;
+    if (norm.length !== raw.length || !terms || !terms.length) return esc(head + piece + tail);
+    const pnorm = norm.slice(start, start + w);
+    const mark = new Array(piece.length).fill(false);
+    terms.forEach(function (t) {
+      let i = pnorm.indexOf(t);
+      while (i !== -1 && t.length) {
+        for (let k = i; k < i + t.length && k < mark.length; k++) mark[k] = true;
+        i = pnorm.indexOf(t, i + t.length);
+      }
+    });
+    let out = '', buf = '', on = false;
+    const flush = function () {
+      if (!buf) return;
+      out += on ? '<mark class="bg-yellow-200 rounded px-0.5">' + esc(buf) + '</mark>' : esc(buf);
+      buf = '';
+    };
+    for (let k = 0; k < piece.length; k++) {
+      if (mark[k] !== on) { flush(); on = mark[k]; }
+      buf += piece[k];
+    }
+    flush();
+    return esc(head) + out + esc(tail);
+  },
+  allSearchLocalGroups: (terms) => {
+    const limit = App.allSearchMaxPerGroup;
+    const pick = function (rows, toParts) {
+      const hits = [];
+      let total = 0;
+      for (const row of rows) {
+        if (!App.allSearchMatches(toParts(row), terms)) continue;
+        total++;
+        if (hits.length < limit) hits.push(row);
+      }
+      return { rows: hits, total: total };
+    };
+    const comments = pick(App.communityCommentRows(), function (row) {
+      const a = App.parseWeStudyAuthorName(App.commentField(row, 'author_name'));
+      return [App.commentField(row, 'content'), a.raw, a.authorName, App.commentField(row, 'forum_category')];
+    });
+    const lessons = pick(App.lessonCommentRows(), function (row) {
+      return [App.commentField(row, 'course_tab'), App.commentField(row, 'section_name'),
+        App.commentField(row, 'lesson_title') || App.commentField(row, 'topic_title'), App.commentField(row, 'content')];
+    });
+    const sources = App.state.knowledgeSources || {};
+    const knowledge = pick(App.state.knowledgeChunks || [], function (ch) {
+      const src = sources[ch.source_key] || {};
+      const info = App.knowledgeReferenceInfo(src);
+      return [ch.content, info.title, info.course, info.section];
+    });
+    return { comments: comments, lessons: lessons, knowledge: knowledge };
+  },
+  // LINEオプチャは一覧と同じくサーバーで探す（全件を画面に持たないため）。サーバーには一番長い語を渡し、
+  // 残りの語は戻ってきた中で絞る。サーバーは新しい順に最大200件までなので、件数は「200件以上」と出す。
+  allSearchOpenchat: async (query) => {
+    const cfg = await App.resolveSemanticConfig();
+    const lists = await Promise.all(query.map(function (g) { return App.allSearchOpenchatOne(cfg, g.slice().sort(function (a, b) { return b.length - a.length; })[0]); }));
+    const seen = {};
+    const rows = [];
+    let capped = false;
+    lists.forEach(function (list) {
+      if (list.length >= 200) capped = true;
+      list.forEach(function (r) {
+        const id = String(r.id || '');
+        if (seen[id] || !App.allSearchMatches([r.content, r.chat_title, r.sender_name, r.thread_title], query)) return;
+        seen[id] = true;
+        rows.push(r);
+      });
+    });
+    rows.sort(function (a, b) { return String(b.posted_at || '').localeCompare(String(a.posted_at || '')); });
+    return { rows: rows, total: rows.length, capped: capped };
+  },
+  allSearchOpenchatOne: async (cfg, first) => {
+    const response = await fetch(cfg.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Semantic-Shared-Secret': cfg.secret },
+      body: JSON.stringify({
+        list_openchat: true,
+        query: first,
+        openchat_limit: 40,
+        session_id: App.state.currentSessionId || undefined,
+        user_id: (App.state.currentUser && App.state.currentUser.id) || undefined
+      })
+    });
+    const text = await response.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
+    if (!response.ok) throw new Error(data.errorMessage || data.message || data.error || 'LINEオプチャの検索に失敗しました');
+    return App.normalizeRelatedList(data.relatedOpenchat || []);
+  },
+  runAllSearch: async () => {
+    if (!App.featureOn('keyword_all')) return;
+    const input = App.elements.allSearchInput;
+    const meta = App.elements.allSearchMeta;
+    const box = App.elements.allSearchResults;
+    if (!input || !box) return;
+    const q = String(input.value || '').trim();
+    const query = App.allSearchQuery(q);
+    const terms = App.allSearchTerms(q);
+    if (!query.length) {
+      if (meta) meta.textContent = '調べたい言葉を入れてから「検索」を押してください。';
+      box.innerHTML = '';
+      return;
+    }
+    const seq = (App.state.allSearchSeq || 0) + 1;
+    App.state.allSearchSeq = seq;
+    const current = function () { return App.state.allSearchSeq === seq; };
+    if (meta) meta.textContent = '検索中…（初回はデータの読み込みに少し時間がかかります）';
+    box.innerHTML = '';
+    const ocTask = App.allSearchOpenchat(query).then(function (r) { return r; }, function (e) { return { error: (e && e.message) || String(e) }; });
+    const local = await Promise.all([App.ensureReferenceData('comments'), App.ensureReferenceData('knowledge')])
+      .then(function () { return App.allSearchLocalGroups(query); }, function (e) { return { error: (e && e.message) || String(e) }; });
+    if (!current()) return;
+    const groups = local.error ? { comments: local, lessons: local, knowledge: local } : local;
+    App.state.allSearchResult = { terms: terms, query: query, groups: groups, openchat: null, expanded: {} };
+    App.renderAllSearchResults();
+    const oc = await ocTask;
+    if (!current()) return;
+    App.state.allSearchResult.openchat = oc;
+    App.renderAllSearchResults();
+  },
+  allSearchGroupDefs: [
+    { key: 'comments', label: 'westudy コミュニティコメント', screen: 'comments' },
+    { key: 'knowledge', label: 'westudy 動画文字起こし', screen: 'knowledge' },
+    { key: 'lessons', label: 'westudy 講座ページ説明文', screen: 'lessons' },
+    { key: 'openchat', label: 'LINEオプチャ', screen: 'openchat' }
+  ],
+  allSearchItemHtml: (kind, row, terms) => {
+    const esc = App.escapeHtml;
+    let head = '', body = '', attrs = '';
+    if (kind === 'comments') {
+      const cid = String(App.commentField(row, 'comment_id') || '').trim();
+      const a = App.parseWeStudyAuthorName(App.commentField(row, 'author_name'));
+      const d = App.referenceDateParts(App.commentField(row, 'posted_at'));
+      head = [d ? d.label : '', a.authorName || a.raw || '', String(App.commentField(row, 'forum_category') || '').trim()].filter(Boolean).join(' ・ ');
+      body = App.commentField(row, 'content');
+      attrs = 'data-kind="comment" data-id="' + esc(cid) + '"';
+    } else if (kind === 'lessons') {
+      const cid = String(App.commentField(row, 'comment_id') || '').trim();
+      head = [App.commentField(row, 'course_tab'), App.commentField(row, 'section_name'),
+        App.commentField(row, 'lesson_title') || App.commentField(row, 'topic_title')].map(function (x) { return String(x || '').trim(); }).filter(Boolean).join(' ＞ ');
+      body = App.commentField(row, 'content');
+      attrs = 'data-kind="lesson" data-id="' + esc(cid) + '"';
+    } else if (kind === 'knowledge') {
+      const src = (App.state.knowledgeSources || {})[row.source_key] || {};
+      const info = App.knowledgeReferenceInfo(src);
+      head = [info.course, info.title, App.formatMmSs(row.start_sec != null ? Number(row.start_sec) : 0) + '〜'].filter(Boolean).join(' ＞ ');
+      body = row.content;
+      attrs = 'data-kind="video_chunk" data-id="' + esc(String(row.chunk_key || '')) + '"';
+    } else {
+      const when = String(row.posted_at || row.postedAt || row.post_date || row.postDate || '').trim();
+      head = [row.chat_title || row.chatTitle, App.formatOpenchatDateTime(when), row.sender_name || row.senderName].map(function (x) { return String(x || '').trim(); }).filter(Boolean).join(' ・ ');
+      body = App.cleanOpenchatDisplayText(row.content);
+      attrs = 'data-kind="openchat" data-id="' + esc(String(row.id || '')) + '"';
+    }
+    return '<li><button type="button" class="all-search-item w-full text-left px-3 py-3 hover:bg-blue-50 border-t" ' + attrs + '>' +
+      '<div class="text-sm text-slate-600">' + esc(head) + '</div>' +
+      '<div class="text-base leading-relaxed text-slate-900">' + App.allSearchSnippetHtml(body, terms) + '</div></button></li>';
+  },
+  renderAllSearchResults: () => {
+    const res = App.state.allSearchResult;
+    const box = App.elements.allSearchResults;
+    if (!res || !box) return;
+    const esc = App.escapeHtml;
+    let sum = 0;
+    const parts = App.allSearchGroupDefs.map(function (def) {
+      const g = def.key === 'openchat' ? res.openchat : res.groups[def.key];
+      let count = '', list = '';
+      if (!g) {
+        count = '検索中…';
+      } else if (g.error) {
+        count = '取得できませんでした';
+        list = '<p class="text-sm text-red-600 p-2">' + esc(g.error) + '</p>';
+      } else {
+        sum += g.total;
+        count = g.total + (g.capped ? '件以上' : '件');
+        const shown = res.expanded[def.key] ? g.rows.length : Math.min(App.allSearchPerGroup, g.rows.length);
+        list = g.rows.length
+          ? '<ul>' + g.rows.slice(0, shown).map(function (r) { return App.allSearchItemHtml(def.key, r, res.terms); }).join('') + '</ul>' +
+            (shown < g.rows.length ? '<button type="button" class="all-search-more m-3 px-4 py-2 rounded border border-blue-700 text-blue-800 text-base" data-group="' + def.key + '">続きを表示（あと' + (g.rows.length - shown) + '件）</button>' : '') +
+            (g.total > g.rows.length ? '<p class="text-sm text-slate-600 px-3 pb-3">数が多いので、最初の' + g.rows.length + '件だけ出しています。言葉を足すと絞り込めます。</p>' : '')
+          : '<p class="text-base text-slate-600 px-3 py-3">見つかりませんでした。</p>';
+      }
+      return '<section class="bg-white rounded border">' +
+        '<div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-100 rounded-t">' +
+        '<h4 class="font-bold text-base">' + esc(def.label) + ' <span class="text-blue-900">' + esc(count) + '</span></h4>' +
+        '<button type="button" class="all-search-open text-sm text-blue-700 underline shrink-0" data-screen-to="' + def.screen + '">この一覧を開く</button>' +
+        '</div>' + list + '</section>';
+    });
+    box.innerHTML = parts.join('');
+    if (App.elements.allSearchMeta) {
+      const pending = !res.openchat;
+      const how = res.query.length > 1 && res.query.every(function (g) { return g.length === 1; })
+        ? '「' + res.query.map(function (g) { return g[0]; }).join('」「') + '」のどれかを含む'
+        : res.query.map(function (g) { return '「' + g.join('」と「') + '」' + (g.length > 1 ? 'をすべて含む' : 'を含む'); }).join('もの、または');
+      App.elements.allSearchMeta.textContent = how + 'もの：' + sum + '件' + (pending ? '（LINEオプチャはまだ探しています）' : '') + '。気になる行を押すと、元の一覧で開きます。';
+    }
+  },
+  onAllSearchResultClick: (ev) => {
+    const t = ev.target && ev.target.closest ? ev.target : null;
+    if (!t) return;
+    const more = t.closest('.all-search-more');
+    if (more && App.state.allSearchResult) {
+      App.state.allSearchResult.expanded[more.getAttribute('data-group')] = true;
+      App.renderAllSearchResults();
+      return;
+    }
+    const open = t.closest('.all-search-open');
+    if (open && App.state.allSearchResult) {
+      // 各一覧の検索欄に入るのは1語だけ（一覧の検索は語を区切らない）。一番長い語を入れて開く。
+      const screen = open.getAttribute('data-screen-to');
+      const word = (App.state.allSearchResult.query[0] || []).slice().sort(function (a, b) { return b.length - a.length; })[0] || '';
+      const inputId = { comments: 'commentSearchInput', knowledge: 'knowledgeSearchInput', lessons: 'lessonSearchInput', openchat: 'openchatSearchInput' }[screen];
+      const el = App.elements[inputId];
+      if (el) el.value = word;
+      if (screen === 'openchat' && App.elements.openchatTitleFilter) App.elements.openchatTitleFilter.value = '';
+      if (screen === 'comments' && App.elements.commentAttachmentsOnly) App.elements.commentAttachmentsOnly.checked = false;
+      App.state.returnScreen = 'allSearch';
+      App.switchScreen(screen);
+      App.showDbReturnBar(screen);
+      if (screen === 'comments') App.renderCommentTable();
+      else if (screen === 'knowledge') App.renderKnowledgeTable();
+      else if (screen === 'lessons') App.renderLessonTable();
+      // オプチャは switchScreen が検索欄の語で読み込み直す
+      return;
+    }
+    const item = t.closest('.all-search-item');
+    if (!item) return;
+    const kind = item.getAttribute('data-kind');
+    const id = item.getAttribute('data-id') || '';
+    if (kind === 'video_chunk') App.openCitationInDb({ kind: 'video_chunk', chunkKey: id });
+    else if (kind === 'lesson') App.openCitationInDb({ kind: 'lesson', commentId: id });
+    else if (kind === 'openchat') App.openCitationInDb({ kind: 'openchat', openchatId: id });
+    else App.openCitationInDb({ kind: 'comment', commentId: id });
+  },
   // (2) 評価した答えの作り方（11/11）。軽いモデルや使い回しで悪いねが多いかを見分ける。
   answerMakeLabel: (x) => {
     if (!x || !x.answer_mode) return '不明（記録前の評価）';
