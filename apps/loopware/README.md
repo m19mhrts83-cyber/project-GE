@@ -71,6 +71,13 @@ npm run dev   # http://127.0.0.1:3004
 - 基準は**本人が承認したものだけ**。承認・編集・取り消し・レビュー完了は Supabase `owner_decisions`（surface=`loopware_criteria` / `loopware_review`）へ追記のみ（現在の一覧は履歴を順に読んで作る）
 - 分析・学習はツールの外：「AIに渡す文章をコピー」で、段階（その場／〜10件／〜30件／〜100件／成果で見直す）に合わせたお願いと生ログをチャットのAIへ渡す
 
+## 資料づくり（`/slides`）
+
+DX互助会などの説明資料を、ループウェアの型で作る。エージェントが構成案を3つ置き → ここで1つ選び観点を選ぶ → 資料を作って直す → エージェントが直しを概念にまとめた次回反映案を置き → ここで 採用／今回だけ／違う。採用したものだけが「資料の基準」として次回の案に効く。
+- アプリは AI を呼ばない。手順は [docs/資料作成ループ_Miss_Lemon手順.md](docs/資料作成ループ_Miss_Lemon手順.md)、型は `prompts/slides_proposal.md`
+- デッキ：`sync_meta`（key=`loopware_slides`）。`scripts/slides_loop.py put` で置く
+- 判断：`owner_decisions`（surface=`slide_plan`／`slide_fix`／`slide_rule`）
+
 ## 声でフィードバック
 
 312・313 の下部バーのマイクで、字幕を見ながら声でコメントを残せる（T05「見ながら言う」）。
