@@ -124,6 +124,66 @@ MA_ACTION_IDS = {
 DONE_LABEL = "回答不要・回答済み"
 CHAT_KINDS = {"chat"}
 CHAT_APP_URLS = {"Chatwork": "https://www.chatwork.com/"}
+# 2026-11-11 松野さん: Chatwork に「返信する」ボタンが無い → ルームを直接開く URL ボタンを先頭に置く
+CHATWORK_ROOM_URL = "https://www.chatwork.com/#!rid{rid}"
+_CONTACT_PARTNERS_CACHE: list[dict[str, Any]] | None = None
+
+
+def _contact_partners() -> list[dict[str, Any]]:
+    """連絡先一覧.yaml（OneDrive → リポジトリ内コピー）。読めなければ空（ボタンは Chatwork トップへ）。"""
+    global _CONTACT_PARTNERS_CACHE
+    if _CONTACT_PARTNERS_CACHE is None:
+        try:
+            from jarvis_comm_hub import load_contact_partners
+
+            _CONTACT_PARTNERS_CACHE = load_contact_partners()
+        except BaseException as e:  # noqa: BLE001  SystemExit（yaml 無し）も含めて soft-fail
+            print(f"# contact yaml skip (chatwork room link): {e}", file=sys.stderr)
+            _CONTACT_PARTNERS_CACHE = []
+    return _CONTACT_PARTNERS_CACHE
+
+
+def _as_id_list(v: Any) -> list[str]:
+    if isinstance(v, (list, tuple)):
+        return [str(x).strip() for x in v if str(x).strip()]
+    s = str(v or "").strip()
+    return [s] if s else []
+
+
+def chatwork_room_id(row: dict[str, Any], partners: list[dict[str, Any]] | None = None) -> str:
+    """行の folder と「Chatwork・ルーム名」から room_id を引く。決められなければ空。"""
+    pl = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+    folder = str(row.get("folder") or pl.get("folder") or "").strip()
+    if not folder:
+        return ""
+    raw = str(pl.get("channel_raw") or row.get("channel") or "")
+    m = re.search(r"Chatwork[・･\s]*([^）)\]]+)", raw)
+    room_name = m.group(1).strip() if m else ""
+    for p in partners if partners is not None else _contact_partners():
+        if str(p.get("folder") or "").strip() != folder:
+            continue
+        ids = _as_id_list(p.get("chatwork_room_id")) + _as_id_list(p.get("chatwork_room_ids"))
+        rooms = p.get("chatwork_rooms") if isinstance(p.get("chatwork_rooms"), dict) else {}
+        if room_name:
+            for k, v in rooms.items():
+                k, v = str(k).strip(), str(v).strip()
+                if k.isdigit() and v == room_name:
+                    return k
+            if str(p.get("chatwork_room_name") or "").strip() == room_name and len(ids) == 1:
+                return ids[0]
+        if len(ids) == 1:
+            return ids[0]
+        return ""
+    return ""
+
+
+def chat_app_url(row: dict[str, Any], partners: list[dict[str, Any]] | None = None) -> str:
+    """チャット行の「アプリで返信」先。Chatwork はルームが分かればそのルーム。"""
+    channel = str(row.get("channel") or "").strip()
+    if channel.startswith("Chatwork"):
+        rid = chatwork_room_id(row, partners)
+        return CHATWORK_ROOM_URL.format(rid=rid) if rid else CHAT_APP_URLS["Chatwork"]
+    return CHAT_APP_URLS.get(channel, "")
 
 
 def now_iso() -> str:
@@ -251,19 +311,42 @@ def is_chat_row(row: dict[str, Any]) -> bool:
     return str(row.get("kind") or "").lower() in CHAT_KINDS
 
 
+def _app_reply_button(chat_url: str, chat_label: str) -> list[dict[str, Any]]:
+    if not chat_url:
+        return []
+    return [
+        {
+            "type": "button",
+            "text": {"type": "plain_text", "text": f"{chat_label}で返信", "emoji": True},
+            "style": "primary",
+            "url": chat_url,
+            "action_id": "mail_action_open_app",
+        }
+    ]
+
+
 def _button_elements(
-    tid: str, *, url_mode: bool, chat: bool = False, materials: bool = False
+    tid: str,
+    *,
+    url_mode: bool,
+    chat: bool = False,
+    materials: bool = False,
+    chat_url: str = "",
+    chat_label: str = "",
 ) -> list[dict[str, Any]]:
     # チャット（LINE／Chatwork 等）は Gmail で送れないので「アプリで返信 → 返信済みにする」
+    # 2026-11-11: アプリ（ルーム）を開く「○○で返信」ボタンを先頭に置く（送信はアプリで本人）
     first_action, first_label = ("done", "返信済みにする") if chat else ("reply", "返信する")
+    app_btn = _app_reply_button(chat_url, chat_label) if chat else []
+    first_style = {} if app_btn else {"style": "primary"}
     # 資料依頼は「集めてから返信」なので Todoist（資料待ち・品目リスト付き）へ
     todoist_label = "資料待ちで後回し" if materials else "Todoist追加"
     if url_mode:
-        return [
+        return app_btn + [
             {
                 "type": "button",
                 "text": {"type": "plain_text", "text": first_label, "emoji": True},
-                "style": "primary",
+                **first_style,
                 "url": ma_url(tid, first_action),
             },
             {
@@ -282,11 +365,11 @@ def _button_elements(
             "text": {"type": "plain_text", "text": DONE_LABEL, "emoji": True},
             "url": ma_url(tid, "done"),
         }])
-    return [
+    return app_btn + [
         {
             "type": "button",
             "text": {"type": "plain_text", "text": first_label, "emoji": True},
-            "style": "primary",
+            **first_style,
             "action_id": MA_ACTION_IDS[first_action],
             "value": f"ma:{first_action}:{tid}",
         },
@@ -758,10 +841,14 @@ def build_compact_payload(
     score = int(row.get("_score") or 0)
     chat = is_chat_row(row)
     channel = str(row.get("channel") or "").strip() or "チャット"
+    chat_url = chat_app_url(row) if chat else ""
+    chat_label = "Chatwork" if channel.startswith("Chatwork") else channel
     if chat:
-        app_url = CHAT_APP_URLS.get(channel)
-        app_link = f"<{app_url}|{channel}を開く>" if app_url else f"{channel}アプリ"
-        draft_note = f"📱 {app_link}で返信 → 「返信済みにする」"
+        draft_note = (
+            f"📱 「{chat_label}で返信」で開いて返信 → 「返信済みにする」"
+            if chat_url
+            else f"📱 {channel}アプリで返信 → 「返信済みにする」"
+        )
     else:
         draft_note = "下書きあり → 返信で編集" if draft else "「返信する」で下書きを自動作成"
     materials = material_items(row)
@@ -814,7 +901,12 @@ def build_compact_payload(
             "type": "actions",
             "block_id": f"ma_actions_{tid[:24]}",
             "elements": _button_elements(
-                tid, url_mode=url_mode, chat=chat, materials=bool(materials)
+                tid,
+                url_mode=url_mode,
+                chat=chat,
+                materials=bool(materials),
+                chat_url=chat_url,
+                chat_label=chat_label,
             ),
         },
         {
