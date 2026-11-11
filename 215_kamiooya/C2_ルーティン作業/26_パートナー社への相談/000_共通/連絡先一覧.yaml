@@ -247,3 +247,17 @@ partners:
     line_direct_chat_mid: ""
     contact: "ひろふみ先生"
     # 豊明市 空手道場・遊愛会（ひろふみ先生・稽古・一般生LINEグループ・YouTube動画共有）
+
+  - folder: "P424_リリーフコミット"
+    name: "リリーフコミット"
+    emails:
+      - "both_ppp.and_rugby35@ezweb.ne.jp"
+      - "iechika@relief-commit.com"
+      - "usada@relief-commit.com"
+    email_domains: ["relief-commit.com"]
+    to_name_hints: ["リリーフコミット", "Relief Commit", "家近"]
+    phones: ["08017529780", "080-1752-9780", "+818017529780"]
+    line: ""
+    line_group_chat_mid: ""
+    line_direct_chat_mid: ""
+    contact: "家近一広"
