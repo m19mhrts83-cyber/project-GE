@@ -1498,6 +1498,8 @@ const App = {
     }
     if (screenName === 'changeLog') void App.loadChangeLog();
     if (screenName === 'allSearch' && App.elements.allSearchInput) setTimeout(function () { App.elements.allSearchInput.focus(); }, 0);
+    // キーワード検索（全データ）を開いたら、言葉を入れている間に一覧データを先に読み込んでおく（初回の待ち時間を減らす）
+    if (screenName === 'allSearch' && App.featureOn('keyword_all')) { void App.ensureReferenceData('comments'); void App.ensureReferenceData('knowledge'); }
     if (screenName === 'adminAnalytics') {
       App.loadAnalytics().catch(function (err) {
         App.showToast((err && err.message) || '分析データの取得に失敗しました', 'error');
@@ -1943,6 +1945,7 @@ const App = {
         let previous=after;
         for(const row of part){const id=Number(row.id);if(!Number.isSafeInteger(id)||id<=previous)throw new Error('コメント一覧の順序を確認できませんでした');previous=id;}
         rows.push(...part);
+        App.state.commentsLoadedCount=rows.length;
         if(part.length<500)break;
         after=previous;
         if(page===99)throw new Error('コメント一覧の上限を超えました');
@@ -1951,6 +1954,7 @@ const App = {
     if(!current())return;
     rows.sort((a,b)=>String(b.posted_at||'').localeCompare(String(a.posted_at||''))||Number(b.id)-Number(a.id));
     App.state.comments = rows.map(App.enrichCommentCategory);
+    try{localStorage.setItem('qa_comments_total',String(rows.length));}catch(e){/* ignore */}
     App.renderCommentCategoryFilterOptions();
     App.renderCommentTable();
     App.renderLessonCourseTabFilterOptions();
@@ -4607,12 +4611,17 @@ const App = {
     const seq = (App.state.allSearchSeq || 0) + 1;
     App.state.allSearchSeq = seq;
     const current = function () { return App.state.allSearchSeq === seq; };
-    if (meta) meta.textContent = '検索中…（初回はデータの読み込みに少し時間がかかります）';
+    if (meta) meta.textContent = '';
     box.innerHTML = '';
-    const ocTask = App.allSearchOpenchat(query).then(function (r) { return r; }, function (e) { return { error: (e && e.message) || String(e) }; });
+    App.state.allSearchOcDone = false;
+    App.state.allSearchStartedAt = Date.now();
+    App.startAllSearchProgress(seq);
+    const ocTask = App.allSearchOpenchat(query).then(function (r) { return r; }, function (e) { return { error: (e && e.message) || String(e) }; })
+      .then(function (r) { if (current()) App.state.allSearchOcDone = true; return r; });
     const local = await Promise.all([App.ensureReferenceData('comments'), App.ensureReferenceData('knowledge')])
       .then(function () { return App.allSearchLocalGroups(query); }, function (e) { return { error: (e && e.message) || String(e) }; });
     if (!current()) return;
+    App.stopAllSearchProgress();
     const groups = local.error ? { comments: local, lessons: local, knowledge: local } : local;
     App.state.allSearchResult = { terms: terms, query: query, groups: groups, openchat: null, expanded: {} };
     App.renderAllSearchResults();
@@ -4620,6 +4629,72 @@ const App = {
     if (!current()) return;
     App.state.allSearchResult.openchat = oc;
     App.renderAllSearchResults();
+  },
+  // 検索中の「進んでいます」表示（11/11 松野さん）。回答待ちと同じ見た目（search-motion）で、
+  // こちらは実際の進み具合（読み込んだ件数・区分ごとの済み）をそのまま出す。初回だけ一覧データの読み込みで時間がかかる。
+  allSearchProgressState: () => {
+    const ready = App.state.referenceReady || {};
+    let est = 22000;
+    try { const v = Number(localStorage.getItem('qa_comments_total')); if (v > 0) est = v; } catch (e) { /* ignore */ }
+    const loaded = ready.comments ? est : Math.min(est, Number(App.state.commentsLoadedCount || 0));
+    const steps = [
+      { icon: 'fa-solid fa-comments', done: !!ready.comments,
+        label: ready.comments ? 'WeStudy コミュニティコメント・講座ページ説明文を読み込みました' : 'WeStudy コミュニティコメント・講座ページ説明文を読み込んでいます',
+        detail: ready.comments ? '' : (loaded ? loaded.toLocaleString('ja-JP') + ' / 約' + est.toLocaleString('ja-JP') + '件' : '') },
+      { icon: 'fa-solid fa-circle-play', done: !!ready.knowledge,
+        label: ready.knowledge ? 'WeStudy 動画文字起こしを読み込みました' : 'WeStudy 動画文字起こしを読み込んでいます', detail: '' },
+      { icon: 'fa-brands fa-line', done: !!App.state.allSearchOcDone,
+        label: App.state.allSearchOcDone ? 'LINEオプチャを探しました' : 'LINEオプチャを探しています', detail: '' },
+      { icon: 'fa-solid fa-magnifying-glass', done: false, label: 'キーワードに合うものを選んでいます', detail: '' }
+    ];
+    const pct = Math.round(60 * (loaded / est) + (ready.knowledge ? 20 : 0) + (App.state.allSearchOcDone ? 15 : 0));
+    let active = steps.findIndex(function (x) { return !x.done; });
+    if (active < 0) active = steps.length - 1;
+    return { steps: steps, pct: Math.min(97, pct), active: active, firstLoad: !ready.comments };
+  },
+  renderAllSearchProgress: () => {
+    const box = App.elements.allSearchResults;
+    if (!box) return;
+    const st = App.allSearchProgressState();
+    const sec = Math.floor((Date.now() - (App.state.allSearchStartedAt || Date.now())) / 1000);
+    const words = st.pct < 30 ? '探し始めました' : st.pct < 60 ? '半分ほど進みました' : st.pct < 90 ? 'もうすぐ結果が出ます' : 'まもなく表示します';
+    let card = document.getElementById('allSearchWorkingCard');
+    if (!card) {
+      box.innerHTML = '<div id="allSearchWorkingCard" class="search-motion-wrap" role="status" aria-live="polite"><div class="search-motion">' +
+        '<div class="search-motion-bar"><span></span><span></span><span></span><b>全データからキーワードを探しています</b></div>' +
+        '<div class="search-motion-body">' +
+          '<div class="search-motion-scan" aria-hidden="true"><div class="search-motion-lines"><i></i><i></i><i></i><i></i></div><div class="search-motion-glass"><i class="fa-solid fa-magnifying-glass"></i></div></div>' +
+          '<ol class="search-motion-steps">' + st.steps.map(function (x, i) { return '<li data-step="' + i + '"><i class="' + x.icon + '" aria-hidden="true"></i><span data-label></span><small data-detail class="ml-auto text-xs whitespace-nowrap"></small></li>'; }).join('') + '</ol>' +
+          '<div class="search-motion-progress" aria-hidden="true"><div data-progress></div></div>' +
+          '<div class="search-motion-meta"><span data-remain></span><span data-elapsed></span></div>' +
+          '<p data-first class="mt-2 text-sm text-slate-500"></p>' +
+        '</div></div></div>';
+      card = document.getElementById('allSearchWorkingCard');
+    }
+    card.querySelectorAll('[data-step]').forEach(function (li) {
+      const i = Number(li.getAttribute('data-step'));
+      const x = st.steps[i];
+      li.classList.toggle('is-done', x.done);
+      li.classList.toggle('is-active', !x.done && i === st.active);
+      li.querySelector('[data-label]').textContent = x.label;
+      li.querySelector('[data-detail]').textContent = x.detail;
+    });
+    const bar = card.querySelector('[data-progress]'); if (bar) bar.style.width = st.pct + '%';
+    const r = card.querySelector('[data-remain]'); if (r) r.textContent = words;
+    const el = card.querySelector('[data-elapsed]'); if (el) el.textContent = '経過 ' + (sec >= 60 ? Math.floor(sec / 60) + '分' : '') + (sec % 60) + '秒';
+    const f = card.querySelector('[data-first]'); if (f) f.textContent = st.firstLoad ? 'はじめての検索では、全データの読み込みに少し時間がかかります。2回目からはすぐに結果が出ます。' : '';
+  },
+  startAllSearchProgress: (seq) => {
+    App.stopAllSearchProgress();
+    App.renderAllSearchProgress();
+    App.state.allSearchProgressTimer = window.setInterval(function () {
+      if (App.state.allSearchSeq !== seq) { App.stopAllSearchProgress(); return; }
+      App.renderAllSearchProgress();
+    }, 400);
+  },
+  stopAllSearchProgress: () => {
+    if (App.state.allSearchProgressTimer) window.clearInterval(App.state.allSearchProgressTimer);
+    App.state.allSearchProgressTimer = null;
   },
   allSearchGroupDefs: [
     // 並びと名前は松野さんの指定（11/11）
@@ -4671,7 +4746,7 @@ const App = {
       const g = def.key === 'openchat' ? res.openchat : res.groups[def.key];
       let count = '', list = '';
       if (!g) {
-        count = '検索中…';
+        count = '探しています…';
       } else if (g.error) {
         count = '取得できませんでした';
         list = '<p class="text-sm text-red-600 p-2">' + esc(g.error) + '</p>';
