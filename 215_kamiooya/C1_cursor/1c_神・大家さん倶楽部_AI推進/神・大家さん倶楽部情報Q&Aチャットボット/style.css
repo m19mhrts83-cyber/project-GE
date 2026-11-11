@@ -586,3 +586,12 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 @keyframes sm-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
 @keyframes sm-pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .search-motion, .search-motion-glass, .search-motion-steps li.is-active i { animation: none; } }
+
+/* 待っている間のおすすめ講座（2026-11-11） */
+.search-motion-courses { border-top: 1px solid #eef3fa; padding: 10px 16px 14px; background: #fbfcfe; }
+.search-motion-courses-title { font-size: 0.85rem; font-weight: 700; color: #11366A; margin-bottom: 6px; }
+.search-motion-courses-title i { color: #FE910B; }
+.search-motion-courses ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.search-motion-courses li { display: flex; flex-direction: column; gap: 1px; }
+.search-motion-courses a { color: #1E4F8F; text-decoration: underline; text-underline-offset: 3px; font-size: 0.95rem; line-height: 1.5; }
+.search-motion-courses li span { font-size: 0.75rem; color: #94a3b8; }
