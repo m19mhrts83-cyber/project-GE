@@ -28,6 +28,16 @@ test("validateItem accepts a good item and normalizes occurred_at", () => {
   assert.equal(validateItem({ ...ok, bot: undefined }, "grok", now).ok, true);
 });
 
+test("validateItem keeps topic and needs_action only when given", () => {
+  const v = validateItem({ ...ok, kind: "agent", topic: "Repair_Vendor", needs_action: true }, "grok", now);
+  assert.equal(v.ok, true);
+  assert.equal(v.value.payload.topic, "repair_vendor");
+  assert.equal(v.value.payload.needs_action, true);
+  const w = validateItem(ok, "grok", now);
+  assert.equal("topic" in w.value.payload, false);
+  assert.equal("needs_action" in w.value.payload, false);
+});
+
 test("validateItem rejects bad shapes", () => {
   const bad = [
     { ...ok, bot: "hawk" }, // 鍵の送り手と違う
@@ -41,6 +51,9 @@ test("validateItem rejects bad shapes", () => {
     { ...ok, summary: "x".repeat(4001) },
     { ...ok, refs: [] },
     { ...ok, refs: { a: "x".repeat(5000) } },
+    { ...ok, topic: "Bad Topic" },
+    { ...ok, topic: "x".repeat(41) },
+    { ...ok, needs_action: "yes" },
     null,
     [ok],
   ];

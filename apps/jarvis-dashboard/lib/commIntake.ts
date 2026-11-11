@@ -14,6 +14,8 @@ export const MAX_BODY_BYTES = 64 * 1024;
 export const MAX_ITEMS = 20;
 export const PER_MINUTE = 30;
 const ID_RE = /^[A-Za-z0-9._:\-]{1,128}$/;
+/** 種類の印（任意）。例: daily_report／property_research／repair_vendor／dev_card。台帳で「やること」にするかの判断に使う。 */
+const TOPIC_RE = /^[a-z0-9_]{1,40}$/;
 
 export type IntakeItem = {
   bot_item_id: string;
@@ -24,6 +26,8 @@ export type IntakeItem = {
     summary: string;
     refs: Record<string, unknown>;
     source: string;
+    topic?: string;
+    needs_action?: boolean;
   };
 };
 
@@ -59,6 +63,11 @@ export function validateItem(
   if (JSON.stringify(refs).length > 4096) return { ok: false, error: "refs too large (max 4KB)" };
   const source = str(o.source);
   if (source.length > 80) return { ok: false, error: "source too long (max 80)" };
+  const topic = str(o.topic).toLowerCase();
+  if (topic && !TOPIC_RE.test(topic)) return { ok: false, error: "topic must be 1-40 chars of [a-z0-9_]" };
+  if (o.needs_action !== undefined && typeof o.needs_action !== "boolean") {
+    return { ok: false, error: "needs_action must be true/false" };
+  }
   return {
     ok: true,
     value: {
@@ -70,6 +79,8 @@ export function validateItem(
         summary,
         refs: refs as Record<string, unknown>,
         source,
+        ...(topic ? { topic } : {}),
+        ...(typeof o.needs_action === "boolean" ? { needs_action: o.needs_action } : {}),
       },
     },
   };
