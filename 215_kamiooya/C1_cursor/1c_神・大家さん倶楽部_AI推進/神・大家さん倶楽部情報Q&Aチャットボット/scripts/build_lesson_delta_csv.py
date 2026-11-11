@@ -82,10 +82,23 @@ def read_full_csv(path: Path) -> list[dict]:
     return rows
 
 
-def build_delta(full_rows: list[dict], state: dict) -> tuple[list[dict], dict]:
+def build_delta(full_rows: list[dict], state: dict, *, add_only: bool = False) -> tuple[list[dict], dict]:
     """
     差分を計算し、(delta_rows, new_state) を返す。
+
+    add_only=True は毎日の新着確認用。full は新着だけの一部なので、
+    state に無い行だけ add にし、更新・削除は判定しない（既存の state はそのまま残す）。
     """
+    if add_only:
+        delta, new_state = [], dict(state)
+        for row in full_rows:
+            cid = row.get("コメントID", "").strip()
+            if not cid or cid in new_state:
+                continue
+            new_state[cid] = row.get("コンテンツハッシュ", "").strip()
+            delta.append({**row, "差分種別": "add"})
+        return delta, new_state
+
     delta: list[dict] = []
     new_state: dict = {}
 
@@ -152,6 +165,8 @@ def main():
                         help="差分生成後に state を更新")
     parser.add_argument("--init-state-only", action="store_true",
                         help="state 初期化のみ（差分CSVはヘッダのみ）")
+    parser.add_argument("--add-only", action="store_true",
+                        help="新着だけの full（westudy_lesson_pages.py --new-only-state）用。追加だけ判定する")
     args = parser.parse_args()
 
     full_path = Path(args.full)
@@ -180,7 +195,7 @@ def main():
     state = load_state(state_path)
     print(f"既知state: {len(state)} 件")
 
-    delta, new_state = build_delta(full_rows, state)
+    delta, new_state = build_delta(full_rows, state, add_only=args.add_only)
 
     adds = sum(1 for r in delta if r.get("差分種別") == "add")
     updates = sum(1 for r in delta if r.get("差分種別") == "update")
