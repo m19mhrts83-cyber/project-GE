@@ -141,6 +141,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     },
     listFeedback:async()=>rest('qa_answer_feedback?select=chat_id,message_id,rating,reasons,comment,question,answer,updated_at,answer_mode,answer_tier,answer_model,answer_reused&order=updated_at.desc&limit=200'),
     saveSourceClick:async row=>{await rest('qa_answer_source_clicks?on_conflict=user_id,chat_id,message_id,kind,source_key',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
+    listRecentJobs:async()=>rest('qa_answer_jobs?'+new URLSearchParams({select:'user_id,chat_id,mode,query,status,error_code,created_at,answer:result->>answer',created_at:'gte.'+new Date(Date.now()-30*86400000).toISOString(),order:'created_at.desc',limit:'2000'})),
     listSourceClicks:async()=>rest('qa_answer_source_clicks?select=user_id,chat_id,message_id,kind,source_key,title,label&order=clicked_at.desc&limit=1000'),
     // (2) 答えの作り方（モデル・使い回し）。評価のときに本文のハッシュで引く。11/11
     answerMeta:async(userId,chatId,answer)=>{
@@ -219,16 +220,35 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       const cfg=await deps.semanticConfig!();
       await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'user',content:job.query},signal);
       // (1) 使用量の削減。スイッチ cost_saving が見える人の質問だけ。読めなければ今までどおり。
-      let saving=false;
+      let saving=false,withContext=false;
       try{
-        const flags=await deps.featureFlags!();const flag=(Array.isArray(flags)?flags:[]).find((f:any)=>f.feature==='cost_saving');
+        const flags=await deps.featureFlags!();const list=Array.isArray(flags)?flags:[];
         // オフ・全員公開のときは本人を引き直さない（会員情報の読み出しを増やさない）
-        if(flag&&flag.stage==='all')saving=true;
-        else if(flag&&['owner','reviewers'].includes(flag.stage)){const u=await deps.member(job.user_id);saving=!!u&&featureAllowed(flag,{id:u.id,email:u.email});}
-      }catch{saving=false;}
+        let me:{id:string;email:string}|null|undefined;
+        const allowed=async(name:string)=>{
+          const flag=list.find((f:any)=>f.feature===name);
+          if(!flag||!['owner','reviewers','all'].includes(flag.stage))return false;
+          if(flag.stage==='all')return true;
+          if(me===undefined){const u=await deps.member(job.user_id);me=u?{id:u.id,email:u.email}:null;}
+          return !!me&&featureAllowed(flag,me);
+        };
+        saving=await allowed('cost_saving');
+        // 同じチャットの直前のやり取りを踏まえて探す・答える（スイッチ chat_context、2026-11-11）。
+        withContext=await allowed('chat_context');
+      }catch{saving=false;withContext=false;}
+      let history:{question:string;answer:string}[]=[];
+      if(withContext){
+        try{
+          const hq=new URLSearchParams({select:'query,result,created_at',user_id:'eq.'+job.user_id,chat_id:'eq.'+job.chat_id,status:'eq.done',id:'neq.'+job.id,order:'created_at.desc',limit:'2'});
+          const rows=await rest('qa_answer_jobs?'+hq);
+          history=(Array.isArray(rows)?rows:[]).reverse().map((r:any)=>({question:String(r?.query||'').slice(0,500),answer:String(r?.result?.answer||'').slice(0,1500)})).filter(t=>t.question);
+        }catch{history=[];/* 読めなければ今までどおり（その質問だけで探す） */}
+      }
       const deep=job.mode==='deep';
-      const key=saving&&!deep?await queryKey(job.query):'';
-      if(saving&&!deep){
+      // 前のやり取りを踏まえた答えは、同じ文面の質問でも中身が変わるので使い回さない・保存しない。
+      const reuse=saving&&!deep&&!history.length;
+      const key=reuse?await queryKey(job.query):'';
+      if(reuse){
         try{
           const row=(await rest('qa_answer_cache?query_hash=eq.'+key+'&select=result,created_at,hits,tier&limit=1'))[0];
           if(row&&fresh(row)&&cacheable(String(row.result?.answer||''))){
@@ -241,7 +261,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         }catch{/* 使い回しが読めなくても答えは作る */}
       }
       const tier=saving&&!deep?answerTier(job.query):'standard';
-      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{})}),signal}));
+      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{}),...(history.length?{history}:{}),...(withContext?{clarify:true}:{})}),signal}));
       const result=await response.json();
       if(!response.ok){if(signal.aborted)throw signal.reason;throw new UpstreamError(result?.code==='semantic_disabled'?'semantic_disabled':'operation_failed',503);}
       const answer=String(result.answer||'').trim();if(!answer)throw new Error('empty_answer');
@@ -250,7 +270,8 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       // 実際に答えたモデル（軽いモデルが使えず今のモデルに戻った場合もそちら）。古い意味検索は返さないので空＝不明。
       const answerModel=typeof result.answerModel==='string'?result.answerModel:'';
       await recordMeta(job,answer,{mode:deep?'deep':'semantic',tier,model:answerModel,reused:false});
-      if(saving&&!deep&&cacheable(answer)){
+      // 聞き返し（【確認】）は質問した人だけへの返事なので使い回さない。
+      if(reuse&&cacheable(answer)&&result.clarification!==true){
         await rest('qa_answer_cache?on_conflict=query_hash',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({query_hash:key,query:job.query.slice(0,4000),result:{...compact,answerModel},tier,hits:0,created_at:new Date().toISOString(),last_hit_at:null})}).catch(()=>{});
       }
       return compact;

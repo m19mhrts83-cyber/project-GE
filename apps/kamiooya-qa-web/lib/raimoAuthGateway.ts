@@ -3,6 +3,7 @@ import {featuresFor, requireFeature, type FeatureFlag} from './featureFlags.ts';
 import {parseFeedback, feedbackRow} from './answerFeedback.ts';
 import {feedbackMetaColumns, type AnswerMeta} from './answerMeta.ts';
 import {publicChangeLog} from './changeLog.ts';
+import {findTroubledChats, summarizeSignals, SIGNAL_LABELS} from './conversationSignals.ts';
 import {parseSourceClick, sourceClickRow, summarizeSourceClicks} from './sourceClicks.ts';
 import {matchPending} from './rosterMatch.ts';
 import {parseThemeDecision, shapeRound, decisionRow} from './rankingThemes.ts';
@@ -33,6 +34,8 @@ export type GatewayDependencies = {
   listFeedback?(): Promise<unknown[]>;
   saveSourceClick?(row: Record<string, unknown>): Promise<void>;
   listSourceClicks?(): Promise<unknown[]>;
+  // うまくいかなかった可能性のある会話（スイッチ conversation_signals）。直近30日の質問の記録。
+  listRecentJobs?(): Promise<unknown[]>;
   // (4) 質問ランキング＋講座テーマ案（qa_theme_rounds / qa_theme_decisions）。
   themeRounds?(limit: number): Promise<unknown[]>;
   themeDecisions?(roundIds: string[]): Promise<unknown[]>;
@@ -219,6 +222,22 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
           answer_mode:r.answer_mode??null,answer_tier:r.answer_tier??null,answer_model:r.answer_model??null,answer_reused:r.answer_reused??null,
           sources:(sc.byMessage.get(String(r.chat_id??'')+'/'+String(r.message_id??''))||[]).map(x=>({kind:x.kind,title:x.title,label:x.label}))}));
         return json({feedback:rows,sources_top:sc.top,source_clicks:Array.isArray(clicks)?clicks.length:0});
+      }
+      // うまくいかなかった可能性のある会話。評価が無くても操作の記録から拾う（AIは使わない）。2026-11-11
+      if(path==='/admin/conversation-signals/list' && req.method==='POST'){
+        let flags:FeatureFlag[]=[];
+        try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
+        requireFeature(Array.isArray(flags)?flags:[],'conversation_signals',{id:user.id,email:user.email});
+        if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
+        if(!d.listRecentJobs)return json({error:'feature_not_available'},404);
+        const safe=async(f?:()=>Promise<unknown[]>)=>{try{const r=f?await f():[];return Array.isArray(r)?r as any[]:[];}catch{return [];}};
+        const [jobs,clicks,feedback]=await Promise.all([d.listRecentJobs(),safe(d.listSourceClicks),safe(d.listFeedback)]);
+        const all=findTroubledChats(Array.isArray(jobs)?jobs as any[]:[],clicks,feedback,100000);
+        const top=all.slice(0,50);
+        const people=new Map<string,{name?:unknown;member_no?:unknown}>();
+        await Promise.all([...new Set(top.map(c=>c.user_id))].map(async id=>{try{const m=await d.member(id);if(m)people.set(id,{name:m.name,member_no:m.member_no});}catch{/* 名前が引けなくても一覧は出す */}}));
+        return json({labels:SIGNAL_LABELS,counts:summarizeSignals(all),total_chats:new Set((Array.isArray(jobs)?jobs as any[]:[]).map(j=>j?.chat_id)).size,flagged:all.length,
+          chats:top.map(c=>({...c,member:people.get(c.user_id)||null}))});
       }
       if(path==='/reference-metadata' && req.method==='GET' && d.referenceMetadata)return json(await d.referenceMetadata());
       // This legacy browser search credential is separate from every privileged server secret.
