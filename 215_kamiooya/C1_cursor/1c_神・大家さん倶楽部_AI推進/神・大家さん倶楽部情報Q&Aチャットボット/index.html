@@ -260,8 +260,8 @@
                 <i class="fa-solid fa-database mr-1"></i>参照データ（回答の根拠を一覧で見る）
               </p>
               <div class="ml-3 pl-2 border-l-2 border-slate-200 space-y-0.5 text-sm">
-                <!-- まとめてキーワード検索（2026-11-11）: スイッチ keyword_all が見える人だけ -->
-                <button id="allSearchTabBtn" data-screen="allSearch" class="screen-tab hidden w-full text-left px-3 py-1.5 rounded hover:bg-slate-100 font-semibold text-blue-900"><i class="fa-solid fa-magnifying-glass mr-1"></i>まとめて検索（全データ）</button>
+                <!-- キーワード検索（全データ）（2026-11-11）: スイッチ keyword_all が見える人だけ -->
+                <button id="allSearchTabBtn" data-screen="allSearch" class="screen-tab hidden w-full text-left px-3 py-1.5 rounded hover:bg-slate-100 font-semibold text-blue-900"><i class="fa-solid fa-magnifying-glass mr-1"></i>キーワード検索（全データ）</button>
                 <button data-screen="comments" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">westudy コミュニティコメント</button>
                 <button data-screen="knowledge" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">westudy 動画文字起こし</button>
                 <button data-screen="lessons" class="screen-tab w-full text-left px-3 py-1.5 rounded hover:bg-slate-100">westudy 講座ページ説明文</button>
@@ -675,19 +675,38 @@
             </div>
           </section>
 
-          <!-- まとめてキーワード検索（2026-11-11）: 全データソースをキーワードで同時に探す。AIは使わない。スイッチ keyword_all が見える人だけ -->
+          <!-- キーワード検索（全データ）（2026-11-11）: 全データソースをキーワードで同時に探す。AIは使わない。年配の方も使う前提で文字大きめ・使い方を常に表示。スイッチ keyword_all が見える人だけ -->
           <section id="allSearchScreen" class="screen-view hidden flex-1 min-h-0 p-4 overflow-auto">
-            <div id="allSearchBox" class="w-full max-w-4xl space-y-3">
-              <div class="bg-white rounded border p-4">
-                <h3 class="font-semibold mb-1">まとめてキーワード検索</h3>
-                <p class="text-sm text-slate-500 mb-3">コミュニティコメント・動画文字起こし・講座ページ説明文・LINEオプチャを、キーワードでまとめて探します。空白で区切ると、すべての語を含むものだけ出します。</p>
-                <form id="allSearchForm" class="flex gap-2">
-                  <input id="allSearchInput" type="search" class="flex-1 min-w-0 border rounded-md px-3 py-2" placeholder="例: 原状回復 費用" />
-                  <button type="submit" class="px-4 py-2 rounded bg-blue-900 text-white shrink-0">検索</button>
+            <div id="allSearchBox" class="w-full max-w-4xl space-y-4">
+              <div class="bg-white rounded border p-4 sm:p-5">
+                <h3 class="font-bold text-xl mb-1">キーワード検索（全データ）</h3>
+                <p class="text-base text-slate-700 mb-4">コミュニティのコメント・セミナー動画・講座ページ・LINEオプチャを、言葉でまとめて探せます。</p>
+                <form id="allSearchForm" class="flex flex-wrap gap-2">
+                  <label for="allSearchInput" class="sr-only">調べたい言葉</label>
+                  <input id="allSearchInput" type="search" enterkeyhint="search" class="flex-1 min-w-[220px] border-2 border-slate-400 rounded-md px-4 py-3 text-lg" placeholder="調べたい言葉を入れてください" />
+                  <button type="submit" class="px-6 py-3 rounded-md bg-blue-900 text-white text-lg font-bold shrink-0"><i class="fa-solid fa-magnifying-glass mr-2"></i>検索</button>
                 </form>
-                <p id="allSearchMeta" class="text-xs text-slate-500 mt-2"></p>
+                <div class="mt-4 rounded-md bg-amber-50 border border-amber-200 p-4 text-base text-slate-800 leading-relaxed">
+                  <p class="font-bold mb-2"><i class="fa-solid fa-circle-info mr-1"></i>検索のしかた</p>
+                  <ul class="space-y-3">
+                    <li>
+                      <span class="font-bold">言葉を1つ入れる</span>　→　その言葉が入っているものを探します。
+                      <div class="mt-1"><button type="button" class="all-search-example px-3 py-1 rounded-full border border-blue-700 text-blue-800 bg-white" data-q="火災保険">例：火災保険</button></div>
+                    </li>
+                    <li>
+                      <span class="font-bold">言葉と言葉の間にスペース（空白）を入れる</span>　→　<span class="underline">全部の言葉</span>が入っているものだけ探します（絞り込み）。
+                      <div class="mt-1"><button type="button" class="all-search-example px-3 py-1 rounded-full border border-blue-700 text-blue-800 bg-white" data-q="原状回復 費用">例：原状回復 費用</button></div>
+                    </li>
+                    <li>
+                      <span class="font-bold">言葉と言葉の間に「または」を入れる</span>　→　<span class="underline">どれか1つでも</span>入っているものを探します（広く探す）。「または」の前後にはスペースを入れてください。
+                      <div class="mt-1"><button type="button" class="all-search-example px-3 py-1 rounded-full border border-blue-700 text-blue-800 bg-white" data-q="敷金 または 保証金">例：敷金 または 保証金</button></div>
+                    </li>
+                  </ul>
+                  <p class="mt-3 text-sm text-slate-600">ひらがな・カタカナ・漢字は区別します（「しききん」では「敷金」は見つかりません）。英数字の全角・半角、大文字・小文字は区別しません。例のボタンを押すと、その言葉で検索します。</p>
+                </div>
+                <p id="allSearchMeta" class="text-base text-slate-700 mt-4" role="status" aria-live="polite"></p>
               </div>
-              <div id="allSearchResults" class="space-y-3"></div>
+              <div id="allSearchResults" class="space-y-4"></div>
             </div>
           </section>
 

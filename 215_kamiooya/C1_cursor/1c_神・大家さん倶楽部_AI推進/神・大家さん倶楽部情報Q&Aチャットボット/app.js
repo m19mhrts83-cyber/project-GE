@@ -174,7 +174,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', keyword_all: 'まとめてキーワード検索' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', keyword_all: 'キーワード検索（全データ）' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -504,6 +504,15 @@ const App = {
     }
     if (App.elements.allSearchResults) {
       App.elements.allSearchResults.addEventListener('click', App.onAllSearchResultClick);
+    }
+    const allSearchBox = document.getElementById('allSearchBox');
+    if (allSearchBox) {
+      allSearchBox.addEventListener('click', function (ev) {
+        const ex = ev.target && ev.target.closest ? ev.target.closest('.all-search-example') : null;
+        if (!ex || !App.elements.allSearchInput) return;
+        App.elements.allSearchInput.value = ex.getAttribute('data-q') || '';
+        void App.runAllSearch();
+      });
     }
     document.querySelectorAll('.screen-tab').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -1471,7 +1480,7 @@ const App = {
       lessons: 'westudy 講座ページ説明文',
       knowledge: 'westudy 動画文字起こし',
       openchat: 'LINEオプチャ',
-      allSearch: 'まとめて検索',
+      allSearch: 'キーワード検索（全データ）',
       adminUsers: 'ユーザ承認',
       adminUserList: 'ユーザ一覧',
       adminAdminList: '管理者一覧',
@@ -4401,7 +4410,7 @@ const App = {
     }
   },
 
-  // まとめてキーワード検索（11/11 松野さん）。コミュニティ・講座ページ・動画文字起こし・LINEオプチャを
+  // キーワード検索（全データ）（11/11 松野さん）。年配の方も使う前提で、説明と例を画面に出し、文字は大きめ。コミュニティ・講座ページ・動画文字起こし・LINEオプチャを
   // 1つの入力欄から同時にキーワードで探し、データソースごとに並べる。AI は呼ばない（費用は増えない）。
   // スイッチ keyword_all が見える人だけ。中身は各一覧と同じデータ（会員が一覧で見られるもの）だけ。
   allSearchPerGroup: 20,
@@ -4410,19 +4419,32 @@ const App = {
     const t = String(v == null ? '' : v);
     return (typeof t.normalize === 'function' ? t.normalize('NFKC') : t).toLowerCase();
   },
-  // 空白（全角も）で区切った語をすべて含むものを当たりにする（AND）。同じ語は1回だけ。
+  // 書き方: 空白（全角も）で区切る → すべての語を含むもの（AND）。
+  // 「または」「OR」「|」で区切る → どれかを含むもの（OR）。例「敷金 または 保証金」「原状回復 費用 または 退去 費用」。
+  allSearchOrPattern: /\s+(?:または|or)\s+|\s*\|\s*/,
+  allSearchQuery: (q) => {
+    return App.allSearchNormalize(q).trim().split(App.allSearchOrPattern).map(function (part) {
+      const seen = {};
+      return part.split(/\s+/).map(function (x) { return x.trim(); }).filter(function (x) {
+        if (!x || x === 'または' || x === 'or' || seen[x]) return false;
+        seen[x] = true;
+        return true;
+      }).slice(0, 8);
+    }).filter(function (g) { return g.length; }).slice(0, 5);
+  },
+  // 印を付ける語（全部の語を1回ずつ）
   allSearchTerms: (q) => {
     const seen = {};
-    return App.allSearchNormalize(q).split(/\s+/).map(function (x) { return x.trim(); }).filter(function (x) {
-      if (!x || seen[x]) return false;
-      seen[x] = true;
-      return true;
-    }).slice(0, 8);
+    const out = [];
+    App.allSearchQuery(q).forEach(function (g) { g.forEach(function (t) { if (!seen[t]) { seen[t] = true; out.push(t); } }); });
+    return out;
   },
+  // terms は語の並び（AND）か、語の並びの並び（OR でつないだ AND）
   allSearchMatches: (parts, terms) => {
     if (!terms || !terms.length) return false;
     const hay = App.allSearchNormalize((parts || []).map(function (x) { return x == null ? '' : String(x); }).join(' \n '));
-    return terms.every(function (t) { return hay.indexOf(t) !== -1; });
+    const groups = Array.isArray(terms[0]) ? terms : [terms];
+    return groups.some(function (g) { return g.length && g.every(function (t) { return hay.indexOf(t) !== -1; }); });
   },
   // 最初に当たった語のまわりを切り出し、当たった語に印を付ける（HTML は全部エスケープしてから）。
   allSearchSnippetHtml: (text, terms, width) => {
@@ -4495,9 +4517,25 @@ const App = {
   },
   // LINEオプチャは一覧と同じくサーバーで探す（全件を画面に持たないため）。サーバーには一番長い語を渡し、
   // 残りの語は戻ってきた中で絞る。サーバーは新しい順に最大200件までなので、件数は「200件以上」と出す。
-  allSearchOpenchat: async (terms) => {
+  allSearchOpenchat: async (query) => {
     const cfg = await App.resolveSemanticConfig();
-    const first = terms.slice().sort(function (a, b) { return b.length - a.length; })[0];
+    const lists = await Promise.all(query.map(function (g) { return App.allSearchOpenchatOne(cfg, g.slice().sort(function (a, b) { return b.length - a.length; })[0]); }));
+    const seen = {};
+    const rows = [];
+    let capped = false;
+    lists.forEach(function (list) {
+      if (list.length >= 200) capped = true;
+      list.forEach(function (r) {
+        const id = String(r.id || '');
+        if (seen[id] || !App.allSearchMatches([r.content, r.chat_title, r.sender_name, r.thread_title], query)) return;
+        seen[id] = true;
+        rows.push(r);
+      });
+    });
+    rows.sort(function (a, b) { return String(b.posted_at || '').localeCompare(String(a.posted_at || '')); });
+    return { rows: rows, total: rows.length, capped: capped };
+  },
+  allSearchOpenchatOne: async (cfg, first) => {
     const response = await fetch(cfg.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Semantic-Shared-Secret': cfg.secret },
@@ -4513,11 +4551,7 @@ const App = {
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
     if (!response.ok) throw new Error(data.errorMessage || data.message || data.error || 'LINEオプチャの検索に失敗しました');
-    const list = App.normalizeRelatedList(data.relatedOpenchat || []);
-    const rows = list.filter(function (r) {
-      return App.allSearchMatches([r.content, r.chat_title, r.sender_name, r.thread_title], terms);
-    });
-    return { rows: rows, total: rows.length, capped: list.length >= 200 };
+    return App.normalizeRelatedList(data.relatedOpenchat || []);
   },
   runAllSearch: async () => {
     if (!App.featureOn('keyword_all')) return;
@@ -4526,9 +4560,10 @@ const App = {
     const box = App.elements.allSearchResults;
     if (!input || !box) return;
     const q = String(input.value || '').trim();
+    const query = App.allSearchQuery(q);
     const terms = App.allSearchTerms(q);
-    if (!terms.length) {
-      if (meta) meta.textContent = 'キーワードを入れてください（空白で区切ると、すべての語を含むものだけ出します）。';
+    if (!query.length) {
+      if (meta) meta.textContent = '調べたい言葉を入れてから「検索」を押してください。';
       box.innerHTML = '';
       return;
     }
@@ -4537,12 +4572,12 @@ const App = {
     const current = function () { return App.state.allSearchSeq === seq; };
     if (meta) meta.textContent = '検索中…（初回はデータの読み込みに少し時間がかかります）';
     box.innerHTML = '';
-    const ocTask = App.allSearchOpenchat(terms).then(function (r) { return r; }, function (e) { return { error: (e && e.message) || String(e) }; });
+    const ocTask = App.allSearchOpenchat(query).then(function (r) { return r; }, function (e) { return { error: (e && e.message) || String(e) }; });
     const local = await Promise.all([App.ensureReferenceData('comments'), App.ensureReferenceData('knowledge')])
-      .then(function () { return App.allSearchLocalGroups(terms); }, function (e) { return { error: (e && e.message) || String(e) }; });
+      .then(function () { return App.allSearchLocalGroups(query); }, function (e) { return { error: (e && e.message) || String(e) }; });
     if (!current()) return;
     const groups = local.error ? { comments: local, lessons: local, knowledge: local } : local;
-    App.state.allSearchResult = { terms: terms, query: q, groups: groups, openchat: null, expanded: {} };
+    App.state.allSearchResult = { terms: terms, query: query, groups: groups, openchat: null, expanded: {} };
     App.renderAllSearchResults();
     const oc = await ocTask;
     if (!current()) return;
@@ -4583,9 +4618,9 @@ const App = {
       body = App.cleanOpenchatDisplayText(row.content);
       attrs = 'data-kind="openchat" data-id="' + esc(String(row.id || '')) + '"';
     }
-    return '<li><button type="button" class="all-search-item w-full text-left p-2 rounded hover:bg-slate-50 border-t" ' + attrs + '>' +
-      '<div class="text-xs text-slate-500">' + esc(head) + '</div>' +
-      '<div class="text-sm text-slate-800">' + App.allSearchSnippetHtml(body, terms) + '</div></button></li>';
+    return '<li><button type="button" class="all-search-item w-full text-left px-3 py-3 hover:bg-blue-50 border-t" ' + attrs + '>' +
+      '<div class="text-sm text-slate-600">' + esc(head) + '</div>' +
+      '<div class="text-base leading-relaxed text-slate-900">' + App.allSearchSnippetHtml(body, terms) + '</div></button></li>';
   },
   renderAllSearchResults: () => {
     const res = App.state.allSearchResult;
@@ -4607,20 +4642,23 @@ const App = {
         const shown = res.expanded[def.key] ? g.rows.length : Math.min(App.allSearchPerGroup, g.rows.length);
         list = g.rows.length
           ? '<ul>' + g.rows.slice(0, shown).map(function (r) { return App.allSearchItemHtml(def.key, r, res.terms); }).join('') + '</ul>' +
-            (shown < g.rows.length ? '<button type="button" class="all-search-more text-sm text-blue-700 hover:underline p-2" data-group="' + def.key + '">さらに表示（' + (g.rows.length - shown) + '件）</button>' : '') +
-            (g.total > g.rows.length ? '<p class="text-xs text-slate-500 p-2">多いため先頭' + g.rows.length + '件まで。語を足して絞り込んでください。</p>' : '')
-          : '<p class="text-sm text-slate-500 p-2">見つかりませんでした。</p>';
+            (shown < g.rows.length ? '<button type="button" class="all-search-more m-3 px-4 py-2 rounded border border-blue-700 text-blue-800 text-base" data-group="' + def.key + '">続きを表示（あと' + (g.rows.length - shown) + '件）</button>' : '') +
+            (g.total > g.rows.length ? '<p class="text-sm text-slate-600 px-3 pb-3">数が多いので、最初の' + g.rows.length + '件だけ出しています。言葉を足すと絞り込めます。</p>' : '')
+          : '<p class="text-base text-slate-600 px-3 py-3">見つかりませんでした。</p>';
       }
       return '<section class="bg-white rounded border">' +
-        '<div class="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 rounded-t">' +
-        '<h4 class="font-semibold text-sm">' + esc(def.label) + ' <span class="text-slate-500 font-normal">' + esc(count) + '</span></h4>' +
-        '<button type="button" class="all-search-open text-xs text-blue-700 hover:underline shrink-0" data-screen-to="' + def.screen + '">一覧で開く</button>' +
+        '<div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-100 rounded-t">' +
+        '<h4 class="font-bold text-base">' + esc(def.label) + ' <span class="text-blue-900">' + esc(count) + '</span></h4>' +
+        '<button type="button" class="all-search-open text-sm text-blue-700 underline shrink-0" data-screen-to="' + def.screen + '">この一覧を開く</button>' +
         '</div>' + list + '</section>';
     });
     box.innerHTML = parts.join('');
     if (App.elements.allSearchMeta) {
       const pending = !res.openchat;
-      App.elements.allSearchMeta.textContent = '「' + res.terms.join('」「') + '」を含むもの ' + sum + '件' + (pending ? '（LINEオプチャは検索中）' : '') + '。行を押すと元の一覧で開きます。';
+      const how = res.query.length > 1 && res.query.every(function (g) { return g.length === 1; })
+        ? '「' + res.query.map(function (g) { return g[0]; }).join('」「') + '」のどれかを含む'
+        : res.query.map(function (g) { return '「' + g.join('」と「') + '」' + (g.length > 1 ? 'をすべて含む' : 'を含む'); }).join('もの、または');
+      App.elements.allSearchMeta.textContent = how + 'もの：' + sum + '件' + (pending ? '（LINEオプチャはまだ探しています）' : '') + '。気になる行を押すと、元の一覧で開きます。';
     }
   },
   onAllSearchResultClick: (ev) => {
@@ -4636,7 +4674,7 @@ const App = {
     if (open && App.state.allSearchResult) {
       // 各一覧の検索欄に入るのは1語だけ（一覧の検索は語を区切らない）。一番長い語を入れて開く。
       const screen = open.getAttribute('data-screen-to');
-      const word = App.state.allSearchResult.terms.slice().sort(function (a, b) { return b.length - a.length; })[0] || '';
+      const word = (App.state.allSearchResult.query[0] || []).slice().sort(function (a, b) { return b.length - a.length; })[0] || '';
       const inputId = { comments: 'commentSearchInput', knowledge: 'knowledgeSearchInput', lessons: 'lessonSearchInput', openchat: 'openchatSearchInput' }[screen];
       const el = App.elements[inputId];
       if (el) el.value = word;

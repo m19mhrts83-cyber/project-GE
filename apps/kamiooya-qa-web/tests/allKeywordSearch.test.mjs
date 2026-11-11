@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-// まとめてキーワード検索（keyword_all）: 4つのデータソースを1つの入力欄からキーワードで探す（AIは使わない）
+// キーワード検索（全データ）（keyword_all）: 4つのデータソースを1つの入力欄からキーワードで探す（AIは使わない）
 function load() {
   const els = {};
   const document = { getElementById: id => els[id] || null, addEventListener() {}, createElement: () => ({}), querySelectorAll: () => [] };
@@ -25,6 +25,22 @@ test('すべての語を含むものだけ当たる（AND）', () => {
   assert.equal(app.allSearchMatches(['原状回復だけ', '費用は別の欄'], terms), true);
   assert.equal(app.allSearchMatches(['原状回復だけ'], terms), false);
   assert.equal(app.allSearchMatches(['何でも'], []), false);
+});
+
+test('「または」「OR」「|」で区切るとどれかを含むもの（OR）。空白は AND のまま', () => {
+  const { app } = load();
+  const q = app.allSearchQuery('敷金 または 保証金');
+  assert.deepEqual(JSON.parse(JSON.stringify(q)), [['敷金'], ['保証金']]);
+  assert.deepEqual(JSON.parse(JSON.stringify(app.allSearchQuery('原状回復 費用 OR 退去 費用'))), [['原状回復', '費用'], ['退去', '費用']]);
+  assert.deepEqual(JSON.parse(JSON.stringify(app.allSearchQuery('敷金｜保証金'))), [['敷金'], ['保証金']]);
+  assert.deepEqual(Array.from(app.allSearchTerms('原状回復 費用 または 退去 費用')), ['原状回復', '費用', '退去']);
+  assert.equal(app.allSearchMatches(['保証金の返還'], q), true);
+  assert.equal(app.allSearchMatches(['礼金'], q), false);
+  const q2 = app.allSearchQuery('原状回復 費用 または 退去 費用');
+  assert.equal(app.allSearchMatches(['退去時の費用'], q2), true);
+  assert.equal(app.allSearchMatches(['退去だけ'], q2), false);
+  // 「または」だけ・前後に語がないときは空
+  assert.deepEqual(JSON.parse(JSON.stringify(app.allSearchQuery(' または '))), []);
 });
 
 test('抜粋は当たった語のまわりを切り出し、印を付け、HTML はエスケープする', () => {
