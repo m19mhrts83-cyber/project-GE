@@ -85,6 +85,10 @@ jobs:
       WESTUDY_LOGIN_NAV_RETRIES: "5"
       WESTUDY_PAGE_GET_RETRIES: "4"
       WESTUDY_LOGIN_FORM_ATTEMPTS: "5"
+      # 講座動画の新着を毎日見るか（リポジトリ変数 KAMIOOYA_LESSON_DAILY=on で有効。未設定は従来どおり週次のみ）。
+      # on のとき月〜土もコース目次だけ見て、新しい lesson の説明を足す。動画の文字起こしは Mac の
+      # kamiooya_video_weekly.py（毎日 12:00、平日は新着だけ）が続けて行う。
+      KAMIOOYA_LESSON_DAILY: ${{ vars.KAMIOOYA_LESSON_DAILY || 'off' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -179,8 +183,14 @@ jobs:
             utc_weekday="$(date -u +%u)"
             if [[ "$schedule_expr" == "0 23 * * 0-5" ]] || \
                [[ "$schedule_expr" == "0 5 * * *" && "$utc_weekday" != "7" ]]; then
-              sync_mode="daily-comments"
-              export WESTUDY_SKIP_LESSONS=1
+              if [[ "$KAMIOOYA_LESSON_DAILY" == "on" ]]; then
+                # 毎日: コメント＋講座の新着 lesson だけ（既存 lesson の更新・削除は日曜のフルで拾う）
+                sync_mode="daily-comments+new-lessons"
+                export WESTUDY_LESSON_MODE=new
+              else
+                sync_mode="daily-comments"
+                export WESTUDY_SKIP_LESSONS=1
+              fi
             fi
           fi
           echo "WESTUDY_SYNC_MODE=$sync_mode" >> "$GITHUB_ENV"
@@ -243,6 +253,7 @@ jobs:
           upload_note="n/a"
           supabase_note="n/a"
           emb_note="n/a"
+          lesson_note="n/a"
           health_note="n/a"
           latest_log=""
           shopt -s nullglob
@@ -260,6 +271,9 @@ jobs:
               supabase_note="skipped (env missing)"
             elif rg -q "Supabase取込失敗" "$latest_log" 2>/dev/null; then
               supabase_note="failed (ログ参照)"
+            fi
+            if rg -q "^LESSON_DELTA_ROWS=" "$latest_log" 2>/dev/null; then
+              lesson_note="$(rg "^LESSON_DELTA_ROWS=" "$latest_log" | tail -n 1 | cut -d= -f2) 件"
             fi
             if rg -q "^emb未付与:" "$latest_log" 2>/dev/null; then
               emb_note="$(rg "^emb未付与:" "$latest_log" | head -n 1)"
@@ -296,6 +310,7 @@ jobs:
               echo "- raimo: \`$upload_note\`"
               echo "- emb: \`$emb_note\`"
             fi
+            echo "- lesson（講座の新着・更新）: \`$lesson_note\`"
             if [[ -n "$latest_log" ]]; then
               echo "- log: \`$latest_log\`"
             fi

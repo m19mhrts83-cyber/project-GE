@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""神大家0〜4の講座動画を週次で差分取込する（Mac launchd・日曜12:00。AI 使用料ゼロ）。
+"""神大家0〜4の講座動画を差分取込する（Mac launchd・毎日12:00。AI 使用料ゼロ）。
 
-日曜 08:00 の GHA（westudy-raimo-weekly）でレッスン説明文が更新された後に動く。
+08:00 の GHA（westudy-raimo-weekly）でレッスン説明文が更新された後に動く。
+  - 日曜（weekly）: 下の 1〜6 をすべて行う（従来の週次）。
+  - 月〜土（daily）: 1 の字幕取得で「まだ取り込んでいない動画つきレッスン」が見つかったコースだけ 2・3・5 を行う。
+    無ければ何もせず終わる（WeStudy にもログインしない）。新着が入ったときだけ #ops に通知。
+    GHA 側はリポジトリ変数 KAMIOOYA_LESSON_DAILY=on のとき月〜土も新着レッスンを足す（off なら平日は空振り）。
   1. 新しいレッスンの Vimeo 自動字幕を取得（jarvis_westudy_course_vtt_batch.py）
   2. 字幕のない動画をローカル Whisper で文字起こし（Notta版がある動画は飛ばす）
   3. Supabase・Raimo へ差分登録（補正表で誤記を直してから入れる）
@@ -13,7 +17,8 @@
 
 例:
   ~/selenium_env/venv/bin/python scripts/kamiooya_video_weekly.py --dry-run   # 登録しない
-  ~/selenium_env/venv/bin/python scripts/kamiooya_video_weekly.py --post      # 本番（launchd と同じ）
+  ~/selenium_env/venv/bin/python scripts/kamiooya_video_weekly.py --post      # 本番（launchd と同じ。曜日で自動）
+  ~/selenium_env/venv/bin/python scripts/kamiooya_video_weekly.py --mode daily --dry-run   # 平日の動きを試す
 """
 
 from __future__ import annotations
@@ -69,11 +74,37 @@ def import_cmd(manifest: Path, course: str, input_dir: Path, graph_root: str, ap
     return cmd + (["--apply", "--embed", "--mirror-raimo"] if apply else [])
 
 
-def build_message(day: str, totals: dict, notta: dict, steps: list[dict], typo: Path | None, report: Path) -> str:
+PENDING_STATUSES = {"vtt_ready", "no_subtitles"}  # 動画つきで、まだ取り込んでいないレッスン
+
+
+def resolve_mode(mode: str, now: datetime) -> str:
+    """auto は日曜（JST）なら weekly、それ以外は daily。"""
+    if mode != "auto":
+        return mode
+    return "weekly" if now.weekday() == 6 else "daily"
+
+
+def pending_lessons(manifest: Path) -> list[dict]:
+    """字幕取得の status JSON から、動画つきで未取込のレッスンを返す（取込済みは batch 側で除外済み）。"""
+    if not manifest.exists():
+        return []
+    try:
+        lessons = json.loads(manifest.read_text(encoding="utf-8")).get("lessons") or []
+    except json.JSONDecodeError:
+        return []
+    return [L for L in lessons if L.get("status") in PENDING_STATUSES]
+
+
+def build_message(day: str, totals: dict, notta: dict, steps: list[dict], typo: Path | None, report: Path,
+                  mode: str = "weekly", new_titles: list[str] | None = None) -> str:
     ng = [s for s in steps if not s["ok"]]
-    lines = [f"神大家 動画の週次取込（{day}）",
-             f"・新規登録: {totals['videos']}動画 / {totals['chunks']}チャンク（Whisper {totals['whisper_videos']}本）",
-             f"・Notta差し替え: {notta.get('replaced', 0)}本、新規 {notta.get('new', 0)}本、要確認 {len(notta.get('hold') or [])}件"]
+    head = "神大家 動画の新着取込" if mode == "daily" else "神大家 動画の週次取込"
+    lines = [f"{head}（{day}）",
+             f"・新規登録: {totals['videos']}動画 / {totals['chunks']}チャンク（Whisper {totals['whisper_videos']}本）"]
+    if new_titles:
+        lines.append("・新しいレッスン: " + "、".join(new_titles[:5]) + (f" ほか{len(new_titles) - 5}件" if len(new_titles) > 5 else ""))
+    if mode != "daily":
+        lines.append(f"・Notta差し替え: {notta.get('replaced', 0)}本、新規 {notta.get('new', 0)}本、要確認 {len(notta.get('hold') or [])}件")
     if typo:
         lines.append(f"・誤記候補: {typo.name}（確認後に補正表へ追加）")
     if ng:
@@ -87,10 +118,13 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="字幕取得・Whisperまでは行い、登録はしない")
     ap.add_argument("--post", action="store_true", help="#ops へ通知")
     ap.add_argument("--course", action="append", help="対象コース（未指定は0〜4すべて）")
+    ap.add_argument("--mode", choices=["auto", "weekly", "daily"], default="auto",
+                    help="auto=日曜は weekly・それ以外は daily（新着があるコースだけ）")
     args = ap.parse_args()
     apply = not args.dry_run
     courses = args.course or COURSES
     now = datetime.now(JST)
+    mode = resolve_mode(args.mode, now)
     day = now.strftime("%Y%m%d")
     STATE.mkdir(parents=True, exist_ok=True)
     (STATE / "logs").mkdir(exist_ok=True)
@@ -108,7 +142,19 @@ def main() -> int:
 
         jobs = [(STATE / f"{batch.course_code(c)}_status.json", c, batch.course_dir(c), batch.graph_root(c))
                 for c in courses]
-        if "神大家1.基礎" in courses:  # 基礎の字幕なし動画（旧フォルダ）も Whisper で埋める
+        new_titles: list[str] = []
+        if mode == "daily":
+            # 平日は新着のあるコースだけ。基礎の旧フォルダ・Notta は日曜の週次に任せる
+            jobs = [j for j in jobs if pending_lessons(j[0])]
+            new_titles = [L.get("title") or L.get("slug", "") for j in jobs for L in pending_lessons(j[0])]
+            if not jobs and all(s["ok"] for s in steps):
+                print(f"daily: 新着の動画レッスンなし（{now:%m/%d}）")
+                (STATE / "last_run.json").write_text(json.dumps(
+                    {"at": now.isoformat(timespec="seconds"), "mode": mode, "apply": apply, "new_lessons": 0,
+                     "totals": totals, "steps": steps}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                return 0
+            print(f"daily: 新着 {len(new_titles)} レッスン → {', '.join(j[1] for j in jobs)}", file=log, flush=True)
+        elif "神大家1.基礎" in courses:  # 基礎の字幕なし動画（旧フォルダ）も Whisper で埋める
             jobs.append((KISO_MANIFEST, "神大家1.基礎", KISO_DIR, KISO_ROOT))
         for manifest, course, src, root in jobs:
             if not manifest.exists():
@@ -136,11 +182,13 @@ def main() -> int:
                     totals["whisper_videos"] += vids if is_whisper else 0
                     manifests.append(m)
 
-        # 4. Notta 差し替え
-        notta_report = STATE / f"notta_{day}.json"
-        cmd = [py, QA_SCRIPTS / "notta_weekly_replace.py", "--report", notta_report] + (["--apply"] if apply else [])
-        run("Notta差し替え", cmd, log, steps)
-        notta = json.loads(notta_report.read_text(encoding="utf-8")) if notta_report.exists() else {}
+        # 4. Notta 差し替え（日曜の週次だけ）
+        notta: dict = {}
+        if mode == "weekly":
+            notta_report = STATE / f"notta_{day}.json"
+            cmd = [py, QA_SCRIPTS / "notta_weekly_replace.py", "--report", notta_report] + (["--apply"] if apply else [])
+            run("Notta差し替え", cmd, log, steps)
+            notta = json.loads(notta_report.read_text(encoding="utf-8")) if notta_report.exists() else {}
 
         # 5. 誤記候補（新しく入った分だけ）
         typo = None
@@ -157,15 +205,15 @@ def main() -> int:
     # 6. レポート・通知
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     report = REPORT_DIR / f"動画取込_{day}.md"
-    msg = build_message(now.strftime("%m/%d"), totals, notta, steps, typo, report)
+    msg = build_message(now.strftime("%m/%d"), totals, notta, steps, typo, report, mode=mode, new_titles=new_titles)
     body = [f"# {msg.splitlines()[0]}", "", *msg.splitlines()[1:], "", "## ステップ", ""]
     body += [f"- {'✅' if s['ok'] else '❌'} {s['step']}（{s['sec']}秒）{' ' + ' '.join(s['tail']) if s['tail'] else ''}" for s in steps]
     if notta.get("hold"):
         body += ["", "## Notta 要確認", ""] + [f"- {h['file']}: {h.get('why', '')}" for h in notta["hold"]]
     body += ["", f"モード: {'本番' if apply else 'dry-run（登録なし）'}", f"ログ: {STATE / 'logs' / (day + '.log')}"]
     report.write_text("\n".join(body) + "\n", encoding="utf-8")
-    (STATE / "last_run.json").write_text(json.dumps({"at": now.isoformat(timespec="seconds"), "apply": apply,
-                                                     "totals": totals, "steps": steps}, ensure_ascii=False, indent=2) + "\n",
+    (STATE / "last_run.json").write_text(json.dumps({"at": now.isoformat(timespec="seconds"), "mode": mode, "apply": apply,
+                                                     "new_lessons": len(new_titles), "totals": totals, "steps": steps}, ensure_ascii=False, indent=2) + "\n",
                                          encoding="utf-8")
     print(msg)
     changed = totals["videos"] or notta.get("replaced") or notta.get("new") or notta.get("hold") or any(not s["ok"] for s in steps)
