@@ -60,10 +60,10 @@ export type ChatTurn = { question: string; answer: string };
 // 直前のやり取りは最大3往復・質問500字・回答1500字まで（プロンプトの膨張を防ぐ）。
 export function normalizeHistory(value: unknown): ChatTurn[] {
   if (!Array.isArray(value)) return [];
-  return value.slice(-3).map((t) => ({
+  return value.map((t) => ({
     question: asString((t as Record<string, unknown>)?.question).trim().slice(0, 500),
     answer: asString((t as Record<string, unknown>)?.answer).trim().slice(0, 1500),
-  })).filter((t) => t.question);
+  })).filter((t) => t.question).slice(-3);
 }
 
 // 検索（意味検索のベクトル）に使う文。「また詳しく」のような短い続きの質問でも、前の質問のテーマで探す。
