@@ -295,6 +295,63 @@ def heartbeat_age_sec(watch: dict[str, Any]) -> float | None:
         return None
 
 
+def _parse_dt(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=JST)
+    return dt.astimezone(JST)
+
+
+def resume_marker_time(marker: Path) -> datetime | None:
+    """マーカー先頭の「YYYY-MM-DD HH:MM:SS +0900」を読む。読めなければ更新時刻。"""
+    try:
+        text = marker.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    m = re.match(r"\s*(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) ([+-]\d{2})(\d{2})", text)
+    if m:
+        dt = _parse_dt(f"{m.group(1)}T{m.group(2)}{m.group(3)}:{m.group(4)}")
+        if dt:
+            return dt
+    try:
+        return datetime.fromtimestamp(marker.stat().st_mtime, tz=JST)
+    except OSError:
+        return None
+
+
+def evaluate_resume_marker(
+    marker: Path,
+    watch: dict[str, Any],
+    hb_age: float | None,
+) -> tuple[str, str | None]:
+    """resume 失敗マーカーの判定。(level, note)。マーカーが無ければ ("ok", None)。
+
+    マーカーは同期 runner が resume を確認できたときにしか消さない。QR 再ログインや手動の
+    再起動で監視が戻っても次の同期まで残るため、監視が running・heartbeat が新しい・
+    マーカーより後に起動している場合は「復帰済み」として info に下げる。
+    """
+    if not marker.is_file():
+        return "ok", None
+    failed_at = resume_marker_time(marker)
+    started_at = _parse_dt(watch.get("started_at"))
+    recovered = (
+        str(watch.get("state") or "") == "running"
+        and hb_age is not None
+        and hb_age <= 180
+        and failed_at is not None
+        and started_at is not None
+        and started_at > failed_at
+    )
+    if recovered:
+        return "info", f"前回 {failed_at:%Y-%m-%d %H:%M} に再開失敗 → いまは復帰済み"
+    return "attention", "バッチのresume失敗マーカーあり（トークン失効/QR要）"
+
+
 def evaluate_main_freshness(
     routes: list[dict[str, Any]],
     watch: dict[str, Any],
@@ -782,9 +839,11 @@ def build_report(
         watch_level = "attention"
         watch_notes.append(f"書込エラー: {err[:120]}")
     # 前回バッチの resume 失敗（pause したまま戻せなかった）痕跡
-    if WATCH_RESUME_FAILED.is_file():
-        watch_level = "attention"
-        watch_notes.append("バッチのresume失敗マーカーあり（トークン失効/QR要）")
+    marker_level, marker_note = evaluate_resume_marker(WATCH_RESUME_FAILED, watch, hb_age)
+    if marker_note:
+        watch_notes.append(marker_note)
+        if level_rank.get(marker_level, 9) < level_rank.get(watch_level, 9):
+            watch_level = marker_level
 
     if level_rank.get(watch_level, 9) < level_rank.get(worst, 9):
         worst = watch_level
