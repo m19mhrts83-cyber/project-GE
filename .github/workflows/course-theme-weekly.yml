@@ -1,0 +1,33 @@
+# (4) 質問ランキング＋講座テーマ案の週次の回（2026-11-11）。
+# - DB 関数 qa_theme_source_digest で DB の中で集計した小さな材料だけを読む（通信量 百KB前後）
+# - 過去の「採用／直して採用／不採用＋理由」を読んで Gemini で案を作り、qa_theme_rounds に入れる
+# - 見るのは Q&A の運営分析（段階公開スイッチ ranking_themes）。ログには件数だけ出す
+name: course-theme weekly
+
+on:
+  schedule:
+    - cron: "0 21 * * 0" # 毎週月曜 6:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: course-theme-weekly
+  cancel-in-progress: false
+
+jobs:
+  round:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Make this week's round
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scripts/course_theme/weekly_round.py

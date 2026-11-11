@@ -5,6 +5,7 @@ import {feedbackMetaColumns, type AnswerMeta} from './answerMeta.ts';
 import {publicChangeLog} from './changeLog.ts';
 import {parseSourceClick, sourceClickRow, summarizeSourceClicks} from './sourceClicks.ts';
 import {matchPending} from './rosterMatch.ts';
+import {parseThemeDecision, shapeRound, decisionRow} from './rankingThemes.ts';
 // Shared gateway: the production adapter supplies persistent sessions and live membership checks.
 type Member = { id: string; email: string; role: string; status: string; authVersion: string; name?: string; member_no?: string; prefecture?: string };
 type Session = { uid: string; authVersion: string; expires: number };
@@ -32,6 +33,10 @@ export type GatewayDependencies = {
   listFeedback?(): Promise<unknown[]>;
   saveSourceClick?(row: Record<string, unknown>): Promise<void>;
   listSourceClicks?(): Promise<unknown[]>;
+  // (4) 質問ランキング＋講座テーマ案（qa_theme_rounds / qa_theme_decisions）。
+  themeRounds?(limit: number): Promise<unknown[]>;
+  themeDecisions?(roundIds: string[]): Promise<unknown[]>;
+  saveThemeDecision?(row: Record<string, unknown>): Promise<void>;
   now?: () => number;
 };
 const approved = (u: Member | null): u is Member => !!u && u.status === 'approved' && ['user', 'admin', 'master_admin'].includes(u.role) && !!u.authVersion;
@@ -181,6 +186,25 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         const [pending,meta]=await Promise.all([d.forward('GET','/admin/users/pending',{actor_user_id:user.id,actor_email:user.email}) as Promise<any>,roster.meta()]);
         const users=Array.isArray(pending?.users)?pending.users.map((u:any)=>({id:String(u.id),member_no:u.member_no,name:u.name})):[];
         return json({matches:await matchPending(users,h=>roster.has(h)),roster_count:meta.row_count??null,synced_at:meta.synced_at??null});
+      }
+      // (4) 質問ランキング＋講座テーマ案（運営分析）。管理者で、かつスイッチ ranking_themes で見える人だけ。
+      if((path==='/admin/ranking-themes/list'||path==='/admin/ranking-themes/decide') && req.method==='POST'){
+        let flags:FeatureFlag[]=[];
+        try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
+        requireFeature(Array.isArray(flags)?flags:[],'ranking_themes',{id:user.id,email:user.email});
+        if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
+        if(!d.themeRounds||!d.themeDecisions||!d.saveThemeDecision)return json({error:'feature_not_available'},404);
+        if(path==='/admin/ranking-themes/decide'){
+          const t=parseThemeDecision(input);
+          const round=(await d.themeRounds(10) as any[]).find(r=>r&&r.id===t.round_id);
+          if(!round||!(Array.isArray(round.themes)?round.themes:[]).some((x:any)=>String(x?.id)===t.theme_id))return json({error:'invalid_request'},400);
+          await d.saveThemeDecision(decisionRow(user.id,t));
+          return json({ok:true});
+        }
+        const rounds=(await d.themeRounds(5) as any[]).filter(r=>r&&typeof r.id==='string');
+        const decisions=rounds.length?await d.themeDecisions(rounds.map(r=>r.id)) as any[]:[];
+        return json({latest:rounds[0]?shapeRound(rounds[0],decisions):null,
+          history:rounds.slice(1).map(r=>{const s=shapeRound(r,decisions);return {id:s.id,created_at:s.created_at,themes:s.themes.map(x=>({id:x.id,title:x.title,decision:x.decision}))};})});
       }
       if(path==='/admin/answer-feedback/list' && req.method==='POST'){
         let flags:FeatureFlag[]=[];
