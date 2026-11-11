@@ -32,6 +32,9 @@ export const SURFACES = [
   "rule_review", // ルール候補の採用・取り消し
   "draft_review", // チャットで作った下書きの版直し（松野さんの直し・ひとこと。scripts/jarvis_draft_decision_log.py）
   "weekly_pick", // 日曜夜の「今週の9件」（選んだ／見送った／残った理由／確定。scripts/jarvis_todoist_weekly_pick.py が反映）
+  "slide_plan", // 資料：作る前の選択（構成案・観点）
+  "slide_fix", // 資料：作った後の直し（直す前と後）
+  "slide_rule", // 資料：次回反映案の採否
 ] as const;
 export type Surface = (typeof SURFACES)[number];
 
@@ -224,6 +227,23 @@ export const LEFT_REASON_TAGS = {
   ai_dev: "AI開発に時間を使った",
 } as const;
 
+/** 資料：選ばなかった案の理由 */
+export const SLIDE_PLAN_REASON_TAGS = {
+  off_theme: "今回の主題とずれる",
+  too_heavy: "重い",
+  same_as_last: "前回と同じ",
+  not_for_members: "メンバー向きでない",
+  no_time: "時間が足りない",
+} as const;
+
+/** 資料：次回反映案を「今回だけ／違う」にした理由 */
+export const SLIDE_RULE_REASON_TAGS = {
+  by_chance: "たまたま",
+  depends: "相手・回による",
+  already_rule: "もう決めている",
+  wording: "言い方が違う",
+} as const;
+
 /** 送った後の手応え */
 export const QUALITY = ["good", "meh", "none_fit"] as const;
 
@@ -238,6 +258,8 @@ const KNOWN_TAGS = new Set<string>([
   ...Object.keys(STAY_REASON_TAGS),
   ...Object.keys(PICK_REASON_TAGS),
   ...Object.keys(LEFT_REASON_TAGS),
+  ...Object.keys(SLIDE_PLAN_REASON_TAGS),
+  ...Object.keys(SLIDE_RULE_REASON_TAGS),
   "hesitate",
 ]);
 
