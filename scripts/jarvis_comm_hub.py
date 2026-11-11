@@ -701,6 +701,136 @@ def reconcile_ok(c: dict[str, int]) -> bool:
     return c["a"] == c["b"] and c["a_unlinked"] == 0 and c["stale"] == 0 and c["reverse"] == 0
 
 
+# ------------------------------------------------------------ 受付の表（comm_intake）→ 台帳
+
+# 受付の kind → comm_items.category（skim は台帳に入れない）
+INTAKE_KIND_TO_CATEGORY = {
+    "partner": "partner",
+    "property": "property",
+    "inquiry": "inquiry",
+    "self": "self",
+    "agent": "agent",
+}
+# 銀行・認証系は台帳に入れない（送金・OTP・銀行 IB は Jarvis 専属）
+INTAKE_BLOCK_RE = re.compile(
+    r"認証コード|確認コード|ワンタイム|OTP|one[- ]?time|2段階|二段階|パスワード|password|暗証|ログイン(通知|のお知らせ)"
+    r"|口座番号|振込|振り込み|入出金|残高|引落|引き落とし|銀行|バンク|カード番号|セキュリティコード",
+    re.IGNORECASE,
+)
+
+
+def _load_party_index(sb) -> dict[str, str]:
+    """party_id / partner_folder / 名前 → party_id。"""
+    out: dict[str, str] = {}
+    for r in _paged(lambda: sb.table("comm_parties").select("party_id,name,partner_folder").order("party_id")):
+        pid = str(r["party_id"])
+        out[pid] = pid
+        if r.get("partner_folder"):
+            out[f"folder:{r['partner_folder']}"] = pid
+        if r.get("name"):
+            out[f"name:{str(r['name']).strip()}"] = pid
+    return out
+
+
+def intake_to_item(intake: dict[str, Any], parties: dict[str, str]) -> tuple[dict[str, Any] | None, str | None]:
+    """受付1行 → (comm_items 行, None) か (None, 入れない理由)。"""
+    p = intake.get("payload") or {}
+    bot = str(intake.get("source_bot") or "")
+    bid = str(intake.get("bot_item_id") or "")
+    kind = str(p.get("kind") or "").lower()
+    if kind == "skim":
+        return None, "skim（読み流し）は台帳に入れない"
+    category = INTAKE_KIND_TO_CATEGORY.get(kind)
+    if not category:
+        return None, f"kind が不明: {kind or '(空)'}"
+    title = str(p.get("title") or "").strip()
+    summary = str(p.get("summary") or "")
+    if not title:
+        return None, "title が空"
+    if INTAKE_BLOCK_RE.search(f"{title}\n{summary}"):
+        return None, "銀行・認証系は台帳に入れない"
+    try:
+        occurred = datetime.fromisoformat(re.sub(r"\.[0-9]+", "", str(p.get("occurred_at") or "")).replace("Z", "+00:00"))
+    except ValueError:
+        return None, "occurred_at が読めない"
+    if occurred.tzinfo is None:
+        occurred = occurred.replace(tzinfo=JST)
+    refs = p.get("refs") if isinstance(p.get("refs"), dict) else {}
+    party_id = None
+    for k in (
+        str(refs.get("party_id") or ""),
+        f"folder:{refs.get('partner_folder')}" if refs.get("partner_folder") else "",
+        f"name:{str(refs.get('partner') or '').strip()}" if refs.get("partner") else "",
+    ):
+        if k and k in parties:
+            party_id = parties[k]
+            break
+    source_label = str(p.get("source") or bot)
+    header = f"{source_label}｜{bot}｜{kind}｜{occurred.astimezone(JST):%Y-%m-%d %H:%M}"
+    return (
+        {
+            "channel": "other",
+            "account": f"bot:{bot}",
+            "external_id": f"intake:{bot}:{bid}",
+            "thread_key": f"bot:{bot}|{refs.get('thread') or kind}",
+            "occurred_at": occurred.isoformat(),
+            "direction": "inbound",
+            "party_id": party_id,
+            "category": category,
+            "tags": [f"bot:{bot}", f"kind:{kind}"],
+            "ingest_status": "ready",
+            # agent（ボットの日報など）は知らせだけ。対応が要るものは kind を property 等で送ってもらう
+            "work_status": "no_action" if kind == "agent" else "new",
+            "subject": title[:500],
+            "summary": summary[:500] or None,
+            "body_text": summary[:BODY_MAX] or None,
+            "context_header": header,
+            "source_ref": {"source": "comm_intake", "intake_id": intake.get("id"), "bot": bot, "refs": refs},
+            "payload": {"source": source_label},
+        },
+        None,
+    )
+
+
+def ingest_intake(sb, *, apply: bool, limit: int = 200) -> dict[str, Any]:
+    """受付の表の new を取込ゲート→名簿→分類して comm_items に本登録する。"""
+    rows = (
+        sb.table("comm_intake").select("id,source_bot,bot_item_id,payload,received_at,status")
+        .eq("status", "new").order("received_at").range(0, limit - 1).execute().data
+        or []
+    )
+    stats: dict[str, Any] = {"new": len(rows), "ingested": 0, "rejected": 0, "reasons": {}}
+    if not rows:
+        return stats
+    parties = _load_party_index(sb)
+    ok: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for r in rows:
+        item, why = intake_to_item(r, parties)
+        if item is None:
+            stats["rejected"] += 1
+            stats["reasons"][why] = stats["reasons"].get(why, 0) + 1
+            if apply:
+                sb.table("comm_intake").update(
+                    {"status": "rejected", "error": why, "updated_at": datetime.now(ZoneInfo("UTC")).isoformat()}
+                ).eq("id", r["id"]).execute()
+            continue
+        ok.append((r, item))
+    stats["ingested"] = len(ok)
+    if not apply or not ok:
+        return stats
+    ids = insert_items(sb, [i for _r, i in ok])
+    now = datetime.now(ZoneInfo("UTC")).isoformat()
+    for r, item in ok:
+        iid = ids.get(item["external_id"])
+        upd = (
+            {"status": "ingested", "ingested_item_id": iid, "error": None, "updated_at": now}
+            if iid
+            else {"error": "comm_items に見つからない（次の回に再試行）", "updated_at": now}
+        )
+        sb.table("comm_intake").update(upd).eq("id", r["id"]).execute()
+    return stats
+
+
 # ------------------------------------------------------------ heartbeat（sync_meta に相乗り）
 
 
@@ -979,6 +1109,17 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ingest_intake(args: argparse.Namespace) -> int:
+    try:
+        st = ingest_intake(client(), apply=bool(args.apply), limit=args.limit)
+    except Exception as e:  # noqa: BLE001 — 本線（台帳書き込み・予備）を止めない
+        print(f"# comm intake soft-fail: {type(e).__name__}: {e}", file=sys.stderr)
+        return 0
+    mode = "apply" if args.apply else "dry-run"
+    print(f"📥 comm ingest-intake {mode} new={st['new']} ingested={st['ingested']} rejected={st['rejected']} reasons={st['reasons']}")
+    return 0
+
+
 def cmd_heartbeat(args: argparse.Namespace) -> int:
     at = write_heartbeat(client(), args.job, args.source)
     print(f"💓 job_ok:{args.job} {at} {args.source}")
@@ -1024,6 +1165,13 @@ def main(argv: list[str] | None = None) -> int:
     s6.add_argument("--source", default="gha", help="gha / backup / gha:<押した人>")
     s6.add_argument("--once-per-day", action="store_true", help="今日の job_ok:comm_reconcile があれば何もしない")
     s6.set_defaults(func=cmd_reconcile)
+
+    s8 = sub.add_parser("ingest-intake", help="受付の表（comm_intake）の new を台帳へ本登録（失敗しても exit 0）")
+    s8.add_argument("--limit", type=int, default=200)
+    g8 = s8.add_mutually_exclusive_group()
+    g8.add_argument("--dry-run", action="store_true")
+    g8.add_argument("--apply", action="store_true")
+    s8.set_defaults(func=cmd_ingest_intake)
 
     s7 = sub.add_parser("heartbeat", help="sync_meta に job_ok:<job> を書く")
     s7.add_argument("--job", required=True)
