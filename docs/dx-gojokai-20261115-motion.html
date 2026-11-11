@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>第10回 互助会 動くスライド（5枚目・17枚目）</title>
+<title>第10回 互助会 動くスライド集（2・5・15・17・22・31枚目）</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
 <style>
   /* NotebookLM マスタースタイル（cute-illustration）に寄せた色。白背景・黒の細線・水彩風の淡色 */
@@ -13,6 +13,7 @@
   .viewport{position:absolute;inset:0 0 56px 0;display:grid;place-items:center}
   .slide{display:none;position:relative;width:min(100vw,calc((100vh - 56px)*16/9));aspect-ratio:16/9;background:var(--paper);container-type:inline-size;overflow:hidden}
   .slide.active{display:block}
+  .slide.img img{width:100%;height:100%;object-fit:contain;display:block}
   .slide svg{position:absolute;inset:0;width:100%;height:100%}
   .chapter{position:absolute;top:3cqw;right:3.5cqw;font-size:1.5cqw;color:var(--muted);font-weight:700}
   .title{position:absolute;left:5cqw;top:4cqw;right:20cqw;font-size:3.6cqw;font-weight:900;line-height:1.3;margin:0}
@@ -51,13 +52,61 @@
   .dots button{width:30px;height:30px;padding:0}
   .dots button.on{background:var(--yellow)}
   .btns{display:flex;gap:8px}
+  /* いけとも風の型：左に結論・右に番号カード（色は互助会の黄色マーカーを差し色に） */
+  .lead{position:absolute;left:5cqw;top:13.5cqw;width:34cqw}
+  .lead .q{font-size:1.7cqw;font-weight:700;color:#555;margin:0 0 1.2cqw}
+  .lead .big{font-size:3.3cqw;font-weight:900;line-height:1.35;margin:0}
+  .band{background-image:linear-gradient(transparent 58%,var(--yellow) 58%);background-repeat:no-repeat;background-size:0% 100%;transition:background-size .9s ease .2s}
+  .on .band,.band.on{background-size:100% 100%}
+  .lead .note{font-size:1.45cqw;font-weight:700;color:#555;line-height:1.55;margin-top:2cqw}
+  .cards{position:absolute;right:5cqw;top:11.5cqw;width:50cqw;display:flex;flex-direction:column;gap:.9cqw}
+  .card{position:relative;display:flex;align-items:center;gap:1.4cqw;background:#fff;border:.22cqw solid var(--ink);border-radius:1.2cqw;padding:.85cqw 1.4cqw;box-shadow:.5cqw .5cqw 0 #e8e4da}
+  .card::before{content:"";position:absolute;left:-.22cqw;top:18%;bottom:18%;width:.6cqw;border-radius:0 .4cqw .4cqw 0;background:var(--yellow)}
+  .card .n{flex:none;width:3.4cqw;height:3.4cqw;border-radius:50%;border:.22cqw solid var(--ink);display:grid;place-items:center;font-size:1.7cqw;font-weight:900;background:#fff;transition:background .5s ease .3s}
+  .card.on .n{background:var(--yellow)}
+  .card .tt{font-size:1.85cqw;font-weight:900;line-height:1.3}
+  .card .sub{display:block;font-size:1.3cqw;font-weight:700;color:#666;margin-top:.15cqw}
+  .card.hl{background:var(--cream)}
+  .card .tag{margin-left:auto;flex:none;font-size:1.2cqw;font-weight:900;background:var(--orange);border:.18cqw solid var(--ink);border-radius:999px;padding:.2cqw .9cqw}
+  .cards.tight .card{padding:.55cqw 1.3cqw}
+  .cards.tight .card .tt{font-size:1.6cqw}
+  .cards.tight .card .n{width:2.9cqw;height:2.9cqw;font-size:1.45cqw}
+  /* ループ */
+  .orbit{offset-path:path("M 1000 230 A 230 230 0 1 1 999.9 230");offset-rotate:0deg;animation:orbit 6s linear infinite}
+  @keyframes orbit{to{offset-distance:100%}}
+  /* 公開までの流れ */
+  .pipe{position:absolute;left:5cqw;right:5cqw;top:15cqw;height:14cqw}
+  .stage{position:absolute;top:2cqw;width:17cqw;height:9cqw;border:.25cqw solid var(--ink);border-radius:1.3cqw;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-weight:900;font-size:2cqw;line-height:1.25;box-shadow:.5cqw .5cqw 0 #e8e4da}
+  .stage small{font-size:1.25cqw;font-weight:700;color:#666}
+  .verb{position:absolute;top:0;font-size:1.45cqw;font-weight:900;background:var(--yellow);border:.18cqw solid var(--ink);border-radius:999px;padding:.15cqw .9cqw;transform:translateX(-50%)}
+  .parcel{position:absolute;top:5.2cqw;left:7cqw;width:3.2cqw;height:2.6cqw;background:var(--orange);border:.22cqw solid var(--ink);border-radius:.4cqw;transition:left 1s cubic-bezier(.5,0,.3,1),opacity .4s;opacity:0;z-index:2}
+  .terms{position:absolute;left:5cqw;right:5cqw;top:33cqw;display:grid;grid-template-columns:repeat(4,1fr);gap:1.2cqw}
+  .term{border:.22cqw solid var(--ink);border-radius:1.1cqw;background:var(--cream);padding:.9cqw 1.1cqw;font-size:1.35cqw;font-weight:700;line-height:1.45}
+  .term b{display:block;font-size:1.8cqw;font-weight:900}
+  .slide[data-cur="0"] .parcel{left:7cqw}
+  .slide[data-cur="1"] .parcel{left:29.5cqw}
+  .slide[data-cur="2"] .parcel{left:52cqw}
+  .slide[data-cur="3"] .parcel,.slide[data-cur="4"] .parcel,.slide[data-cur="5"] .parcel{left:74.5cqw}
+  .spin{transform-box:view-box;transform-origin:960px 440px;animation:spin 7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
 </style>
-</head>
-<body>
 <div class="viewport">
-
-<!-- 5枚目：AIの使い方は5段階で進化してきた -->
-<section class="slide" data-steps="6" data-name="5枚目 AI進化といま地点">
+<section class="slide" data-steps="3" data-name="2枚目 今日の流れ（動く版）">
+  <div class="chapter">①開会</div>
+  <h1 class="title"><span class="mk">今日の流れ</span></h1>
+  <div class="lead"><p class="q">きょうは7つの章で進みます</p><p class="big"><span class="band" data-at="1">AIを「社員」として<br>働かせる</span>までを<br>ひと通り</p>
+    <p class="note" data-at="2">④は今村さん・友利さん向けの<br>初学者講座（第1回）</p></div>
+  <div class="cards tight">
+    <div class="card" data-at="1"><span class="n">1</span><span class="tt">開会</span></div>
+    <div class="card" data-at="1"><span class="n">2</span><span class="tt">AI進化といま地点</span></div>
+    <div class="card" data-at="1"><span class="n">3</span><span class="tt">バイブコーディング</span></div>
+    <div class="card hl" data-at="2"><span class="n">4</span><span class="tt">初学者講座 第1回<span class="sub">Cursor・3R・1社員1フォルダ</span></span><span class="tag">初学者講座</span></div>
+    <div class="card" data-at="3"><span class="n">5</span><span class="tt">松野の実践<span class="sub">エージェントツールの組み合わせ・Todoist・Slack</span></span></div>
+    <div class="card" data-at="3"><span class="n">6</span><span class="tt">おせっかいAI<span class="sub">Grok bot・Muse</span></span></div>
+    <div class="card" data-at="3"><span class="n">7</span><span class="tt">持ち帰りと12月の相談</span></div>
+  </div>
+</section>
+<section class="slide" data-steps="6" data-name="5枚目（動く版）">
   <svg viewBox="0 0 1600 900" aria-hidden="true" id="art5"></svg>
   <div class="chapter">②AI進化といま地点</div>
   <h1 class="title"><span class="mk">AI活用は5段階で進化してきた</span></h1>
@@ -69,9 +118,21 @@
   <div class="refs" data-at="6" onclick="event.stopPropagation()"><span class="lab">いけともさんの資料で見る ↗</span><a href="https://superslide-share.frontier.monster/p/ssm_pdf_iphecQ5sS9_aeCJMnX8b6H5nBNKvOy8YqtHWO7CMN8U#page=10" target="_blank" rel="noopener">全体像</a><a href="https://superslide-share.frontier.monster/p/ssm_pdf_iphecQ5sS9_aeCJMnX8b6H5nBNKvOy8YqtHWO7CMN8U#page=11" target="_blank" rel="noopener">①プロンプト</a><a href="https://superslide-share.frontier.monster/p/ssm_pdf_iphecQ5sS9_aeCJMnX8b6H5nBNKvOy8YqtHWO7CMN8U#page=13" target="_blank" rel="noopener">②コンテキスト</a><a href="https://superslide-share.frontier.monster/p/ssm_pdf_iphecQ5sS9_aeCJMnX8b6H5nBNKvOy8YqtHWO7CMN8U#page=15" target="_blank" rel="noopener">③ハーネス</a><a href="https://superslide-share.frontier.monster/p/ssm_pdf_iphecQ5sS9_aeCJMnX8b6H5nBNKvOy8YqtHWO7CMN8U#page=17" target="_blank" rel="noopener">④ループ</a><a href="https://superslide-share.frontier.monster/p/ssm_pdf_iphecQ5sS9_aeCJMnX8b6H5nBNKvOy8YqtHWO7CMN8U#page=18" target="_blank" rel="noopener">⑤グラフ</a><a href="https://superslide-share.frontier.monster/p/ssm_pdf_iphecQ5sS9_aeCJMnX8b6H5nBNKvOy8YqtHWO7CMN8U#page=30" target="_blank" rel="noopener">ループウェアとは</a></div>
   <div class="text small" style="left:5cqw;bottom:2.6cqw">出典：いけともさん ループウェア講座 Day1（2026-11-07）</div>
 </section>
-
-<!-- 17枚目：1社員1フォルダ -->
-<section class="slide" data-steps="6" data-name="17枚目 1社員1フォルダ">
+<section class="slide" data-steps="6" data-name="15枚目 「これ自動化したい」と思ったら（動く版）">
+  <div class="chapter">④初学者講座</div>
+  <h1 class="title"><span class="mk">「これ自動化したい」と思ったら</span></h1>
+  <div class="lead"><p class="q">業務を1つ、AI社員にする流れ</p><p class="big"><span class="band" data-at="1">5ステップ</span>で<br>まず1人目を<br>つくる</p>
+    <p class="note">例：修繕依頼のメールを一覧にしたい<br>（架空：青葉ハイツ203号室）</p></div>
+  <div class="cards">
+    <div class="card" data-at="1"><span class="n">1</span><span class="tt">楽にしたい業務を1つ決める<span class="sub">例：修繕依頼のメールを一覧にしたい</span></span></div>
+    <div class="card" data-at="2"><span class="n">2</span><span class="tt">業務のフォルダを作り、材料を入れる<span class="sub">受信メール・修繕ルールなど</span></span></div>
+    <div class="card" data-at="3"><span class="n">3</span><span class="tt">3Rで頼む（話してOK）<span class="sub">Role 役割／Request 頼みごと／Reference 見る資料</span></span></div>
+    <div class="card" data-at="4"><span class="n">4</span><span class="tt">元の文と見比べて「ここを直して」<span class="sub">勝手に日付を決めていないか・分からないことを埋めていないか</span></span></div>
+    <div class="card hl" data-at="5"><span class="n">5</span><span class="tt">やり方を指示書に残す<span class="sub">次からは一言で頼める</span></span></div>
+  </div>
+  <div class="shime" data-at="6"><span>指示書が残れば、それがAI社員の誕生</span></div>
+</section>
+<section class="slide" data-steps="6" data-name="17枚目（動く版）">
   <svg viewBox="0 0 1600 900" aria-hidden="true" id="art17"></svg>
   <div class="chapter">④初学者講座</div>
   <h1 class="title"><span class="mk">1社員1フォルダ</span></h1>
@@ -82,7 +143,36 @@
   <div class="text small" style="right:4cqw;bottom:6.2cqw;font-size:1.2cqw" data-at="2">出典：いけともさん AIエージェントチーム構築術 Day1（2026-10-03）</div>
   <div class="shime" data-at="6"><span>フォルダはAI社員の席。手順・権限・報告先がそろえば働ける</span></div>
 </section>
-
+<section class="slide" data-steps="6" data-name="22枚目 ループ（動く版）">
+  <svg viewBox="0 0 1600 900" aria-hidden="true" id="art22"></svg>
+  <div class="chapter">⑤松野の実践</div>
+  <h1 class="title"><span class="mk">押した判断が記録に残る＝ループ</span></h1>
+  <div class="lead" style="width:30cqw"><p class="q">5段階の④ループ</p><p class="big" style="font-size:2.9cqw"><span class="band" data-at="3">判断が記録に残り</span>、<br>次のAIが<br>もっと賢くなる</p>
+    <p class="note" data-at="6">初学者の皆さんは、<br>まず「使う側」からで大丈夫です</p></div>
+  <div class="shime" data-at="6"><span>判断が記録に残り、AI社員が成長するループ</span></div>
+</section>
+<section class="slide" data-steps="5" data-name="31枚目 保存して公開まで（動く版）">
+  <div class="chapter" style="background:#fff;border:.2cqw solid var(--ink);border-radius:.6cqw;padding:.2cqw .8cqw;color:var(--ink)">補足</div>
+  <h1 class="title"><span class="mk">用語（2）保存して公開するまで</span></h1>
+  <div class="pipe">
+    <div class="stage" style="left:0" data-at="0">Cursorで<br>作る<small>手元のパソコン</small></div>
+    <div class="stage" style="left:22.5cqw" data-at="1">記録<small>コミット＝セーブ</small></div>
+    <div class="stage" style="left:45cqw" data-at="2">GitHub<small>プログラムの保管庫</small></div>
+    <div class="stage" style="left:67.5cqw" data-at="3">Vercelで<br>公開<small>Webアプリの公開場所</small></div>
+    <span class="verb" style="left:19.8cqw" data-at="1">コミット</span>
+    <span class="verb" style="left:42.3cqw" data-at="2">プッシュ</span>
+    <span class="verb" style="left:64.8cqw" data-at="3">デプロイ（自動）</span>
+    <div class="parcel" data-at="0" style="top:11.6cqw"></div>
+  </div>
+  <div class="terms">
+    <div class="term" data-at="1"><b>コミット</b>変更を記録する（ゲームのセーブ）</div>
+    <div class="term" data-at="2"><b>プッシュ</b>手元の記録をネット上に送る</div>
+    <div class="term" data-at="4"><b>プル</b>ネット上の最新を手元に持ってくる</div>
+    <div class="term" data-at="3"><b>デプロイ</b>作ったものを公開し、使える状態にする</div>
+  </div>
+  <div class="text small" style="left:5cqw;top:30cqw" data-at="4">データは Supabase に保存（ログイン機能もある）</div>
+  <div class="shime" data-at="5"><span>Cursorで作って、プッシュすれば、自動で公開される</span></div>
+</section>
 </div>
 
 <div class="bar">
@@ -91,7 +181,7 @@
   <div class="btns">
     <button id="prev" aria-label="前へ">◀</button>
     <button id="next" aria-label="次へ">▶</button>
-    <button id="swap" aria-label="スライドを切り替え">5枚目／17枚目</button>
+    <button id="swap" aria-label="次の動く版へ移動">次の動く版へ</button>
   </div>
 </div>
 
@@ -148,19 +238,48 @@
       '<path class="draw" data-at="4" d="M150 282 Q170 330 260 360 M660 282 Q640 330 560 360" fill="none" '+S+'/></g>'+
     '<g data-at="5"><rect x="166" y="500" width="100" height="20" rx="4" fill="#fff1a8" opacity=".9"/><text x="216" y="440" text-anchor="middle" font-size="40" fill="#3f9a52">✓</text></g>';
 
+
+  // 22枚目：ループ（時計回り：報告→ボタンで判断→記録→賢くなる）
+  (function(){
+    var cx=960, cy=440, r=215, el=document.getElementById('art22'); if(!el) return;
+    function node(x,y,fill,label,icon,lx,ly,anc){
+      return '<g transform="translate('+x+','+y+')"><circle r="70" fill="'+fill+'" '+S+'/>'+icon+
+        '<text x="'+lx+'" y="'+ly+'" text-anchor="'+anc+'" font-size="30" '+F+' fill="#2a2a2a">'+label+'</text></g>';
+    }
+    var ic={
+      rep:'<rect x="-26" y="-34" width="52" height="64" rx="6" fill="#fff" '+S+'/><path d="M-14 -16H14M-14 -2H14M-14 12H6" stroke="#2a2a2a" stroke-width="3" stroke-linecap="round"/>',
+      btn:'<circle r="30" fill="#fff" '+S+'/><circle r="16" fill="#fff1a8" '+S+'/>',
+      rec:'<path d="M-36 -20 Q-36 -30 -26 -30 L-8 -30 L-2 -20 Z" fill="#fbd9b5" '+S+'/><rect x="-36" y="-22" width="72" height="52" rx="8" fill="#fdf3dc" '+S+'/>',
+      ai:'<rect x="-30" y="-24" width="60" height="48" rx="16" fill="#fff" '+S+'/><circle cx="-11" cy="-2" r="4" fill="#2a2a2a"/><circle cx="11" cy="-2" r="4" fill="#2a2a2a"/><path d="M-8 12 Q0 18 8 12" fill="none" '+S+'/><line x1="0" y1="-24" x2="0" y2="-38" '+S+'/><circle cx="0" cy="-42" r="6" fill="#fff1a8" '+S+'/>'
+    };
+    function arc(a1,a2,k){ arc.k=k; // 角度（度、0=右、時計回り）
+      var p=function(a){a=a*Math.PI/180;return [cx+r*Math.cos(a),cy+r*Math.sin(a)]}, s=p(a1), e=p(a2);
+      return '<path class="draw" data-at="'+arc.k+'" d="M'+s[0].toFixed(1)+' '+s[1].toFixed(1)+' A '+r+' '+r+' 0 0 1 '+e[0].toFixed(1)+' '+e[1].toFixed(1)+'" fill="none" stroke="#2a2a2a" stroke-width="5" stroke-linecap="round" marker-end="url(#ah22)"/>';
+    }
+    el.innerHTML='<defs><marker id="ah22" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#2a2a2a"/></marker></defs>'+
+      '<g data-at="1">'+node(cx,cy-r,'#d9e9f5','AIからの報告',ic.rep,90,10,'start')+'</g>'+
+      '<g data-at="2">'+arc(-70,-20,2)+node(cx+r,cy,'#fff1a8','ボタンで判断',ic.btn,90,10,'start')+'</g>'+
+      '<g data-at="3">'+arc(20,70,3)+node(cx,cy+r,'#fbd9b5','記録に残る',ic.rec,90,10,'start')+'</g>'+
+      '<g data-at="4">'+arc(110,160,4)+node(cx-r,cy,'#d7ecd2','AIが賢くなる',ic.ai,-8,112,'end')+arc(200,250,4)+'</g>'+
+      '<g data-at="5"><g class="spin"><circle cx="'+cx+'" cy="'+(cy-r)+'" r="13" fill="#d24b3e" stroke="#2a2a2a" stroke-width="3"/></g></g>'+
+      '<g data-at="6"><line x1="1330" y1="200" x2="1330" y2="395" stroke="#2a2a2a" stroke-width="5" stroke-linecap="round"/>'+
+        '<path d="M1330 205 L1500 228 L1470 262 L1500 296 L1330 290 Z" fill="#fff1a8" '+S+'/>'+
+        '<text x="1408" y="262" text-anchor="middle" font-size="34" '+F+' font-weight="900" fill="#2a2a2a">いまここ</text></g>';
+  })();
   // 操作
   var slides=[].slice.call(document.querySelectorAll('.slide')), si=0, cur=0;
   var dots=document.getElementById('dots'), label=document.getElementById('label');
   function N(){return +slides[si].dataset.steps}
   function render(){
-    slides.forEach(function(s,i){s.classList.toggle('active',i===si)});
+    slides.forEach(function(s,i){s.classList.toggle('active',i===si)});slides[si].dataset.cur=cur;
     slides[si].querySelectorAll('[data-at]').forEach(function(el){el.classList.toggle('on',+el.getAttribute('data-at')<=cur)});
     dots.innerHTML='';
     for(var i=0;i<=N();i++){var b=document.createElement('button');b.textContent=i;b.dataset.i=i;if(i===cur)b.className='on';b.onclick=function(){cur=+this.dataset.i;render()};dots.appendChild(b);}
-    label.textContent=slides[si].dataset.name+'　手順'+cur+'／'+N();
+    dots.style.visibility=N()?'visible':'hidden';
+    label.textContent=slides[si].dataset.name+'（'+(si+1)+'／'+slides.length+'）'+(N()?'　手順'+cur+'／'+N():'');
   }
-  function go(d){cur=Math.max(0,Math.min(N(),cur+d));render()}
-  function swap(){si=(si+1)%slides.length;cur=0;render()}
+  function go(d){var n=cur+d;if(n>N()){if(si<slides.length-1){si++;cur=0}}else if(n<0){if(si>0){si--;cur=N()}}else cur=n;render()}
+  function swap(){var m=[];slides.forEach(function(s,i){if(!s.classList.contains('img'))m.push(i)});var t=m.filter(function(i){return i>si})[0];si=(t===undefined?m[0]:t);cur=0;render()}
   document.getElementById('prev').onclick=function(){go(-1)};
   document.getElementById('next').onclick=function(){go(1)};
   document.getElementById('swap').onclick=swap;
@@ -171,9 +290,8 @@
   });
   document.querySelector('.viewport').addEventListener('click',function(){go(1)});
   // #s17 で17枚目から開く
-  if(location.hash==='#s17'){si=1}
+  var m=location.hash.match(/^#p(\d+)$/);if(m){si=Math.max(0,Math.min(slides.length-1,+m[1]-1))}
   render();
 })();
 </script>
-</body>
-</html>
+
