@@ -4622,10 +4622,11 @@ const App = {
     App.renderAllSearchResults();
   },
   allSearchGroupDefs: [
-    { key: 'comments', label: 'westudy コミュニティコメント', screen: 'comments' },
-    { key: 'knowledge', label: 'westudy 動画文字起こし', screen: 'knowledge' },
-    { key: 'lessons', label: 'westudy 講座ページ説明文', screen: 'lessons' },
-    { key: 'openchat', label: 'LINEオプチャ', screen: 'openchat' }
+    // 並びと名前は松野さんの指定（11/11）
+    { key: 'comments', label: 'WeStudy コミュニティコメント', screen: 'comments' },
+    { key: 'openchat', label: 'LINEオプチャ', screen: 'openchat' },
+    { key: 'lessons', label: '講座ページ説明文', screen: 'lessons' },
+    { key: 'knowledge', label: 'WeStudy 動画文字起こし', screen: 'knowledge' }
   ],
   allSearchItemHtml: (kind, row, terms) => {
     const esc = App.escapeHtml;
@@ -4665,6 +4666,7 @@ const App = {
     if (!res || !box) return;
     const esc = App.escapeHtml;
     let sum = 0;
+    const summary = [];
     const parts = App.allSearchGroupDefs.map(function (def) {
       const g = def.key === 'openchat' ? res.openchat : res.groups[def.key];
       let count = '', list = '';
@@ -4683,24 +4685,41 @@ const App = {
             (g.total > g.rows.length ? '<p class="text-sm text-slate-600 px-3 pb-3">数が多いので、最初の' + g.rows.length + '件だけ出しています。言葉を足すと絞り込めます。</p>' : '')
           : '<p class="text-base text-slate-600 px-3 py-3">見つかりませんでした。</p>';
       }
-      return '<section class="bg-white rounded border">' +
-        '<div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-100 rounded-t">' +
+      summary.push({ def: def, count: count, has: !!(g && !g.error && g.total) });
+      // 見出しはスクロールしても上に残す（sticky）。どの区分を見ているか分かるように。
+      return '<section id="allSearchGroup-' + def.key + '" class="bg-white rounded border scroll-mt-2">' +
+        '<div class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-100 border-b shadow-sm">' +
         '<h4 class="font-bold text-base">' + esc(def.label) + ' <span class="text-blue-900">' + esc(count) + '</span></h4>' +
         '<button type="button" class="all-search-open text-sm text-blue-700 underline shrink-0" data-screen-to="' + def.screen + '">この一覧を開く</button>' +
         '</div>' + list + '</section>';
     });
-    box.innerHTML = parts.join('');
+    // 最初に4区分の件数の表。区分名を押すとその区分へ移動する。
+    const table = '<div class="bg-white rounded border">' +
+      '<table class="w-full text-base"><thead class="bg-slate-100"><tr><th class="text-left px-3 py-2">区分</th><th class="text-right px-3 py-2 whitespace-nowrap">件数</th></tr></thead><tbody>' +
+      summary.map(function (x) {
+        return '<tr class="border-t"><td class="px-3 py-2">' +
+          (x.has ? '<button type="button" class="all-search-jump text-blue-700 underline text-left" data-group="' + x.def.key + '">' + esc(x.def.label) + '</button>' : '<span class="text-slate-700">' + esc(x.def.label) + '</span>') +
+          '</td><td class="px-3 py-2 text-right whitespace-nowrap font-bold">' + esc(x.count) + '</td></tr>';
+      }).join('') +
+      '</tbody></table></div>';
+    box.innerHTML = table + parts.join('');
     if (App.elements.allSearchMeta) {
       const pending = !res.openchat;
       const how = res.query.length > 1 && res.query.every(function (g) { return g.length === 1; })
         ? '「' + res.query.map(function (g) { return g[0]; }).join('」「') + '」のどれかを含む'
         : res.query.map(function (g) { return '「' + g.join('」と「') + '」' + (g.length > 1 ? 'をすべて含む' : 'を含む'); }).join('もの、または');
-      App.elements.allSearchMeta.textContent = how + 'もの：' + sum + '件' + (pending ? '（LINEオプチャはまだ探しています）' : '') + '。気になる行を押すと、元の一覧で開きます。';
+      App.elements.allSearchMeta.textContent = how + 'もの：' + sum + '件' + (pending ? '（LINEオプチャはまだ探しています）' : '') + '。表の区分名を押すとその区分へ移動します。気になる行を押すと、元の一覧で開きます。';
     }
   },
   onAllSearchResultClick: (ev) => {
     const t = ev.target && ev.target.closest ? ev.target : null;
     if (!t) return;
+    const jump = t.closest('.all-search-jump');
+    if (jump) {
+      const sec = document.getElementById('allSearchGroup-' + jump.getAttribute('data-group'));
+      if (sec && sec.scrollIntoView) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     const more = t.closest('.all-search-more');
     if (more && App.state.allSearchResult) {
       App.state.allSearchResult.expanded[more.getAttribute('data-group')] = true;
