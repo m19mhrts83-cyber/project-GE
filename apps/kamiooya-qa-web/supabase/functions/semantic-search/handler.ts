@@ -259,7 +259,8 @@ function formatMmSs(value: number | null): string {
 
 /** 取込経路の識別ラベル（例: 【Vimeo自動字幕・暫定】）は回答に出さない */
 function displaySourceTitle(title: string): string {
-  return title.replace(/^\s*【[^】]*(?:暫定|自動字幕)[^】]*】\s*/, "").trim();
+  // 「（動画1106455203）」は取込時の Vimeo 番号。回答に写らないよう AI に渡す題名から外す（11/11 松野さん）
+  return title.replace(/^\s*【[^】]*(?:暫定|自動字幕)[^】]*】\s*/, "").replace(/\s*[（(]動画\s*[0-9０-９]+[）)]/g, "").trim();
 }
 
 function buildAnswerContext(
