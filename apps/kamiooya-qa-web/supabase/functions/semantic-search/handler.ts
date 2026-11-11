@@ -51,26 +51,7 @@ type SemanticSearchRequest = {
   secret?: string;
   session_id?: string;
   user_id?: string;
-  /** 同じチャットの直前のやり取り（古い順）。スイッチ chat_context の人だけ、サーバーが付ける（2026-11-11）。 */
-  history?: unknown;
 };
-
-export type ChatTurn = { question: string; answer: string };
-
-// 直前のやり取りは最大3往復・質問500字・回答1500字まで（プロンプトの膨張を防ぐ）。
-export function normalizeHistory(value: unknown): ChatTurn[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((t) => ({
-    question: asString((t as Record<string, unknown>)?.question).trim().slice(0, 500),
-    answer: asString((t as Record<string, unknown>)?.answer).trim().slice(0, 1500),
-  })).filter((t) => t.question).slice(-3);
-}
-
-// 検索（意味検索のベクトル）に使う文。「また詳しく」のような短い続きの質問でも、前の質問のテーマで探す。
-export function contextualSearchQuery(query: string, history: ChatTurn[]): string {
-  if (!history.length) return query;
-  return [...history.map((t) => t.question), query].join("\n").slice(-1200);
-}
 
 type CommentRow = {
   source_type: string | null;
@@ -305,17 +286,7 @@ function buildAnswerContext(
   return parts.join("\n\n");
 }
 
-export function buildAnswerPrompt(query: string, answerContext: string, history: ChatTurn[] = []): string {
-  const followUp = history.length ? [
-    "",
-    "【このチャットのこれまでのやり取り（古い順）】",
-    ...history.flatMap((t, i) => [`(${i + 1}) 質問: ${t.question}`, `(${i + 1}) 回答の要旨: ${t.answer || "（記録なし）"}`]),
-    "",
-    "【続きの質問の扱い】",
-    "A. 今回の質問は上のやり取りの続きです。「もっと詳しく」「また調べて」「それについて」のように対象が省略されていれば、直前の質問のテーマについて答えること。関係の薄い話題まで広げて網羅しない。",
-    "B. 前の回答と同じ内容の繰り返しは短くし、前の回答で足りなかった点・より具体的な事例・数値・手順・新しい根拠を中心に深掘りすること。",
-    "C. 今回の質問がはっきり別の話題なら、その話題として答えてよい。",
-  ] : [];
+function buildAnswerPrompt(query: string, answerContext: string): string {
   return [
     "あなたは神・大家さん倶楽部の情報Q&Aアシスタントです。",
     "次の「参考情報テキスト」だけを根拠に、日本語でできるだけ網羅的に答えてください。推測で新しい事実を足さないこと。",
@@ -331,8 +302,6 @@ export function buildAnswerPrompt(query: string, answerContext: string, history:
     "9. 根拠の番号は参考情報の[コミュニティN]、[セミナーN]、[LINEオプチャN]をそのまま使い、番号を振り直さない。「LINEオプチャ1、LINEオプチャ4」のように接頭辞を省略しない。動画を使った文は（セミナーN：動画タイトル 分:秒頃）の形で示す。",
     "10. 【LINE添付・内容未解析】はファイル名と投稿文だけの情報です。ファイル内部を読んだと扱わず、内容や数値を推測しないこと。関連資料として紹介する場合も元の[LINEオプチャN]を示すこと。",
     "8. セミナー動画の本文は自動文字起こしのため誤変換や句読点の欠落がある（例: 神王さんクラブ→神・大家さん倶楽部）。文脈から明らかな語は正しい表記に直して要約し、聞き取れない数値や固有名詞は断定しない。",
-    "",
-    ...followUp,
     "",
     "参考情報テキスト:",
     answerContext,
@@ -370,8 +339,7 @@ async function summarizeAnswer(
   answerContext: string,
   usage?: GeminiUsage,
   signal?: AbortSignal,
-  lite = false,
-  history: ChatTurn[] = []
+  lite = false
 ): Promise<string> {
   const trimmed = answerContext.trim();
   if (!trimmed) return REFUSAL;
@@ -384,7 +352,7 @@ async function summarizeAnswer(
     signal,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: buildAnswerPrompt(query, trimmed, history) }] }],
+      contents: [{ role: "user", parts: [{ text: buildAnswerPrompt(query, trimmed) }] }],
       generationConfig: {
         temperature: 0.2,
         maxOutputTokens: 8192,
@@ -524,8 +492,6 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
 
   const query = asString(body?.query).trim();
   const listOpenchat = body?.list_openchat === true;
-  const history = normalizeHistory(body?.history);
-  const searchQuery = contextualSearchQuery(query, history);
 
   if (!query && !listOpenchat) {
     return json({
@@ -680,8 +646,8 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
     }));
     void keywordResult.catch(()=>{});
     const embeddingStarted=performance.now();
-    const cached=await queryEmbeddingCache.get(await embeddingKey(GEMINI_EMBED_MODEL,'RETRIEVAL_QUERY',GEMINI_EMBED_DIM,searchQuery),
-      signal=>{embeddingProviderCalls++;return embedQuery(searchQuery,signal);},req.signal);
+    const cached=await queryEmbeddingCache.get(await embeddingKey(GEMINI_EMBED_MODEL,'RETRIEVAL_QUERY',GEMINI_EMBED_DIM,query),
+      signal=>{embeddingProviderCalls++;return embedQuery(query,signal);},req.signal);
     const embedding=cached.values;
     const embeddingMs=Math.round(performance.now()-embeddingStarted);
 
@@ -783,7 +749,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       openchatsForAnswer
     );
     const retrievalMs=Math.round(performance.now()-retrievalStarted);
-    const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext, geminiUsage, req.signal, liteAnswer, history);
+    const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext, geminiUsage, req.signal, liteAnswer);
 
     const referenceLabels=labelAnswerSources(commentsForAnswer,chunksForAnswer,openchatsForAnswer);
     const knownLabels=new Set([...Object.values(referenceLabels.comments),...Object.values(referenceLabels.chunks),...Object.values(referenceLabels.openchats)]);
