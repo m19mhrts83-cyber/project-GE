@@ -44,6 +44,8 @@ AI が Todoist にタスクを入れるときは、件名の先頭に印を付�
 
 - 書く先は **`~/Documents/500_Obsidian_r1` だけ**（マイドライブの同名フォルダへ直書きしない）
 - 書いたら報告前に `scripts/jarvis_obsidian_ogd_retag.py "相対パス.md"`（印なしは iPhone Pull に出ない）
+- iPhone に反映されないときは印と Pull を先に確認。iPhone 側の無反応だけで Mac の再認証・token 再発行をしない。新 token を発行した場合は iPhone／Mac の両方を更新する
+- `ogd_pull`／`ogd_retag` の API が 500 等で失敗したら成功扱いにせず、反復・token 再発行を止めてエンドポイント／スクリプトを確認。通常確認に Reset は使わない
 - Journal 読取前は `scripts/jarvis_obsidian_ogd_pull.py --prefix '01_Journaling/★Journal'`
 - 詳細: `.cursor/rules/jarvis-obsidian-gdrive-sync.mdc`
 
