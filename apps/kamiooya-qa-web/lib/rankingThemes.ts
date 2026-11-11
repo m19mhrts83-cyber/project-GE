@@ -29,7 +29,10 @@ const num = (v: unknown) => { const x = Number(v); return Number.isFinite(x) && 
 // DB の行を画面向けに整える（決まった項目だけ、長さも切る）。
 export function shapeRound(r: any, decisions: any[]) {
   const ranking = (Array.isArray(r?.ranking) ? r.ranking : []).slice(0, 30).map((x: any) => ({
-    topic: str(x?.topic, 80), count: num(x?.count), chatbot: num(x?.chatbot), forum: num(x?.forum), openchat: num(x?.openchat),
+    // count＝Q&Aチャットで聞かれた回数、people＝聞いた人数（どちらも質問ログから数えた値。11/11 見直し）。
+    // chatbot/forum/openchat は 11/11 朝の第1回（AI の目安）だけが持つ古い形。
+    topic: str(x?.topic, 80), count: num(x?.count), people: x?.people == null ? null : num(x.people), variants: num(x?.variants),
+    chatbot: num(x?.chatbot), forum: num(x?.forum), openchat: num(x?.openchat),
     examples: (Array.isArray(x?.examples) ? x.examples : []).slice(0, 3).map((e: unknown) => str(e, 140)),
   }));
   const byTheme = new Map<string, any>();
@@ -42,7 +45,7 @@ export function shapeRound(r: any, decisions: any[]) {
   });
   const s = r?.stats && typeof r.stats === 'object' ? r.stats : {};
   return { id: str(r?.id, 40), created_at: r?.created_at ?? null, period_days: num(r?.period_days), model: str(r?.model, 60), ranking, themes,
-    stats: { chatbot: num(s.chatbot), forum: num(s.forum), openchat: num(s.openchat), courses: num(s.courses) } };
+    stats: { chatbot: num(s.chatbot), chatbot_users: num(s.chatbot_users), forum: num(s.forum), openchat: num(s.openchat), courses: num(s.courses) } };
 }
 
 export function decisionRow(userId: string, d: ThemeDecisionInput) {
