@@ -15,7 +15,6 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
-import re
 import sys
 import urllib.error
 import urllib.request
@@ -40,30 +39,30 @@ def rest(path: str, method: str = "GET", body: object | None = None, prefer: str
 
 
 STR = {"type": "STRING"}
-# 件数は文字列で受ける。INTEGER だと Gemini が桁の終わらない数字を出して JSON が読めなくなることがある（11/11 実測）。
-INT = {"type": "STRING", "description": "件数。半角数字だけ、5桁まで"}
-SCHEMA = {"type": "OBJECT", "required": ["ranking", "themes"], "properties": {
-    "ranking": {"type": "ARRAY", "items": {"type": "OBJECT", "required": ["topic", "count"], "properties": {
-        "topic": STR, "count": INT, "chatbot": INT, "forum": INT, "openchat": INT,
-        "examples": {"type": "ARRAY", "items": STR}}}},
+# 数は Gemini に数えさせない（11/11 松野さん「Q&Aに問い合わせた数を出したい」）。
+# Gemini は「どの質問が同じ趣旨か」のまとめ方だけを返し、回数・人数はこのスクリプトが質問ログから正確に数える。
+GROUP_SCHEMA = {"type": "OBJECT", "required": ["groups"], "properties": {
+    "groups": {"type": "ARRAY", "items": {"type": "OBJECT", "required": ["topic", "ids"], "properties": {
+        "topic": STR, "ids": {"type": "ARRAY", "items": STR}}}}}}
+THEME_SCHEMA = {"type": "OBJECT", "required": ["themes"], "properties": {
     "themes": {"type": "ARRAY", "items": {"type": "OBJECT", "required": ["id", "title", "why", "evidence"], "properties": {
         "id": STR, "title": STR, "why": STR, "evidence": STR, "format": STR, "target": STR}}}}}
 
 
-def gemini(prompt: str, tries: int = 3) -> dict:
+def gemini(prompt: str, schema: dict, tries: int = 3) -> dict:
     for i in range(tries):
         try:
-            return _gemini_once(prompt)
+            return _gemini_once(prompt, schema)
         except (ValueError, KeyError, IndexError) as e:
             print(f"Gemini の応答を読めませんでした（{i + 1}回目）: {type(e).__name__} {str(e)[:120]}", file=sys.stderr)
     raise SystemExit("Gemini の応答を3回とも読めませんでした")
 
 
-def _gemini_once(prompt: str) -> dict:
+def _gemini_once(prompt: str, schema: dict) -> dict:
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         # Gemini 3 は温度を下げると同じ出力を繰り返しやすい（数字が延々と続く等）ので既定の 1.0 のまま。
-        "generationConfig": {"responseMimeType": "application/json", "responseSchema": SCHEMA,
+        "generationConfig": {"responseMimeType": "application/json", "responseSchema": schema,
                              "maxOutputTokens": 16384},
     }
     req = urllib.request.Request(
@@ -93,55 +92,91 @@ def past_decisions() -> list[dict]:
     return out
 
 
-PROMPT = """あなたは不動産投資家コミュニティ「神・大家さん倶楽部」の講座企画を手伝う担当です。
-会員が実際に聞いていることを集計した材料（JSON）と、運営が過去のテーマ案に付けた判断を渡します。
+GROUP_PROMPT = """神大家Q&Aチャット（不動産投資家コミュニティの会員がAIに質問するチャット）に届いた質問の一覧です。
+同じ趣旨の質問（言い方が違っても聞きたいことが同じもの）を1つのまとまりにしてください。
+- 各質問は id で指定し、1つの質問は1つのまとまりにだけ入れる。どこにも当てはまらない質問は、その1件だけのまとまりにする。
+- topic は会員が聞いていることを会員の言葉で20字以内（例: 「築古戸建の修繕費の目安」）。
+- 「テスト」「こんにちは」のように中身のない質問は topic を「(質問以外)」にする。
+- 数を数える必要はありません。
 
-やること:
-1. ranking: 材料の質問（chatbot.top / forum.questions / forum.topics / openchat.questions / openchat.threads）を、
-   意味の近いもの同士でまとめ、多い順に最大20個。count はまとまりの件数の目安（chatbot.top の n も足す。0〜20000 の整数）。
-   chatbot / forum / openchat はそれぞれの内訳の目安。examples は実際の質問を短く言い直したもの最大3つ
-   （個人名・会社名・物件の住所・電話番号などは入れない）。topic は会員の言葉で20字以内。
-2. themes: 講座またはグループコンサル（グルコン）のテーマ案をちょうど5つ。id は t1〜t5。
-   - 需要（ranking の多さ）に対して既存講座（courses.titles）が少ない「すき間」を優先する。
-   - 既存講座が多いテーマは、新しい切り口（最新動向・事例・実務の手順）がある場合だけにする。
-   - 過去の判断（decisions）を必ず反映する。不採用の理由に当てはまる案は出さない。直して採用された題名の傾向
-     （具体さ・言い回し）に合わせる。採用済みと同じ案は繰り返さない。
-   - title は30字以内、why は「なぜ今これか」を2文以内、evidence は根拠の数字（何件・どこで）を1文、
-     format は形式（例: 60分講座、グルコン、連載3回）、target は対象（例: 1棟目購入前、築古戸建の保有者）。
+出力は次の形の JSON だけ: {"groups":[{"topic":"","ids":["q1","q2"]}]}
 
-出力は次の形の JSON だけ:
-{"ranking":[{"topic":"","count":0,"chatbot":0,"forum":0,"openchat":0,"examples":[""]}],
- "themes":[{"id":"t1","title":"","why":"","evidence":"","format":"","target":""}]}
+質問一覧（id, 質問, この文面で聞かれた回数）:
+%s
+"""
+
+THEME_PROMPT = """あなたは不動産投資家コミュニティ「神・大家さん倶楽部」の講座企画を手伝う担当です。
+次の材料から、講座またはグループコンサル（グルコン）のテーマ案をちょうど5つ出してください。id は t1〜t5。
+
+材料:
+- ranking: Q&Aチャットでよく聞かれていること（回数・人数は質問ログから数えた正確な値）
+- forum / openchat: コミュニティとLINEオープンチャットの投稿の集計と質問の抜粋（件数は投稿数）
+- courses.titles: 既存の講座
+
+決まりごと:
+- 需要（ranking の回数・人数、コミュニティ・オプチャで多い話題）に対して既存講座が少ない「すき間」を優先する。
+- 既存講座が多いテーマは、新しい切り口（最新動向・事例・実務の手順）がある場合だけにする。
+- 過去の判断（decisions）を必ず反映する。不採用の理由に当てはまる案は出さない。直して採用された題名の傾向
+  （具体さ・言い回し）に合わせる。採用済みと同じ案は繰り返さない。
+- title は30字以内、why は「なぜ今これか」を2文以内、evidence は根拠の数字（どこで何回・何人・何件）を1文、
+  format は形式（例: 60分講座、グルコン、連載3回）、target は対象（例: 1棟目購入前、築古戸建の保有者）。
+- 個人名・会社名・物件の住所・電話番号などは書かない。
+
+出力は次の形の JSON だけ: {"themes":[{"id":"t1","title":"","why":"","evidence":"","format":"","target":""}]}
 
 decisions:
 %s
 
-材料:
+ranking:
+%s
+
+forum / openchat / courses:
 %s
 """
 
 
-def clean(res: dict) -> tuple[list, list]:
-    def s(v, n):
-        return str(v or "").strip()[:n]
+def s_(v, n):
+    return str(v or "").strip()[:n]
 
-    def n(v):
-        try:
-            digits = re.sub(r"[^0-9.]", "", str(v))[:6]
-            return min(99999, max(0, int(round(float(digits)))))
-        except (TypeError, ValueError):
-            return 0
 
-    ranking = [{"topic": s(x.get("topic"), 80), "count": n(x.get("count")), "chatbot": n(x.get("chatbot")),
-                "forum": n(x.get("forum")), "openchat": n(x.get("openchat")),
-                "examples": [s(e, 140) for e in (x.get("examples") or [])[:3]]}
-               for x in (res.get("ranking") or [])[:20] if isinstance(x, dict) and x.get("topic")]
-    themes = [{"id": f"t{i + 1}", "title": s(t.get("title"), 120), "why": s(t.get("why"), 400),
-               "evidence": s(t.get("evidence"), 400), "format": s(t.get("format"), 120), "target": s(t.get("target"), 120)}
+def build_ranking(top: list[dict], groups: list[dict]) -> list[dict]:
+    """Gemini のまとめ方に、質問ログの回数（n）と人数（u のハッシュの重複なし）を当てる。"""
+    by_id = {f"q{i + 1}": q for i, q in enumerate(top)}
+    used: set[str] = set()
+    out = []
+    for g in groups:
+        if not isinstance(g, dict):
+            continue
+        ids = [i for i in dict.fromkeys(str(x) for x in (g.get("ids") or [])) if i in by_id and i not in used]
+        if not ids:
+            continue
+        used.update(ids)
+        out.append((s_(g.get("topic"), 80) or "(名前なし)", [by_id[i] for i in ids]))
+    # Gemini が入れ忘れた質問も落とさない（その文面のまとまりにする）
+    for i, q in by_id.items():
+        if i not in used:
+            out.append((s_(q.get("q"), 40), [q]))
+    ranking = []
+    for topic, qs in out:
+        if topic == "(質問以外)":
+            continue
+        users = set()
+        for q in qs:
+            users.update(str(u) for u in (q.get("u") or []))
+        qs = sorted(qs, key=lambda q: -int(q.get("n") or 0))
+        ranking.append({"topic": topic, "count": sum(int(q.get("n") or 0) for q in qs), "people": len(users),
+                        "variants": len(qs), "examples": [s_(q.get("q"), 140) for q in qs[:3]]})
+    ranking.sort(key=lambda r: (-r["count"], -r["people"], r["topic"]))
+    return ranking[:20]
+
+
+def clean_themes(res: dict) -> list:
+    themes = [{"id": f"t{i + 1}", "title": s_(t.get("title"), 120), "why": s_(t.get("why"), 400),
+               "evidence": s_(t.get("evidence"), 400), "format": s_(t.get("format"), 120), "target": s_(t.get("target"), 120)}
               for i, t in enumerate([t for t in (res.get("themes") or []) if isinstance(t, dict) and t.get("title")][:5])]
     if len(themes) < 3:
         raise SystemExit("テーマ案が足りません（Gemini の応答が想定と違う）")
-    return ranking, themes
+    return themes
 
 
 def main() -> None:
@@ -150,14 +185,20 @@ def main() -> None:
     digest = rest("rpc/qa_theme_source_digest", "POST", {"p_days": DAYS})
     size = len(json.dumps(digest, ensure_ascii=False).encode())
     decisions = past_decisions()
-    res = gemini(PROMPT % (json.dumps(decisions, ensure_ascii=False), json.dumps(digest, ensure_ascii=False)))
-    ranking, themes = clean(res)
+    top = digest["chatbot"]["top"]
+    listing = "\n".join(f'q{i + 1}\t{q["q"]}\t{q["n"]}' for i, q in enumerate(top))
+    groups = gemini(GROUP_PROMPT % listing, GROUP_SCHEMA).get("groups") or [] if top else []
+    ranking = build_ranking(top, groups)
+    rest_part = {k: digest[k] for k in ("forum", "openchat", "courses")}
+    themes = clean_themes(gemini(THEME_PROMPT % (json.dumps(decisions, ensure_ascii=False),
+                                                 json.dumps(ranking, ensure_ascii=False),
+                                                 json.dumps(rest_part, ensure_ascii=False)), THEME_SCHEMA))
     now = dt.datetime.now(JST)
     rid = "r" + now.strftime("%Y%m%d")
     if rest(f"qa_theme_rounds?select=id&id=eq.{rid}"):
         rid += now.strftime("-%H%M")
     row = {"id": rid, "period_days": DAYS, "model": MODEL, "ranking": ranking, "themes": themes,
-           "stats": {"chatbot": digest["chatbot"]["events"], "forum": digest["forum"]["posts"],
+           "stats": {"chatbot": digest["chatbot"]["events"], "chatbot_users": digest["chatbot"]["users"], "forum": digest["forum"]["posts"],
                      "openchat": digest["openchat"]["posts"], "courses": digest["courses"]["total"]}}
     print(f"round={rid} digest_kb={size // 1024} ranking={len(ranking)} themes={len(themes)} past_decisions={len(decisions)}")
     if os.environ.get("DRY_RUN") == "1":

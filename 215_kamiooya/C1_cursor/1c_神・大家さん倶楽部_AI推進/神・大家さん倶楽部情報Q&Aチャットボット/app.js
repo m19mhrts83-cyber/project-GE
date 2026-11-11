@@ -4983,16 +4983,14 @@ const App = {
       return;
     }
     const st = latest.stats || {};
-    status.textContent = String(latest.created_at || '').slice(0, 10) + ' の回（直近 ' + (latest.period_days || 120) + ' 日）／ チャットボット ' + (st.chatbot || 0) +
-      ' 件・コミュニティ ' + (st.forum || 0) + ' 件・オプチャ ' + (st.openchat || 0) + ' 件・既存講座 ' + (st.courses || 0) + ' 本';
-    list.innerHTML = (latest.ranking || []).map(function (x) {
-      const parts = [];
-      if (x.chatbot) parts.push('チャットボット ' + x.chatbot);
-      if (x.forum) parts.push('コミュニティ ' + x.forum);
-      if (x.openchat) parts.push('オプチャ ' + x.openchat);
-      return '<li><span class="font-medium">' + esc(x.topic) + '</span> <span class="text-slate-500">約 ' + x.count + ' 件' + (parts.length ? '（' + esc(parts.join('・')) + '）' : '') + '</span>' +
-        (x.examples && x.examples.length ? '<details class="text-xs text-slate-600"><summary>質問の例</summary><ul class="list-disc ml-4">' + x.examples.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></details>' : '') + '</li>';
-    }).join('') || '<li class="list-none text-slate-500">まだありません。</li>';
+    status.textContent = String(latest.created_at || '').slice(0, 10) + ' の回（直近 ' + (latest.period_days || 120) + ' 日）／ Q&Aチャットへの質問 ' + (st.chatbot || 0) +
+      ' 回' + (st.chatbot_users ? '・' + st.chatbot_users + ' 人' : '') + '（テーマ案の材料には、コミュニティ ' + (st.forum || 0) + ' 件・オプチャ ' + (st.openchat || 0) + ' 件・既存講座 ' + (st.courses || 0) + ' 本も使っています）';
+    const exact = (latest.ranking || []).some(function (x) { return x.people != null; });
+    list.innerHTML = exact ? (latest.ranking || []).map(function (x) {
+      return '<li><span class="font-medium">' + esc(x.topic) + '</span> <span class="text-slate-600">' + x.count + ' 回・' + x.people + ' 人</span>' +
+        (x.examples && x.examples.length ? '<details class="text-xs text-slate-600"><summary>実際の質問' + (x.variants > 1 ? '（言い方 ' + x.variants + ' 通り）' : '') + '</summary><ul class="list-disc ml-4">' + x.examples.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></details>' : '') + '</li>';
+    }).join('') || '<li class="list-none text-slate-500">まだ質問がありません。</li>'
+      : '<li class="list-none text-slate-500">この回は数え方を見直す前のものです。次の回（または再集計）から、Q&Aチャットで聞かれた回数・人数で並びます。</li>';
     cards.innerHTML = (latest.themes || []).map(function (t) {
       const d = t.decision;
       return '<div class="border rounded p-2" data-theme="' + esc(t.id) + '">' +
