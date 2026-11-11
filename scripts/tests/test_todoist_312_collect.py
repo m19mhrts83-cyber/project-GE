@@ -2,8 +2,10 @@
 """312 入口（jarvis_todoist_312_collect.py）の判定と3案のテスト（ネットワーク不要）。"""
 from __future__ import annotations
 
+import os
 import sys
 import unittest
+from unittest import mock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -108,6 +110,17 @@ class LinkToken(unittest.TestCase):
         exp, sig = tok.split(".")
         self.assertEqual(int(exp), int(NOW.timestamp()) + 7 * 86400)
         self.assertRegex(sig, r"^[A-Za-z0-9_-]{20,}$")
+
+    def test_nody_url_without_key_goes_through_dashboard(self):
+        # 投稿側に鍵が無いと素のリンクは Nody の /login で止まる → ダッシュ経由にする（2026-11-12）
+        with mock.patch.dict(os.environ, {"LOOPWARE_ACCESS_KEY": "", "JARVIS_DASHBOARD_URL": ""}):
+            url = c.nody_url("/312?topic=abc", NOW)
+        self.assertEqual(url, "https://jarvis-dashboard-amber.vercel.app/go/loopware?to=/312%3Ftopic%3Dabc")
+
+    def test_nody_url_with_key_has_pass(self):
+        with mock.patch.dict(os.environ, {"LOOPWARE_ACCESS_KEY": "k", "JARVIS_LOOPWARE_URL": ""}):
+            url = c.nody_url("/312?topic=abc", NOW)
+        self.assertTrue(url.startswith("https://jarvis-loopware.vercel.app/312?topic=abc&t="), url)
 
 
 if __name__ == "__main__":

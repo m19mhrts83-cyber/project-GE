@@ -42,6 +42,9 @@ import json
 import os
 import sys
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from jarvis_nody_link import nody_link  # noqa: E402
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -323,7 +326,7 @@ def main(argv: list[str] | None = None) -> int:
             raise RuntimeError("JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY が必要です（--sql で INSERT 文だけ出せます）")
         res = sb.table("draft_reviews").insert(row).execute()
         rid = res.data[0]["id"]
-        print(f"ID: {rid}\nNody: {NODY_URL}/drafts/{rid}")
+        print(f"ID: {rid}\nNody: {nody_link(f'/drafts/{rid}')}")
         return 0
 
     if args.command == "pull":
