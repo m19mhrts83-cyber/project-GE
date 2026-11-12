@@ -60,7 +60,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/materials", label: "資料ハブ", icon: "folder" },
       { href: "/kiso-transcripts", label: "基礎講座・文字起こし", icon: "book" },
       { href: "/purchase-compare", label: "購入比較", icon: "cart" },
-      { href: LOOPWARE_URL, label: "ループウェア（312/313）", external: true, icon: "grid" },
+      { href: "/go/loopware?to=/", label: "Nody（ループウェア）", external: true, icon: "grid" },
       { href: "/apps", label: "アプリ・プロンプト集", icon: "grid" },
       { href: "/agent-team", label: "AIエージェントチーム", icon: "bolt" },
       { href: "/notebooklm", label: "NotebookLM", icon: "book" },
