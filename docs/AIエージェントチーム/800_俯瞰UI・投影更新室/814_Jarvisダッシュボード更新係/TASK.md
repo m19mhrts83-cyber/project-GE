@@ -57,3 +57,9 @@ Dashboardの履歴画面から時間の訂正・作業記録の追記を可能�
 - 完了条件: 依存関係のない待ち合わせを削減し、根拠選択・モデル入力が変わらない統合テスト、結果と残る提案を文書化。
 
 - 結果: 独立取得を前倒し、LINE取得失敗時の不完全生成を抑止。Node76/Deno3/Edge型チェック成功。旧mainでは新しい回帰試験2件が失敗することも確認。PR #242。
+
+## 月別Journal保存（2026-11-13）
+
+- task_id: obsidian-monthly-journal-20261113 / executor: codex / status: running
+- 目的: `★Journal/YYYY-MM/YYYY-MM-DD.md` に生ログと戦術レビューを1件として保存。対象日から月を決め、競合時は停止。Drive直接uploadを呼ばず、既存Obsidian同期に任せる。
+- 完了条件: 月跨ぎ・再送・競合を検証、APIの新旧receipt対応を本番反映、11/12統合ノートを上書きなしで作成。旧2ファイルは保持。
