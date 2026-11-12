@@ -42,7 +42,7 @@ PY = _MAC_PY if _MAC_PY.is_file() else Path(sys.executable)
 JST = timezone(timedelta(hours=9))
 MAX_L1 = 5
 AGENT_ID = "313"
-AGENT_ROLE = "完了候補確認"
+AGENT_ROLE = "タスク処置"
 ITEM_MARK = "✅"  # 期日超過は 📅（別投稿・記号で区別）
 USERNAME = f"{AGENT_ID} {AGENT_ROLE}"
 
@@ -317,7 +317,7 @@ def _complete_task(it: dict[str, Any], *, dry_run: bool, reason: str) -> dict[st
         why = "了承後 close"
     comment = (
         f"{head}\n"
-        f"サマリ: Todoist完了候補確認 — {why}（{reason}）: {title[:80]}\n"
+        f"サマリ: Todoistタスク処置 — {why}（{reason}）: {title[:80]}\n"
         "アウトプット:\n"
         f"- [該当タスク]({out_link})\n"
     )
@@ -423,7 +423,7 @@ def cmd_digest(args: argparse.Namespace) -> int:
         it["title_short"] = _short_title(it.get("title"))
     payload = build_close_blocks(
         items,
-        header_text="313 完了候補確認",
+        header_text="313 タスク処置",
         fallback_text=text,
         url_mode=url_mode,
     )
@@ -492,7 +492,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
     state["last_apply_results"] = results
     _save_state(state)
 
-    print("📎 Todoist完了候補確認（313 digest）" + (" DRY-RUN" if dry else ""))
+    print("📎 Todoistタスク処置（313 digest）" + (" DRY-RUN" if dry else ""))
     for r in results:
         if r.get("ok"):
             prefix = "[dry] " if dry else ""

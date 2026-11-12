@@ -173,7 +173,7 @@ agents:
     schedule: 材料できたとき即＋取りこぼし保険（ソフト相乗り）
     note: 2026-10-21 Phase1+1.5a意図OK・運用確認。digest→#consult→了承後create。L2ボタン／定時は後続
   '313':
-    name: Todoist完了候補確認係
+    name: Todoistタスク処置係
     path: 300_品質・タスク運用管理室/313_完了候補確認係
     flowforge_id: flow_6s1nyBIKzluSsdgR-hs9IolD
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_6s1nyBIKzluSsdgR-hs9IolD

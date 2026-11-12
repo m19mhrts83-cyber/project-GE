@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Todoist完了候補確認（313）— 夜20:00 片付け runner
+# Todoistタスク処置（313）— 夜20:00 片付け runner
 # 段階1: 旧 ✅／📅 2通 → 1通「313 片付け」3択
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
