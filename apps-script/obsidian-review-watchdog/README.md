@@ -11,7 +11,7 @@ Runs outside the Mac every five minutes and calls the authenticated Dashboard mo
 3. Run `installObsidianReviewWatchdogTrigger` once and approve UrlFetch/time-trigger permissions.
 4. Confirm the Apps Script execution is successful. The first online check initializes state without a Slack message. If no Mac poll arrives for 10 minutes after initialization, it sends an offline alert; recovery sends one follow-up.
 
-The trigger is best-effort on Google's schedule. Expected alert delay is approximately 5–10 minutes after the last poll, plus any Apps Script scheduling delay. The Mac poller uses a 15-second LaunchAgent interval after its local installer is updated.
+The trigger is best-effort on Google's schedule. Expected alert delay is approximately 5–10 minutes after the last poll, plus any Apps Script scheduling delay. The Mac poller keeps its existing 60-second LaunchAgent interval, about 43,200 outbound polls per 30-day month, with no additional poller process.
 
 ## Secrets and deployment
 

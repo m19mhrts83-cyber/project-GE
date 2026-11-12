@@ -10,7 +10,7 @@
 ChatGPT private tools
   ├─ 読取: search_vault_notes / get_vault_read_result / get_vault_note_excerpt
   │    → read-only Bearer key → Supabase短期要求箱
-  │    ← Macから15秒間隔の外向きpoll → allowlist配下を読取 → 抜粋を返す
+  │    ← Macから60秒間隔の外向きpoll → allowlist配下を読取 → 抜粋を返す
   └─ 書込: submit_daily_review（確定指示の後だけ）
        → submit Bearer key → obsidian_review_inbox（一時キュー）
        ← Mac poll → Documents Vaultへno-clobber保存
@@ -49,7 +49,7 @@ Vault正本は `~/Documents/500_Obsidian_r1`。Google DriveはOGD同期ハブ、
 
 ## Mac worker・保存安全性
 
-- 既存worker `scripts/jarvis_obsidian_review_inbox.py` がレビュー保存とVault read requestの両方を処理する。LaunchAgent installerは15秒間隔で登録する。
+- 既存worker `scripts/jarvis_obsidian_review_inbox.py` がレビュー保存とVault read requestの両方を処理する。既存と同じ60秒間隔で登録する（30日あたり約43,200回の外向きpoll）。
 - 読取ロジックは `scripts/jarvis_obsidian_vault_reader.py`。Vault正本から直接read-only取得し、結果を一時queueへ返す。検索語やノート本文をMacログに出さない。
 - レビュー保存は固定フォルダ `01_Journaling/★Journal/日次レビュー/`。既存ファイルに異なる本文があれば上書きしない。保存・OGD helper成功後だけackする。
 - Google Drive APIのupload/patchは既存 `scripts/jarvis_obsidian_ogd_retag.py` 内でMacから実行する。Cloud APIにDrive tokenやDrive書込処理を持たせない。
@@ -59,6 +59,7 @@ Vault正本は `~/Documents/500_Obsidian_r1`。Google DriveはOGD同期ハブ、
 
 - Dashboardはreview/read pollの成功時刻を `obsidian_review_agent_status` に記録する。
 - Apps Scriptは5分ごとに `/api/obsidian-review/monitor` を呼ぶ。最後のMac pollから5分を超えるとoffline、再度応答があればrecoveredと判定。
+- monitorの呼出しは30日あたり約8,640回。
 - 最初の監視呼出しから10分は起動猶予。Apps Scriptの実行遅延もあるため、通知目安はMac最終応答から約5〜10分＋GAS遅延。
 - Slack `#ops` には状態遷移時のみ短い通知を送る。成功状態の定期投稿なし。同じ状態で通知を繰り返さない。
 - Slack webhookはVercel環境変数 `SLACK_WEBHOOK_AI_TEAM_OPS` に置き、GASにはmonitor endpoint/keyだけを置く。
@@ -68,22 +69,22 @@ Vault正本は `~/Documents/500_Obsidian_r1`。Google DriveはOGD同期ハブ、
 
 - 2026-11-10分: Macログに `saved and synced`、Vault内に生ログ・戦術レビューの2ファイルを確認済み。OGD helperとackまで成功。iPhone画面での表示は未確認。
 - 2026-11-12分: 前回の読み取りdry-runでpendingなし、Vault内保存なし。依頼時点の「送信保留」と整合。ChatGPT側の送信履歴は確認していない。
-- このブランチのread/monitor新規経路はまだdeploy・migration・connector設定・実データを用いた動作確認をしていない。
+- 2026-11-12: Supabase migration適用、Vercel Productionにread/poll/monitor鍵とSlack webhookを設定、既存owner-only Site pluginへ読み取りツールを追加して公開済み。PR #379をmainへmerge済み。
+- 残作業: Mac LaunchAgentの一時worktree参照を安定worktreeへ付け替え、Google Apps ScriptのScript Properties/5分triggerを登録する。Apps Script画面操作とlive検索による動作確認は未完了。
 
 ## 有効化に必要な作業
 
-1. このbranchのコードをレビュー後にmerge/deployする。
-2. Supabaseへ `apps/jarvis-dashboard/supabase/migrations/20261112_obsidian_vault_read_watchdog.sql` を適用する。
-3. Vercel Productionに以下を設定する（値はGit・チャットへ書かない）。
+1. 完了: PR #379をmerge/deployし、Supabase migrationを適用した。
+2. 完了: Vercel Productionへ以下を秘密変数として設定した（値はGit・チャットへ書かない）。
    - `OBSIDIAN_REVIEW_READ_KEY`
    - `OBSIDIAN_VAULT_POLL_KEY`
    - `OBSIDIAN_REVIEW_MONITOR_KEY`
    - `SLACK_WEBHOOK_AI_TEAM_OPS`（既存設定が使える場合は再設定不要）
-4. Macの `~/git-repos/.env.jarvis_private` に `OBSIDIAN_VAULT_POLL_KEY` を追加する。
-5. mainへ反映後、**安定したrepo checkoutから** `launchd/install_obsidian_review_inbox_launchd.sh` を実行する。現在のLaunchAgentは一時worktreeを実行先にしているため、この手順で安定パスへ付け替える。
-6. `apps-script/obsidian-review-watchdog/README.md` に従いGAS private projectを作り、Script Propertiesを設定してtriggerを登録する。
-7. ChatGPTにread-only MCP endpoint `https://jarvis-dashboard-amber.vercel.app/api/obsidian-vault/mcp` を、Bearer `OBSIDIAN_REVIEW_READ_KEY` でprivate登録する。既存save toolとは別の接続として扱う。
-8. 有効化後、許可範囲内の一件で出典付き検索→抜粋取得、offline/recoveryの一度ずつの通知を確認する。失敗時に成功扱いしない。
+3. 完了: Macの `~/git-repos/.env.jarvis_private` に `OBSIDIAN_VAULT_POLL_KEY` を追加した。
+4. 次: 安定したcheckoutから `launchd/install_obsidian_review_inbox_launchd.sh` を実行し、一時worktree参照を付け替える。
+5. 次: `apps-script/obsidian-review-watchdog/README.md` に従いGAS private projectを作り、Script Propertiesを設定してtriggerを登録する。
+6. 完了: 既存owner-only ChatGPT Site plugin「Obsidian 日次レビュー」を読み取り3 toolを含むversion 3に更新。必要なら新しいChatGPT会話を開いてtool一覧を更新する。
+7. 設定後、許可範囲内の一件で出典付き検索→抜粋取得、offline/recoveryの通知を確認する。失敗時に成功扱いしない。
 
 ## 既知の制約
 

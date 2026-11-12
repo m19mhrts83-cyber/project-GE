@@ -26,11 +26,11 @@ ChatGPTからMac正本Obsidian Vaultを安全に検索・抜粋できる読み�
 
 ## 実装結果（2026-11-12）
 
-- 追加対応中: Supabase migrationを本番適用、Vercel Productionに認証鍵とSlack webhookを登録、Mac秘密envに中継鍵を追加。コード公開・Site plugin登録・GAS設定は継続中。
+- 追加対応中: PR #379はmainへmerge済み。Supabase migrationとVercel Production秘密変数を設定し、Site plugin version 3を公開。LaunchAgent付け替え・GAS Script Properties/trigger設定・live確認が残る。ブラウザー操作はWork設定で無効。
 
-- 読取MCP、Mac側allowlist検索、短期Supabase要求箱、専用鍵、heartbeat/watchdog/Slack状態通知、LaunchAgent 15秒poll設定を追加。
-- 運用・有効化手順: `docs/Obsidian日次レビュー受信.md`。Supabase migration、Vercel環境変数、GAS trigger、ChatGPT read connector、安定checkoutからのLaunchAgent再登録は未実施。
-- 専用worktree `codex/obsidian-bidirectional-20261112` に実装。`git diff --check` はclean。テストや本番疎通、Slack送信は実施していない。
+- 読取MCP、Mac側allowlist検索、短期Supabase要求箱、専用鍵、heartbeat/watchdog/Slack状態通知を追加。LaunchAgentは既存負荷を保つ60秒間隔とした。
+- Supabase migration適用、Vercel本番設定、Site plugin更新済み。GitHub PR ChecksとPreview buildは成功。Slack通知・Vault書込み・live検索要求は未実施。
+- 運用・残手順: `docs/Obsidian日次レビュー受信.md`。Google Apps ScriptはUI操作でScript Properties/triggerを登録する必要あり。現在のLaunchAgentは一時worktree参照のまま。
 
 ## 依頼
 
