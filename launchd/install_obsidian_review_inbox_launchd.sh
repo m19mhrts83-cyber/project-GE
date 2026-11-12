@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Install ChatGPT daily-review inbox polling (every minute, Mac outbound-only).
+# Install ChatGPT review and read polling (every 15 seconds, Mac outbound-only).
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.obsidian-review-inbox"
@@ -16,7 +16,7 @@ cat >"$PLIST" <<EOF
   <key>Label</key><string>${LABEL}</string>
   <key>ProgramArguments</key>
   <array><string>${RUNNER}</string></array>
-  <key>StartInterval</key><integer>60</integer>
+  <key>StartInterval</key><integer>15</integer>
   <key>RunAtLoad</key><true/>
   <key>StandardOutPath</key><string>${HOME}/Library/Logs/jarvis_obsidian_review/launchd.out.log</string>
   <key>StandardErrorPath</key><string>${HOME}/Library/Logs/jarvis_obsidian_review/launchd.err.log</string>
@@ -27,4 +27,4 @@ EOF
 launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 launchctl enable "gui/$(id -u)/${LABEL}"
-echo "installed ${LABEL} (every 60s) → ${PLIST}"
+echo "installed ${LABEL} (every 15s) → ${PLIST}"
