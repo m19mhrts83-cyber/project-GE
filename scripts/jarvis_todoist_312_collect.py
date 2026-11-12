@@ -42,6 +42,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from jarvis_nody_link import link_token, nody_link  # noqa: E402,F401
 from jarvis_todoist_mark import mark_title, strip_mark  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
@@ -55,6 +56,7 @@ CHANNELS = {
     "report": "C0C866FNU3C",
 }
 WORKSPACE = "aiwsnetwork"
+
 LOOPWARE_DEFAULT = "https://jarvis-loopware.vercel.app"
 DONE_REACTIONS = {"white_check_mark", "heavy_check_mark", "ballot_box_with_check", "ok", "+1"}
 
@@ -247,20 +249,9 @@ def parse_body(body: str) -> dict[str, str]:
     return out
 
 
-def link_token(key: str, now: datetime, days: int = 7) -> str:
-    """apps/loopware/lib/access.ts の linkToken と同じ作り方。"""
-    exp = int(now.timestamp()) + days * 86400
-    sig = hmac.new(key.encode(), f"loopware-link-v1:{exp}".encode(), hashlib.sha256).digest()
-    return f"{exp}." + base64.urlsafe_b64encode(sig).decode().rstrip("=")
-
-
 def nody_url(path: str, now: datetime) -> str:
-    base = (os.environ.get("JARVIS_LOOPWARE_URL") or LOOPWARE_DEFAULT).rstrip("/")
-    key = (os.environ.get("LOOPWARE_ACCESS_KEY") or "").strip()
-    url = f"{base}{path}"
-    if key:
-        url += ("&" if "?" in url else "?") + "t=" + link_token(key, now)
-    return url
+    """Slack に貼る Nody のリンク（鍵があれば t= 付き、無ければダッシュ経由）。"""
+    return nody_link(path, now)
 
 
 # ---- 外部 API ---------------------------------------------------------------

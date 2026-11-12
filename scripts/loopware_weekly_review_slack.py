@@ -32,6 +32,9 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from jarvis_nody_link import nody_link  # noqa: E402
+
 JST = timezone(timedelta(hours=9))
 APP_URL = os.environ.get("LOOPWARE_URL", "https://jarvis-loopware.vercel.app")
 HERE = Path(__file__).resolve().parent
@@ -370,7 +373,7 @@ def report_text(monday: datetime, s: dict) -> str:
             f"・見送り理由: {why}",
             f"・直し{s['edits']}件／次も同じに{s['rules']}件／音声{s['voice']}件",
             f"・基準: 承認済み{s['criteria']}件",
-            f"見る: {APP_URL}/review",
+            f"見る: {nody_link('/review')}",
             "次: Miss Lemonで続行\n\n担当メモ: 「Nodyの週次レビューをして」と声をかけると、仮説をまとめて提案します\n\n橋渡し: 松野さんが了承した基準だけ反映。完了にすると翌朝ここへ「確認済み」を返す",
         ]
     )

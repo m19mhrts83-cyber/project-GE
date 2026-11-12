@@ -16,6 +16,9 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from jarvis_nody_link import nody_link  # noqa: E402
+
 DEFAULT_CONSULT_CHANNEL = "C0C7R0UF3MM"
 AGENT_USERNAME = "313 タスク処置"
 
@@ -42,11 +45,11 @@ def _loopware() -> str:
 
 
 def loopware_313_url(task_id: str = "", *, tab: str = "cleanup") -> str:
-    base = _loopware()
     q = f"tab={tab}"
     if task_id:
         q += f"&task={task_id}"
-    return f"{base}/313?{q}"
+    # Slack から開いても鍵で止められないように（jarvis_nody_link 参照）
+    return nody_link(f"/313?{q}")
 
 
 def _action_secret_name() -> str:
