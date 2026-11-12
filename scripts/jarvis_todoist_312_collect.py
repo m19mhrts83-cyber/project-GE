@@ -260,6 +260,9 @@ def nody_url(path: str, now: datetime) -> str:
     url = f"{base}{path}"
     if key:
         url += ("&" if "?" in url else "?") + "t=" + link_token(key, now)
+    else:
+        # 鍵が無いと Slack からのリンクが Nody のログイン画面で止まる（GHA は secret LOOPWARE_ACCESS_KEY）
+        print("⚠ LOOPWARE_ACCESS_KEY が無いので Nody リンクに t= を付けられません（scripts/loopware_env_setup.py）", file=sys.stderr)
     return url
 
 
