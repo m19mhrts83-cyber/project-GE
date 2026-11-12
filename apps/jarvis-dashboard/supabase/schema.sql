@@ -591,6 +591,8 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20261017_yen_rate_daily.sql）
 -- obsidian_review_inbox（ChatGPT 日次レビューの一時受信箱）
 -- （migrations/20261110_obsidian_review_inbox.sql）
+-- obsidian_vault_read_requests / obsidian_review_agent_status（Vault読取要求・Mac heartbeat）
+-- （migrations/20261112_obsidian_vault_read_watchdog.sql）
 
 -- Data API 明示 GRANT（2026-10-30 以降の新規テーブル対策。既存も明示して reset 耐性を確保）
 -- 全テーブル分の正本: migrations/20260926_data_api_explicit_grants.sql
