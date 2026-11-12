@@ -39,6 +39,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/openchat", label: "神大家オプチャ", icon: "chat" },
       { href: "/situation", label: "状況ウォッチ", icon: "watch" },
       { href: "/review", label: "週次レビュー", icon: "loop" },
+      { href: "/kotoba", label: "ことばの棚", icon: "book" },
       { href: "/archive", label: "処理済み", icon: "archive" },
     ],
   },
