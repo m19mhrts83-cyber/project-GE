@@ -2,7 +2,7 @@
 
 - 更新: 2026-11-12
 - 実装ブランチ: `codex/obsidian-bidirectional-20261112`
-- 状態: コード準備済み。Supabase migration／Vercel Production／ChatGPT connector／Mac LaunchAgent／GAS triggerは未適用。
+- 状態: 2026-11-12にAPI・DB・Mac worker・GAS初回監視まで設定済み。2026-11-13、月別日付ノート保存へ変更。
 
 ## 全体構成
 
@@ -102,3 +102,13 @@ Vault正本は `~/Documents/500_Obsidian_r1`。Google DriveはOGD同期ハブ、
 - Mac: `scripts/jarvis_obsidian_review_inbox.py`, `scripts/jarvis_obsidian_vault_reader.py`
 - Watchdog: `apps-script/obsidian-review-watchdog/`
 - submit schema: `docs/obsidian-review-submit-openapi.yaml`
+
+
+## 2026-11-13 月別日付ノート保存（現行仕様）
+
+- 新規保存先は `01_Journaling/★Journal/YYYY-MM/YYYY-MM-DD.md`。例: `2026-11/2026-11-12.md`、翌月は `2026-12/2026-12-01.md`。実行日ではなくレビュー対象日で決定し、月フォルダがなければ作成する。
+- 1ノート内に「生ログ」「戦術レビュー」を格納。本文の末尾空白も保持する。既存の同一内容なら再利用し、異なる内容なら上書きせずエラー。同一日の別レビューも自動追記しない。
+- Mac workerはDrive upload helperを呼ばない。既存Obsidianプラグインによる同期に任せ、同期設定は変えない。Obsidianが終了中の場合など、Drive/iPhone反映を保存完了と同時に保証しない。
+- APIの内部 `delivered` はローカル保存receiptを意味する。Google DriveやiPhoneへの反映確認とは分離する。旧2ファイル形式のreceiptは更新中の互換性のため受理する。
+- 11月12日分は旧2ファイルから本文を読み、新規日付ノートを作成する。既存2ファイルは削除せず保持する。Cloud本文は既に消去済みなので、元の送信本文とのバイト一致を遡って保証するものではない。
+- review_idによるChatGPTの保存状態照会tool追加は別途未実装。既存ログの古い `saved and synced` は現在のworkerでは `saved locally` として区別する。
