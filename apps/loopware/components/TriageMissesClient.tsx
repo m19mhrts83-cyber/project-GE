@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { agoLabel, type DeskCard } from "@/lib/deskCore";
+import { agoLabel, isVendorItemId, type DeskCard } from "@/lib/deskCore";
 
 /** 見落とし（/misses?surface=triage）。仕分けが出さなかったものを、要対応だった／出さなくてよい で判断する */
 type MissCard = DeskCard & { why: "auto_skip" | "not_surfaced" | "near_miss" };
@@ -24,6 +24,7 @@ export default function TriageMissesClient() {
   const [cards, setCards] = useState<MissCard[] | null>(null);
   const [done, setDone] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState("");
+  const [errs, setErrs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch("/api/misses?surface=triage", { cache: "no-store" })
@@ -40,6 +41,7 @@ export default function TriageMissesClient() {
 
   async function judge(c: MissCard, verdict: "miss" | "ok") {
     setDone((d) => ({ ...d, [c.id]: "…" }));
+    setErrs((e) => ({ ...e, [c.id]: "" }));
     try {
       const r = await fetch("/api/misses/judge", {
         method: "POST",
@@ -48,10 +50,14 @@ export default function TriageMissesClient() {
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "失敗");
-      setDone((d) => ({ ...d, [c.id]: verdict === "miss" ? "要対応に戻しました（判断デスクの先頭に出ます）" : "このままにしました" }));
+      const missText = isVendorItemId(c.id)
+        ? "要対応だったと記録しました（業者返信なので、返信は業者返信のカードから）"
+        : "要対応に戻しました（判断デスクの先頭に出ます）";
+      setDone((d) => ({ ...d, [c.id]: verdict === "miss" ? missText : "このままにしました" }));
     } catch (e) {
+      // 失敗はそのカードの下に出す（ページ上部だと押しても何も起きないように見える）
       setDone((d) => ({ ...d, [c.id]: "" }));
-      setMsg(e instanceof Error ? e.message : String(e));
+      setErrs((x) => ({ ...x, [c.id]: `記録できませんでした: ${e instanceof Error ? e.message : String(e)}` }));
     }
   }
 
@@ -87,6 +93,7 @@ export default function TriageMissesClient() {
               <button onClick={() => void judge(c, "ok")}>出さなくてよい</button>
             </div>
           )}
+          {errs[c.id] ? <p className="meta" style={{ margin: 0, color: "var(--alert)" }}>{errs[c.id]}</p> : null}
         </article>
       ))}
     </div>
