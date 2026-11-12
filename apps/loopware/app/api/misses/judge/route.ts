@@ -3,7 +3,7 @@ import { serviceClient } from "@/lib/supabase";
 import { alreadyLogged } from "@/lib/desk";
 import { markMiss } from "@/lib/misses";
 import { writeDecision } from "@/lib/ownerDecisionLog";
-import { isDeskItemId } from "@/lib/deskCore";
+import { isTriageItemId } from "@/lib/deskCore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +21,8 @@ export async function POST(req: Request) {
   }
   const id = String(b.itemId || "");
   const key = String(b.idemKey || "");
-  if (!isDeskItemId(id) || !["miss", "ok"].includes(String(b.verdict)) || key.length < 8) {
+  // 見落としには業者返信（re-vendor-…）も出るので、デスク用の isDeskItemId ではなく形だけ見る
+  if (!isTriageItemId(id) || !["miss", "ok"].includes(String(b.verdict)) || key.length < 8) {
     return NextResponse.json({ ok: false, error: "itemId / verdict / idemKey" }, { status: 400 });
   }
   const sb = serviceClient();
