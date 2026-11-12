@@ -3,6 +3,9 @@
 """312 入口 — Slack の松野さんの発言から『起こり』を拾い、Nody（/312）のお題にする。
 
   collect（既定。月・水・金 20:30 JST）
+    0. 台帳（comm_items: メール・パートナー・自分の送信）からも拾う（--comm-max 件まで・水曜だけ。既定 0＝止め）
+       拾う条件: 受信・除外以外・14日以内・new／needs_reply（needs_reply は triage が pending のものだけ）、
+       自分の送信は「〜します」の約束だけ。source_ref＝comm_items:<id> で二重にしない
     1. #consult／#ai-hub／#report から、松野さん本人の発言（直近 --hours 時間）を集める
        （AI が松野さんの名前で出した報告文は形で外す。Bot・Webhook 投稿も外す）
     2. 依頼語・問いかけ・「〜したい」で『起こり』を判定（ルールのみ。AI は使わない）
@@ -12,7 +15,8 @@
     5. #consult に「312 起票候補 N件 → Nody で開く」を1通
 
   reflect（30分ごと）
-    Nody で「既存タスクへ追記」「別タスクを作る」を選んだお題だけ Todoist に反映し、
+    Nody で「既存タスクへ追記」「別タスクを作る」を選んだお題だけ Todoist に反映し（Slack と台帳の両方）、
+    台帳由来は comm_links(todoist_task) を足し、台帳の work_status を waiting にする。
     task_loop_decisions.reflected_todoist_id に記録する。「登録しない」は何もしない。
     close・統合・削除・期日変更はしない（313／人の担当）。
 
@@ -173,7 +177,15 @@ LABELS = ("登録しない", "既存タスクへ追記", "別タスクを作る"
 
 
 def build_proposals(
-    *, text: str, kind: str, permalink: str, when: str, match: dict[str, Any] | None, now: datetime
+    *,
+    text: str,
+    kind: str,
+    permalink: str,
+    when: str,
+    match: dict[str, Any] | None,
+    now: datetime,
+    where: str = "Slack で松野さんから",
+    source_label: str = "Slack",
 ) -> list[dict[str, Any]]:
     """proposal.md の並び（1 登録しない → 2 既存へ追記 → 3 別タスク）で3案を作る。★は1つ。"""
     title = derive_title(text)
@@ -200,7 +212,7 @@ def build_proposals(
             [
                 f"対象：{m_title}",
                 f"期限：{m_due}（変えません）",
-                f"追記文：{when} の Slack で松野さんから{KIND_JA[kind]}あり。「{title}」",
+                f"追記文：{when} の {where}{KIND_JA[kind]}あり。「{title}」",
                 origin,
                 "扱い：既存タスク1件にコメントを足し、新しいタスクは作りません。",
             ]
@@ -218,7 +230,7 @@ def build_proposals(
             f"タイトル：{title}",
             f"期限：{due_ja}",
             "プロジェクト：受信箱",
-            f"説明：Slack の{KIND_JA[kind]}から起票。{origin}",
+            f"説明：{source_label} の{KIND_JA[kind]}から起票。{origin}",
             ("注意：既存の「" + m_title + "」と同じ用件なら二重管理になります。") if match else "完了条件：（直して書く）",
         ]
     )
@@ -346,10 +358,253 @@ def post_consult(text: str, dry: bool) -> None:
     print(r.stdout.strip() or r.stderr.strip())
 
 
+# ---- 台帳（comm_items）からの入口 ---------------------------------------------
+# 拾う条件（台帳スレッドと合意 2026-11-10）:
+#   受信（inbound）・除外以外・14日以内・work_status が new／needs_reply
+#   needs_reply は、つながった triage が pending で生きているものだけ（閉じ残しは入れない）
+#   自分の送信（category=self）は「〜します」の約束っぽい文だけ
+# お試し: 1回の上限は --comm-max（既定 0＝止める）。曜日は COMM_WEEKDAY（水）だけ。
+
+COMM_DAYS = 14
+COMM_WEEKDAY = 2  # 水曜（月=0）。お試しは週1回
+COMM_COLS = "id,channel,account,category,direction,party_id,occurred_at,subject,summary,body_text,work_status,context_header,source_ref"
+PROMISE_RE = re.compile(
+    r"(お送りします|送ります|送付します|ご連絡(します|いたします)|確認(します|いたします)|対応(します|いたします)|"
+    r"折り返し|手配(します|いたします)|準備(します|いたします)|提出(します|いたします)|ご返信(します|いたします)|"
+    r"伺います|お持ちします|調整(します|いたします))"
+)
+ASK_RE = re.compile(r"(ください|いただけ|頂け|お願い|でしょうか|(です|でした|ます)か[、。？?\s]|ご確認|ご検討|ご連絡|ご返信|いかが|教えて)")
+OWN_FIRST_RE = re.compile(r"^\s*\d{4}/\d{1,2}/\d{1,2}\s+\d{1,2}:\d{2}\s+松野")  # LINE 等のブロックで先頭の発言者が自分
+THANKS_RE = re.compile(r"^(いつも)?(ありがとう|お疲れ|おつかれ|了解|承知|よろしくお願い)\S{0,20}$")
+AUTO_REPLY_RE = re.compile(r"(自動返信|自動送信|auto-?reply|out of office|不在通知|受付完了のお知らせ)", re.I)
+_QUOTE_CUT_RE = re.compile(r"^(>|.*(wrote:|のメッセージ:|からのメッセージ|-----Original Message-----|─{6,}))")
+ACCOUNT_EMAIL = {"admin": "admin@livingsupport-matsu.co.jp", "estate": "matsuno.estate@gmail.com"}
+CAT_JA = {"partner": "パートナー", "inquiry": "メール", "property": "物件", "self": "自分の送信", "agent": "共有"}
+CH_JA = {"gmail": "メール", "chatwork": "Chatwork", "line": "LINE", "line_oa": "公式LINE", "imessage": "iMessage", "slack": "Slack", "other": "その他"}
+
+
+def own_text(body: str, limit: int = 1500) -> str:
+    """送信メール本文から引用（> や「〜wrote:」以降）を落とし、自分が書いた部分だけにする。"""
+    out: list[str] = []
+    for line in (body or "").splitlines():
+        if _QUOTE_CUT_RE.match(line.strip()):
+            break
+        out.append(line)
+    return "\n".join(out)[:limit]
+
+
+GREETING_LINE_RE = re.compile(
+    r"^(.{0,12}(さん|様|さま)[、,。\s]*|CC[:：].*|To[:：].*|お疲れ|おつかれ|お世話にな|いつも|ありがとう|ご対応ありがとう|"
+    r"よろしく|宜しく|かしこまり|了解|承知|失礼いたします|追加です|追加ですみません|すみません|恐れ入り|.*添付します|.*\.(png|jpe?g|pdf|xlsx?)$|---)"
+)
+CHAT_ASK_RE = re.compile(
+    r"(ください|いただけ|頂け|お願い(します|いたします|できます)|でしょうか|(です|でした|ます)か[、。？?\s]|"
+    r"ご(確認|検討|連絡|返信|回答|手配)(を|の)?(ください|お願い|いただけ|頂け|下さい)|いかが|教えて|"
+    r"可能(でしょうか|ですか)|して(ほしい|欲しい)|までに|締切|期限)"
+)
+_LINE_HEAD_RE = re.compile(r"^\s*\d{4}/\d{1,2}/\d{1,2}\s+\d{1,2}:\d{2}\s+\S+\s+")
+
+
+def chat_ask_line(body: str) -> str | None:
+    """チャット本文から、あいさつ・前置きを除いた『依頼・問いかけ』の1文を返す（無ければ None）。"""
+    t = re.sub(r"<[^>]+>", "\n", body or "")
+    t = t.split("**添付ファイル**")[0]
+    t = re.sub(r"\[qt\].*?\[/qt\]", "\n", t, flags=re.S)  # Chatwork の引用
+    t = re.sub(r"\[/?[a-zA-Z]+[^\]]*\]", " ", t)  # Chatwork のタグ（[To:…] [qtmeta …] など）
+    cand: list[str] = []
+    for raw in t.splitlines():
+        line = _LINE_HEAD_RE.sub("", raw).strip()
+        if not line or line in ("本文", "本文を開く") or GREETING_LINE_RE.match(line):
+            continue
+        cand.append(line)
+    for i, line in enumerate(cand):
+        test = re.sub(r"(どうぞ)?(よろしく|宜しく)お願い(いた)?(します|致します|申し上げます)[。！!]?", "", line)
+        if CHAT_ASK_RE.search(test) or classify(test) in ("request", "question"):
+            # 「〜ですが、」で前の行から続く文は前の行も付ける／この行が「〜が、」で切れていたら次の行も付ける
+            if i > 0 and len(line) < 25 and re.search(r"(が|けど|ので|て)[、,]?$", cand[i - 1]):
+                line = cand[i - 1] + line
+            if re.search(r"(が|けど|ので|て)[、,]$", line) and i + 1 < len(cand):
+                line = line + cand[i + 1]
+            return line[:120] if len(re.sub(r"\W", "", line)) >= 6 else None
+    return None
+
+
+def comm_label(it: dict[str, Any]) -> str:
+    cat = CAT_JA.get(str(it.get("category") or ""), "台帳")
+    ch = CH_JA.get(str(it.get("channel") or ""), str(it.get("channel") or ""))
+    return cat if cat == ch else f"{cat}・{ch}"
+
+
+def comm_origin(it: dict[str, Any]) -> str:
+    """元の1件へ戻る道（Gmail は URL、やり取り.md はパスと見出し）。"""
+    ref = it.get("source_ref") or {}
+    if isinstance(ref, str):
+        try:
+            ref = json.loads(ref)
+        except ValueError:
+            ref = {}
+    th = ref.get("gmail_thread_id")
+    if th:
+        email = ACCOUNT_EMAIL.get(str(ref.get("account") or it.get("account") or "admin"), ACCOUNT_EMAIL["admin"])
+        return f"https://mail.google.com/mail/u/{email}/#all/{th}"
+    if ref.get("path"):
+        return f"{ref['path']}（{str(ref.get('heading') or '')[:80]}）"
+    return f"comm_items:{it.get('id')}"
+
+
+def _plain(t: str) -> str:
+    """md 由来の <details><summary>本文</summary> や先頭の「日時 名前」を落として1行に。"""
+    t = re.sub(r"<[^>]+>", " ", t or "")
+    t = re.sub(r"^\s*本文\s*", "", t)
+    t = re.sub(r"^\s*\d{4}/\d{1,2}/\d{1,2}\s+\d{1,2}:\d{2}\s+\S+\s+", "", t.strip())
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def comm_text(it: dict[str, Any]) -> str:
+    subject = re.sub(r"\s+", " ", str(it.get("subject") or "")).strip()
+    summary = _plain(str(it.get("summary") or "")) or _plain(str(it.get("body_text") or ""))[:200]
+    if subject in ("(件名なし)", "（件名なし）"):
+        subject = ""
+    if it.get("category") == "self":
+        body = own_text(str(it.get("body_text") or ""))
+        m = PROMISE_RE.search(body)
+        line = ""
+        if m:
+            start = body.rfind("\n", 0, m.start()) + 1
+            end = body.find("\n", m.end())
+            line = body[start : end if end >= 0 else None].strip()
+        return f"{subject}｜{line}" if line else subject
+    if it.get("channel") != "gmail":
+        ask = chat_ask_line(str(it.get("body_text") or ""))
+        if ask:
+            return ask
+    elif re.search(r"(様|さま|御中|お世話に|と申します)", summary[:30]):
+        ask = chat_ask_line(str(it.get("body_text") or ""))  # 要約が宛名・あいさつだけのとき
+        return f"{subject}｜{ask}" if (ask and subject) else (ask or subject or summary)
+    if summary and summary != subject:
+        return f"{subject}｜{summary}" if subject else summary
+    return subject or summary
+
+
+def pick_comm(rows: list[dict[str, Any]], pending_ids: set[str], known: set[str]) -> list[dict[str, Any]]:
+    """台帳の行から、お題にするものを選ぶ（純関数・テスト用）。"""
+    out: list[dict[str, Any]] = []
+    for it in rows:
+        ref = f"comm_items:{it['id']}"
+        if ref in known:
+            continue
+        if AUTO_REPLY_RE.search(str(it.get("subject") or "")):
+            continue  # 自動返信はやることにならない
+        if it.get("category") != "self":
+            ref = it.get("source_ref") if isinstance(it.get("source_ref"), dict) else {}
+            if str(ref.get("channel_raw") or "").startswith(("こちらから", "自分から")):
+                continue  # md 見出しでは自分から（受信扱いの誤り）
+            body_plain = re.sub(r"<[^>]+>|本文", " ", str(it.get("body_text") or "")).strip()
+            if "**対応**" in body_plain or re.search(r"(松野と申します|松野です。|リビングサポート松の松野)", body_plain[:600]):
+                continue  # 対応済みのメモつき・自分が書いた文面
+            if OWN_FIRST_RE.match(body_plain):
+                continue  # 受信扱いでも中身は自分の発言（LINE の既知の限界）
+            if THANKS_RE.match(comm_text(it).strip()):
+                continue  # お礼・あいさつだけ
+            if it.get("channel") != "gmail" and not chat_ask_line(str(it.get("body_text") or "")):
+                continue  # チャットは、あいさつを除いた本文に依頼・問いかけの文があるものだけ（メールは仕分け済み）
+        if it.get("category") == "self":
+            if it.get("direction") != "outbound" or not PROMISE_RE.search(own_text(str(it.get("body_text") or ""))):
+                continue
+        else:
+            if it.get("direction") != "inbound":
+                continue
+            ws = it.get("work_status")
+            if ws == "needs_reply" and str(it["id"]) not in pending_ids:
+                continue  # 閉じ残し（triage は済み）
+            if ws not in ("new", "needs_reply"):
+                continue
+        out.append(it)
+    out.sort(key=lambda x: str(x.get("occurred_at") or ""), reverse=True)
+    return out
+
+
+def comm_candidates(now: datetime, known: set[str], limit: int) -> list[dict[str, Any]]:
+    since = (now - timedelta(days=COMM_DAYS)).isoformat()
+    inbound = sb(
+        "comm_items",
+        params={
+            "select": COMM_COLS,
+            "direction": "eq.inbound",
+            "ingest_status": "neq.excluded",
+            "work_status": "in.(new,needs_reply)",
+            "occurred_at": f"gte.{since}",
+            "order": "occurred_at.desc",
+            "limit": "200",
+        },
+    ) or []
+    own = sb(
+        "comm_items",
+        params={
+            "select": COMM_COLS,
+            "direction": "eq.outbound",
+            "category": "eq.self",
+            "ingest_status": "neq.excluded",
+            "occurred_at": f"gte.{since}",
+            "order": "occurred_at.desc",
+            "limit": "200",
+        },
+    ) or []
+    nr = [str(r["id"]) for r in inbound if r.get("work_status") == "needs_reply"]
+    pending: set[str] = set()
+    for i in range(0, len(nr), 50):
+        chunk = ",".join(nr[i : i + 50])
+        for t in sb("triage_items", params={"select": "comm_item_id,status", "comm_item_id": f"in.({chunk})", "status": "eq.pending"}) or []:
+            pending.add(str(t["comm_item_id"]))
+    return pick_comm(inbound + own, pending, known)[: max(0, limit)]
+
+
+def comm_topic(it: dict[str, Any], tasks: list[dict[str, Any]], now: datetime) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
+    text = comm_text(it)
+    occurred = datetime.fromisoformat(str(it["occurred_at"]).replace("Z", "+00:00")).astimezone(JST)
+    when = occurred.strftime("%-m/%-d %H:%M")
+    label = comm_label(it)
+    own = it.get("category") == "self"
+    kind = "request" if own else (classify(text) or "request")
+    origin = comm_origin(it)
+    match, score = best_match(text, tasks)
+    who = str(it.get("context_header") or "").split("｜")[0]
+    head = f"[{label} {when}・{'自分の約束' if own else KIND_JA[kind]}] {text.strip()}"
+    if who and not own:
+        head += f"\n相手：{who}"
+    topic = {
+        "agent_id": AGENT,
+        "source_kind": "comm",
+        "source_ref": f"comm_items:{it['id']}",
+        "comm_item_id": it["id"],
+        "topic_text": head + (f"\n既存：{match.get('content')}／{((match.get('due') or {}) or {}).get('date') or '期限なし'}／未完了。" if match else "\n既存：近いタスクなし。"),
+        "todoist_task_ids": [str(match["id"])] if match else [],
+        "todoist_snapshot": (
+            {"content": match.get("content"), "due": (match.get("due") or {}).get("date"), "project_id": match.get("project_id"), "score": round(score, 2)}
+            if match
+            else {}
+        ),
+        "status": "open",
+    }
+    props = build_proposals(
+        text=text,
+        kind=kind,
+        permalink=origin,
+        when=when,
+        match=match,
+        now=now,
+        where=(f"{label}で自分から約束" if own else f"{label}で{who or '相手'}から"),
+        source_label=label,
+    )
+    if own:
+        props = [{**p, "body": p["body"].replace("約束依頼あり", "約束あり")} for p in props]
+    return topic, props, {"kind": kind, "title": derive_title(text), "link": origin, "label": label, "when": when}
+
+
 # ---- collect ----------------------------------------------------------------
 
 
-def collect(*, hours: int, max_items: int, dry: bool, now: datetime) -> int:
+def collect(*, hours: int, max_items: int, dry: bool, now: datetime, comm_max: int = 0, comm_any_day: bool = False) -> int:
     owner = os.environ.get("SLACK_OWNER_USER_ID") or OWNER_DEFAULT
     oldest = (now - timedelta(hours=hours)).timestamp()
     tasks = active_tasks()
@@ -413,19 +668,40 @@ def collect(*, hours: int, max_items: int, dry: bool, now: datetime) -> int:
         )
         made.append({**f, "id": tid, "title": derive_title(f["text"])})
 
-    print(f"312 collect: 候補 {len(made)} 件（{hours}時間・チャンネル {len(CHANNELS)}）")
+    # 台帳（メール・パートナー・自分の送信）。お試し: 上限 comm_max・水曜だけ。失敗しても Slack 分は止めない
+    comm_made: list[dict[str, Any]] = []
+    comm_on = comm_max > 0 and (comm_any_day or now.weekday() == COMM_WEEKDAY)
+    if comm_on:
+        try:
+            for it in comm_candidates(now, known, comm_max):
+                topic, props, info = comm_topic(it, tasks, now)
+                if dry:
+                    print(json.dumps({"topic": topic, "proposals": props}, ensure_ascii=False, indent=1))
+                    comm_made.append({**info, "id": "dry"})
+                    continue
+                rows = sb("task_loop_topics", method="POST", body=topic, prefer="return=representation")
+                tid = rows[0]["id"]
+                sb(
+                    "task_loop_proposals",
+                    method="POST",
+                    body=[{**p, "topic_id": tid, "prompt_version": PROMPT_VERSION} for p in props],
+                    prefer="return=minimal",
+                )
+                comm_made.append({**info, "id": tid})
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"comm: {e}")
+
+    print(f"312 collect: 候補 {len(made)} 件（{hours}時間・チャンネル {len(CHANNELS)}）＋台帳 {len(comm_made)} 件（{'上限 ' + str(comm_max) if comm_on else '止め'}）")
     for e in errors:
         print(f"::warning::{e}")
 
-    if not made:
+    if not made and not comm_made:
         return 0
     if (os.environ.get("JARVIS_TODOIST_312_COLLECT_DISABLE") or "").strip() == "1":
         print("JARVIS_TODOIST_312_COLLECT_DISABLE=1 のため #consult には出さない")
         return 0
-    first = made[0]["id"]
-    lines = [f"【相談】312 Todoist起票整理｜起票候補 {len(made)}件", ""]
-    for i, f in enumerate(made, 1):
-        lines.append(f"{i}. [{KIND_JA[f['kind']]}] {f['title']}  <{f['link']}|元の発言>")
+    lines = consult_lines(made, comm_made)
+    first = (made or comm_made)[0]["id"]
     lines += [
         "",
         f"→ <{nody_url('/312' + ('' if first == 'dry' else f'?topic={first}'), now)}|Nody で扱いを決める>（登録しない／既存へ追記／別タスク）",
@@ -438,7 +714,47 @@ def collect(*, hours: int, max_items: int, dry: bool, now: datetime) -> int:
     return 0
 
 
+def consult_lines(made: list[dict[str, Any]], comm_made: list[dict[str, Any]]) -> list[str]:
+    """#consult の見出しと一覧。台帳分が無いときは今までと同じ文面。"""
+    total = len(made) + len(comm_made)
+    head = f"【相談】312 Todoist起票整理｜起票候補 {total}件"
+    if comm_made:
+        head += f"（Slack {len(made)}件・メール等 {len(comm_made)}件）"
+    lines = [head, ""]
+    i = 0
+    for f in made:
+        i += 1
+        lines.append(f"{i}. [{KIND_JA[f['kind']]}] {f['title']}  <{f['link']}|元の発言>")
+    for f in comm_made:
+        i += 1
+        link = f["link"]
+        tail = f"  <{link}|元のメール>" if link.startswith("http") else "  （やり取り.md）"
+        lines.append(f"{i}. [{f['label']}] {f['title']}{tail}")
+    return lines
+
+
 # ---- reflect ----------------------------------------------------------------
+
+
+def mark_comm_task(item_id: str, task_id: str) -> None:
+    """台帳の行に Todoist をひもづけ、対応状況を waiting に（new／needs_reply のときだけ）。失敗しても反映は止めない。"""
+    try:
+        sb(
+            "comm_links",
+            params={"on_conflict": "item_id,target_type,target_id"},
+            method="POST",
+            body={"item_id": item_id, "target_type": "todoist_task", "target_id": task_id, "role": "312"},
+            prefer="resolution=ignore-duplicates,return=minimal",
+        )
+        sb(
+            "comm_items",
+            params={"id": f"eq.{item_id}", "work_status": "in.(new,needs_reply)"},
+            method="PATCH",
+            body={"work_status": "waiting"},
+            prefer="return=minimal",
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::comm link {item_id}: {e}")
 
 
 def reflect(*, dry: bool) -> int:
@@ -460,7 +776,7 @@ def reflect(*, dry: bool) -> int:
         t["id"]: t
         for t in sb(
             "task_loop_topics",
-            params={"select": "id,source_kind,source_ref,todoist_task_ids,topic_text", "id": f"in.({ids})", "source_kind": "eq.slack"},
+            params={"select": "id,source_kind,source_ref,comm_item_id,todoist_task_ids,topic_text", "id": f"in.({ids})", "source_kind": "in.(slack,comm)"},
         )
         or []
     }
@@ -484,6 +800,13 @@ def reflect(*, dry: bool) -> int:
         f = parse_body(body)
         label = p["label"]
         src = t.get("source_ref") or ""
+        if t.get("source_kind") == "comm" and t.get("comm_item_id"):
+            try:
+                items = sb("comm_items", params={"select": "id,account,source_ref", "id": f"eq.{t['comm_item_id']}"}) or []
+                if items:
+                    src = comm_origin(items[0])
+            except Exception as e:  # noqa: BLE001
+                print(f"::warning::comm origin {t['comm_item_id']}: {e}")
         if label == "既存タスクへ追記":
             target = (t.get("todoist_task_ids") or [None])[0]
             if not target:
@@ -526,6 +849,8 @@ def reflect(*, dry: bool) -> int:
             mark(d["id"], "-")  # 登録しない
             continue
         mark(d["id"], done_id)
+        if t.get("source_kind") == "comm" and t.get("comm_item_id") and not dry:
+            mark_comm_task(str(t["comm_item_id"]), done_id)
         n += 1
         print(f"反映: {label} → {done_id}")
     print(f"312 reflect: {n} 件反映")
@@ -538,6 +863,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--hours", type=int, default=96, help="何時間さかのぼるか（月→水 48h、金→月 72h ＋余裕）")
     ap.add_argument("--max", type=int, default=5, help="1回のお題の上限（ノイズ抑制）")
     ap.add_argument("--dry-run", action="store_true", help="DB に書かず Slack に出さない")
+    ap.add_argument("--comm-max", type=int, default=0, help="台帳（comm_items）から拾う上限。0 で止める（お試しは 5）")
+    ap.add_argument("--comm-any-day", action="store_true", help="台帳分を水曜以外でも拾う（手動の確認用）")
     a = ap.parse_args(argv)
     need = ["JARVIS_SUPABASE_URL", "JARVIS_SUPABASE_SERVICE_ROLE_KEY", "TODOIST_API_TOKEN"]
     if a.mode == "collect":
@@ -550,7 +877,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if a.mode == "reflect":
             return reflect(dry=a.dry_run)
-        return collect(hours=a.hours, max_items=a.max, dry=a.dry_run, now=now)
+        return collect(hours=a.hours, max_items=a.max, dry=a.dry_run, now=now, comm_max=a.comm_max, comm_any_day=a.comm_any_day)
     except urllib.error.HTTPError as e:
         print(f"HTTP {e.code}: {e.read().decode(errors='replace')[:300]}", file=sys.stderr)
         return 1
