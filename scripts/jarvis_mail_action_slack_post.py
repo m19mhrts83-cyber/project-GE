@@ -119,7 +119,10 @@ MA_ACTION_IDS = {
     "skip": "mail_action_skip",
     "todoist": "mail_action_todoist",
     "done": "mail_action_done",
+    "prep": "mail_action_prep",
 }
+# メール: 後回しボタン（過去資料を探して回答案を作り、Todoist にも入れる。新しい資料は作らない）
+PREP_LABEL = "📎 資料を集めて後回し"
 # メール: 返信不要・別経路で返信済み。見送りと違い送信者は学習で除外しない（次回も判断に出す）
 DONE_LABEL = "回答不要・回答済み"
 CHAT_KINDS = {"chat"}
@@ -380,11 +383,18 @@ def _button_elements(
             "action_id": MA_ACTION_IDS["skip"],
             "value": f"ma:skip:{tid}",
         },
+        # 2026-11-13: メールは「資料を集めて後回し」= 過去資料探し＋回答案＋Todoist（ma:prep）
+        # チャットは添付できないので従来どおり Todoist だけ
         {
             "type": "button",
             "text": {"type": "plain_text", "text": todoist_label, "emoji": True},
             "action_id": MA_ACTION_IDS["todoist"],
             "value": f"ma:todoist:{tid}",
+        } if chat else {
+            "type": "button",
+            "text": {"type": "plain_text", "text": PREP_LABEL, "emoji": True},
+            "action_id": MA_ACTION_IDS["prep"],
+            "value": f"ma:prep:{tid}",
         },
     ] + ([] if chat else [{
         "type": "button",

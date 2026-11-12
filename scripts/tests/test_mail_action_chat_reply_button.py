@@ -70,6 +70,16 @@ class ChatworkRoomTest(unittest.TestCase):
         self.assertEqual(els[0].get("style"), "primary")
         self.assertNotIn("mail_action_open_app", [e.get("action_id") for e in els])
 
+    def test_buttons_mail_prep(self):
+        # メールの後回しは「資料を集めて後回し」（ma:prep）。チャットは Todoist のまま
+        els = m._button_elements("t1", url_mode=False)
+        vals = [e.get("value") for e in els]
+        self.assertIn("ma:prep:t1", vals)
+        self.assertNotIn("ma:todoist:t1", vals)
+        self.assertIn(m.PREP_LABEL, [e["text"]["text"] for e in els])
+        chat = m._button_elements("t1", url_mode=False, chat=True)
+        self.assertIn("ma:todoist:t1", [e.get("value") for e in chat])
+
     def test_compact_card_chatwork(self):
         m._CONTACT_PARTNERS_CACHE = PARTNERS
         try:

@@ -11,6 +11,7 @@ import {
   normalizeMailAccount,
   parseMaAction,
   saveMailActionDraft,
+  saveMailActionPrep,
   type MailActionSlackAction,
 } from "@/lib/mailActionSlackAction";
 import { composeDraft, proofreadDraft, reviseDraft } from "@/lib/mailDraftCheck";
@@ -18,6 +19,7 @@ import { retrieveYoritooriForAsk } from "@/lib/onedrive/retrieveYoritoori";
 import { searchMaterialFiles } from "@/lib/materialFiles";
 import {
   candidateValue,
+  documentTermsFromText,
   humanSize,
   parseCandidateValue,
   searchTermsFromItems,
@@ -40,6 +42,7 @@ export const MA_ACTION_IDS = {
   skip: "mail_action_skip",
   todoist: "mail_action_todoist",
   done: "mail_action_done",
+  prep: "mail_action_prep",
 } as const;
 
 export const MA_MODAL_CALLBACK = "mail_action_reply_modal";
@@ -61,14 +64,20 @@ export function maTimingFromMeta(meta: MaModalMeta) {
   return { openedAt: meta.o, proofread: meta.pr, revise: meta.rv, findFiles: meta.ff };
 }
 
-/** value: ma:reply|skip|todoist|done:{triage_id} */
+/** カードのボタン。prep =「過去資料で回答案（後回し）」: 資料探し＋下書き＋Todoist */
+export type MaButtonAction = MailActionSlackAction | "prep";
+
+/** value: ma:reply|skip|todoist|done|prep:{triage_id} */
 export function parseMaButtonValue(
   value: string,
-): { action: MailActionSlackAction; id: string } | null {
+): { action: MaButtonAction; id: string } | null {
   const m = String(value || "")
     .trim()
-    .match(/^ma:(reply|skip|todoist|done):([a-zA-Z0-9_.:-]{6,80})$/i);
+    .match(/^ma:(reply|skip|todoist|done|prep):([a-zA-Z0-9_.:-]{6,80})$/i);
   if (!m) return null;
+  if (m[1].toLowerCase() === "prep") {
+    return isMailActionTriageId(m[2]) ? { action: "prep", id: m[2] } : null;
+  }
   const action = parseMaAction(m[1]);
   const id = m[2];
   if (!action || !isMailActionTriageId(id)) return null;
@@ -379,6 +388,8 @@ async function openReplyModal(opts: {
   /** 本文が空なので、開いた後に下書きを作る */
   composing?: boolean;
   openedAt?: number;
+  /** 「過去資料で回答案」で先に探しておいた添付候補 */
+  candidates?: MaterialCandidate[];
 }): Promise<{ ok: boolean; error?: string; viewId?: string }> {
   const view = buildReplyView({
     meta: { id: opts.triageId, channel: opts.channelId, message_ts: opts.messageTs, o: opts.openedAt || Date.now() },
@@ -387,8 +398,14 @@ async function openReplyModal(opts: {
     state: { ...EMPTY_STATE, body: opts.draft, to: opts.to, account: opts.account },
     version: 1,
     materials: extractMaterialRequests(opts.inbound),
+    candidates: opts.candidates,
+    showFileQuery: Boolean(opts.candidates?.length),
     busy: opts.composing,
-    notice: opts.composing ? "⏳ これまでのやり取りを踏まえて下書きを作成中…（10秒ほど）" : undefined,
+    notice: opts.composing
+      ? "⏳ これまでのやり取りを踏まえて下書きを作成中…（10秒ほど）"
+      : opts.candidates?.length
+        ? "📎 過去資料の候補です。添付するものにチェックして「送信」"
+        : undefined,
   });
   return slackApi(opts.token, "views.open", { trigger_id: opts.triggerId, view });
 }
@@ -785,7 +802,7 @@ export async function handleMaModalSubmit(opts: {
 }
 
 export async function handleMaBlockAction(opts: {
-  action: MailActionSlackAction;
+  action: MaButtonAction;
   triageId: string;
   triggerId?: string;
   channelId?: string;
@@ -799,6 +816,10 @@ export async function handleMaBlockAction(opts: {
   run?: () => Promise<void>;
 }> {
   const { action, triageId, triggerId, channelId, messageTs } = opts;
+
+  if (action === "prep") {
+    return startMaterialPrep({ triageId, channelId, messageTs });
+  }
 
   if (action === "reply") {
     const row = await fetchMailActionTriage(triageId);
@@ -826,6 +847,7 @@ export async function handleMaBlockAction(opts: {
         channelId,
         messageTs,
         composing,
+        candidates: storedCandidates(row.payload),
       });
       if (opened.ok) {
         const viewId = opened.viewId;
@@ -926,6 +948,181 @@ export async function handleMaBlockAction(opts: {
     blocks: result.ok
       ? withLoggedLine(maDoneBlocks(title, result.message, true), await weekDecisionCount())
       : maDoneBlocks(title, result.message, false),
+  };
+}
+
+/** 「過去資料で回答案」で保存した候補（payload.material_candidates） */
+function storedCandidates(payload: unknown): MaterialCandidate[] {
+  const raw = (payload as Record<string, unknown> | null)?.material_candidates;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((x) => x as MaterialCandidate)
+    .filter((x) => x && (x.s === "od" || x.s === "gd") && typeof x.id === "string" && typeof x.n === "string")
+    .slice(0, 10);
+}
+
+/** 準備できたカード: 候補・下書きの頭・Todoist・［返信する］［見送り］ */
+export function maPrepResultBlocks(input: {
+  id: string;
+  who: string;
+  candidates: MaterialCandidate[];
+  terms: string[];
+  draft: string;
+  draftError?: string;
+  todoistUrl?: string;
+  notes?: string[];
+}): Array<Record<string, unknown>> {
+  const lines: string[] = [`📎 *過去資料で回答案を用意しました*（${input.who.slice(0, 40)}）`];
+  if (input.candidates.length) {
+    lines.push(`*資料の候補 ${input.candidates.length} 件*（返信画面でチェックすると添付できます）`);
+    for (const c of input.candidates.slice(0, 5)) {
+      const meta = [SOURCE_LABEL[c.s], (c.m || "").slice(0, 10)].filter(Boolean).join("・");
+      lines.push(`• ${c.n.slice(0, 60)}（${meta}）`);
+    }
+    if (input.candidates.length > 5) lines.push(`…ほか ${input.candidates.length - 5} 件`);
+  } else if (input.terms.length) {
+    lines.push(`過去の資料は見つかりませんでした（探した語: ${input.terms.join("・")}）。返信画面の「📎 資料を探す」で語を変えて探せます`);
+  } else {
+    lines.push("メールから資料名を拾えなかったので、資料探しはしていません（返信画面の「📎 資料を探す」で探せます）");
+  }
+  for (const n of input.notes || []) lines.push(`⚠️ ${n}`);
+  if (input.draft.trim()) {
+    const head = input.draft.trim().replace(/\n{2,}/g, "\n").slice(0, 300);
+    lines.push(`*回答案（冒頭）*\n>${head.replace(/\n/g, "\n>")}${input.draft.trim().length > 300 ? "…" : ""}`);
+  } else if (input.draftError) {
+    lines.push(`❌ 回答案は作れませんでした（${input.draftError}）。返信画面で「指示で見直し」から作れます`);
+  }
+  const blocks: Array<Record<string, unknown>> = [
+    { type: "section", text: { type: "mrkdwn", text: lines.join("\n").slice(0, 2900) } },
+  ];
+  if (input.todoistUrl) {
+    blocks.push({
+      type: "context",
+      elements: [{ type: "mrkdwn", text: `🗂 忘れないよう Todoist にも入れました（返信すると自動で閉じます）: ${input.todoistUrl}` }],
+    });
+  }
+  blocks.push({
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "返信する", emoji: true },
+        style: "primary",
+        action_id: MA_ACTION_IDS.reply,
+        value: `ma:reply:${input.id}`,
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "見送り", emoji: true },
+        style: "danger",
+        action_id: MA_ACTION_IDS.skip,
+        value: `ma:skip:${input.id}`,
+      },
+    ],
+  });
+  return blocks;
+}
+
+/**
+ * 「資料を集めて後回し」: すぐ「準備中」に差し替え、後で
+ * ① Todoist に入れる（忘れ防止。返信したら閉じる）② 過去資料を OneDrive / Google Drive で探す
+ * ③ やり取り履歴＋候補で回答案を作る ④ カードを「返信する」付きに差し替える。
+ * 新しい資料は作らない（既にあるファイルを探すだけ）。
+ */
+async function startMaterialPrep(opts: {
+  triageId: string;
+  channelId?: string;
+  messageTs?: string;
+}): Promise<{
+  kind: "replace" | "error";
+  text: string;
+  blocks?: ReturnType<typeof maDoneBlocks>;
+  run?: () => Promise<void>;
+}> {
+  const { triageId, channelId, messageTs } = opts;
+  const bot = (process.env.SLACK_BOT_TOKEN || "").trim();
+  const row = await fetchMailActionTriage(triageId);
+  if (!row) return { kind: "error", text: "対象のメール要対応が見つかりません" };
+  if (String(row.status || "") === "sent") return { kind: "error", text: "すでに送信済みです" };
+  const who = String(row.partner || row.from_email || "相手");
+  const busy = maDoneBlocks(
+    "過去の資料を探して回答案を作っています…",
+    "30秒ほどでこのカードが「返信する」付きに変わります。Todoist にも入れておきます。",
+    true,
+  ).map((b) => ({ ...b, text: { ...b.text, text: b.text.text.replace("✅", "⏳") } }));
+
+  return {
+    kind: "replace",
+    text: "過去の資料を探して回答案を作っています…",
+    blocks: busy as ReturnType<typeof maDoneBlocks>,
+    run: async () => {
+      const todo = await applyMailActionSlack(triageId, "todoist", {
+        source: "slack_prep",
+        keepCard: true,
+      }).catch((e) => ({ ok: false, message: String(e), todoist_url: undefined }));
+      const inbound = String(row.original_body || "");
+      const materials = extractMaterialRequests(inbound);
+      let terms = searchTermsFromItems(materials);
+      if (!terms.length) terms = documentTermsFromText(inbound);
+      const [found, history] = await Promise.all([
+        terms.length
+          ? searchMaterialFiles(terms).catch((e) => ({
+              candidates: [] as MaterialCandidate[],
+              notes: [`資料を探せませんでした（${e instanceof Error ? e.message : e}）`],
+            }))
+          : Promise.resolve({ candidates: [] as MaterialCandidate[], notes: [] as string[] }),
+        retrieveYoritooriForAsk({
+          lane: row.lane,
+          title: row.subject,
+          summary: row.summary,
+          payload: { ...(row.payload || {}), partner: row.partner, folder: row.folder },
+        }).catch(() => null),
+      ]);
+      const cands = found.candidates.slice(0, 10);
+      const instruction = cands.length
+        ? `手元の過去資料に次の候補がある: ${cands.slice(0, 5).map((c) => c.n).join("、")}。` +
+          "該当する資料を添付してお送りする前提で書く。ただし確実に揃うと言い切らず、足りないものは「確認のうえ追ってお送りします」とする。新しい資料を作る約束はしない。"
+        : materials.length
+          ? "手元の過去資料では見つからなかった。資料は確認のうえ追ってお送りする旨を書く。新しい資料を作る約束はしない。"
+          : "";
+      const draft = inbound.trim()
+        ? await composeDraft({
+            who,
+            subject: String(row.subject || ""),
+            inbound,
+            history: history?.ok ? history.promptBlock : "",
+            materials,
+            instruction,
+          }).catch((e) => ({ ok: false as const, error: String(e) }))
+        : { ok: false as const, error: "元のメール本文がありません" };
+      await saveMailActionPrep(triageId, {
+        draft: draft.ok ? draft.text : "",
+        candidates: cands,
+        terms,
+      }).catch(() => {});
+      const todoUrl =
+        todo.ok && "todoist_url" in todo ? String(todo.todoist_url || "") : "";
+      const notes = [...found.notes];
+      if (!todo.ok) notes.push(`Todoist に入れられませんでした（${todo.message}）`);
+      const blocks = maPrepResultBlocks({
+        id: triageId,
+        who,
+        candidates: cands,
+        terms,
+        draft: draft.ok ? draft.text : "",
+        draftError: draft.ok ? undefined : draft.error,
+        todoistUrl: todoUrl || undefined,
+        notes,
+      });
+      if (bot && channelId && messageTs) {
+        await slackApi(bot, "chat.update", {
+          channel: channelId,
+          ts: messageTs,
+          text: `過去資料で回答案を用意しました（${who}）`,
+          blocks,
+        });
+      }
+    },
   };
 }
 
