@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pull confirmed daily reviews into the local Obsidian Vault and OGD sync."""
+"""Pull confirmed daily reviews into monthly notes in the local Obsidian Vault."""
 from __future__ import annotations
 
 import argparse
@@ -16,7 +16,7 @@ from jarvis_obsidian_vault_reader import VaultReadError, process_request
 
 REPO = Path(__file__).resolve().parents[1]
 VAULT = Path.home() / "Documents/500_Obsidian_r1"
-RELATIVE_DIR = Path("01_Journaling/★Journal/日次レビュー")
+RELATIVE_DIR = Path("01_Journaling/★Journal")
 DEFAULT_API = "https://jarvis-dashboard-amber.vercel.app"
 MAX_RESPONSE = 2 * 1024 * 1024
 
@@ -117,57 +117,36 @@ def write_no_clobber(target: Path, content: str) -> None:
         tmp.unlink(missing_ok=True)
 
 
+def daily_note_contents(review_id: str, review_date: str, raw_log: str, tactical: str) -> str:
+    frontmatter = {"date": review_date, "type": "daily_review", "review_id": review_id,
+                   "source": "ChatGPT daily review confirmation"}
+    yaml = "\n".join(f"{key}: {json.dumps(value, ensure_ascii=False)}" for key, value in frontmatter.items())
+    # Preserve each submitted body, including its trailing whitespace.
+    return (f"---\n{yaml}\n---\n\n# {review_date}\n\n## 生ログ\n\n"
+            + raw_log + "\n\n## 戦術レビュー\n\n" + tactical + "\n")
+
+
 def write_review(item: dict) -> list[str]:
     review_id, review_date, raw_log, tactical = safe_review(item)
     vault = VAULT.expanduser().resolve()
     if not vault.is_dir():
         raise InboxError("canonical Obsidian Vault is not present")
-    ogd_data = vault / ".obsidian/plugins/google-drive-sync/data.json"
-    if not ogd_data.is_file():
-        raise InboxError("existing Google Drive Sync plugin state is not present")
-    directory = vault / RELATIVE_DIR
-    directory.mkdir(parents=True, exist_ok=True)
-    if not directory.resolve().is_relative_to(vault):
-        raise InboxError("review directory resolves outside the Vault")
-
-    stem = f"{review_date}_{review_id[:8]}"
-    raw_name = f"{stem}_生ログ.md"
-    tactical_name = f"{stem}_戦術レビュー.md"
-    raw_path = directory / raw_name
-    tactical_path = directory / tactical_name
-    write_no_clobber(
-        raw_path,
-        note_contents(review_id, review_date, "raw", raw_log, tactical_name[:-3]),
-    )
-    write_no_clobber(
-        tactical_path,
-        note_contents(review_id, review_date, "tactical", tactical, raw_name[:-3]),
-    )
-    return [
-        (RELATIVE_DIR / raw_name).as_posix(),
-        (RELATIVE_DIR / tactical_name).as_posix(),
-    ]
-
-
-def retag(paths: list[str]) -> None:
-    script = REPO / "scripts/jarvis_obsidian_ogd_retag.py"
-    if not script.is_file():
-        raise InboxError("OGD sync helper is missing")
-    import subprocess
-
-    try:
-        result = subprocess.run(
-            [sys.executable, str(script), *paths],
-            cwd=REPO,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-            timeout=180,
-        )
-    except subprocess.TimeoutExpired:
-        raise InboxError("OGD sync helper timed out") from None
-    if result.returncode:
-        raise InboxError(f"OGD sync helper failed (exit {result.returncode})")
+    relative = RELATIVE_DIR / review_date[:7] / f"{review_date}.md"
+    directory = vault
+    # Do not follow symlinks, even during directory creation.
+    for part in relative.parent.parts:
+        directory = directory / part
+        if directory.is_symlink():
+            raise InboxError("refusing symlink directory")
+        directory.mkdir(exist_ok=True)
+        if not directory.resolve().is_relative_to(vault):
+            raise InboxError("review directory resolves outside the Vault")
+    target = directory / relative.name
+    content = daily_note_contents(review_id, review_date, raw_log, tactical)
+    write_no_clobber(target, content)
+    if target.is_symlink() or target.read_bytes() != content.encode("utf-8"):
+        raise InboxError("local note verification failed")
+    return [relative.as_posix()]
 
 
 def process_vault_read_requests(api: str, key: str, items: list) -> bool:
@@ -241,14 +220,13 @@ def main() -> int:
                 print(f"pending {review_id[:8]} {item.get('review_date')}")
                 continue
             paths = write_review(item)
-            retag(paths)
             api_request(
                 f"{api}/api/obsidian-review/inbox",
                 key,
                 method="POST",
                 payload={"review_id": review_id, "saved_paths": paths},
             )
-            print(f"saved and synced {review_id[:8]} {item.get('review_date')}")
+            print(f"saved locally {review_id[:8]} {item.get('review_date')}; existing Obsidian sync pending verification")
         except (InboxError, OSError, ValueError) as exc:
             failed = True
             print(f"review {review_id[:8]}: {exc}", file=sys.stderr)

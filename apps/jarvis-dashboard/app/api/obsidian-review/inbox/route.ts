@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { bearerMatches, recordMacPoll, secretMatches } from "@/lib/obsidianReviewAgent";
+import { validSavedReviewPaths } from "@/lib/obsidianReviewInbox";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -100,7 +101,7 @@ export async function GET(request: NextRequest) {
   );
 }
 
-/** Acknowledge only after local files and the existing OGD upload both succeed. */
+/** Confirm local persistence. This receipt does not certify Drive or iPhone sync. */
 export async function POST(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   let body: Record<string, unknown>;
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
   const reviewId = typeof body.review_id === "string" ? body.review_id.trim() : "";
   const paths = Array.isArray(body.saved_paths) ? body.saved_paths : [];
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(reviewId) ||
-      paths.length !== 2 || paths.some((p) => typeof p !== "string" || !p.startsWith("01_Journaling/★Journal/日次レビュー/"))) {
+      !validSavedReviewPaths(reviewId, paths)) {
     return NextResponse.json({ ok: false, error: "invalid_ack" }, { status: 400 });
   }
   const supabase = createServiceClient();
