@@ -12,6 +12,8 @@ import urllib.request
 from datetime import date
 from pathlib import Path
 
+from jarvis_obsidian_vault_reader import VaultReadError, process_request
+
 REPO = Path(__file__).resolve().parents[1]
 VAULT = Path.home() / "Documents/500_Obsidian_r1"
 RELATIVE_DIR = Path("01_Journaling/★Journal/日次レビュー")
@@ -23,7 +25,14 @@ class InboxError(RuntimeError):
     pass
 
 
-def api_request(url: str, key: str, *, method: str = "GET", payload: dict | None = None) -> dict:
+def api_request(
+    url: str,
+    key: str,
+    *,
+    method: str = "GET",
+    payload: dict | None = None,
+    extra_headers: dict[str, str] | None = None,
+) -> dict:
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8") if payload is not None else None
     req = urllib.request.Request(
         url,
@@ -33,6 +42,7 @@ def api_request(url: str, key: str, *, method: str = "GET", payload: dict | None
             "Authorization": f"Bearer {key}",
             "Accept": "application/json",
             **({"Content-Type": "application/json"} if data is not None else {}),
+            **(extra_headers or {}),
         },
     )
     try:
@@ -160,18 +170,56 @@ def retag(paths: list[str]) -> None:
         raise InboxError(f"OGD sync helper failed (exit {result.returncode})")
 
 
+def process_vault_read_requests(api: str, key: str, items: list) -> bool:
+    """Serve only bounded read requests from the local Vault; never log query or excerpts."""
+    if not isinstance(items, list):
+        print("Vault read poll returned invalid item list", file=sys.stderr)
+        return False
+    ok = True
+    for item in items:
+        request_id = str(item.get("id") or "") if isinstance(item, dict) else "unknown"
+        if not isinstance(item, dict):
+            ok = False
+            continue
+        try:
+            output = process_request(item)
+            response_payload = {"request_id": request_id, "result": output}
+        except VaultReadError as exc:
+            response_payload = {"request_id": request_id, "error_code": str(exc)}
+        except (OSError, ValueError):
+            response_payload = {"request_id": request_id, "error_code": "read_failed"}
+        try:
+            api_request(
+                f"{api}/api/obsidian-vault/inbox",
+                key,
+                method="POST",
+                payload=response_payload,
+            )
+            print(f"Vault read {'completed' if 'result' in response_payload else 'failed'} {request_id[:8]}")
+        except InboxError as exc:
+            print(f"Vault read response failed {request_id[:8]}: {exc}", file=sys.stderr)
+            ok = False
+    return ok
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="list pending review IDs without saving")
     args = parser.parse_args()
     api = (os.environ.get("OBSIDIAN_REVIEW_INBOX_URL") or DEFAULT_API).rstrip("/")
     key = (os.environ.get("OBSIDIAN_REVIEW_POLL_KEY") or "").strip()
+    read_key = (os.environ.get("OBSIDIAN_VAULT_POLL_KEY") or "").strip()
     if not key:
         print("OBSIDIAN_REVIEW_POLL_KEY is not configured", file=sys.stderr)
         return 2
     try:
         dry_query = "&dryRun=1" if args.dry_run else ""
-        result = api_request(f"{api}/api/obsidian-review/inbox?limit=5{dry_query}", key)
+        extra_headers = {"X-Obsidian-Vault-Poll-Key": read_key} if read_key else None
+        result = api_request(
+            f"{api}/api/obsidian-review/inbox?limit=5{dry_query}",
+            key,
+            extra_headers=extra_headers,
+        )
     except InboxError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -182,9 +230,6 @@ def main() -> int:
     expired_count = result.get("expired_count")
     if isinstance(expired_count, int) and expired_count > 0:
         print(f"warning: {expired_count} pending review(s) expired before Mac delivery", file=sys.stderr)
-    if not items:
-        return 1 if isinstance(expired_count, int) and expired_count > 0 else 0
-
     failed = False
     for item in items:
         review_id = str(item.get("review_id") or "") if isinstance(item, dict) else "unknown"
@@ -207,6 +252,11 @@ def main() -> int:
         except (InboxError, OSError, ValueError) as exc:
             failed = True
             print(f"review {review_id[:8]}: {exc}", file=sys.stderr)
+    read_items = result.get("vault_read_items") or []
+    if read_key and not args.dry_run and not process_vault_read_requests(api, read_key, read_items):
+        failed = True
+    if isinstance(expired_count, int) and expired_count > 0:
+        failed = True
     return 1 if failed else 0
 
 

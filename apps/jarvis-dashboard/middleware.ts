@@ -74,7 +74,10 @@ export async function middleware(request: NextRequest) {
   if (
     path === "/api/obsidian-review/mcp" ||
     path === "/api/obsidian-review/inbox" ||
-    path === "/api/obsidian-review/submit"
+    path === "/api/obsidian-review/submit" ||
+    path === "/api/obsidian-review/monitor" ||
+    path === "/api/obsidian-vault/mcp" ||
+    path === "/api/obsidian-vault/inbox"
   ) {
     return NextResponse.next({ request });
   }
