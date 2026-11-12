@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-25T00:44:13+09:00",
+  "updated": "2026-11-12T23:16:06+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -12,11 +12,12 @@
     "share_id": "uksxiDIzE1AEckKH"
   },
   "counts": {
-    "候補": 24,
-    "設計中": 8,
+    "候補": 22,
+    "設計中": 9,
     "運用確認": 11,
     "運用": 0,
-    "停止": 0
+    "停止": 0,
+    "廃止（611へ統合）": 1
   },
   "genres": [
     {
@@ -752,8 +753,8 @@
       "department_name": "連絡・物件動向把握室",
       "genre_id": "property",
       "genre_name": "物件",
-      "status": "候補",
-      "status_icon": "⚪",
+      "status": "設計中",
+      "status_icon": "🔵",
       "report": "report",
       "trigger": "イベント＋時間",
       "schedule": "deals進捗時",
@@ -761,8 +762,8 @@
       "tool_fit": "A+B",
       "tool_notes": "KURASHIFT見回り。Grok部長と弱対応",
       "note": "ミックスは弱対応。主はKURASHIFT／部長Daily",
-      "summary": "（ビルダー叩き台・候補。詳細は CLAUDE.md）",
-      "flow_summary": "",
+      "summary": "#deal-active を KURASHIFT の写しとして棚卸し（載せる・聞く・閉じる）",
+      "flow_summary": "KURASHIFT（正本）で内見候補以上になった案件を、113 が #deal-active に **1案件1スレッド** で写し、段階が変われば書き換え、**14日動きがなければ月曜朝に「どうしますか？」**（続ける／保留／見送り）。消すのは**松野さんがボタンで閉じた案件だけ**で、見送りは KURASHIFT 側にも戻す。",
       "builder_tag": "〔Grok:S〕",
       "mixup_kind": "mac_twin",
       "grok_counterpart": "bucho_re",
@@ -812,35 +813,21 @@
         "trigger_kinds": [
           {
             "id": "human",
-            "on": false,
-            "detail": "人が頼む",
-            "raw": "人が頼む"
-          },
-          {
-            "id": "schedule",
-            "on": false,
-            "detail": "時間",
-            "raw": "時間"
+            "on": true,
+            "detail": "人が頼む（「deal-active 整理して」）",
+            "raw": "人が頼む（「deal-active 整理して」）"
           },
           {
             "id": "schedule",
             "on": true,
-            "detail": "deals進捗時",
-            "raw": "",
-            "from_registry": true
-          },
-          {
-            "id": "event",
-            "on": false,
-            "detail": "何かが届いたら",
-            "raw": "何かが届いたら"
+            "detail": "時間（毎朝の見回り・月曜朝の確認）",
+            "raw": "時間（毎朝の見回り・月曜朝の確認）"
           },
           {
             "id": "event",
             "on": true,
-            "detail": "deals進捗時",
-            "raw": "",
-            "from_registry": true
+            "detail": "何かが届いたら（Slack ボタン）",
+            "raw": "何かが届いたら（Slack ボタン）"
           },
           {
             "id": "watch",
@@ -850,10 +837,11 @@
           }
         ],
         "trigger_kinds_on": [
+          "human",
           "schedule",
           "event"
         ],
-        "trigger_kinds_label": "時間 · イベント",
+        "trigger_kinds_label": "人依頼 · 時間 · イベント",
         "triggers_filled": true,
         "when": "deals進捗時",
         "registry_trigger": "イベント＋時間",
@@ -2042,15 +2030,33 @@
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/research-chat-task-capture.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/research-chat-task-capture.md",
             "kind": "doc"
+          },
+          {
+            "title": "ループウェア_入口設計_20261107.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/ループウェア_入口設計_20261107.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/ループウェア_入口設計_20261107.md",
+            "kind": "doc"
+          },
+          {
+            "title": "重複タスクまとめ案_本格版プロンプト.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/重複タスクまとめ案_本格版プロンプト.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/重複タスクまとめ案_本格版プロンプト.md",
+            "kind": "doc"
+          },
+          {
+            "title": "重複タスクまとめ案_設計書.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/重複タスクまとめ案_設計書.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/docs/重複タスクまとめ案_設計書.md",
+            "kind": "doc"
           }
         ],
-        "procedure_count": 10,
+        "procedure_count": 13,
         "source": "claude+registry+ops_yaml"
       }
     },
     {
       "id": "313",
-      "name": "Todoist完了候補確認係",
+      "name": "Todoistタスク処置係",
       "path": "300_品質・タスク運用管理室/313_完了候補確認係",
       "department_id": "300",
       "department_name": "品質・タスク運用管理室",
@@ -2177,17 +2183,17 @@
           },
           {
             "kind": "`#report`",
-            "destination": "確認のみ完了一覧（先頭 `【報告】313 完了候補確認`）",
+            "destination": "確認のみ完了一覧（先頭 `【報告】313 タスク処置`）",
             "channels": []
           },
           {
             "kind": "`#consult`",
-            "destination": "要判断／期日超過（先頭 `【相談】313 完了候補確認`。Webhook表示名も `313 完了候補確認`）",
+            "destination": "要判断／期日超過（先頭 `【相談】313 タスク処置`。Webhook表示名も `313 タスク処置`）",
             "channels": []
           },
           {
             "kind": "`#ops`",
-            "destination": "API失敗・二重起票疑い（`【ops】313 完了候補確認`）",
+            "destination": "API失敗・二重起票疑い（`【ops】313 タスク処置`）",
             "channels": []
           },
           {
@@ -2254,9 +2260,15 @@
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/docs/phase1-l1-digest.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/docs/phase1-l1-digest.md",
             "kind": "doc"
+          },
+          {
+            "title": "ループウェア_出口設計_20261107.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/docs/ループウェア_出口設計_20261107.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/313_完了候補確認係/docs/ループウェア_出口設計_20261107.md",
+            "kind": "doc"
           }
         ],
-        "procedure_count": 8,
+        "procedure_count": 9,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -2826,7 +2838,7 @@
       "grok_counterpart": "",
       "flowforge_id": "flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
-      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG",
+      "flowforge_share_url": "",
       "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_8mwIkbI0S9kV2u5kSwl2I-Oi",
       "permissions": {
         "can_do": "Slack FB／Todoistコメントの常駐拾い・Ack・許可リスト内AI処置（対外・金は人）。冗長はGHA L1／Cloud L2",
@@ -2958,7 +2970,7 @@
           {
             "title": "FlowForge（作業フロー）",
             "path": "",
-            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
             "kind": "flowforge"
           },
           {
@@ -5128,7 +5140,7 @@
     },
     {
       "id": "611",
-      "name": "リソース制約要約係",
+      "name": "リソース制約・配車係",
       "path": "600_リソース・家計室/611_リソース制約要約係",
       "department_id": "600",
       "department_name": "リソース・家計室",
@@ -5142,8 +5154,8 @@
       "tool_assigned": "jarvis",
       "tool_fit": "A",
       "tool_notes": "リソース制約要約＋頻度提案",
-      "note": "AI使用状況把握＋レビュー連動で社員頻度の減増を提案（本番変更は人確認後）。813と連携",
-      "summary": "AI使用状況把握＋レビュー連動で社員頻度の減増を提案（本番変更は人確認後）。813と連携",
+      "note": "全エージェントの使用量を見て「この作業はこのエージェントで」の割り振り案を#consultに出す（2026-11-05 に813を統合。実装の指示は松野）。flow.md参照",
+      "summary": "全エージェントの使用量を見て「この作業はこのエージェントで」の割り振り案を#consultに出す（2026-11-05 に813を統合。実装の指示は松野）。flow.md参照",
       "flow_summary": "",
       "builder_tag": "〔Grok:R〕",
       "mixup_kind": "mac_twin",
@@ -5183,7 +5195,7 @@
         "site_logins": [],
         "site_logins_summary": "なし",
         "has_site_logins": false,
-        "human_gate": "頻度の本番変更、ツール有料枠の増減、代行チェーン切替（813と連携）。",
+        "human_gate": "頻度の本番変更、ツール有料枠の増減、代行・割り振りの切替（旧813を統合済み）。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
       },
@@ -5245,7 +5257,7 @@
             ]
           },
           {
-            "kind": "813 への枠切替連携",
+            "kind": "枠切れ時の割り振り案（旧813分）",
             "destination": "`#ops` ＋必要なら Todoist `要Jarvis連携`",
             "channels": [
               "ops"
@@ -7056,7 +7068,7 @@
       "tool_notes": "Genspark/Speakly議事録→NotebookLM1ノート→Studioインフォ→Notion当日ページ（インフォ→議事録）。ページ複製は人",
       "note": "2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation",
       "summary": "2026-10-19 新設。正本 scripts/friday_family_meeting_weekly.py。config/notion_family_coaching.yaml automation",
-      "flow_summary": "松野が当日ページを複製 → 日曜21:30「議事録MD → NLMソース → インフォ → Notion（インフォ→議事録順）」→ **Slack `#report`【715】**。失敗は `#ops`＋月曜 `--retry`。",
+      "flow_summary": "松野が当日ページを複製 → 日曜21:30「議事録MD → NLMソース → インフォ → Notion（インフォ→議事録順）」→ **Slack `#report`【715】**。失敗は `#ops`＋月曜 `--retry`。人の手当てが要る失敗・retry でも直らない失敗は `#ai-hub`【要手当て】→ 番頭さん解決確認／ホーク起票（`CLAUDE.md` §4）。",
       "builder_tag": "〔Grok:F〕",
       "mixup_kind": "mac_twin",
       "grok_counterpart": "family",
@@ -7145,10 +7157,15 @@
           },
           {
             "kind": "失敗・枠切れ",
-            "destination": "Slack `#ops`（翌朝リトライ→だめなら FRIDAY 手当て）",
+            "destination": "Slack `#ops`（原因・進み・「次:」を短く）",
             "channels": [
               "ops"
             ]
+          },
+          {
+            "kind": "要手当て",
+            "destination": "Slack **`#ai-hub`【要手当て】**（下の「失敗の拾い方」。同じ原因は1回だけ）",
+            "channels": []
           },
           {
             "kind": "Jarvisへの依頼・確認",
@@ -7160,6 +7177,36 @@
           {
             "kind": "正本",
             "destination": "Notion 家族会議 `(YYYY/MM/DD)` ページ／Drive `13_家族会議_週次/`",
+            "channels": []
+          },
+          {
+            "kind": "原因（自動判定）",
+            "destination": "`#ai-hub` に出す時点",
+            "channels": []
+          },
+          {
+            "kind": "Notion 当日ページ未作成",
+            "destination": "日曜の初回失敗ですぐ",
+            "channels": []
+          },
+          {
+            "kind": "Genspark 認証切れ（401）",
+            "destination": "日曜の初回失敗ですぐ",
+            "channels": []
+          },
+          {
+            "kind": "Genspark クレジット不足（`gsk` は API 利用扱いで残高を使う）",
+            "destination": "日曜の初回失敗ですぐ",
+            "channels": []
+          },
+          {
+            "kind": "当日の録音が見つからない",
+            "destination": "日曜の初回失敗ですぐ",
+            "channels": []
+          },
+          {
+            "kind": "NotebookLM／Studio／Notion API／不明",
+            "destination": "月曜07:00 `--retry` でも失敗したとき",
             "channels": []
           }
         ],
@@ -7593,7 +7640,7 @@
       "department_name": "俯瞰UI・投影更新室",
       "genre_id": "apps",
       "genre_name": "アプリ・俯瞰",
-      "status": "候補",
+      "status": "廃止（611へ統合）",
       "status_icon": "⚪",
       "report": "ops",
       "trigger": "枠切れ",
@@ -7601,7 +7648,7 @@
       "tool_assigned": "gencode",
       "tool_fit": "C",
       "tool_notes": "代行チェーン先頭GenCode",
-      "note": "枠切れ代行チェーン＋611の頻度コントロール案を承認経由で反映。Jarvisは候補外で俯瞰",
+      "note": "【統合済み・廃止】2026-11-05 に611「リソース制約・配車係」へ統合。固定の代行チェーンは持たず、使用量で割り振る。flow.mdは611を参照",
       "summary": "枠切れの代行チェーン提案＋611の頻度減増案を承認経由で反映",
       "flow_summary": "",
       "builder_tag": "",
@@ -11556,7 +11603,7 @@
       {
         "side": "ai_only",
         "agent_id": "313",
-        "agent_name": "Todoist完了候補確認係",
+        "agent_name": "Todoistタスク処置係",
         "builder_tag": "",
         "mixup_kind": "ai_only",
         "grok_counterpart": "",
@@ -11784,7 +11831,7 @@
       {
         "side": "paired",
         "agent_id": "611",
-        "agent_name": "リソース制約要約係",
+        "agent_name": "リソース制約・配車係",
         "builder_tag": "〔Grok:R〕",
         "mixup_kind": "mac_twin",
         "grok_counterpart": "resource",
@@ -11979,7 +12026,7 @@
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "枠切れ代行チェーン＋611の頻度コントロール案を承認経由で反映。Jarvisは候補外で俯瞰"
+        "role_split": "【統合済み・廃止】2026-11-05 に611「リソース制約・配車係」へ統合。固定の代行チェーンは持たず、使用量で割り振る。flow.mdは611を参照"
       },
       {
         "side": "ai_only",

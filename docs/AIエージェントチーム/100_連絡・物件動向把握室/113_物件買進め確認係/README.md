@@ -1,4 +1,4 @@
-# 物件買進め確認係 — 一目でわかる1枚
+# 【設計中】物件買進め確認係 — 一目でわかる1枚
 
 - **AIオートメーション（FlowForge）**: [flow_RM18Xwo_pNXzMLpYwB9mU-pM](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_RM18Xwo_pNXzMLpYwB9mU-pM)
 
