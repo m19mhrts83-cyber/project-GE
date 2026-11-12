@@ -18,7 +18,7 @@ Use this skill when the user asks to run the migrated source command `todoist`.
 | 意図 | やること |
 |---|---|
 | 起票候補・宿題の整理 | **312 Todoist起票整理係**（`docs/AIエージェントチーム/300_品質・タスク運用管理室/312_Todoist起票整理係/CLAUDE.md`） |
-| 掃除・確認のみ完了・並列バッチ | **`/todoist-batch`** へ（313 完了候補確認係＋ skill `todoist-batch-sweep`） |
+| 掃除・確認のみ完了・並列バッチ | **`/todoist-batch`** へ（313 タスク処置係＋ skill `todoist-batch-sweep`） |
 | 単件の列移動・コメント返信 | `jarvis-todoist-owner-confirm.mdc` どおり CLI |
 
 ## 必須（毎回）

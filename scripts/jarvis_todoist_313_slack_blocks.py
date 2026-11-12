@@ -17,7 +17,7 @@ import urllib.request
 from typing import Any
 
 DEFAULT_CONSULT_CHANNEL = "C0C7R0UF3MM"
-AGENT_USERNAME = "313 完了候補確認"
+AGENT_USERNAME = "313 タスク処置"
 
 T313_ACTION_IDS = {
     "close": "todoist_313_close",
