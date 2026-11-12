@@ -4,12 +4,33 @@
 
 | 項目 | 値 |
 |---|---|
-| task_id | kamiooya-history-edit-20261101 |
+| task_id | obsidian-bidirectional-20261112 |
 | agent_id | 814 |
 | executor | codex |
-| status | done |
-| started_at | |
+| status | running |
+| started_at | 2026-11-12 |
 | finished_at | |
+
+## 依頼（2026-11-12追加）
+
+ChatGPTからMac正本Obsidian Vaultを安全に検索・抜粋できる読み取りAPIを実装し、既存日次レビュー保存経路と権限を分離する。Mac heartbeatとSlack #opsのoffline/recovery通知も実装する。
+
+## 完了条件
+
+- [x] allowlist配下のMarkdownだけを検索・抜粋するread-only要求・応答キューを実装
+- [x] ChatGPT read toolとMac poll/responseを別キーで認証
+- [x] Mac heartbeatを記録し、GAS監視から状態遷移時だけSlack #ops通知
+- [x] 既存レビュー保存のローカル正本・no-clobber・OGD同期を維持
+- [x] 運用手順・Secrets/手動設定/未デプロイ事項を文書化
+- [x] 実装結果をworktreeで確認し、TASKをdoneにしてロック解放
+
+## 実装結果（2026-11-12）
+
+- 追加対応中: Supabase migrationを本番適用、Vercel Productionに認証鍵とSlack webhookを登録、Mac秘密envに中継鍵を追加。コード公開・Site plugin登録・GAS設定は継続中。
+
+- 読取MCP、Mac側allowlist検索、短期Supabase要求箱、専用鍵、heartbeat/watchdog/Slack状態通知、LaunchAgent 15秒poll設定を追加。
+- 運用・有効化手順: `docs/Obsidian日次レビュー受信.md`。Supabase migration、Vercel環境変数、GAS trigger、ChatGPT read connector、安定checkoutからのLaunchAgent再登録は未実施。
+- 専用worktree `codex/obsidian-bidirectional-20261112` に実装。`git diff --check` はclean。テストや本番疎通、Slack送信は実施していない。
 
 ## 依頼
 

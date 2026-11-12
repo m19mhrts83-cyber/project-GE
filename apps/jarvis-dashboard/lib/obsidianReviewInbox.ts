@@ -33,9 +33,16 @@ export function validateDailyReview(input: Record<string, unknown>): ReviewValid
 
 export function submitKeyMatches(supplied: string, envName = "OBSIDIAN_REVIEW_SUBMIT_KEY"): boolean {
   const expected = (process.env[envName] || "").trim();
+  const otherKeys = [
+    "OBSIDIAN_REVIEW_POLL_KEY",
+    "OBSIDIAN_REVIEW_READ_KEY",
+    "OBSIDIAN_VAULT_POLL_KEY",
+    "OBSIDIAN_REVIEW_MONITOR_KEY",
+  ];
+  if (!expected || otherKeys.some((name) => expected === (process.env[name] || "").trim())) return false;
   const a = Buffer.from(expected);
   const b = Buffer.from(supplied.trim());
-  return a.length > 0 && a.length === b.length && timingSafeEqual(a, b);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export async function enqueueDailyReview(
