@@ -46,6 +46,9 @@ MONEY_RE = re.compile(r"(振込|支払|引落|請求|入金|返済|融資|保険
 HARD_RE = re.compile(r"(期限|締切|〆切|振込|支払|引落|説明会|入試|行事|参加証|更新前)")
 OWNER_HINT_RE = re.compile(r"(\[要ボス\]|\[要判断\]|\[メール要対応\]|\[資料待ち\]|【松野さん】|ボス実施|ボスが)")
 SKIP_RE = re.compile(r"\[要フォロー\]")
+# 土日祝はエージェントの自動化を進める日（松野さん 2026-11-12）。この日付に置いた自動化タスクは
+# 週次ピックの候補にも日付消しにも入れない。祝日は Todoist 側で土日同様に置く運用。
+AGENT_RE = re.compile(r"(\[自律化\]|自動化|エージェント作成)")
 
 PICK_TEXT = {
     "deadline": "締切まであと{n}日",
@@ -101,6 +104,9 @@ def is_owner_task(t: dict[str, Any]) -> bool:
     content = t.get("content") or ""
     if SKIP_RE.search(content):
         return False
+    du = due_of(t)
+    if du and du.weekday() >= 5 and AGENT_RE.search(content):
+        return False  # 土日のエージェント自動化枠
     labels = set(t.get("labels") or [])
     if content.lstrip().startswith(AI_MARK):
         return "要ボス" in labels or bool(OWNER_HINT_RE.search(content))
