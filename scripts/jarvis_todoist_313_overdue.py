@@ -24,7 +24,7 @@ REPO = Path(__file__).resolve().parents[1]
 STATE_PATH = REPO / ".jarvis_state" / "todoist_313_overdue.json"
 MAX_TOP = 5
 AGENT_ID = "313"
-AGENT_ROLE = "完了候補確認"
+AGENT_ROLE = "タスク処置"
 ITEM_MARK = "📅"  # 完了候補は ✅（別投稿・記号で区別）
 USERNAME = f"{AGENT_ID} {AGENT_ROLE}"
 
