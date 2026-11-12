@@ -13,17 +13,18 @@ Runs outside the Mac every five minutes and calls the authenticated Dashboard mo
 
 The trigger is best-effort on Google's schedule. Expected alert delay is approximately 5–10 minutes after the last poll, plus any Apps Script scheduling delay. The Mac poller keeps its existing 60-second LaunchAgent interval, about 43,200 outbound polls per 30-day month, with no additional poller process.
 
-## Secrets and deployment
+## Deployment state
 
-The following values must be added to Vercel Production (the key value must not enter Git):
+Applied on 2026-11-12:
 
-- `OBSIDIAN_REVIEW_READ_KEY` — ChatGPT read-only MCP key
-- `OBSIDIAN_VAULT_POLL_KEY` — Mac read-queue poll/response key
-- `OBSIDIAN_REVIEW_MONITOR_KEY` — GAS-to-Dashboard monitor key
-- `SLACK_WEBHOOK_AI_TEAM_OPS` — existing private `#ops` Incoming Webhook
+- Supabase migration `20261112_obsidian_vault_read_watchdog.sql`.
+- Vercel Production read, poll, and monitor keys plus private `#ops` webhook.
+- Read-only tools added to the existing owner-only ChatGPT Site plugin, which retains `submit_daily_review`.
+- Mac poll key added to `~/git-repos/.env.jarvis_private`; the LaunchAgent runs from a persistent checkout at 60-second intervals.
 
-Also add `OBSIDIAN_VAULT_POLL_KEY` to `~/git-repos/.env.jarvis_private` on the Mac. Keep the existing review submit and review poll keys separate. Apply the Supabase migration before deploying the routes. Add the read-only MCP endpoint to the private ChatGPT connector:
+Still required: create a private Apps Script project, set these Script Properties, and run the installer function once:
 
-`https://jarvis-dashboard-amber.vercel.app/api/obsidian-vault/mcp`
+- `OBSIDIAN_WATCHDOG_URL` = `https://jarvis-dashboard-amber.vercel.app/api/obsidian-review/monitor`
+- `OBSIDIAN_WATCHDOG_KEY` = Vercel Production `OBSIDIAN_REVIEW_MONITOR_KEY`
 
-Use HTTP Bearer authentication with `OBSIDIAN_REVIEW_READ_KEY`. The existing review submit connector remains separate and write-only. Do not paste key values into chat or commit them.
+The Site plugin has separate read and submit tools; the read MCP key is stored as a Site secret and is distinct from the review submit key. Open a new ChatGPT conversation if the refreshed tool list is not visible. Do not paste key values into chat or commit them.
