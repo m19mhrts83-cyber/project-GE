@@ -4,6 +4,7 @@ import {
   enqueueDailyReview,
   submitKeyMatches,
   validateDailyReview,
+  validSavedReviewPaths,
 } from "../lib/obsidianReviewInbox.ts";
 
 const valid = {
@@ -67,4 +68,17 @@ test("queue insert is idempotent and does not overwrite a duplicate review id", 
     accepted: true,
     duplicate: true,
   });
+});
+
+
+test("save receipts accept monthly notes and reject traversal, month mismatch, and invalid dates", () => {
+  const root = "01_Journaling/★Journal/";
+  assert.equal(validSavedReviewPaths(valid.review_id, [`${root}2026-11/2026-11-12.md`]), true);
+  assert.equal(validSavedReviewPaths(valid.review_id, [`${root}2026-12/2026-12-01.md`]), true);
+  for (const path of ["2026-11/2026-12-01.md", "2026-02/2026-02-30.md", "2026-11/../2026-11-12.md"]) {
+    assert.equal(validSavedReviewPaths(valid.review_id, [root + path]), false);
+  }
+  const old = `${root}日次レビュー/2026-11-10_${valid.review_id.slice(0,8)}`;
+  assert.equal(validSavedReviewPaths(valid.review_id, [`${old}_生ログ.md`, `${old}_戦術レビュー.md`]), true);
+  assert.equal(validSavedReviewPaths(valid.review_id, ["../elsewhere", `${old}_戦術レビュー.md`]), false);
 });
