@@ -301,6 +301,11 @@ def sections(rows: list[dict[str, Any]], cands: list[dict[str, Any]]) -> str:
     st = stay_reasons(rows)
     lines += ["", "### 残っている理由（多い順に潰す）"]
     lines += [f"- {STAY_LABEL.get(k, k)} {n}" for k, n in st.most_common()] or ["- なし"]
+    fixes = [r for r in rows if r.get("surface") == "uiux_fix"]
+    if fixes or any(r.get("surface") in ("uiux_plan", "uiux_rule") for r in rows):
+        from jarvis_uiux_loop import fix_metrics, metrics_lines  # noqa: PLC0415
+
+        lines += ["", "### 画面の好み（UI/UX。擦り合わせは減っているか）", *metrics_lines(fix_metrics(fixes))]
     hits = next_step_hits(rows)
     if hits:
         lines += ["", "### 次の一手の型"]
