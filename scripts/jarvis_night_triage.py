@@ -36,6 +36,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from jarvis_cloud_file import read_text_cloud
+from jarvis_thread_context import compact_context
 
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
@@ -1198,6 +1199,8 @@ def queue_item_fields(c: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any
         "channel": c.get("channel") or ("Gmail" if (c.get("lane") or "partner") != "openchat" else ""),
         "channel_raw": c.get("channel_raw") or "",
         "original_body": body[:8000],
+        # 判断デスクで「自分が送った1つ前のメール」を見せる（DB の payload.thread_context へ）
+        "thread_context": compact_context(c.get("context"), body),
         "updated_at": now_iso(),
     }
     base.update(extra)
