@@ -1,5 +1,5 @@
 /**
- * 313 Todoist完了候補確認 — Slack ボタン／署名 URL
+ * 313 Todoistタスク処置 — Slack ボタン／署名 URL
  * 署名は PROPERTY_GATE_ACTION_TOKEN（116／511 と同系）
  */
 import { createHmac, timingSafeEqual } from "crypto";

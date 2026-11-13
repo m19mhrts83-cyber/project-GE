@@ -391,7 +391,11 @@ def cmd_health(reg: dict[str, Any], *, notify_ops: bool) -> int:
         return 0
     for i in issues:
         print(f"⚠️ {i}")
-    if notify_ops:
+    # 2026-11-13 松野さん: 件数が多いだけ（中身は流し読み・通知が9割）では 🔴 にしない。
+    # 件数・ミュート数は 🟡 扱いで #ops には出さず、メールの色は
+    # jarvis_night_triage_ops_report.py（パートナー・人のメールが止まったら 🔴）に一本化。
+    print("判定: 🟡 件数のみ（#ops には出さない・日曜の週次まとめで片付け）")
+    if notify_ops and os.environ.get("JARVIS_MAIL_ACTION_HEALTH_OPS_LEGACY", "").strip() == "1":
         skip, reason = _should_skip_health_notify(issues)
         if skip:
             print(

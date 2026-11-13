@@ -1,6 +1,6 @@
 # /todoist-batch — Todoist 掃除・並列バッチ
 
-**313 完了候補確認係**＋ skill `todoist-batch-sweep` を起動する依頼コマンド。
+**313 タスク処置係**＋ skill `todoist-batch-sweep` を起動する依頼コマンド。
 
 ## 既定テンプレ
 

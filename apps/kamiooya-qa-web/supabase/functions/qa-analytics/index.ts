@@ -171,6 +171,10 @@ Deno.serve(async (req) => {
   let billableSemantic = 0;
   const byDay: Record<string, { normal: number; semantic: number; deep: number }> = {};
   const queryCounts: Record<string, { count: number; semantic: number; normal: number; deep: number }> = {};
+  // 「〇回・〇人」で比べられるよう、質問ごと・日ごとの人数も数える（同じ人は1人）。2026-11-12
+  const queryUsers: Record<string, Set<string>> = {};
+  const dayUsers: Record<string, Set<string>> = {};
+  const chatUsers = new Set<string>();
 
   for (const row of rows) {
     const mode = modeOf(row);
@@ -188,6 +192,11 @@ Deno.serve(async (req) => {
     }
 
     const day = asString(row.created_at).slice(0, 10) || "unknown";
+    const uid = asString(row.user_id).trim();
+    if (uid) {
+      chatUsers.add(uid);
+      (dayUsers[day] ||= new Set()).add(uid);
+    }
     if (!byDay[day]) byDay[day] = { normal: 0, semantic: 0, deep: 0 };
     if (mode === "semantic") byDay[day].semantic += 1;
     else if (mode === "deep") byDay[day].deep += 1;
@@ -197,6 +206,7 @@ Deno.serve(async (req) => {
     if (q) {
       if (!queryCounts[q]) queryCounts[q] = { count: 0, semantic: 0, normal: 0, deep: 0 };
       queryCounts[q].count += 1;
+      if (uid) (queryUsers[q] ||= new Set()).add(uid);
       if (mode === "semantic") queryCounts[q].semantic += 1;
       else if (mode === "deep") queryCounts[q].deep += 1;
       else queryCounts[q].normal += 1;
@@ -234,10 +244,11 @@ Deno.serve(async (req) => {
       semantic: byDay[day].semantic,
       deep: byDay[day].deep,
       total: byDay[day].normal + byDay[day].semantic + byDay[day].deep,
+      users: dayUsers[day] ? dayUsers[day].size : 0,
     }));
 
   const topQueries = Object.entries(queryCounts)
-    .map(([query, v]) => ({ query, ...v }))
+    .map(([query, v]) => ({ query, ...v, users: queryUsers[query] ? queryUsers[query].size : 0 }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 30);
 
@@ -369,6 +380,82 @@ Deno.serve(async (req) => {
     };
   }
 
+  // キーワード検索（全データ）の利用（qa_keyword_search_events）。チャットの質問とは別に数え、画面で並べて比べる。
+  // 表がまだ無い（移行前）なら available:false で返し、画面は「記録の準備中」と出す。2026-11-12
+  let keyword: Record<string, unknown> = { available: false };
+  try {
+    const { data: kwRows, error: kwError } = await sb
+      .from("qa_keyword_search_events")
+      .select("created_at,user_id,query_text,hit_total,hits,has_or,result_status")
+      .gte("created_at", since)
+      .lt("created_at", until || "9999-12-31T00:00:00Z")
+      .order("created_at", { ascending: false })
+      .limit(5000);
+    if (!kwError) {
+      const kRows = kwRows || [];
+      const kwUsers = new Set<string>();
+      const kwDay: Record<string, { count: number; users: Set<string> }> = {};
+      const kwQuery: Record<string, { count: number; zero: number; hits: number; users: Set<string>; last: string }> = {};
+      const bySource: Record<string, number> = { comments: 0, openchat: 0, lessons: 0, knowledge: 0 };
+      let zeroHit = 0;
+      let orCount = 0;
+      for (const r of kRows) {
+        const uid = asString(r.user_id).trim();
+        if (uid) kwUsers.add(uid);
+        const day = asString(r.created_at).slice(0, 10) || "unknown";
+        if (!kwDay[day]) kwDay[day] = { count: 0, users: new Set() };
+        kwDay[day].count += 1;
+        if (uid) kwDay[day].users.add(uid);
+        const hitTotal = Number(r.hit_total) || 0;
+        if (hitTotal === 0) zeroHit += 1;
+        if (r.has_or === true) orCount += 1;
+        const h = (r.hits && typeof r.hits === "object" ? r.hits : {}) as Record<string, unknown>;
+        for (const k of Object.keys(bySource)) if (Number(h[k]) > 0) bySource[k] += 1;
+        const q = asString(r.query_text).trim().replace(/\s+/g, " ").slice(0, 120);
+        if (q) {
+          if (!kwQuery[q]) kwQuery[q] = { count: 0, zero: 0, hits: 0, users: new Set(), last: asString(r.created_at) };
+          kwQuery[q].count += 1;
+          kwQuery[q].hits += hitTotal;
+          if (hitTotal === 0) kwQuery[q].zero += 1;
+          if (uid) kwQuery[q].users.add(uid);
+        }
+      }
+      keyword = {
+        available: true,
+        total: kRows.length,
+        users: kwUsers.size,
+        zero_hit: zeroHit,
+        or_count: orCount,
+        // その区分で1件以上見つかった検索の回数（どのデータがよく役に立っているか）
+        by_source: bySource,
+        daily: Object.keys(kwDay)
+          .sort()
+          .map((day) => ({ day, count: kwDay[day].count, users: kwDay[day].users.size })),
+        top: Object.entries(kwQuery)
+          .map(([query, v]) => ({
+            query,
+            count: v.count,
+            users: v.users.size,
+            zero_hit: v.zero,
+            avg_hits: v.count > 0 ? Math.round(v.hits / v.count) : 0,
+            last_at: v.last,
+          }))
+          .sort((a, b) => b.count - a.count || b.users - a.users)
+          .slice(0, 30),
+        // 見つからなかった言葉（データやことばの言い換えを足す手がかり）
+        zero_queries: Object.entries(kwQuery)
+          .filter(([, v]) => v.zero > 0)
+          .map(([query, v]) => ({ query, count: v.zero, users: v.users.size }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10),
+      };
+    } else {
+      keyword = { available: false, error: kwError.message };
+    }
+  } catch (e) {
+    keyword = { available: false, error: String(e) };
+  }
+
   return json({
     ok: true,
     range_days: sinceParam ? rangeDays : days,
@@ -382,6 +469,8 @@ Deno.serve(async (req) => {
       deep_ok: deepOk,
       failed,
       disabled,
+      // チャットで質問した人数（期間内・成功した質問。RPC が無ければ取得した記録から数える）
+      users: usersRes.error ? chatUsers.size : Number(usersRes.data) || 0,
       semantic_ratio: total > 0 ? Number((semantic / total).toFixed(4)) : 0,
       deep_ratio: total > 0 ? Number((deep / total).toFixed(4)) : 0,
       normal_ratio: total > 0 ? Number((normal / total).toFixed(4)) : 0,
@@ -391,6 +480,7 @@ Deno.serve(async (req) => {
     metering_error: weeklyRes.error ? weeklyRes.error.message : null,
     daily,
     top_queries: topQueries,
+    keyword,
     recent_events: recent,
   });
 });

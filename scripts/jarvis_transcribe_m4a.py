@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Just Press Record 等の .m4a を Gemini で文字起こしする。
+"""Just Press Record 等の .m4a を Mac の中だけで文字起こしする（2026-11-13 から）。
 
-前処理: macOS の `afconvert` で WAV 化し、Gemini（無料枠）へ送る。
-話者分離はモデル任せ（分かれば 話者A/B）。
+前処理: macOS の `afconvert` で WAV 化し、ローカル Whisper（mlx-whisper、無ければ faster-whisper）で起こす。
+音声は外へ出さない。従量課金の Gemini API は使わない。
+最後の「要約（3行以内）」は Mac の定額AI（jarvis_flat_ai）で付ける。作れなければ要約なしで保存する。
+話者の書き分けはしない（Whisper は話者を分けない）。
 
 例:
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
@@ -13,61 +15,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
-import time
-import urllib.error
-import urllib.request
 from pathlib import Path
-
-
-API_BASE = "https://generativelanguage.googleapis.com"
-DEFAULT_MODEL = "gemini-3.5-flash"
-PROMPT = """あなたは日本語の電話録音の文字起こし係です。
-次の音声を可能な限り正確に文字起こししてください。
-
-出力ルール:
-1. 話者が区別できそうなら「話者A:」「話者B:」で分けて書く（断定できないときは無理に分けず、段落で続ける）。
-2. 聞き取れない箇所は［聴き取り不能］と書く。
-3. フィラー（えー、あのー）は必要最小限に残す。
-4. タイムスタンプは分単位の目安で、大きな話題の切れ目だけ `[mm:ss]` を付けてよい（細かすぎなくてよい）。
-5. 最後に「## 要約（3行以内）」を付ける。
-6. 前置き・解説は不要。Markdown 本文のみ。
-7. 呼び出し音・無音のみならその旨を短く書いてよい。
-"""
-
-
-def _api_key() -> str:
-    key = (os.environ.get("GEMINI_API_KEY") or "").strip()
-    if not key:
-        raise SystemExit("GEMINI_API_KEY が未設定です。.env.jarvis_private を source してください。")
-    return key
-
-
-def _safe_url(url: str) -> str:
-    return url.split("?key=")[0]
-
-
-def _http_json(
-    method: str,
-    url: str,
-    *,
-    data: bytes | None = None,
-    headers: dict[str, str] | None = None,
-    timeout: float = 300,
-) -> dict:
-    req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8")
-            return json.loads(body) if body else {}
-    except urllib.error.HTTPError as e:
-        err = e.read().decode("utf-8", errors="replace")
-        raise SystemExit(f"HTTP {e.code} {_safe_url(url)}: {err[:800]}") from e
 
 
 def validate_media(path: Path) -> None:
@@ -102,101 +55,77 @@ def to_wav(src: Path, wav_path: Path, *, large: bool = False) -> None:
         raise SystemExit("WAV 変換結果が空です。")
 
 
-def upload_wav(wav_path: Path, api_key: str) -> str:
-    raw = wav_path.read_bytes()
-    mime = "audio/wav"
-    start_headers = {
-        "x-goog-api-key": api_key,
-        "X-Goog-Upload-Protocol": "resumable",
-        "X-Goog-Upload-Command": "start",
-        "X-Goog-Upload-Header-Content-Length": str(len(raw)),
-        "X-Goog-Upload-Header-Content-Type": mime,
-        "Content-Type": "application/json",
-    }
-    meta = json.dumps({"file": {"display_name": wav_path.name}}).encode("utf-8")
-    req = urllib.request.Request(
-        f"{API_BASE}/upload/v1beta/files",
-        data=meta,
-        method="POST",
-        headers=start_headers,
-    )
+
+MLX_MODEL = os.environ.get("JARVIS_TRANSCRIBE_MLX_MODEL", "mlx-community/whisper-large-v3-turbo")
+FW_MODEL = os.environ.get("JARVIS_TRANSCRIBE_FW_MODEL", "large-v3")
+
+
+def _mmss(sec: float) -> str:
+    sec = int(sec)
+    return f"{sec // 60:02d}:{sec % 60:02d}"
+
+
+def local_transcribe(wav: Path) -> tuple[str, str]:
+    """ローカル Whisper で起こす。(本文, 手段ラベル)。約1分ごとに [mm:ss] を付けて段落にする。"""
+    segs: list[tuple[float, str]] = []
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            upload_url = resp.headers.get("X-Goog-Upload-URL")
-            if not upload_url:
-                raise SystemExit("Upload URL が返りませんでした。")
-    except urllib.error.HTTPError as e:
-        err = e.read().decode("utf-8", errors="replace")
-        raise SystemExit(f"upload start HTTP {e.code}: {err[:800]}") from e
+        import mlx_whisper  # noqa: PLC0415
 
-    info = _http_json(
-        "POST",
-        upload_url,
-        data=raw,
-        headers={
-            "Content-Length": str(len(raw)),
-            "X-Goog-Upload-Offset": "0",
-            "X-Goog-Upload-Command": "upload, finalize",
-        },
-        timeout=600,
-    )
-    file_info = info.get("file") or info
-    name = file_info.get("name")
-    uri = file_info.get("uri")
-    if not name:
-        raise SystemExit(f"upload 応答不正: {info!r}")
-    for _ in range(60):
-        st = _http_json(
-            "GET",
-            f"{API_BASE}/v1beta/{name}",
-            headers={"x-goog-api-key": api_key},
-            timeout=60,
+        res = mlx_whisper.transcribe(str(wav), path_or_hf_repo=MLX_MODEL, language="ja",
+                                     condition_on_previous_text=False)
+        segs = [(float(x["start"]), str(x["text"])) for x in res.get("segments") or []]
+        label = f"ローカル Whisper（{MLX_MODEL}）"
+    except ImportError:
+        from faster_whisper import WhisperModel  # noqa: PLC0415
+
+        model = WhisperModel(FW_MODEL, device="auto", compute_type="int8")
+        segments, _ = model.transcribe(str(wav), language="ja", vad_filter=True,
+                                       condition_on_previous_text=False)
+        segs = [(float(x.start), str(x.text)) for x in segments]
+        label = f"ローカル Whisper（faster-whisper {FW_MODEL}）"
+    paras: list[str] = []
+    cur: list[str] = []
+    cur_start = None
+    last = None
+    for start, text in segs:
+        t = " ".join((text or "").split()).strip()
+        if not t or t == last:
+            continue
+        last = t
+        if cur_start is None:
+            cur_start = start
+        cur.append(t)
+        if start - cur_start >= 60:
+            paras.append(f"[{_mmss(cur_start)}] " + "".join(cur))
+            cur, cur_start = [], None
+    if cur:
+        paras.append(f"[{_mmss(cur_start or 0)}] " + "".join(cur))
+    body = "\n\n".join(paras).strip() or "（音声から文字を取り出せませんでした。無音・呼び出し音のみの可能性）"
+    return body, label
+
+
+def flat_summary(body: str) -> str:
+    """定額AIで3行要約。作れなければ空。"""
+    if len(body) < 80:
+        return ""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import jarvis_flat_ai as flat  # noqa: PLC0415
+
+        res = flat.generate(
+            "次の電話録音の文字起こしを、日本語で3行以内に要約してください。箇条書き（- ）で、前置きなし。\n\n"
+            + body[:12000]
         )
-        state = (st.get("state") or "").upper()
-        if state == "ACTIVE":
-            return st.get("uri") or uri
-        if state == "FAILED":
-            raise SystemExit(f"ファイル処理失敗: {st}")
-        time.sleep(2)
-    raise SystemExit("ファイルが ACTIVE になりませんでした。")
-
-
-def generate_transcript(file_uri: str, api_key: str, model: str) -> str:
-    url = f"{API_BASE}/v1beta/models/{model}:generateContent"
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": PROMPT},
-                    {"file_data": {"mime_type": "audio/wav", "file_uri": file_uri}},
-                ]
-            }
-        ],
-        "generationConfig": {"temperature": 0.2},
-    }
-    out = _http_json(
-        "POST",
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
-        timeout=600,
-    )
-    cands = out.get("candidates") or []
-    if not cands:
-        raise SystemExit(f"候補なし: {json.dumps(out, ensure_ascii=False)[:800]}")
-    parts = (((cands[0] or {}).get("content") or {}).get("parts")) or []
-    texts = [p.get("text", "") for p in parts if p.get("text")]
-    text = "\n".join(texts).strip()
-    if not text:
-        raise SystemExit(f"本文空: {json.dumps(out, ensure_ascii=False)[:800]}")
-    return text
+        return res.text.strip()
+    except Exception as e:
+        print(f"# summary skip: {e}", file=sys.stderr)
+        return ""
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="m4a → Gemini 文字起こし")
+    ap = argparse.ArgumentParser(description="m4a → ローカル Whisper 文字起こし")
     ap.add_argument("--input", "-i", required=True, help=".m4a / .wav パス")
     ap.add_argument("--output", "-o", help="出力 MD（省略時は隣に *_文字起こし.md）")
-    ap.add_argument("--model", default=os.environ.get("JARVIS_TRANSCRIBE_MODEL", DEFAULT_MODEL))
     ap.add_argument("--stdout", action="store_true", help="ファイル保存せず標準出力のみ")
     args = ap.parse_args()
 
@@ -205,21 +134,21 @@ def main() -> int:
         raise SystemExit(f"ファイルがありません: {src}")
 
     validate_media(src)
-    api_key = _api_key()
 
     with tempfile.TemporaryDirectory(prefix="jarvis_jpr_") as tmp:
         wav = Path(tmp) / f"{src.stem}.wav"
         print(f"# convert: {src.name} → wav", file=sys.stderr)
         to_wav(src, wav)
-        print(f"# upload: {wav.name} ({wav.stat().st_size} bytes)", file=sys.stderr)
-        uri = upload_wav(wav, api_key)
-        print(f"# generate: model={args.model}", file=sys.stderr)
-        body = generate_transcript(uri, api_key, args.model)
+        print(f"# transcribe locally: {wav.name} ({wav.stat().st_size} bytes)", file=sys.stderr)
+        body, via = local_transcribe(wav)
+    summary = flat_summary(body)
+    if summary:
+        body = body + "\n\n## 要約（3行以内）\n\n" + summary
 
     header = (
         f"# 文字起こし: {src.name}\n\n"
         f"- 元ファイル: `{src}`\n"
-        f"- 手段: afconvert → Gemini `{args.model}`（Jarvis）\n"
+        f"- 手段: afconvert → {via}（Jarvis・音声は外に出さない）\n"
         f"- 注意: 自動文字起こしのため誤変換あり。重要判断は録音で確認。\n\n"
         f"---\n\n"
     )

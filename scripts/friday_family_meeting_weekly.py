@@ -371,15 +371,12 @@ def _guide_prompt() -> str:
 
 
 def format_summary_with_template(summary: str) -> str:
-    """Genspark 要約を 52_ の型に仕上げる（Gemini）。失敗は呼び出し側で元の要約に戻す。"""
-    import jarvis_gemini_research as gemini  # noqa: E402
+    """Genspark 要約を 52_ の型に仕上げる（Mac の定額AI。2026-11-13 から従量の Gemini は使わない）。
+    失敗は呼び出し側で元の要約に戻す。"""
+    import jarvis_flat_ai as flat  # noqa: E402
 
-    key = (os.environ.get("GEMINI_API_KEY") or "").strip()
-    if not key:
-        raise RuntimeError("GEMINI_API_KEY なし")
-    model = os.environ.get("GEMINI_MODEL") or gemini.DEFAULT_MODEL
     prompt = f"{_guide_prompt()}\n{FAMILY_FORMAT_NOTES}\n--- 自動議事録 ---\n{summary}"
-    out = gemini.generate(prompt, api_key=key, model=model).strip()
+    out = flat.generate(prompt).text.strip()
     out = re.sub(r"^```(?:markdown)?\s*|\s*```$", "", out).strip()
     if "決まったこと" not in out or "ToDo" not in out:
         raise RuntimeError("型の見出しが出力にない")

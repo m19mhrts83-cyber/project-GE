@@ -81,7 +81,8 @@ def already_in_md(text: str, partner_name: str, subject: str, date_yyyymmdd: str
     subj = (subject or "").strip()
     name = (partner_name or "").strip()
     for m in re.finditer(
-        r"###\s+(\d{4}/\d{2}/\d{2})[^\n]*｜([^｜]+)｜",
+        # 日時の直後の「｜相手名｜」を取る（[^\n]* だと貪欲で「相手から返信」側を拾い、名前が一致しなかった）
+        r"###\s+(\d{4}/\d{2}/\d{2})[^｜\n]*｜([^｜\n]+)｜",
         text,
     ):
         d = m.group(1).replace("/", "-")

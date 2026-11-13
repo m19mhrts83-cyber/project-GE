@@ -63,7 +63,17 @@ export const CHOICE_MA: Partial<Record<DeskChoice, "skip" | "todoist" | "done">>
 const ID_RE = /^[a-zA-Z0-9_.:-]{6,80}$/;
 
 export function isDeskItemId(id: string): boolean {
-  return ID_RE.test(id || "") && !/^re-vendor-/i.test(id);
+  return ID_RE.test(id || "") && !isVendorItemId(id);
+}
+
+/** 業者返信（516）の案件。判断デスクには出さないが、見落とし（/misses）には出る */
+export function isVendorItemId(id: string): boolean {
+  return /^re-vendor-/i.test(id || "");
+}
+
+/** triage_items の id として正しい形か（業者返信も含む。見落としの判断用） */
+export function isTriageItemId(id: string): boolean {
+  return ID_RE.test(id || "");
 }
 
 function obj(x: unknown): Record<string, unknown> {

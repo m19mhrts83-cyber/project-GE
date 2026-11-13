@@ -89,3 +89,11 @@ test('フリーメールからの転送は、転送元の配信停止の文言�
     subject: 'Fwd: 【資生堂オンラインストア】お支払いについて', original_body: '---------- Forwarded message ---------\n配信停止はこちら' };
   assert.equal(d.isDeskRow(r), true);
 });
+
+test('見落としの判断は業者返信の id も受ける（デスクには出さない）', () => {
+  assert.equal(d.isDeskItemId('re-vendor-067c20c0e7fc1a27'), false);
+  assert.equal(d.isTriageItemId('re-vendor-067c20c0e7fc1a27'), true);
+  assert.equal(d.isVendorItemId('re-vendor-067c20c0e7fc1a27'), true);
+  assert.equal(d.isTriageItemId('gha-cw-7790cf4'), true);
+  assert.equal(d.isTriageItemId('bad id!'), false);
+});

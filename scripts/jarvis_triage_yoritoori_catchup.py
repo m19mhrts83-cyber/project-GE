@@ -37,11 +37,12 @@ def append_sent_block(
     partner_name: str,
     subject: str,
     body: str,
+    date_str: str | None = None,
 ) -> bool:
     if not md_path.is_file():
         print(f"# missing {md_path}", file=sys.stderr)
         return False
-    date_str = datetime.now().strftime("%Y/%m/%d %H:%M")
+    date_str = date_str or datetime.now().strftime("%Y/%m/%d %H:%M")
     summary = (subject or "").strip() or (body.strip().splitlines()[0][:40] if body.strip() else "送信")
     subject_block = f"**件名**: {subject}\n" if subject else ""
     block = f"""
@@ -53,6 +54,13 @@ def append_sent_block(
 ---
 """
     content = md_path.read_text(encoding="utf-8")
+    # 送信トレイ取込（gmail_to_yoritoori）やクラウド（jarvis_gha_triage_sent_yoritoori）が
+    # 先に書いていたら二重にしない（相手・件名・日付が同じ「自分から送信」）
+    from jarvis_gha_partner_gmail_yoritoori import already_in_md
+
+    if already_in_md(content, partner_name, subject, date_str[:10].replace("/", "-")):
+        print(f"# already in md: {partner_name} {subject[:40]}")
+        return True
     marker = "## やり取り（時系列）"
     if marker in content:
         after_marker = content[content.find(marker) :]
@@ -125,7 +133,20 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             done += 1
             continue
-        if not append_sent_block(md, partner_name=partner, subject=subject, body=body):
+        sent_at = str(payload.get("sent_at") or "").strip()
+        date_str = None
+        if sent_at:
+            try:
+                date_str = (
+                    datetime.fromisoformat(sent_at.replace("Z", "+00:00"))
+                    .astimezone()
+                    .strftime("%Y/%m/%d %H:%M")
+                )
+            except ValueError:
+                date_str = None
+        if not append_sent_block(
+            md, partner_name=partner, subject=subject, body=body, date_str=date_str
+        ):
             continue
         payload = dict(payload)
         payload["yoritoori_appended"] = True

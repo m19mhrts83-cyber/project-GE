@@ -38,6 +38,17 @@ AI が Todoist にタスクを入れるときは、件名の先頭に印を付�
 
 スクリプトは `scripts/jarvis_todoist_mark.py`（ダッシュボードは `lib/todoistMark.ts`）を使う。`jarvis_todoist_api.py create-task` は既定で 🤖、頼まれたときは `--requested`。MCP などで直接入れるときも同じ印を手で付ける。件名を書き直すときは今の印を残し、重複確認は印を外して比べる。
 
+## Obsidian / Google Drive Sync（2026-11-10・全エージェント共通）
+
+正本は `docs/AIエージェントチーム/49_共通ルール_AI使用量と入力_20261024.md` の **R11**。
+
+- 書く先は **`~/Documents/500_Obsidian_r1` だけ**（マイドライブの同名フォルダへ直書きしない）
+- 書いたら報告前に `scripts/jarvis_obsidian_ogd_retag.py "相対パス.md"`（印なしは iPhone Pull に出ない）
+- iPhone に反映されないときは印と Pull を先に確認。iPhone 側の無反応だけで Mac の再認証・token 再発行をしない。新 token を発行した場合は iPhone／Mac の両方を更新する
+- `ogd_pull`／`ogd_retag` の API が 500 等で失敗したら成功扱いにせず、反復・token 再発行を止めてエンドポイント／スクリプトを確認。通常確認に Reset は使わない
+- Journal 読取前は `scripts/jarvis_obsidian_ogd_pull.py --prefix '01_Journaling/★Journal'`
+- 詳細: `.cursor/rules/jarvis-obsidian-gdrive-sync.mdc`
+
 ## Cursor Cloud specific instructions
 
 このリポジトリは個人自動化モノレポ（Jarvis）です。クラウドで実際に動かせる「アプリ」は次の4つです。Python スクリプト群（`scripts/`, `215_kamiooya/`, `line_unofficial_poc/` など）は Mac 専用（`/Users/matsunomasaharu2` 等のハードコードパス・launchd・Selenium 前提）で、クラウド環境では動かしません。

@@ -107,6 +107,8 @@ export function parseMaAction(
 
 type TriageRow = {
   id: string;
+  /** LINE / Chatwork / Gmail など */
+  channel?: string | null;
   status: string | null;
   subject: string | null;
   draft_text: string | null;
@@ -171,6 +173,31 @@ export async function saveMailActionDraft(id: string, text: string, source: stri
     .eq("id", id);
 }
 
+/**
+ * 「過去資料で回答案」の結果を保存する。下書きは AI のものなので上書きしてよい
+ * （送った本文は送信時に draft_text へ入り直す）。候補は返信モーダルで使う。
+ */
+export async function saveMailActionPrep(
+  id: string,
+  opts: { draft?: string; candidates: unknown[]; terms: string[] },
+): Promise<void> {
+  const sb = createServiceClient();
+  if (!sb) return;
+  const row = await fetchMailActionTriage(id);
+  if (!row || String(row.status || "") === "sent") return;
+  const payload = asPayload(row.payload);
+  const now = new Date().toISOString();
+  payload.material_candidates = opts.candidates.slice(0, 10);
+  payload.material_prep = { at: now, terms: opts.terms, n: opts.candidates.length };
+  const patch: Record<string, unknown> = { payload, updated_at: now };
+  if (opts.draft?.trim()) {
+    patch.draft_text = opts.draft;
+    payload.draft_source = "slack_prep";
+    payload.draft_created_at = now;
+  }
+  await sb.from("triage_items").update(patch).eq("id", id);
+}
+
 export async function fetchMailActionTriage(
   id: string,
 ): Promise<TriageRow | null> {
@@ -179,7 +206,7 @@ export async function fetchMailActionTriage(
   const { data, error } = await sb
     .from("triage_items")
     .select(
-      "id,status,subject,draft_text,original_body,from_email,partner,account,lane,kind,summary,folder,gmail_thread_id,gmail_message_id,payload",
+      "id,status,subject,draft_text,original_body,from_email,partner,account,lane,kind,channel,summary,folder,gmail_thread_id,gmail_message_id,payload",
     )
     .eq("id", id)
     .maybeSingle();

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Install ChatGPT daily-review inbox polling (every minute, Mac outbound-only).
+# Install ChatGPT review and read polling (every minute, Mac outbound-only).
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.obsidian-review-inbox"
