@@ -132,7 +132,7 @@ class Handler(SimpleHTTPRequestHandler):
                 200,
                 {
                     "ok": True,
-                    "gemini": bool(os.environ.get("GEMINI_API_KEY")),
+                    "gemini": bool(os.environ.get("SHUHEN_GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")),
                     "maps": bool(os.environ.get("GOOGLE_MAPS_API_KEY")),
                     "token_required": bool(TOKEN),
                     "port": PORT,
@@ -238,8 +238,8 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main() -> int:
-    if not os.environ.get("GEMINI_API_KEY"):
-        print("WARN: GEMINI_API_KEY 未設定", file=sys.stderr)
+    if not (os.environ.get("SHUHEN_GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")):
+        print("WARN: SHUHEN_GEMINI_API_KEY 未設定", file=sys.stderr)
     if not os.environ.get("GOOGLE_MAPS_API_KEY"):
         print("WARN: GOOGLE_MAPS_API_KEY 未設定", file=sys.stderr)
 

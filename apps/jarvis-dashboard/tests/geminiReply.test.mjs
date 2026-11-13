@@ -1,38 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { geminiReply } from '../lib/geminiReply.ts';
+import { readFileSync } from 'node:fs';
 
-test('Gemini bounds and error handling without network', async (t) => {
-  const originalFetch = globalThis.fetch;
-  const originalKey = process.env.GEMINI_API_KEY;
-  process.env.GEMINI_API_KEY = 'test-only';
-  t.after(() => {
-    globalThis.fetch = originalFetch;
-    if (originalKey === undefined) delete process.env.GEMINI_API_KEY;
-    else process.env.GEMINI_API_KEY = originalKey;
-  });
-  for (const status of [401, 429, 500]) {
-    let calls = 0;
-    globalThis.fetch = async () => { calls++; return new Response('SECRET_SENTINEL', { status }); };
-    const result = await geminiReply('test', { maxAttempts: 2 });
-    assert.equal(result.ok, false);
-    assert.equal(calls, 1);
-    assert.ok(!result.error.includes('SECRET_SENTINEL'));
+// 2026-11-13: 従量課金の Gemini API を呼ばないことを確かめる（定額 AI への依頼だけ）。
+test('geminiReply no longer calls a metered AI API', () => {
+  for (const f of ['lib/geminiReply.ts', 'lib/flatAi.ts', 'app/actions/triage.ts']) {
+    const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+    assert.ok(!src.includes('generativelanguage.googleapis.com'), `${f} calls Gemini API`);
+    assert.ok(!/api\.openai\.com|api\.anthropic\.com/.test(src), `${f} calls a metered API`);
   }
-  let calls = 0;
-  globalThis.fetch = async () => { calls++; return new Response('', { status: 404 }); };
-  await geminiReply('test', { maxAttempts: 2 });
-  assert.equal(calls, 2);
-  calls = 0;
-  globalThis.fetch = async () => { calls++; throw new Error('SECRET_SENTINEL'); };
-  assert.equal((await geminiReply('test')).ok, false);
-  assert.equal(calls, 1);
-  globalThis.fetch = async () => new Response('invalid-json');
-  assert.equal((await geminiReply('test')).ok, false);
-  globalThis.fetch = async (_url, options) => {
-    assert.equal(JSON.parse(options.body).generationConfig.maxOutputTokens, 2048);
-    assert.ok(options.signal);
-    return Response.json({ candidates: [{ content: { parts: [{ text: 'answer' }] } }] });
-  };
-  assert.deepEqual(await geminiReply('test', { maxOutputTokens: 2048 }), { ok: true, text: 'answer' });
+});
+
+test('flatPromptHash is stable and image-aware', async () => {
+  const { flatPromptHash } = await import('../lib/flatAiHash.ts');
+  assert.equal(flatPromptHash('a'), flatPromptHash('a'));
+  assert.notEqual(flatPromptHash('a'), flatPromptHash('b'));
+  assert.notEqual(flatPromptHash('a'), flatPromptHash('a', [{ mimeType: 'image/png', base64: 'xx' }]));
 });

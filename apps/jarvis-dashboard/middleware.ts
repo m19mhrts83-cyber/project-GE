@@ -86,6 +86,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request });
   }
   // 台帳の受付窓口（ボット。COMM_INTAKE_KEYS の鍵を route で確認）
+  // Mac 見張り（Supabase pg_cron から 5 分ごと。MAC_WATCH_KEY で認証）
+  if (path === "/api/mac-watch") {
+    return NextResponse.next({ request });
+  }
+
   if (path === "/api/comm-intake") {
     return NextResponse.next({ request });
   }

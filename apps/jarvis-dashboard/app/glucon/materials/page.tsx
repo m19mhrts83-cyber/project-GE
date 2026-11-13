@@ -2,7 +2,7 @@ import Shell from "@/components/Shell";
 import GluconMaterialsList from "@/components/glucon/GluconMaterialsList";
 import { getGluconMaterialsPageState } from "@/app/actions/glucon";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 type SearchParams = Promise<{
   tab?: string;
