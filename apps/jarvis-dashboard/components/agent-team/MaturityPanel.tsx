@@ -24,6 +24,14 @@ function Lv({ v }: { v: number | null }) {
   return <span className={`mat-lv lv-${Math.floor(v)}`}>L{v}</span>;
 }
 
+/** 先週（1つ前の計測）からの差。前回が無い・どちらか未計測なら理由を出す */
+function WeekDelta({ now, prev, hasPrev }: { now: number | null; prev: number | null; hasPrev: boolean }) {
+  if (!hasPrev) return <span className="meta">初回</span>;
+  if (now == null || prev == null) return <span className="meta">—</span>;
+  const d = Math.round((now - prev) * 10) / 10;
+  return <span className={`mat-delta ${d > 0 ? "up" : d < 0 ? "down" : ""}`}>{d === 0 ? "±0" : `${d > 0 ? "+" : ""}${d}`}</span>;
+}
+
 function Trend({ team, axisKey, goal }: { team: Snapshot[]; axisKey: "process" | "output"; goal: number }) {
   const axis = maturityConfig.axes.find((a) => a.key === axisKey)!;
   const pts = team.map((s) => ({ d: s.measured_on, v: axisLevel(axis, s).level })).filter((p) => p.v != null) as { d: string; v: number }[];
@@ -73,11 +81,8 @@ export default async function MaturityPanel() {
                   <div className="mat-axis-head">
                     <strong>{axis.label}</strong>
                     <Lv v={a.level} />
-                    {p != null && a.level != null ? (
-                      <span className={`mat-delta ${a.level > p ? "up" : a.level < p ? "down" : ""}`}>
-                        {a.level === p ? "±0" : `${a.level > p ? "+" : ""}${Math.round((a.level - p) * 10) / 10}`}
-                      </span>
-                    ) : null}
+                    <span className="meta">先週比</span>
+                    <WeekDelta now={a.level} prev={p} hasPrev={Boolean(prev)} />
                     <span className="meta">
                       {a.measured}/{a.total} 項目を計測 · 目標 L{g}
                     </span>
@@ -111,6 +116,7 @@ export default async function MaturityPanel() {
                   <tr>
                     <th>項目</th>
                     <th>レベル</th>
+                    <th>先週比</th>
                     <th>指標と実測（{latest.measured_on}）</th>
                     <th>世界水準の状態</th>
                   </tr>
@@ -123,16 +129,21 @@ export default async function MaturityPanel() {
                         <Lv v={itemLevel(item, latest)} />
                       </td>
                       <td>
+                        <WeekDelta now={itemLevel(item, latest)} prev={itemLevel(item, prev)} hasPrev={Boolean(prev)} />
+                      </td>
+                      <td>
                         <ul className="mat-metrics">
                           {item.metrics.map((k) => {
                             const def = maturityConfig.metrics[k];
                             const v = metricValue(latest, k);
+                            const pv = metricValue(prev, k);
                             return (
                               <li key={k} title={`出どころ: ${def.source}`}>
                                 {def.label}：
                                 {v ? (
                                   <>
                                     <b>{formatMetric(def, v)}</b> <Lv v={metricLevel(def, v.value)} />
+                                    {pv ? <span className="meta"> 先週 {formatMetric(def, { value: pv.value })}</span> : null}
                                     {v.note ? <span className="meta"> {v.note}</span> : null}
                                   </>
                                 ) : (

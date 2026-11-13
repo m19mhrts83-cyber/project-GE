@@ -27,8 +27,12 @@ export default async function HomeMaturityBand() {
                   {axis.key === "process" ? "Process" : "Output"}{" "}
                   <b>{a.level == null ? "未計測" : `L${a.level}`}</b>
                   {goal ? <span className="meta"> / 目標 L{goal[axis.key]}</span> : null}
-                  {p != null && a.level != null && a.level !== p ? (
-                    <span className={`mat-delta ${a.level > p ? "up" : "down"}`}> {a.level > p ? "+" : ""}{Math.round((a.level - p) * 10) / 10}</span>
+                  {prev && p != null && a.level != null ? (
+                    <span className={`mat-delta ${a.level > p ? "up" : a.level < p ? "down" : ""}`}>
+                      {" "}先週比 {a.level === p ? "±0" : `${a.level > p ? "+" : ""}${Math.round((a.level - p) * 10) / 10}`}
+                    </span>
+                  ) : !prev ? (
+                    <span className="meta"> 初回</span>
                   ) : null}
                   <span className="meta">（{a.measured}/{a.total}項目を計測）</span>
                 </span>
