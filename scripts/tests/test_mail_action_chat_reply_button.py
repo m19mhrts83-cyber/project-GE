@@ -60,7 +60,13 @@ class ChatworkRoomTest(unittest.TestCase):
             self.assertEqual(els[0]["text"]["text"], "Chatworkで返信")
             self.assertEqual(els[0]["url"], "https://www.chatwork.com/#!rid1")
             self.assertEqual(els[0]["action_id"], "mail_action_open_app")
-            self.assertEqual(els[1]["text"]["text"], "返信済みにする")
+            labels = [e["text"]["text"] for e in els]
+            self.assertIn("返信済みにする", labels)
+            # Slack から押せるときは「✍️ 返信案を作る」を2番目に（URL 版は押せないので出さない）
+            if url_mode:
+                self.assertNotIn(m.CHAT_DRAFT_LABEL, labels)
+            else:
+                self.assertEqual(els[1]["value"], "ma:chatdraft:t1")
             # primary は1つだけ
             self.assertEqual(sum(1 for e in els if e.get("style") == "primary"), 1)
 
@@ -69,6 +75,20 @@ class ChatworkRoomTest(unittest.TestCase):
         self.assertEqual(els[0]["text"]["text"], "返信する")
         self.assertEqual(els[0].get("style"), "primary")
         self.assertNotIn("mail_action_open_app", [e.get("action_id") for e in els])
+
+    def test_line_gets_open_button(self):
+        r = {"id": "x", "kind": "chat", "channel": "LINE", "original_body": "確認です"}
+        self.assertEqual(m.chat_app_url(r, []), m.LINE_CHATS_URL)
+
+    def test_buttons_mail_prep(self):
+        # メールの後回しは「資料を集めて後回し」（ma:prep）。チャットは Todoist のまま
+        els = m._button_elements("t1", url_mode=False)
+        vals = [e.get("value") for e in els]
+        self.assertIn("ma:prep:t1", vals)
+        self.assertNotIn("ma:todoist:t1", vals)
+        self.assertIn(m.PREP_LABEL, [e["text"]["text"] for e in els])
+        chat = m._button_elements("t1", url_mode=False, chat=True)
+        self.assertIn("ma:todoist:t1", [e.get("value") for e in chat])
 
     def test_compact_card_chatwork(self):
         m._CONTACT_PARTNERS_CACHE = PARTNERS

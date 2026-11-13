@@ -71,6 +71,31 @@ export function searchTermsFromItems(
   return out.slice(0, maxTerms);
 }
 
+/** 書類名らしい語（〜書・〜表・〜票・〜図・〜証明 など）。前後の助詞で切る */
+const DOC_NAME_RE =
+  /[一-龥ァ-ヶーA-Za-z0-9]{1,14}(?:申込書|依頼書|契約書|見積書|請求書|報告書|証明書|明細書|計算書|申告書|確認書|承諾書|通知書|謄本|試算表|一覧表|図面|写真|台帳|票)/g;
+const DOC_QUOTE_STOP_RE = /^(>|-{3,}\s*Original|From:|差出人:|\d{4}年\d{1,2}月\d{1,2}日.*\d{1,2}:\d{2})/;
+
+/**
+ * 依頼品目が取れないメール用: 本文（引用より前）から書類名らしい語を拾う。
+ * 例:「入居者募集依頼書を添付いたしますので」→ ["入居者募集依頼書"]
+ */
+export function documentTermsFromText(body: string, maxTerms = 4): string[] {
+  const lines: string[] = [];
+  for (const line of String(body || "").split(/\r?\n/)) {
+    if (DOC_QUOTE_STOP_RE.test(line.trim())) break;
+    lines.push(line);
+  }
+  const out: string[] = [];
+  for (const m of lines.join("\n").matchAll(DOC_NAME_RE)) {
+    const v = m[0].replace(/^(?:の|を|は|が|に|と|で|も|ご|お)+/, "");
+    if (v.length < 2 || STOP_TERMS.has(v) || out.includes(v)) continue;
+    out.push(v);
+    if (out.length >= maxTerms) break;
+  }
+  return out;
+}
+
 function norm(s: string): string {
   return s.normalize("NFKC").toLowerCase();
 }
