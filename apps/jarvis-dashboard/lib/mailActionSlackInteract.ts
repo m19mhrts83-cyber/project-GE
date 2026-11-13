@@ -43,6 +43,7 @@ export const MA_ACTION_IDS = {
   todoist: "mail_action_todoist",
   done: "mail_action_done",
   prep: "mail_action_prep",
+  chatdraft: "mail_action_chatdraft",
 } as const;
 
 export const MA_MODAL_CALLBACK = "mail_action_reply_modal";
@@ -65,7 +66,7 @@ export function maTimingFromMeta(meta: MaModalMeta) {
 }
 
 /** カードのボタン。prep =「過去資料で回答案（後回し）」: 資料探し＋下書き＋Todoist */
-export type MaButtonAction = MailActionSlackAction | "prep";
+export type MaButtonAction = MailActionSlackAction | "prep" | "chatdraft";
 
 /** value: ma:reply|skip|todoist|done|prep:{triage_id} */
 export function parseMaButtonValue(
@@ -73,10 +74,11 @@ export function parseMaButtonValue(
 ): { action: MaButtonAction; id: string } | null {
   const m = String(value || "")
     .trim()
-    .match(/^ma:(reply|skip|todoist|done|prep):([a-zA-Z0-9_.:-]{6,80})$/i);
+    .match(/^ma:(reply|skip|todoist|done|prep|chatdraft):([a-zA-Z0-9_.:-]{6,80})$/i);
   if (!m) return null;
-  if (m[1].toLowerCase() === "prep") {
-    return isMailActionTriageId(m[2]) ? { action: "prep", id: m[2] } : null;
+  const extra = m[1].toLowerCase();
+  if (extra === "prep" || extra === "chatdraft") {
+    return isMailActionTriageId(m[2]) ? { action: extra, id: m[2] } : null;
   }
   const action = parseMaAction(m[1]);
   const id = m[2];
@@ -807,6 +809,8 @@ export async function handleMaBlockAction(opts: {
   triggerId?: string;
   channelId?: string;
   messageTs?: string;
+  /** 押されたカードのブロック（チャットの「○○で返信」URL を引き継ぐ） */
+  messageBlocks?: unknown;
 }): Promise<{
   kind: "replace" | "delete" | "ephemeral" | "modal_opened" | "error";
   text: string;
@@ -819,6 +823,9 @@ export async function handleMaBlockAction(opts: {
 
   if (action === "prep") {
     return startMaterialPrep({ triageId, channelId, messageTs });
+  }
+  if (action === "chatdraft") {
+    return startChatDraft({ triageId, channelId, messageTs, messageBlocks: opts.messageBlocks });
   }
 
   if (action === "reply") {
@@ -948,6 +955,154 @@ export async function handleMaBlockAction(opts: {
     blocks: result.ok
       ? withLoggedLine(maDoneBlocks(title, result.message, true), await weekDecisionCount())
       : maDoneBlocks(title, result.message, false),
+  };
+}
+
+/** カードの「○○で返信」URL ボタン（action_id=mail_action_open_app）を拾う */
+export function findAppReplyButton(blocks: unknown): { url: string; text: string } | null {
+  if (!Array.isArray(blocks)) return null;
+  for (const b of blocks) {
+    const els = (b as { elements?: unknown })?.elements;
+    if (!Array.isArray(els)) continue;
+    for (const e of els) {
+      const el = e as { action_id?: string; url?: string; text?: { text?: string } };
+      if (el?.action_id === "mail_action_open_app" && el.url) {
+        return { url: el.url, text: String(el.text?.text || "アプリで返信") };
+      }
+    }
+  }
+  return null;
+}
+
+/** LINE はトーク一覧を開く（個人トークを外から直接開く URL は LINE に無い） */
+export const LINE_CHATS_URL = "https://line.me/R/nv/chat";
+
+/** 返信案つきのチャットカード: 案（コピー用）＋［○○で返信］［返信済みにする］［作り直す］［見送り］ */
+export function maChatDraftBlocks(input: {
+  id: string;
+  who: string;
+  channel: string;
+  draft: string;
+  error?: string;
+  app?: { url: string; text: string } | null;
+}): Array<Record<string, unknown>> {
+  const head = `✍️ *${input.channel}の返信案*（${input.who.slice(0, 40)}）`;
+  const text = input.draft.trim()
+    ? `${head}\n\`\`\`${input.draft.trim().slice(0, 2600)}\`\`\``
+    : `${head}\n❌ 返信案を作れませんでした（${input.error || "不明"}）。「作り直す」でもう一度どうぞ`;
+  const elements: Array<Record<string, unknown>> = [];
+  if (input.app) {
+    elements.push({
+      type: "button",
+      text: { type: "plain_text", text: input.app.text, emoji: true },
+      style: "primary",
+      url: input.app.url,
+      action_id: "mail_action_open_app",
+    });
+  }
+  elements.push(
+    {
+      type: "button",
+      text: { type: "plain_text", text: "返信済みにする", emoji: true },
+      action_id: MA_ACTION_IDS.done,
+      value: `ma:done:${input.id}`,
+    },
+    {
+      type: "button",
+      text: { type: "plain_text", text: "作り直す", emoji: true },
+      action_id: MA_ACTION_IDS.chatdraft,
+      value: `ma:chatdraft:${input.id}`,
+    },
+    {
+      type: "button",
+      text: { type: "plain_text", text: "見送り", emoji: true },
+      style: "danger",
+      action_id: MA_ACTION_IDS.skip,
+      value: `ma:skip:${input.id}`,
+    },
+  );
+  const howTo = input.channel.startsWith("LINE")
+    ? "案を長押し（PC は選択）でコピー →「LINEで返信」でトーク一覧を開き、相手を選んで貼り付けて送信 → 「返信済みにする」"
+    : `案を長押し（PC は選択）でコピー →「${input.app?.text || "アプリで返信"}」で開いて貼り付けて送信 → 「返信済みにする」`;
+  return [
+    { type: "section", text: { type: "mrkdwn", text: text.slice(0, 2900) } },
+    { type: "context", elements: [{ type: "mrkdwn", text: howTo }] },
+    { type: "actions", elements },
+  ];
+}
+
+/**
+ * チャット（LINE／Chatwork）の「✍️ 返信案を作る」: すぐ「作成中」に差し替え、
+ * やり取り履歴を踏まえた短い返信案を作ってカードに出す。送信は本人がアプリで行う。
+ */
+async function startChatDraft(opts: {
+  triageId: string;
+  channelId?: string;
+  messageTs?: string;
+  messageBlocks?: unknown;
+}): Promise<{
+  kind: "replace" | "error";
+  text: string;
+  blocks?: ReturnType<typeof maDoneBlocks>;
+  run?: () => Promise<void>;
+}> {
+  const { triageId, channelId, messageTs } = opts;
+  const bot = (process.env.SLACK_BOT_TOKEN || "").trim();
+  const row = await fetchMailActionTriage(triageId);
+  if (!row) return { kind: "error", text: "対象の要対応が見つかりません" };
+  const who = String(row.partner || row.from_email || "相手");
+  const channelRaw = String(row.channel || "");
+  const channel = channelRaw.startsWith("Chatwork") ? "Chatwork" : channelRaw.startsWith("LINE") ? "LINE" : channelRaw || "チャット";
+  const app =
+    findAppReplyButton(opts.messageBlocks) ||
+    (channel === "LINE" ? { url: LINE_CHATS_URL, text: "LINEで返信" } : null);
+  const busy = [
+    {
+      type: "section",
+      text: { type: "mrkdwn" as const, text: `⏳ *${channel}の返信案を作っています…*（${who.slice(0, 40)}）\n10秒ほどでこのカードに案が出ます。` },
+    },
+  ];
+  return {
+    kind: "replace",
+    text: "返信案を作っています…",
+    blocks: busy as ReturnType<typeof maDoneBlocks>,
+    run: async () => {
+      const inbound = String(row.original_body || row.summary || "");
+      const history = await retrieveYoritooriForAsk({
+        lane: row.lane,
+        title: row.subject,
+        summary: row.summary,
+        payload: { ...(row.payload || {}), partner: row.partner, folder: row.folder },
+      }).catch(() => null);
+      const draft = inbound.trim()
+        ? await composeDraft({
+            who,
+            subject: String(row.subject || ""),
+            inbound,
+            history: history?.ok ? history.promptBlock : "",
+            chat: channel,
+          }).catch((e) => ({ ok: false as const, error: String(e) }))
+        : { ok: false as const, error: "届いたメッセージの本文がありません" };
+      if (draft.ok) {
+        await saveMailActionPrep(triageId, { draft: draft.text, candidates: [], terms: [] }).catch(() => {});
+      }
+      const blocks = maChatDraftBlocks({
+        id: triageId,
+        who,
+        channel,
+        draft: draft.ok ? draft.text : "",
+        error: draft.ok ? undefined : draft.error,
+        app,
+      });
+      if (bot && channelId && messageTs) {
+        await slackApi(bot, "chat.update", {
+          channel: channelId,
+          ts: messageTs,
+          text: `${channel}の返信案（${who}）`,
+          blocks,
+        });
+      }
+    },
   };
 }
 

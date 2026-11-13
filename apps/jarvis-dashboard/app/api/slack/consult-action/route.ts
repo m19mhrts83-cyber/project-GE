@@ -444,6 +444,7 @@ export async function POST(request: NextRequest) {
         triggerId,
         channelId,
         messageTs,
+        messageBlocks: (payload.message as { blocks?: unknown } | undefined)?.blocks,
       });
       if (result.kind === "modal_opened") {
         if (result.run) after(result.run);

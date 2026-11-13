@@ -120,13 +120,17 @@ MA_ACTION_IDS = {
     "todoist": "mail_action_todoist",
     "done": "mail_action_done",
     "prep": "mail_action_prep",
+    "chatdraft": "mail_action_chatdraft",
 }
+CHAT_DRAFT_LABEL = "✍️ 返信案を作る"
 # メール: 後回しボタン（過去資料を探して回答案を作り、Todoist にも入れる。新しい資料は作らない）
 PREP_LABEL = "📎 資料を集めて後回し"
 # メール: 返信不要・別経路で返信済み。見送りと違い送信者は学習で除外しない（次回も判断に出す）
 DONE_LABEL = "回答不要・回答済み"
 CHAT_KINDS = {"chat"}
 CHAT_APP_URLS = {"Chatwork": "https://www.chatwork.com/"}
+# 2026-11-13 松野さん: LINE にも開くボタン。個人トークを外から直接開く URL は LINE に無いのでトーク一覧を開く
+LINE_CHATS_URL = "https://line.me/R/nv/chat"
 # 2026-11-11 松野さん: Chatwork に「返信する」ボタンが無い → ルームを直接開く URL ボタンを先頭に置く
 CHATWORK_ROOM_URL = "https://www.chatwork.com/#!rid{rid}"
 _CONTACT_PARTNERS_CACHE: list[dict[str, Any]] | None = None
@@ -186,6 +190,8 @@ def chat_app_url(row: dict[str, Any], partners: list[dict[str, Any]] | None = No
     if channel.startswith("Chatwork"):
         rid = chatwork_room_id(row, partners)
         return CHATWORK_ROOM_URL.format(rid=rid) if rid else CHAT_APP_URLS["Chatwork"]
+    if channel.startswith("LINE"):
+        return LINE_CHATS_URL
     return CHAT_APP_URLS.get(channel, "")
 
 
@@ -342,6 +348,13 @@ def _button_elements(
     first_action, first_label = ("done", "返信済みにする") if chat else ("reply", "返信する")
     app_btn = _app_reply_button(chat_url, chat_label) if chat else []
     first_style = {} if app_btn else {"style": "primary"}
+    # チャットは「✍️ 返信案を作る」で案をカードに出し、コピーしてアプリに貼る（2026-11-13）
+    draft_btn = [{
+        "type": "button",
+        "text": {"type": "plain_text", "text": CHAT_DRAFT_LABEL, "emoji": True},
+        "action_id": MA_ACTION_IDS["chatdraft"],
+        "value": f"ma:chatdraft:{tid}",
+    }] if chat else []
     # 資料依頼は「集めてから返信」なので Todoist（資料待ち・品目リスト付き）へ
     todoist_label = "資料待ちで後回し" if materials else "Todoist追加"
     if url_mode:
@@ -368,7 +381,7 @@ def _button_elements(
             "text": {"type": "plain_text", "text": DONE_LABEL, "emoji": True},
             "url": ma_url(tid, "done"),
         }])
-    return app_btn + [
+    return app_btn + draft_btn + [
         {
             "type": "button",
             "text": {"type": "plain_text", "text": first_label, "emoji": True},
@@ -852,10 +865,12 @@ def build_compact_payload(
     chat = is_chat_row(row)
     channel = str(row.get("channel") or "").strip() or "チャット"
     chat_url = chat_app_url(row) if chat else ""
-    chat_label = "Chatwork" if channel.startswith("Chatwork") else channel
+    chat_label = (
+        "Chatwork" if channel.startswith("Chatwork") else "LINE" if channel.startswith("LINE") else channel
+    )
     if chat:
         draft_note = (
-            f"📱 「{chat_label}で返信」で開いて返信 → 「返信済みにする」"
+            f"📱 「✍️ 返信案を作る」→ 案をコピー →「{chat_label}で返信」で開いて貼り付け → 「返信済みにする」"
             if chat_url
             else f"📱 {channel}アプリで返信 → 「返信済みにする」"
         )

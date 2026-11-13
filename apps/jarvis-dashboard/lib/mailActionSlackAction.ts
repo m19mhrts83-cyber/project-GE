@@ -107,6 +107,8 @@ export function parseMaAction(
 
 type TriageRow = {
   id: string;
+  /** LINE / Chatwork / Gmail など */
+  channel?: string | null;
   status: string | null;
   subject: string | null;
   draft_text: string | null;
@@ -204,7 +206,7 @@ export async function fetchMailActionTriage(
   const { data, error } = await sb
     .from("triage_items")
     .select(
-      "id,status,subject,draft_text,original_body,from_email,partner,account,lane,kind,summary,folder,gmail_thread_id,gmail_message_id,payload",
+      "id,status,subject,draft_text,original_body,from_email,partner,account,lane,kind,channel,summary,folder,gmail_thread_id,gmail_message_id,payload",
     )
     .eq("id", id)
     .maybeSingle();
