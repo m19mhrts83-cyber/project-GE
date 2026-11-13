@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
   flowforgeOpenLabel,
@@ -30,7 +31,7 @@ function genreHashDomId(): string | null {
 }
 
 const STATUS_FILTERS = ["すべて", "運用確認", "設計中", "運用", "候補", "停止"] as const;
-type Tab = "genre" | "ai" | "grok" | "map" | "perms" | "ops";
+type Tab = "genre" | "ai" | "grok" | "map" | "perms" | "ops" | "maturity";
 type PermsSide = "ai" | "grok" | "site";
 type OpsView = "triggers" | "procedures" | "reports";
 
@@ -57,6 +58,8 @@ type Props = {
   permissionsMeta?: PermissionsMeta;
   permissionsUpdated?: string;
   opsMeta?: OpsMeta;
+  /** 成熟度タブの中身（サーバーで描画した MaturityPanel） */
+  maturity?: ReactNode;
 };
 
 export default function AgentTeamClient({
@@ -73,8 +76,13 @@ export default function AgentTeamClient({
   permissionsMeta,
   permissionsUpdated,
   opsMeta,
+  maturity,
 }: Props) {
   const [tab, setTab] = useState<Tab>("genre");
+  // ホームの「成熟度の詳細」から #maturity で来たら成熟度タブを開く
+  useEffect(() => {
+    if (window.location.hash === "#maturity") setTab("maturity");
+  }, []);
   const [genreFilter, setGenreFilter] = useState<string>("すべて");
   const [statusFilter, setStatusFilter] = useState<string>("すべて");
   const [deptFilter, setDeptFilter] = useState<string>("すべて");
@@ -262,6 +270,7 @@ export default function AgentTeamClient({
                 (permissionsMeta?.site_login_bot_ids?.length || 0),
             ],
             ["ops", "運用", agents.length],
+            ["maturity", "成熟度", 10],
           ] as const
         ).map(([id, label, n]) => (
           <button
@@ -1446,6 +1455,7 @@ export default function AgentTeamClient({
           </section>
         </>
       ) : null}
+      {tab === "maturity" ? <div id="maturity">{maturity}</div> : null}
     </>
   );
 }

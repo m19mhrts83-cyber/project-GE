@@ -1,0 +1,279 @@
+{
+  "_note": "UI/UX採点表。goals は一度決めたら動かさない（年1回 review_on に見直し、過去分は残して新しい要素を末尾に足す）。evaluations は採点のたびに末尾へ追加（過去分は書き換えない）。点数は各項目0〜10（比較相手と同水準=10）、合計は100点換算。 一流水準=80点（各項目で比較相手の8割）。target_region が目標、もう一方は参考線。",
+  "apps": [
+    {
+      "key": "dashboard",
+      "label": "ジャービスダッシュボード",
+      "href": "/"
+    },
+    {
+      "key": "kurashift",
+      "label": "KURASHIFT",
+      "href": "https://jarvis-trade-desk.vercel.app"
+    },
+    {
+      "key": "loopware",
+      "label": "ループウェア（判断デスク）",
+      "href": "https://jarvis-loopware.vercel.app/desk"
+    }
+  ],
+  "axes": [
+    {
+      "key": "clarity",
+      "label": "わかりやすさ",
+      "question": "初めてでも迷わず目的の場所に行けるか（情報設計・ナビ）",
+      "world_bar": "Linear：左ナビは数項目、残りは⌘Kで呼ぶ。Notion：階層が1本で迷わない",
+      "japan_bar": "freee会計：やることリストから各画面へ一直線。マネーフォワード ME：タブ5つで全体が見える"
+    },
+    {
+      "key": "speed",
+      "label": "速さ",
+      "question": "表示・操作で待たされる感じがないか",
+      "world_bar": "Linear／Superhuman：押した瞬間に反映（楽観的更新）、通信は裏で",
+      "japan_bar": "LINE：開いてすぐ最新。SmartHR：読み込み中は骨組みを即表示"
+    },
+    {
+      "key": "efficiency",
+      "label": "手数の少なさ",
+      "question": "キーボードや一押しで済むか",
+      "world_bar": "Superhuman：全操作にショートカット、1件数秒で処理。Linear：⌘Kで何でも",
+      "japan_bar": "freee：自動仕訳を一括で登録。LINE：返信まで2タップ"
+    },
+    {
+      "key": "visual",
+      "label": "見た目の美しさと統一感",
+      "question": "色・余白・文字サイズが決まった型で揃っているか",
+      "world_bar": "Linear／Things 3：文字サイズ4〜5段、余白と色が全画面で同じ型",
+      "japan_bar": "SmartHR：公開デザインシステムで部品が揃う"
+    },
+    {
+      "key": "feedback",
+      "label": "状態の伝わり方",
+      "question": "済んだ・失敗した・取り消せるがすぐ分かるか",
+      "world_bar": "Superhuman：操作ごとに「元に戻す」トースト。Linear：同期状態が常に見える",
+      "japan_bar": "freee：登録後に結果と取消を表示。マネーフォワード：連携エラーを一覧で通知"
+    },
+    {
+      "key": "mobile",
+      "label": "スマホで使える",
+      "question": "片手で読めて押せるか",
+      "world_bar": "Things 3：スマホが主役の設計、押す場所が親指の届く位置",
+      "japan_bar": "LINE／マネーフォワード ME：スマホで全機能が完結"
+    },
+    {
+      "key": "focus",
+      "label": "集中を守る",
+      "question": "大事なことが先に出て、ノイズが少ないか",
+      "world_bar": "Superhuman：受信箱は1件ずつ、重要と他を分ける。Things 3：今日だけ見せる",
+      "japan_bar": "freee：ホームは「やること」中心。SmartHR：役割ごとに必要な通知だけ"
+    },
+    {
+      "key": "readability",
+      "label": "読みやすさ",
+      "question": "文字の大きさ・コントラスト・読み上げ対応",
+      "world_bar": "Notion：本文16px前後、行間ゆったり、色だけに頼らない",
+      "japan_bar": "SmartHR：アクセシビリティ基準を公開し、本文サイズとコントラストを守る"
+    }
+  ],
+  "benchmarks": {
+    "world": [
+      {
+        "name": "Linear",
+        "url": "https://linear.app"
+      },
+      {
+        "name": "Superhuman",
+        "url": "https://superhuman.com"
+      },
+      {
+        "name": "Notion",
+        "url": "https://www.notion.com"
+      },
+      {
+        "name": "Things 3",
+        "url": "https://culturedcode.com/things/"
+      }
+    ],
+    "japan": [
+      {
+        "name": "freee会計",
+        "url": "https://www.freee.co.jp/accounting/"
+      },
+      {
+        "name": "マネーフォワード ME",
+        "url": "https://moneyforward.com/me"
+      },
+      {
+        "name": "SmartHR",
+        "url": "https://smarthr.jp"
+      },
+      {
+        "name": "LINE",
+        "url": "https://line.me/ja/"
+      }
+    ]
+  },
+  "goals": [
+    {
+      "set_on": "2026-11-13",
+      "review_on": "2027-11-13",
+      "target_region": "japan",
+      "japan": 80,
+      "world": 80,
+      "note": "初回設定。1年後に日本一流水準（日本の比較相手の8割=80点）。世界一流水準（80点）は参考線として表示。3アプリ共通。次の見直しまで動かさない"
+    }
+  ],
+  "evaluations": [
+    {
+      "date": "2026-11-13",
+      "method": "コード読み（画面は未確認。次回は実画面で補正）",
+      "by": "Claude",
+      "scores": {
+        "dashboard": {
+          "world": {
+            "clarity": 4,
+            "speed": 5,
+            "efficiency": 6,
+            "visual": 5,
+            "feedback": 5,
+            "mobile": 4,
+            "focus": 4,
+            "readability": 5
+          },
+          "japan": {
+            "clarity": 5,
+            "speed": 6,
+            "efficiency": 7,
+            "visual": 6,
+            "feedback": 6,
+            "mobile": 5,
+            "focus": 5,
+            "readability": 6
+          }
+        },
+        "kurashift": {
+          "world": {
+            "clarity": 4,
+            "speed": 4,
+            "efficiency": 3,
+            "visual": 4,
+            "feedback": 3,
+            "mobile": 4,
+            "focus": 3,
+            "readability": 5
+          },
+          "japan": {
+            "clarity": 5,
+            "speed": 5,
+            "efficiency": 4,
+            "visual": 5,
+            "feedback": 4,
+            "mobile": 5,
+            "focus": 4,
+            "readability": 6
+          }
+        },
+        "loopware": {
+          "world": {
+            "clarity": 6,
+            "speed": 5,
+            "efficiency": 6,
+            "visual": 5,
+            "feedback": 6,
+            "mobile": 6,
+            "focus": 7,
+            "readability": 6
+          },
+          "japan": {
+            "clarity": 7,
+            "speed": 6,
+            "efficiency": 7,
+            "visual": 6,
+            "feedback": 7,
+            "mobile": 7,
+            "focus": 8,
+            "readability": 7
+          }
+        }
+      },
+      "improvements": {
+        "dashboard": [
+          {
+            "axis": "focus",
+            "gap": "ホームに帯が11本並び、Superhuman・freeeの「やること中心」と比べて大事な件が埋もれる",
+            "next": "ホームを「いまやること」と判断待ちの2帯に絞り、残りは折りたたみか各ページへ"
+          },
+          {
+            "axis": "clarity",
+            "gap": "左ナビの項目が35個。Linearは数項目＋⌘K",
+            "next": "ナビは毎日使う5〜7個だけにし、残りは⌘Kパレットから呼ぶ"
+          },
+          {
+            "axis": "visual",
+            "gap": "画面内の直書きスタイルが約470か所、文字サイズが28種類で型が揃っていない",
+            "next": "文字サイズを5段（小・本文・中見出し・見出し・数値）に決め、カードとボタンを共通部品に寄せる"
+          },
+          {
+            "axis": "mobile",
+            "gap": "スマホ用の調整が一部の画面だけ",
+            "next": "ホームとパートナーの2画面をスマホ幅で見直し、押す場所を48px以上に"
+          },
+          {
+            "axis": "feedback",
+            "gap": "完了ボタンの後に「元に戻す」が無い操作がある",
+            "next": "既読・完了・見送りに共通の「元に戻す」トーストを付ける"
+          }
+        ],
+        "kurashift": [
+          {
+            "axis": "focus",
+            "gap": "トップ画面が1ファイル約1,100行で情報が密。freeeのホームは「やること」と残高だけ",
+            "next": "トップを「今月の要対応」と「資産の現在地」の2つに絞り、詳細は各ページへ"
+          },
+          {
+            "axis": "visual",
+            "gap": "直書きスタイルが約1,280か所で、画面ごとに見た目がばらつく",
+            "next": "表・カード・数値表示の共通部品を作り、よく使う画面から置き換える"
+          },
+          {
+            "axis": "speed",
+            "gap": "読み込み中の骨組み表示（loading）が1画面も無い",
+            "next": "重い画面（ライフプラン・MQ・家計BS）に骨組み表示を足す"
+          },
+          {
+            "axis": "efficiency",
+            "gap": "ショートカットや一括操作がほぼ無い",
+            "next": "ダッシュボードと同じ⌘Kパレットを入れる"
+          },
+          {
+            "axis": "feedback",
+            "gap": "保存や取込の完了・失敗の知らせが少ない",
+            "next": "保存・取込の結果を共通のトーストで出す"
+          }
+        ],
+        "loopware": [
+          {
+            "axis": "visual",
+            "gap": "文字サイズが34種類。Things 3は4〜5段",
+            "next": "文字サイズを5段に揃え、判断ボタンの色の意味を全画面で統一"
+          },
+          {
+            "axis": "speed",
+            "gap": "読み込み中の骨組み表示が無く、次の1件が出るまで間がある",
+            "next": "次の数件を先に読み込み、判断した瞬間に次を出す（楽観的更新）"
+          },
+          {
+            "axis": "efficiency",
+            "gap": "Enter/Escはあるが、Superhumanのように全判断をキー1つでは押せない",
+            "next": "採る・見送る・迷うに1/2/3キーを割り当て、画面に小さく表示"
+          },
+          {
+            "axis": "clarity",
+            "gap": "デスク・残り・ルール・週次などの行き来が初見では分かりにくい",
+            "next": "上部に3〜4個のタブを固定し、今どこにいるかを明示"
+          }
+        ]
+      }
+    }
+  ]
+}

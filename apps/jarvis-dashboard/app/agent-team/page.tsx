@@ -1,5 +1,7 @@
 import Shell from "@/components/Shell";
+import { Suspense } from "react";
 import AgentTeamClient from "@/components/agent-team/AgentTeamClient";
+import MaturityPanel from "@/components/agent-team/MaturityPanel";
 import {
   getAgentTeam,
   getGenres,
@@ -7,6 +9,8 @@ import {
   getOpsMeta,
   getPermissionsMeta,
 } from "@/lib/agentTeam";
+
+export const dynamic = "force-dynamic";
 
 export default function AgentTeamPage() {
   const team = getAgentTeam();
@@ -32,6 +36,11 @@ export default function AgentTeamPage() {
         permissionsMeta={permissionsMeta}
         permissionsUpdated={team.permissions_updated}
         opsMeta={opsMeta}
+        maturity={
+          <Suspense fallback={<p className="meta">成熟度を読み込み中…</p>}>
+            <MaturityPanel />
+          </Suspense>
+        }
       />
     </Shell>
   );
