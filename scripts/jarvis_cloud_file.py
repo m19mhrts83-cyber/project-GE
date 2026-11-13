@@ -10,6 +10,11 @@ OSError [Errno 11] Resource deadlock avoided（EDEADLK）が出る。数秒後�
     ok = copy_cloud(src, dst)           # 失敗なら False
 
 関連: jarvis_energy_cf_collect.py（ローカルコピー経由で読む先行例）
+
+launchd から起動したプロセスは「未ダウンロードのファイルを取りに行く」設定が OFF
+（getiopolicy_np = 1）で始まり、何度再試行しても EDEADLK になる（ターミナルは ON = 2）。
+このモジュールを import した時点でプロセスの設定を ON にする（2026-11-14、311 が
+10/24〜11/14 に同じ下書きで止まり続けた原因）。
 """
 
 from __future__ import annotations
@@ -18,6 +23,32 @@ import shutil
 import sys
 import time
 from pathlib import Path
+
+# <sys/resource.h>
+_IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES = 3
+_IOPOL_SCOPE_PROCESS = 0
+_IOPOL_MATERIALIZE_DATALESS_FILES_ON = 2
+
+
+def enable_dataless_materialization() -> bool:
+    """macOS: このプロセスで Drive／OneDrive の未ダウンロードファイルを読めるようにする。"""
+    if sys.platform != "darwin":
+        return False
+    try:
+        import ctypes
+
+        libc = ctypes.CDLL(None, use_errno=True)
+        rc = libc.setiopolicy_np(
+            _IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+            _IOPOL_SCOPE_PROCESS,
+            _IOPOL_MATERIALIZE_DATALESS_FILES_ON,
+        )
+        return rc == 0
+    except Exception:  # noqa: BLE001 — 失敗しても従来どおり再試行で動く
+        return False
+
+
+enable_dataless_materialization()
 
 DEFAULT_ATTEMPTS = 3
 DEFAULT_WAIT_SEC = 2.0
