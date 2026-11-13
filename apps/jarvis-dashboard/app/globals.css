@@ -5255,3 +5255,47 @@ tr.at-map-ai-only .at-map-missing {
 }
 
 
+
+/* ホーム: UI/UX 現在地（HomeUiuxScoreBand） */
+.uiux-asof { flex-basis: 100%; font-size: 0.78rem; }
+.uiux-goal { font-size: 0.9rem; }
+.uiux-review-due { margin-left: 8px; padding: 1px 8px; border-radius: var(--radius-chip); background: #fef3c7; color: var(--med); font-weight: 700; font-size: 0.78rem; }
+.uiux-table { margin: 12px 0 4px; display: grid; gap: 2px; }
+.uiux-row { display: grid; grid-template-columns: minmax(9rem, 1.2fr) 1fr 1fr; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.uiux-head { border-top: 0; padding: 0 0 4px; font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+.uiux-app a { color: var(--ink); font-weight: 600; text-decoration: none; }
+.uiux-app a:hover { color: var(--accent); text-decoration: underline; }
+.uiux-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.uiux-score { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 2ch; }
+.uiux-delta { font-size: 0.78rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.uiux-delta.up { color: var(--accent); }
+.uiux-delta.down { color: var(--high); }
+.uiux-delta.muted { color: var(--muted); font-weight: 500; }
+.uiux-meter { display: inline-block; width: 56px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.uiux-meter > span { display: block; height: 100%; background: var(--info); }
+.uiux-meter > span.done { background: var(--accent); }
+.uiux-spark-goal { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 2; }
+.uiux-spark-line { fill: none; stroke: var(--info); stroke-width: 1.5; }
+.uiux-spark-dot { fill: var(--info); }
+.uiux-detail { margin-top: 10px; }
+.uiux-detail > summary { cursor: pointer; font-size: 0.88rem; font-weight: 600; color: var(--accent); }
+.uiux-axes { margin: 10px 0; border-collapse: collapse; font-size: 0.85rem; min-width: 16rem; }
+.uiux-axes th, .uiux-axes td { padding: 4px 12px 4px 0; text-align: left; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.uiux-axes th { font-size: 0.75rem; color: var(--muted); }
+.uiux-total td { font-weight: 700; border-bottom: 0; }
+.uiux-imps { margin: 6px 0 0; padding-left: 1.4em; font-size: 0.88rem; display: grid; gap: 8px; }
+.uiux-imps li { line-height: 1.5; }
+.uiux-imp-axis { display: inline-block; font-weight: 700; margin-right: 6px; }
+.uiux-imp-gap, .uiux-imp-next { display: block; }
+.uiux-imp-gap { color: var(--muted); }
+.uiux-bench { font-size: 0.88rem; line-height: 1.8; margin: 8px 0; }
+.uiux-bench a { color: var(--accent); }
+.uiux-bars { margin: 8px 0; font-size: 0.85rem; display: grid; gap: 8px; }
+.uiux-bars dt { font-weight: 700; }
+.uiux-bars dd { margin: 2px 0 0 1em; color: var(--text); }
+.uiux-rule { font-size: 0.78rem; }
+@media (max-width: 720px) {
+  .uiux-row { grid-template-columns: 1fr 1fr; }
+  .uiux-row .uiux-app { grid-column: 1 / -1; }
+  .uiux-head span:first-child { display: none; }
+}
