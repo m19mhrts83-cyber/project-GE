@@ -300,6 +300,54 @@ def load_mute_registry(sb: Any) -> dict[str, Any]:
         return base
 
 
+POLICY_META_KEY = "loopware_sender_policy"
+
+
+def load_sender_policies(sb: Any) -> dict[str, str]:
+    """判断デスクで選んだ「この送り手は次回から」（hide / auto_done / always）。読めなければ空。"""
+    try:
+        r = sb.table("sync_meta").select("value").eq("key", POLICY_META_KEY).limit(1).execute()
+        rows = r.data or []
+        raw = rows[0].get("value") if rows else None
+        obj = json.loads(raw) if isinstance(raw, str) and raw.strip() else raw
+        entries = obj.get("entries") if isinstance(obj, dict) else None
+        out: dict[str, str] = {}
+        for k, v in (entries or {}).items():
+            pol = v.get("policy") if isinstance(v, dict) else None
+            if pol in ("hide", "auto_done", "always"):
+                out[str(k)] = pol
+        return out
+    except Exception as e:
+        print(f"# sender policy load skip: {e}", file=sys.stderr)
+        return {}
+
+
+def sender_policy(policies: dict[str, str], from_email: str) -> str | None:
+    key = mute_key(parse_from_addr(from_email))
+    return policies.get(key) if key else None
+
+
+def parse_from_addr(raw: str) -> str:
+    s = (raw or "").strip()
+    m = re.search(r"<([^>]+)>", s)
+    return (m.group(1) if m else s).strip()
+
+
+def auto_close_by_policy(sb: Any, row: dict[str, Any]) -> bool:
+    """「出さずに自動で回答不要」の送り手のメールを回答不要（done）で閉じる。印は payload に残す。"""
+    try:
+        pl = dict(row.get("payload") or {})
+        now = datetime.now(timezone.utc).isoformat()
+        pl["loopware_auto_policy"] = {"policy": "auto_done", "at": now, "source": "auto_policy"}
+        sb.table("triage_items").update(
+            {"status": "done", "payload": pl, "updated_at": now}
+        ).eq("id", row.get("id")).eq("status", "pending").execute()
+        return True
+    except Exception as e:
+        print(f"# auto close skip id={row.get('id')}: {e}", file=sys.stderr)
+        return False
+
+
 def is_muted(reg: dict[str, Any], from_email: str) -> bool:
     key = mute_key(from_email)
     if not key:
@@ -1202,9 +1250,14 @@ def mark_gmail_read_after_slack(
     return {"ok": ok, "fail": fail, "skip": skip, "dry_run": int(dry_run)}
 
 
-def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def load_pending_from_supabase(
+    *, limit: int, dry_run: bool = False
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     sb = _sb()
     mute = load_mute_registry(sb)
+    policies = load_sender_policies(sb)
+    policy_hidden = 0
+    policy_closed = 0
     pool = max(limit * 10, 60)
     r = (
         sb.table("triage_items")
@@ -1311,7 +1364,13 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
             continue
         if lane == "openchat":
             continue
-        if is_muted(mute, str(row.get("from_email") or "")):
+        pol = sender_policy(policies, str(row.get("from_email") or ""))
+        if pol in ("hide", "auto_done"):
+            policy_hidden += 1
+            if pol == "auto_done" and not dry_run and auto_close_by_policy(sb, row):
+                policy_closed += 1
+            continue
+        if pol != "always" and is_muted(mute, str(row.get("from_email") or "")):
             muted_n += 1
             continue
         ap = apply_to_row(book, row)
@@ -1336,6 +1395,8 @@ def load_pending_from_supabase(*, limit: int) -> tuple[list[dict[str, Any]], dic
         "pool": len(pool_rows),
         "ranked": len(ranked),
         "muted": muted_n,
+        "policy_hidden": policy_hidden,
+        "policy_closed": policy_closed,
         "rule_hidden": rule_hidden,
         "rules": len(book.confirmed) + len(book.exceptions),
         "vendor_skip": skipped_vendor,
@@ -1709,7 +1770,7 @@ def main() -> int:
             return 2
         rows = rank_candidates([one], limit=1)
     elif args.from_triage:
-        rows, stats = load_pending_from_supabase(limit=args.limit)
+        rows, stats = load_pending_from_supabase(limit=args.limit, dry_run=args.dry_run)
         try:
             wait_limit = int(
                 os.environ.get("JARVIS_MAIL_ACTION_WAIT_LIMIT") or REPLY_WAIT_LIMIT_DEFAULT
