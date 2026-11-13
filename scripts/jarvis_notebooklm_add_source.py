@@ -90,6 +90,9 @@ def main() -> int:
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(
             user_data_dir=str(STUDIO_PROFILE),
+            # ログイン(jarvis_notebooklm_mcp_login)・Studio ランナーと同じ Chrome 本体で開く。
+            # 付属 Chromium だと Chrome で保存したログイン情報を読めずログアウト扱いになる。
+            channel="chrome",
             headless=False,
             viewport={"width": 1400, "height": 950},
             locale="ja-JP",
