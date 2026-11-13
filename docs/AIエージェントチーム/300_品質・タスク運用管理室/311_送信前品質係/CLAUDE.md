@@ -113,6 +113,7 @@ OK→送信／NG→送らず再確認。311自体は送信ボタンを押さな�
 ## 5. 成果物の置き場
 
 - 下書き正本: OneDrive 各パートナー `4.送信下書き.txt` 等（**きっかけで渡されたパスのみ**）
+- **Drive／OneDrive の下書きが launchd から読めない（`[Errno 11] Resource deadlock avoided`）**: launchd 起動のプロセスは未ダウンロードファイルの取得が OFF で始まる。`scripts/jarvis_cloud_file.py` を import すると ON になる（2026-11-14 修正。10/24〜11/14 にハウ住む緑店の下書きで止まっていた原因）。Drive の新しい読み込みは必ず `jarvis_cloud_file` 経由で
 - ルール: `jarvis-outbound-confirm.mdc` / `partner-email-send.mdc`
 - ログ: このフォルダ `logs/`
 
