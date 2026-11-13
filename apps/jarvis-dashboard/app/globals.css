@@ -5255,3 +5255,81 @@ tr.at-map-ai-only .at-map-missing {
 }
 
 
+
+/* ホーム: UI/UX 現在地（HomeUiuxScoreBand） */
+.uiux-asof { flex-basis: 100%; font-size: 0.78rem; }
+.uiux-goal { font-size: 0.9rem; }
+.uiux-review-due { margin-left: 8px; padding: 1px 8px; border-radius: var(--radius-chip); background: #fef3c7; color: var(--med); font-weight: 700; font-size: 0.78rem; }
+.uiux-table { margin: 12px 0 4px; display: grid; gap: 2px; }
+.uiux-row { display: grid; grid-template-columns: minmax(9rem, 1.2fr) 1fr 1fr; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.uiux-head { border-top: 0; padding: 0 0 4px; font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+.uiux-app a { color: var(--ink); font-weight: 600; text-decoration: none; }
+.uiux-app a:hover { color: var(--accent); text-decoration: underline; }
+.uiux-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.uiux-score { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 2ch; }
+.uiux-delta { font-size: 0.78rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.uiux-delta.up { color: var(--accent); }
+.uiux-delta.down { color: var(--high); }
+.uiux-delta.muted { color: var(--muted); font-weight: 500; }
+.uiux-meter { display: inline-block; width: 56px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.uiux-meter > span { display: block; height: 100%; background: var(--info); }
+.uiux-meter > span.done { background: var(--accent); }
+.uiux-spark-goal { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 2; }
+.uiux-spark-line { fill: none; stroke: var(--info); stroke-width: 1.5; }
+.uiux-spark-dot { fill: var(--info); }
+.uiux-detail { margin-top: 10px; }
+.uiux-detail > summary { cursor: pointer; font-size: 0.88rem; font-weight: 600; color: var(--accent); }
+.uiux-axes { margin: 10px 0; border-collapse: collapse; font-size: 0.85rem; min-width: 16rem; }
+.uiux-axes th, .uiux-axes td { padding: 4px 12px 4px 0; text-align: left; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.uiux-axes th { font-size: 0.75rem; color: var(--muted); }
+.uiux-total td { font-weight: 700; border-bottom: 0; }
+.uiux-imps { margin: 6px 0 0; padding-left: 1.4em; font-size: 0.88rem; display: grid; gap: 8px; }
+.uiux-imps li { line-height: 1.5; }
+.uiux-imp-axis { display: inline-block; font-weight: 700; margin-right: 6px; }
+.uiux-imp-gap, .uiux-imp-next { display: block; }
+.uiux-imp-gap { color: var(--muted); }
+.uiux-bench { font-size: 0.88rem; line-height: 1.8; margin: 8px 0; }
+.uiux-bench a { color: var(--accent); }
+.uiux-bars { margin: 8px 0; font-size: 0.85rem; display: grid; gap: 8px; }
+.uiux-bars dt { font-weight: 700; }
+.uiux-bars dd { margin: 2px 0 0 1em; color: var(--text); }
+.uiux-rule { font-size: 0.78rem; }
+@media (max-width: 720px) {
+  .uiux-row { grid-template-columns: 1fr 1fr; }
+  .uiux-row .uiux-app { grid-column: 1 / -1; }
+  .uiux-head span:first-child { display: none; }
+}
+
+/* AIエージェント運用成熟度（HomeMaturityBand / MaturityPanel） */
+.mat-lv { white-space: nowrap; display: inline-block; padding: 0 8px; border-radius: var(--radius-chip); font-size: 0.78rem; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--line); color: var(--ink); }
+.mat-lv.lv-1 { background: #fee2e2; color: var(--high); }
+.mat-lv.lv-2 { background: #fef3c7; color: var(--med); }
+.mat-lv.lv-3 { background: #dbeafe; color: var(--info); }
+.mat-lv.lv-4, .mat-lv.lv-5 { background: #ccfbf1; color: var(--accent); }
+.mat-lv.is-none { background: transparent; color: var(--muted); border: 1px dashed var(--line); font-weight: 500; }
+.mat-delta { font-size: 0.78rem; font-weight: 700; color: var(--muted); }
+.mat-delta.up { color: var(--accent); }
+.mat-delta.down { color: var(--high); }
+.mat-band-axes { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.mat-band-axis b { font-size: 1.2rem; }
+.mat-band-prio { font-size: 0.88rem; }
+.mat-panel { margin-top: 12px; }
+.mat-axes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 12px 0; }
+.mat-axis-card { border: 1px solid var(--line); border-radius: var(--radius-card); padding: 12px 14px; background: var(--card); }
+.mat-axis-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mat-trend { margin-top: 8px; display: block; max-width: 100%; }
+.mat-trend-goal { stroke: var(--muted); stroke-dasharray: 3 3; stroke-width: 1; }
+.mat-trend-line { fill: none; stroke: var(--accent); stroke-width: 2; }
+.mat-trend-dot { fill: var(--accent); }
+.mat-h { font-size: 0.95rem; margin: 18px 0 8px; }
+.mat-prio { padding-left: 1.4em; display: grid; gap: 10px; font-size: 0.9rem; }
+.mat-prio li > span { display: block; }
+.mat-prio-item { font-weight: 700; }
+.mat-prio-act { margin-top: 2px; }
+.mat-btn-wrap .btn { margin-left: 8px; padding: 2px 10px; font-size: 0.8rem; }
+.mat-done { margin-left: 8px; font-size: 0.82rem; color: var(--accent); }
+.mat-err { margin-left: 8px; font-size: 0.8rem; color: var(--high); }
+.mat-metrics { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
+.mat-table td { vertical-align: top; }
+.mat-rule { margin-top: 14px; font-size: 0.88rem; }
+.mat-rule > summary { cursor: pointer; font-weight: 600; color: var(--accent); }

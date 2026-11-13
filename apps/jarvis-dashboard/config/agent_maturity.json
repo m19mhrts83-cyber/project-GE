@@ -1,0 +1,352 @@
+{
+  "_note": "AIエージェント運用成熟度の物差し。指標の実測値は Supabase agent_maturity_snapshots（scripts/jarvis_agent_maturity.py が週1で追加）。レベルの線(levels)とゴールは一度決めたら年1回だけ見直す（goals の末尾に追加、過去分は残す）。levels は L2〜L5 に上がる境目。dir=up は大きいほど良い、down は小さいほど良い。min_n 未満の母数は「未計測」。",
+  "level_labels": {
+    "1": "人が毎回動かしている。記録はない",
+    "2": "一部が自動で動く。記録はまばら",
+    "3": "記録がそろい、週次で見ている",
+    "4": "数値の目標があり、外れたら手を打つ",
+    "5": "改善が自動で回り、人は判断だけする"
+  },
+  "goals": [
+    {
+      "set_on": "2026-11-13",
+      "review_on": "2027-11-13",
+      "process": 4,
+      "output": 4,
+      "note": "初回設定（松野さん了承）。1年後に Process・Output とも L4。次の見直しまで動かさない"
+    }
+  ],
+  "axes": [
+    {
+      "key": "process",
+      "label": "Process：AIエージェント運用",
+      "items": [
+        {
+          "key": "autonomy",
+          "label": "自律性",
+          "world": "人が入るのは判断の場面だけ。合図（時間・イベント）で自分から動き、本番運用に上がった担当が仕事の大半を持つ（Anthropic／OpenAI のエージェント設計指針の考え方）",
+          "metrics": [
+            "active_agent_ratio",
+            "operating_agents"
+          ],
+          "actions": [
+            "運用確認中の社員から1人選び、1週間の実績を見て「運用」に上げる",
+            "人の合図でしか動かない社員を1人選び、時間かイベントの合図を足す"
+          ]
+        },
+        {
+          "key": "achievement",
+          "label": "成果達成力",
+          "world": "タスクの成功率を測り続け、外れた件を分類して直している（エージェント評価の基本）",
+          "metrics": [
+            "triage_hit_rate",
+            "ai_task_completion"
+          ],
+          "actions": [
+            "AIが起票して2週間以上残っているタスクを一覧にし、閉じるか担当を決め直す",
+            "仕分けで「違う」になった件の理由を3つに分類し、ルール候補にする"
+          ]
+        },
+        {
+          "key": "delegation",
+          "label": "連携・委譲",
+          "world": "担当の受け渡しが記録され、渡した先で止まらずに完了まで進む",
+          "metrics": [
+            "handoff_completion"
+          ],
+          "actions": [
+            "Todoistコメントの署名に社員番号を入れる（例：【Claude・313】）",
+            "受け渡し後に止まっているタスクを週次で拾い、元の担当に戻す"
+          ]
+        },
+        {
+          "key": "reliability",
+          "label": "信頼性・改善学習",
+          "world": "失敗率の目標を決めて外れを数え（Google SRE の考え方）、直しをルールとして蓄える",
+          "metrics": [
+            "job_success_rate",
+            "rules_adopted_28d"
+          ],
+          "actions": [
+            "直近の失敗ジョブを原因別に分け、多い原因を1つ潰す",
+            "土曜の週次でルール候補を1つ以上採用する"
+          ]
+        },
+        {
+          "key": "cost",
+          "label": "費用対効果",
+          "world": "成果1件あたりの費用を測り、同じ品質で安い経路を選んでいる",
+          "metrics": [
+            "ai_cost_per_done"
+          ],
+          "actions": [
+            "ClaudeとGrokの月額をサブスク台帳に入れ、費用対効果を計測できるようにする"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "output",
+      "label": "Output：アプリ・成果物品質",
+      "items": [
+        {
+          "key": "function",
+          "label": "機能品質",
+          "world": "AIの成果物の多くが手直しなしで使われ、手直しの理由が記録されている",
+          "metrics": [
+            "draft_no_edit_rate"
+          ],
+          "actions": [
+            "判断ログに「下書きを直したか」を必ず記録する（送信時に自動で入れる）"
+          ]
+        },
+        {
+          "key": "uiux",
+          "label": "UI/UX",
+          "world": "日本の一流アプリ（freee・マネーフォワード ME・SmartHR・LINE）と同水準",
+          "metrics": [
+            "uiux_japan_avg"
+          ],
+          "actions": [
+            "ホームのUI/UXカードで一番低いアプリの改善ポイントを1つ直す"
+          ]
+        },
+        {
+          "key": "stability",
+          "label": "安定性",
+          "world": "止まった処理はすぐ見つかり、要確認の件は溜まらない（DORA の復旧時間の考え方）",
+          "metrics": [
+            "watch_attention",
+            "stale_heartbeats"
+          ],
+          "actions": [
+            "状況ウォッチの「要確認」を古い順に3件片付ける",
+            "最終実行が古くなっている定期処理を再開し、止まった理由を記録する"
+          ]
+        },
+        {
+          "key": "maintainability",
+          "label": "保守性",
+          "world": "変更の失敗率が低く、CIが一度で通る（DORA の変更失敗率）",
+          "metrics": [
+            "fix_pr_ratio",
+            "ci_pass_rate"
+          ],
+          "actions": [
+            "直近の修正用PRを見直し、同じ種類の不具合を防ぐテストを1つ足す",
+            "CIで落ちやすいチェックを特定して直す"
+          ]
+        },
+        {
+          "key": "contribution",
+          "label": "実務への貢献度",
+          "world": "目標（1日5件・1件3分以内の送信）を毎週満たしている",
+          "metrics": [
+            "sent_per_week"
+          ],
+          "actions": [
+            "判断デスクで送信まで進まなかった件を見直し、詰まった段階を1つ直す"
+          ]
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "active_agent_ratio": {
+      "label": "合図で実際に動いている社員の割合（運用確認・運用）",
+      "unit": "ratio",
+      "dir": "up",
+      "levels": [
+        0.1,
+        0.25,
+        0.5,
+        0.75
+      ],
+      "source": "社員名簿の状態と合図"
+    },
+    "operating_agents": {
+      "label": "「運用」に上がった社員の数",
+      "unit": "count",
+      "dir": "up",
+      "levels": [
+        1,
+        3,
+        6,
+        10
+      ],
+      "source": "社員名簿の状態"
+    },
+    "triage_hit_rate": {
+      "label": "仕分けの当たり率（28日）",
+      "unit": "ratio",
+      "dir": "up",
+      "levels": [
+        0.6,
+        0.75,
+        0.85,
+        0.95
+      ],
+      "min_n": 10,
+      "source": "判断ログ triage_miss"
+    },
+    "ai_task_completion": {
+      "label": "AIが起票したタスクの完了率（28日）",
+      "unit": "ratio",
+      "dir": "up",
+      "levels": [
+        0.3,
+        0.5,
+        0.7,
+        0.85
+      ],
+      "min_n": 5,
+      "source": "Todoist の🤖・🦾依頼"
+    },
+    "handoff_completion": {
+      "label": "担当が交代したタスクの完了率（28日）",
+      "unit": "ratio",
+      "dir": "up",
+      "levels": [
+        0.3,
+        0.5,
+        0.7,
+        0.85
+      ],
+      "min_n": 3,
+      "source": "Todoistコメントの署名（近似）"
+    },
+    "job_success_rate": {
+      "label": "ジョブの成功率（28日）",
+      "unit": "ratio",
+      "dir": "up",
+      "levels": [
+        0.7,
+        0.85,
+        0.95,
+        0.99
+      ],
+      "min_n": 5,
+      "source": "kurashift_jobs"
+    },
+    "rules_adopted_28d": {
+      "label": "採用したルールの数（28日）",
+      "unit": "count",
+      "dir": "up",
+      "levels": [
+        1,
+        2,
+        4,
+        8
+      ],
+      "source": "判断ログ rule_review"
+    },
+    "ai_cost_per_done": {
+      "label": "AIの月額÷完了タスク数",
+      "unit": "yen",
+      "dir": "down",
+      "levels": [
+        5000,
+        2000,
+        1000,
+        500
+      ],
+      "source": "サブスク台帳＋Todoist（台帳がそろうまで未計測）"
+    },
+    "draft_no_edit_rate": {
+      "label": "下書きを直さずに送れた割合（28日）",
+      "unit": "ratio",
+      "dir": "up",
+      "levels": [
+        0.2,
+        0.4,
+        0.6,
+        0.8
+      ],
+      "min_n": 10,
+      "source": "判断ログ edited"
+    },
+    "uiux_japan_avg": {
+      "label": "UI/UX採点（日本）の3アプリ平均",
+      "unit": "score",
+      "dir": "up",
+      "levels": [
+        40,
+        55,
+        70,
+        80
+      ],
+      "source": "ホームのUI/UX採点"
+    },
+    "watch_attention": {
+      "label": "状況ウォッチの「要確認」件数",
+      "unit": "count",
+      "dir": "down",
+      "levels": [
+        10,
+        5,
+        2,
+        0
+      ],
+      "source": "watch_status"
+    },
+    "stale_heartbeats": {
+      "label": "最終実行が古い定期処理の数",
+      "unit": "count",
+      "dir": "down",
+      "levels": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "source": "sync_meta"
+    },
+    "fix_pr_ratio": {
+      "label": "マージしたPRのうち修正用の割合（28日・近似）",
+      "unit": "ratio",
+      "dir": "down",
+      "levels": [
+        0.4,
+        0.25,
+        0.15,
+        0.05
+      ],
+      "min_n": 10,
+      "source": "GitHub（件名で判定）"
+    },
+    "ci_pass_rate": {
+      "label": "PRのCIが通った割合（28日）",
+      "unit": "ratio",
+      "dir": "up",
+      "levels": [
+        0.6,
+        0.75,
+        0.9,
+        0.97
+      ],
+      "min_n": 10,
+      "source": "GitHub Actions pr-checks"
+    },
+    "sent_per_week": {
+      "label": "1週間に送ったメールの件数（目安35件）",
+      "unit": "count",
+      "dir": "up",
+      "levels": [
+        5,
+        15,
+        25,
+        35
+      ],
+      "source": "判断ログ triage sent"
+    }
+  },
+  "heartbeats": {
+    "gha_heartbeat_at": 1,
+    "triage_pushed_at": 1,
+    "watch_pushed_at": 1,
+    "mac_morning_refreshed_at": 2,
+    "ops_fail_watch_at": 1,
+    "yen_rate_pushed_at": 3
+  },
+  "cost_ledger_complete": false
+}
