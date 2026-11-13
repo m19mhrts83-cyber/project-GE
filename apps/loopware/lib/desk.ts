@@ -8,6 +8,8 @@
  */
 import { createHmac } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadPolicies } from "@/lib/senderPolicy";
+import { hiddenFromDesk } from "@/lib/senderPolicyCore";
 import { normalizeDecision, type DecisionInput, type Timing } from "@/lib/decisionContract";
 import {
   DECIDED_STATUSES,
@@ -42,7 +44,11 @@ export async function loadDeskCards(sb: SupabaseClient, opts: { item?: string | 
     .order("received_at", { ascending: false })
     .limit(600); // 自動のお知らせを外してから絞るので多めに読む
   if (error) throw new Error(error.message);
-  let cards = orderCards(((data || []) as TriageRow[]).filter(isDeskRow).map(toCard)).slice(0, limit);
+  // 送り手ごとの「次回から」: 出さない／自動で回答不要の送り手はデスクに出さない
+  const policies = await loadPolicies(sb);
+  let cards = orderCards(
+    ((data || []) as TriageRow[]).filter(isDeskRow).filter((r) => !hiddenFromDesk(policies, r.from_email)).map(toCard),
+  ).slice(0, limit);
   if (opts.item) {
     const hit = cards.find((c) => c.id === opts.item);
     if (hit) {

@@ -6,6 +6,7 @@ import Icon from "./Icon";
 import LogJar, { type Bead } from "./LogJar";
 import VoicePanel from "./VoicePanel";
 import { MAIL_REASON_TAGS, STAY_REASON_TAGS, type WeekTally } from "@/lib/decisionContract";
+import { SENDER_POLICIES, type SenderPolicy } from "@/lib/senderPolicyCore";
 import { agoLabel, stateLine, type DeskCard, type DeskChoice } from "@/lib/deskCore";
 
 /**
@@ -18,7 +19,7 @@ import { agoLabel, stateLine, type DeskCard, type DeskChoice } from "@/lib/deskC
 
 type Phase =
   | { k: "card" }
-  | { k: "reason"; key: string; choice: DeskChoice }
+  | { k: "reason"; key: string; choice: DeskChoice; itemId: string }
   | { k: "opened" };
 
 const QUEUE_KEY = "loopware_desk_queue_v1";
@@ -192,9 +193,9 @@ export default function DeskClient() {
       } finally {
         setBusy(false);
       }
-      if (choice === "skip" || choice === "hesitate") {
+      if (choice === "skip" || choice === "hesitate" || choice === "done") {
         setLeft(AUTO_MS);
-        setPhase({ k: "reason", key, choice });
+        setPhase({ k: "reason", key, choice, itemId: card.id });
       } else {
         next();
       }
@@ -218,6 +219,21 @@ export default function DeskClient() {
       }
     },
     [next, card],
+  );
+
+  // 「この送り手は次回から」（任意）。選ぶと次回から Slack にもデスクにも反映される
+  const senderPolicy = useCallback(
+    async (itemId: string, key: string, policy: SenderPolicy) => {
+      next();
+      try {
+        const r = await post("/api/desk/sender-policy", { itemId, policy, idemKey: key });
+        if (r.ok) flash(`✓ この送り手は次回から「${SENDER_POLICIES[policy]}」`);
+        else flash(String(r.json.error || "送り手の設定を保存できませんでした"));
+      } catch {
+        flash("送り手の設定を保存できませんでした（判断は記録済みです）");
+      }
+    },
+    [next],
   );
 
   // 理由は任意。5 秒で次へ
@@ -249,7 +265,10 @@ export default function DeskClient() {
       if (phase.k === "reason") {
         const tags = phase.choice === "hesitate" ? STAY_TAGS : MAIL_TAGS;
         const n = Number(e.key);
-        if (n >= 1 && n <= tags.length) void tag(phase.key, phase.choice, tags[n - 1].k);
+        if (phase.choice !== "done" && n >= 1 && n <= tags.length) void tag(phase.key, phase.choice, tags[n - 1].k);
+        if (phase.choice !== "hesitate" && n >= 7 && n <= 9) {
+          void senderPolicy(phase.itemId, phase.key, (["hide", "auto_done", "always"] as const)[n - 7]);
+        }
         if (e.key === "Enter" || e.key === "Escape") next();
         return;
       }
@@ -399,18 +418,40 @@ export default function DeskClient() {
 
       {phase.k === "reason" ? (
         <div className="glass desk-reason desk-sheet">
-          <p>
-            {phase.choice === "hesitate" ? "残っている理由は？（任意）" : "見送った理由は？（任意）"}
-            <span className="meta"> {Math.ceil(left / 1000)} 秒で次へ</span>
-          </p>
-          <div className="tags">
-            {(phase.choice === "hesitate" ? STAY_TAGS : MAIL_TAGS).map((t, i) => (
-              <button key={t.k} className="tag" onClick={() => void tag(phase.key, phase.choice, t.k)}>
-                <kbd>{i + 1}</kbd>
-                {t.label}
-              </button>
-            ))}
-          </div>
+          {phase.choice !== "done" ? (
+            <>
+              <p>
+                {phase.choice === "hesitate" ? "残っている理由は？（任意）" : "見送った理由は？（任意）"}
+                <span className="meta"> {Math.ceil(left / 1000)} 秒で次へ</span>
+              </p>
+              <div className="tags">
+                {(phase.choice === "hesitate" ? STAY_TAGS : MAIL_TAGS).map((t, i) => (
+                  <button key={t.k} className="tag" onClick={() => void tag(phase.key, phase.choice, t.k)}>
+                    <kbd>{i + 1}</kbd>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p>
+              回答不要にしました
+              <span className="meta"> {Math.ceil(left / 1000)} 秒で次へ</span>
+            </p>
+          )}
+          {phase.choice !== "hesitate" ? (
+            <div className="desk-sender">
+              <p className="meta">この送り手は次回から（任意）</p>
+              <div className="tags">
+                {(Object.keys(SENDER_POLICIES) as SenderPolicy[]).map((p, i) => (
+                  <button key={p} className="tag" onClick={() => void senderPolicy(phase.itemId, phase.key, p)}>
+                    <kbd>{7 + i}</kbd>
+                    {SENDER_POLICIES[p]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="desk-timer" style={{ width: `${(left / AUTO_MS) * 100}%` }} />
           <button className="ghost" onClick={next}>理由なしで次へ</button>
         </div>
