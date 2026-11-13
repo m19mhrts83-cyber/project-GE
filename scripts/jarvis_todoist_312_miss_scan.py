@@ -30,7 +30,29 @@ SIGNAL_RE = re.compile(
     r"(要確認|ご確認ください|見積|退去|修繕|折り返し|返信ください|資料提出|未提出)",
     re.I,
 )
+# 「退去」「見積」だけでは契約の条文や説明文も拾ってしまう。依頼・確認の言い回しが同じ行にあるものだけを候補にする
+ASK_RE = re.compile(r"(ください|下さい|お願い|いただけ|頂け|ですか|ますか|？|\?|確認|折り返し|未提出|提出)", re.I)
+# 箇条書きの条文・契約の取り決め（依頼ではない）
+CLAUSE_RE = re.compile(r"^\s*(?:[・･\-*]\s*\d*年以内|\d+[.．)）]\s)")
 NOISE_RE = re.compile(r"^(何卒|引き続き)?よろしくお願い", re.I)
+
+
+def is_ask_line(line: str) -> bool:
+    """依頼・確認の行か（サインの語 + 依頼の言い回し。条文っぽい行は除く）"""
+    ln = line.strip()
+    if not ln or NOISE_RE.search(ln) or CLAUSE_RE.search(line):
+        return False
+    return bool(SIGNAL_RE.search(ln) and ASK_RE.search(ln))
+
+
+def journal_signal_line(text: str) -> str:
+    """Journal の本文から宿題・要対応の行を1行取り出す（先頭の front matter は読まない）"""
+    body = re.sub(r"\A---\n.*?\n---\n", "", text, count=1, flags=re.S)
+    for ln in body.splitlines():
+        t = ln.strip().lstrip("#-*・ ").strip()
+        if t and re.search(r"(タスク|Todoist|宿題|要対応|返事)", t) and not t.startswith(("source:", "type:", "review_id:")):
+            return t[:160]
+    return ""
 
 
 def scan_yoritoori(limit: int = 20) -> list[dict]:
@@ -57,7 +79,7 @@ def scan_yoritoori(limit: int = 20) -> list[dict]:
             (
                 ln
                 for ln in reversed(lines)
-                if SIGNAL_RE.search(ln) and not NOISE_RE.search(ln.strip())
+                if is_ask_line(ln)
             ),
             "",
         )[:120]
@@ -88,13 +110,14 @@ def scan_journal(days: int = 3) -> list[dict]:
             text = p.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        if not re.search(r"(タスク|Todoist|宿題|要対応|返事)", text):
+        snippet = journal_signal_line(text)
+        if not snippet:
             continue
         out.append({
             "source": "obsidian_journal",
             "ref": str(p),
             "folder": p.name,
-            "snippet": text[:200].replace("\n", " "),
+            "snippet": snippet,
             "hypothesis": "Journal に宿題言及。拾い漏れ確認",
         })
     return out
