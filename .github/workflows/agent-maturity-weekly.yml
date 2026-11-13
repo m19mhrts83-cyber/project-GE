@@ -1,0 +1,49 @@
+name: AI agent maturity weekly
+
+# AIエージェント運用成熟度の週次計測（土曜 08:00 JST）。
+# 実測値を Supabase agent_maturity_snapshots に 1 行ずつ足す。物差しは apps/jarvis-dashboard/config/agent_maturity.json。
+# 表示はダッシュボードのホーム（要約）と /agent-team の「成熟度」。
+
+on:
+  schedule:
+    - cron: "0 23 * * 5" # 土曜 08:00 JST
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "記録せず集計結果だけ出す"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: agent-maturity-weekly
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Measure
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          IN_DRY: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ "${IN_DRY:-false}" == "true" ]]; then
+            python scripts/jarvis_agent_maturity.py --dry-run
+          else
+            python scripts/jarvis_agent_maturity.py
+          fi

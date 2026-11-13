@@ -1103,9 +1103,11 @@ def expire_stale_pending(items: list[dict[str, Any]], *, now: datetime | None = 
     「件数」が判断材料にならなくなっていた（2026-10-24）。0 で無効。
     """
     days = int(os.environ.get("JARVIS_TRIAGE_PENDING_EXPIRE_DAYS") or "21")
+    # 流し読み（skim）は 7 日で「見た」にする（2026-11-13 松野さん・#ops の赤をゴミで立てない）
+    skim_days = int(os.environ.get("JARVIS_TRIAGE_SKIM_EXPIRE_DAYS") or "7")
     if days <= 0:
         return 0
-    cutoff = (now or datetime.now(JST)) - timedelta(days=days)
+    base = now or datetime.now(JST)
     n = 0
     for it in items:
         if it.get("status") != "pending":
@@ -1115,9 +1117,10 @@ def expire_stale_pending(items: list[dict[str, Any]], *, now: datetime | None = 
             rec = datetime.strptime(raw[:16], "%Y/%m/%d %H:%M").replace(tzinfo=JST)
         except ValueError:
             continue
-        if rec < cutoff:
+        lim = skim_days if it.get("kind") == "skim" and 0 < skim_days < days else days
+        if rec < base - timedelta(days=lim):
             it["status"] = "skipped"
-            it["skip_reason"] = f"auto_expired_{days}d"
+            it["skip_reason"] = f"auto_expired_{lim}d"
             it["updated_at"] = now_iso()
             n += 1
     return n

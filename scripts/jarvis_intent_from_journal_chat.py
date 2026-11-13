@@ -19,7 +19,6 @@ import os
 import re
 import subprocess
 import sys
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -269,16 +268,7 @@ def rule_extract_themes(blob: str) -> list[dict[str, Any]]:
 
 
 def gemini_extract(journal: str, chat: str, catalog: list[dict[str, Any]]) -> dict[str, Any] | None:
-    key = (os.environ.get("GEMINI_API_KEY") or "").strip()
-    if not key:
-        return None
-    models = [
-        (os.environ.get("GEMINI_MODEL") or "").strip(),
-        "gemini-flash-lite-latest",
-        "gemini-flash-latest",
-    ]
-    models = [m for i, m in enumerate(models) if m and m not in models[:i]]
-
+    # 2026-11-13: 従量課金の Gemini API はやめ、Mac の定額AI（GenCode → Codex → Cursor → Claude）で作る。
     prompt = f"""あなたは秘書 Jarvis です。ユーザーの日誌と直近チャットから「いま考えていること」を抽出し、
 未読メール一覧のうち要確認に上げるべきものを選んでください。
 
@@ -308,55 +298,16 @@ def gemini_extract(journal: str, chat: str, catalog: list[dict[str, Any]]) -> di
 - 大きな方針転換ではなく、詰まっている手続き・次の一手に近いものを優先。
 """
 
-    last_err = ""
-    for model in models:
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{model}:generateContent?key={key}"
-        )
-        payload = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1536},
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=90) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-        except Exception as e:
-            last_err = str(e)[:200]
-            continue
-        cands = data.get("candidates") or []
-        if not cands:
-            last_err = "empty"
-            continue
-        parts = (((cands[0] or {}).get("content") or {}).get("parts")) or []
-        text = "\n".join(
-            p.get("text", "") for p in parts if isinstance(p, dict) and p.get("text")
-        ).strip()
-        if text.startswith("```"):
-            text = re.sub(r"^```(?:json)?\s*", "", text)
-            text = re.sub(r"\s*```$", "", text)
-        try:
-            obj = json.loads(text)
-        except json.JSONDecodeError:
-            m = re.search(r"\{[\s\S]*\}", text)
-            if not m:
-                last_err = "json"
-                continue
-            try:
-                obj = json.loads(m.group(0))
-            except json.JSONDecodeError:
-                last_err = "json2"
-                continue
-        if isinstance(obj, dict):
-            obj["_via"] = f"gemini:{model}"
-            return obj
-    print(f"# intent llm failed: {last_err}", file=sys.stderr)
+    import jarvis_flat_ai as flat  # noqa: PLC0415
+
+    try:
+        obj, res = flat.generate_json(prompt)
+    except Exception as e:
+        print(f"# intent flat_ai: {e}", file=sys.stderr)
+        return None
+    if isinstance(obj, dict):
+        obj["_via"] = f"flat:{res.provider}"
+        return obj
     return None
 
 

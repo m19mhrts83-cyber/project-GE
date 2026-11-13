@@ -27,6 +27,9 @@ import {
 } from "@/lib/quietEdgeContext";
 import { createClient } from "@/lib/supabase/server";
 
+/** 定額AI（Mac）の読み取り・レビューの待ち時間用 */
+export const maxDuration = 120;
+
 function fmtCount(n: number | null | undefined) {
   if (n == null) return "—";
   return `${n.toLocaleString("ja-JP")}回`;

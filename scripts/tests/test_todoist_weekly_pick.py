@@ -40,6 +40,12 @@ class OwnerTests(unittest.TestCase):
         self.assertFalse(w.is_owner_task(task(6, "🤖 [要フォロー][card] 引落")))
         self.assertFalse(w.is_owner_task(task(7, "子", parent_id="1")))
 
+    def test_weekend_agent_slot(self):
+        sat = {"date": "2026-11-14"}
+        self.assertFalse(w.is_owner_task(task(8, "【提案】[自律化] 58_ 承認案の実装", due=sat)))
+        self.assertTrue(w.is_owner_task(task(9, "【提案】[自律化] 58_ 承認案の実装", due={"date": "2026-11-16"})))
+        self.assertTrue(w.is_owner_task(task(10, "運動会の結果をNotionへ", due=sat)))
+
     def test_hard(self):
         self.assertTrue(w.is_hard(task(1, "振込", deadline={"date": "2026-11-21"})))
         self.assertTrue(w.is_hard(task(2, "名中説明会 参加証印刷", due={"date": "2026-11-14"})))

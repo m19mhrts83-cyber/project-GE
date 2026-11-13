@@ -8,7 +8,8 @@ Workspace Gemini のチャット履歴同期は対象外。API キーによる�
   python scripts/jarvis_gemini_research.py "愛知県の投資用不動産ローンの近況を要約して"
   python scripts/jarvis_gemini_research.py --model gemini-flash-latest "質問"
 
-要: GEMINI_API_KEY（Cloud Environment Secrets にも同名で置く）
+要: GEMINI_FREE_API_KEY（課金を無効にした Google プロジェクトの無料枠専用の鍵）。
+2026-11-13 から従量課金の GEMINI_API_KEY は使わない。無料枠は送った内容を Google が製品改善に使うことがあるので、私的な情報は送らない。
 """
 from __future__ import annotations
 
@@ -56,9 +57,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("prompt", nargs="+", help="調査したい内容")
     ap.add_argument("--model", default=os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL)
     args = ap.parse_args(argv)
-    key = (os.environ.get("GEMINI_API_KEY") or "").strip()
+    key = (os.environ.get("GEMINI_FREE_API_KEY") or "").strip()
     if not key:
-        print("GEMINI_API_KEY 未設定", file=sys.stderr)
+        print("GEMINI_FREE_API_KEY 未設定（従量課金の鍵は使わない）", file=sys.stderr)
         return 1
     prompt = " ".join(args.prompt).strip()
     try:

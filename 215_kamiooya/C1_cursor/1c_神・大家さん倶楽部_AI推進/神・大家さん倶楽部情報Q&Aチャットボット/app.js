@@ -4389,7 +4389,10 @@ const App = {
           used_sources: payload.used_sources || null,
           meta: payload.meta || {},
           result_status: payload.result_status || 'ok',
-          error_message: payload.error_message || null
+          error_message: payload.error_message || null,
+          hits: payload.hits,
+          term_count: payload.term_count,
+          has_or: payload.has_or
         })
       });
     } catch (e) {
@@ -4631,6 +4634,25 @@ const App = {
     if (!current()) return;
     App.state.allSearchResult.openchat = oc;
     App.renderAllSearchResults();
+    void App.logKeywordSearch(query, terms, groups, oc);
+  },
+  // 運営分析で「チャットの質問」と並べて比べるため、キーワード検索も1回ずつ記録する（11/12 松野さん）。
+  // 送る言葉は画面と同じ正規化の後（同じ言葉は同じ行にまとまる）。送れなくても検索の動きは変えない。
+  logKeywordSearch: async (query, terms, groups, oc) => {
+    try {
+      const cnt = function (g) { return g && !g.error ? Number(g.total != null ? g.total : (g.rows || []).length) || 0 : 0; };
+      const hits = { comments: cnt(groups.comments), openchat: cnt(oc), lessons: cnt(groups.lessons), knowledge: cnt(groups.knowledge) };
+      const failedParts = (groups.comments && groups.comments.error ? 1 : 0) + (oc && oc.error ? 1 : 0);
+      await App.logQaSearchEvent({
+        search_mode: 'keyword',
+        query: query.map(function (g) { return g.join(' '); }).join(' または ').slice(0, 500),
+        meta: {},
+        result_status: failedParts >= 2 ? 'error' : failedParts ? 'partial' : 'ok',
+        hits: hits,
+        term_count: (terms || []).length,
+        has_or: query.length > 1
+      });
+    } catch (e) { /* 記録の失敗は画面に出さない */ }
   },
   // 検索中の「進んでいます」表示（11/11 松野さん）。回答待ちと同じ見た目（search-motion）で、
   // こちらは実際の進み具合（読み込んだ件数・区分ごとの済み）をそのまま出す。初回だけ一覧データの読み込みで時間がかかる。
@@ -5368,7 +5390,7 @@ const App = {
     if (normal > 0) series.push({ key: 'normal', label: '通常（切替前）', note: 'まだ新しい検索に切り替わっていない方', cls: 'ab-c3', value: normal });
     const pctOf = (v) => (total > 0 ? Math.round((v / total) * 1000) / 10 : 0);
     const daily = (data.daily || []).map((d) => {
-      const o = { day: String(d.day || ''), semantic: num(d.semantic), deep: num(d.deep), normal: num(d.normal) };
+      const o = { day: String(d.day || ''), semantic: num(d.semantic), deep: num(d.deep), normal: num(d.normal), users: num(d.users) };
       o.total = num(d.total) || o.semantic + o.deep + o.normal;
       return o;
     });
@@ -5392,6 +5414,11 @@ const App = {
       else trend = '<span class="ab-trend"><i class="fa-solid fa-arrow-right"></i> 前半と後半はほぼ同じです</span>';
     }
     const countUp = (v, digits) => '<span class="ab-count" data-to="' + v + '" data-digits="' + (digits || 0) + '">' + (digits ? Number(v).toFixed(digits) : fmt(v)) + '</span>';
+    // キーワード検索（全データ）の利用。チャットの質問とは別に数えて並べる（11/12 松野さん「どっちがよく使われているか分かるように」）
+    const kw = data.keyword || {};
+    const kwOn = !!kw.available;
+    const kwTotal = num(kw.total), kwUsers = num(kw.users), kwZero = num(kw.zero_hit);
+    const chatUsers = num(t.users);
 
     // 1) ひと目でわかるまとめ
     const lead =
@@ -5401,6 +5428,7 @@ const App = {
       '<p class="ab-lead-text">質問は <b>' + fmt(total) + '件</b>、1日あたり <b>約' + esc(avg.toFixed(1)) + '件</b> でした。' +
       (peak && peak.total > 0 ? 'いちばん多かったのは <b>' + esc(dayLabel(peak.day, true)) + 'の' + fmt(peak.total) + '件</b> です。' : '') +
       (failed > 0 ? 'うまく答えられなかった質問が <b class="ab-warn-text">' + fmt(failed) + '件</b> あります。' : 'うまく答えられなかった質問はありません。') +
+      (kwOn ? 'キーワード検索は <b>' + fmt(kwTotal) + '回</b>' + (kwUsers ? '（' + fmt(kwUsers) + '人）' : '') + '使われました。' : '') +
       '</p>' + trend + '</div></div>';
 
     // 2) 大きな数字のカード
@@ -5470,14 +5498,113 @@ const App = {
           '<li style="--d:' + (i * 70) + 'ms"><span class="ab-rank-no' + (i < 3 ? ' is-top' : '') + '">' + (i + 1) + '</span>' +
           '<div class="ab-rank-main"><div class="ab-rank-q" title="' + esc(q.query || '') + '">' + esc(q.query || '') + '</div>' +
           '<div class="ab-rank-bar"><i style="width:' + ((num(q.count) / tqMax) * 100).toFixed(1) + '%"></i></div></div>' +
-          '<span class="ab-rank-n">' + fmt(q.count) + '<small>回</small></span></li>').join('') + '</ol>';
+          '<span class="ab-rank-n">' + fmt(q.count) + '<small>回</small>' + (q.users != null ? '<em>' + fmt(q.users) + '人</em>' : '') + '</span></li>').join('') + '</ol>';
     const rankCard =
-      '<div class="ab-card ab-ranking"><h4 class="ab-h"><i class="fa-solid fa-ranking-star"></i> よく聞かれた質問（同じ文の多い順・上位10）</h4>' + ranking + '</div>';
+      '<div class="ab-card ab-ranking"><h4 class="ab-h"><i class="fa-solid fa-comments"></i> Q&amp;Aチャットの質問ランキング</h4>' +
+      '<p class="ab-muted ab-rank-note">チャットに入力された質問。同じ文の多い順・上位10（同じ人が何度聞いても人数は1人）</p>' + ranking + '</div>';
 
-    root.innerHTML = lead + kpis + '<div class="ab-row">' + donut + rankCard + '</div>' + dailyCard;
+    // 6) キーワード検索ランキング（チャットとは別に）
+    const kq = (kw.top || []).slice(0, 10);
+    const kqMax = Math.max(1, ...kq.map((q) => num(q.count)));
+    const kwRanking = !kwOn
+      ? '<p class="ab-muted">記録の準備中です（反映後の検索から数えます）。</p>'
+      : kq.length === 0
+        ? '<p class="ab-muted">この期間はまだ検索がありません</p>'
+        : '<ol class="ab-rank ab-rank-kw">' + kq.map((q, i) =>
+            '<li style="--d:' + (i * 70) + 'ms"><span class="ab-rank-no' + (i < 3 ? ' is-top' : '') + '">' + (i + 1) + '</span>' +
+            '<div class="ab-rank-main"><div class="ab-rank-q" title="' + esc(q.query || '') + '">' + esc(q.query || '') +
+            (num(q.zero_hit) > 0 ? '<span class="ab-badge-zero">見つからず ' + fmt(q.zero_hit) + '回</span>' : '<span class="ab-rank-hits">平均 ' + fmt(q.avg_hits) + '件ヒット</span>') + '</div>' +
+            '<div class="ab-rank-bar"><i style="width:' + ((num(q.count) / kqMax) * 100).toFixed(1) + '%"></i></div></div>' +
+            '<span class="ab-rank-n">' + fmt(q.count) + '<small>回</small><em>' + fmt(q.users) + '人</em></span></li>').join('') + '</ol>';
+    const zq = (kw.zero_queries || []).slice(0, 5);
+    const kwRankCard =
+      '<div class="ab-card ab-ranking ab-ranking-kw"><h4 class="ab-h"><i class="fa-solid fa-magnifying-glass"></i> キーワード検索ランキング</h4>' +
+      '<p class="ab-muted ab-rank-note">「キーワード検索（全データ）」に入れた言葉。多い順・上位10</p>' + kwRanking +
+      (zq.length ? '<div class="ab-zero"><b><i class="fa-solid fa-circle-exclamation"></i> 見つからなかった言葉</b>（言い換えやデータを足す候補）<div>' +
+        zq.map((q) => '<span>' + esc(q.query) + '<small>' + fmt(q.count) + '回</small></span>').join('') + '</div></div>' : '') + '</div>';
+
+    // 7) チャットとキーワード検索の比べ（回数・人数・1人あたり・前半/後半・日ごと）と、次の手のヒント
+    const kwDaily = {};
+    (kw.daily || []).forEach((d) => { kwDaily[String(d.day || '')] = d; });
+    const allDays = Array.from(new Set(daily.map((d) => d.day).concat(Object.keys(kwDaily)))).sort();
+    const pairs = allDays.map((day) => {
+      const c = daily.find((d) => d.day === day);
+      const k = kwDaily[day];
+      return { day: day, chat: c ? c.total : 0, chatUsers: c ? num(c.users) : 0, kw: k ? num(k.count) : 0, kwUsers: k ? num(k.users) : 0 };
+    });
+    const halfOf = (key) => {
+      const h = Math.floor(pairs.length / 2);
+      if (h < 3) return null;
+      const a = pairs.slice(0, h).reduce((x, d) => x + d[key], 0), b = pairs.slice(pairs.length - h).reduce((x, d) => x + d[key], 0);
+      if (a + b === 0) return null;
+      return b > a * 1.15 ? { cls: 'ab-trend-up', icon: 'fa-arrow-trend-up', text: '後半に増加' }
+        : b < a * 0.85 ? { cls: 'ab-trend-down', icon: 'fa-arrow-trend-down', text: '後半に減少' }
+        : { cls: '', icon: 'fa-arrow-right', text: '横ばい' };
+    };
+    const both = total + kwTotal;
+    const chatPct = both > 0 ? Math.round((total / both) * 100) : 0;
+    const per = (n, u) => (u > 0 ? (n / u).toFixed(1) : '—');
+    const side = (cls, icon, label, count, users, extra, tr) =>
+      '<div class="ab-vs-side ' + cls + '"><div class="ab-vs-label"><i class="fa-solid ' + icon + '"></i>' + esc(label) + '</div>' +
+      '<div class="ab-vs-num">' + countUp(count) + '<small>回</small></div>' +
+      '<div class="ab-vs-sub"><span><b>' + fmt(users) + '</b>人</span><span>1人あたり <b>' + esc(per(count, users)) + '</b>回</span></div>' +
+      (extra || '') + (tr ? '<span class="ab-trend ' + tr.cls + '"><i class="fa-solid ' + tr.icon + '"></i> ' + esc(tr.text) + '</span>' : '') + '</div>';
+    const hints = [];
+    if (!kwOn) {
+      hints.push('キーワード検索の記録はこれから始まります。反映後の検索から、ここで比べられるようになります。');
+    } else if (both === 0) {
+      hints.push('この期間はどちらもまだ使われていません。');
+    } else {
+      if (kwTotal > total * 1.2) hints.push('キーワード検索のほうがよく使われています（チャットの約' + (total > 0 ? (kwTotal / total).toFixed(1) + '倍' : '—') + '）。調べたい言葉がはっきりしている方が多いようです。よく検索される言葉は、チャットの例や講座テーマの候補にできます。');
+      else if (total > kwTotal * 1.2) hints.push('チャットの質問のほうがよく使われています（キーワード検索の約' + (kwTotal > 0 ? (total / kwTotal).toFixed(1) + '倍' : '—') + '）。' + (kwTotal === 0 ? 'キーワード検索はまだ使われていません。' : '') + 'キーワード検索は、知られていないか、使いどころが伝わっていない可能性があります。');
+      else hints.push('チャットの質問とキーワード検索は、ほぼ同じくらい使われています。');
+      if (kwZero > 0) hints.push('キーワード検索で見つからなかったのは <b>' + fmt(kwZero) + '回</b>（' + Math.round((kwZero / Math.max(1, kwTotal)) * 100) + '%）です。キーワード検索ランキングの下の「見つからなかった言葉」は、言い換えやデータを足す候補です。');
+      if (kwUsers > 0 && chatUsers > 0 && kwUsers < chatUsers / 2) hints.push('キーワード検索を使った人（' + fmt(kwUsers) + '人）は、チャットを使った人（' + fmt(chatUsers) + '人）の半分未満です。');
+    }
+    const fKw = App.state.features && App.state.features.keyword_all;
+    if (kwOn && fKw && !fKw.members) hints.push('キーワード検索はまだ会員には公開していないため、いまの数字は試しに使った分です。');
+    const pMax = Math.max(1, ...pairs.map((d) => Math.max(d.chat, d.kw)));
+    const pEvery = pairs.length <= 14 ? 1 : pairs.length <= 31 ? 3 : pairs.length <= 60 ? 7 : 14;
+    const pairChart = pairs.length === 0 ? '' :
+      '<p class="ab-readout ab-vs-readout" aria-live="polite"></p>' +
+      '<div class="ab-pair">' + pairs.map((d, i) =>
+        '<button type="button" class="ab-pair-col" data-p="' + i + '" style="--d:' + Math.min(i * 30, 900) + 'ms" aria-label="' + esc(dayLabel(d.day, true) + ' チャット' + d.chat + '回 キーワード検索' + d.kw + '回') + '">' +
+        '<span class="ab-pair-bars"><i class="ab-k1" style="height:' + ((d.chat / pMax) * 100).toFixed(1) + '%"></i><i class="ab-k2" style="height:' + ((d.kw / pMax) * 100).toFixed(1) + '%"></i></span>' +
+        '<span class="ab-xlab">' + (i % pEvery === 0 || i === pairs.length - 1 ? esc(dayLabel(d.day, false)) : '') + '</span></button>').join('') + '</div>';
+    const compareCard =
+      '<div class="ab-card ab-compare"><h4 class="ab-h"><i class="fa-solid fa-scale-balanced"></i> チャットの質問とキーワード検索の比べ</h4>' +
+      '<div class="ab-vs">' +
+        side('ab-vs-chat', 'fa-comments', 'Q&Aチャットの質問', total, chatUsers, '', halfOf('chat')) +
+        side('ab-vs-kw', 'fa-magnifying-glass', 'キーワード検索', kwTotal, kwUsers,
+          kwOn ? '<div class="ab-vs-sub ab-vs-zero"><span>見つからなかった <b>' + fmt(kwZero) + '</b>回</span></div>' : '<div class="ab-vs-sub">記録の準備中</div>', halfOf('kw')) +
+      '</div>' +
+      (both > 0 ? '<div class="ab-share" role="img" aria-label="使われた割合 チャット' + chatPct + '% キーワード検索' + (100 - chatPct) + '%">' +
+        '<i class="ab-k1" style="width:' + chatPct + '%"><span>' + (chatPct >= 12 ? 'チャット ' + chatPct + '%' : '') + '</span></i>' +
+        '<i class="ab-k2" style="width:' + (100 - chatPct) + '%"><span>' + (100 - chatPct >= 12 ? 'キーワード ' + (100 - chatPct) + '%' : '') + '</span></i></div>' : '') +
+      pairChart +
+      (pairs.length ? '<ul class="ab-legend ab-legend-row"><li><span class="ab-swatch ab-k1"></span>Q&Aチャットの質問</li><li><span class="ab-swatch ab-k2"></span>キーワード検索</li></ul>' : '') +
+      '<div class="ab-hints"><b><i class="fa-solid fa-lightbulb"></i> 読み取りと次の手</b><ul>' + hints.map((h) => '<li>' + h + '</li>').join('') + '</ul></div>' +
+      '</div>';
+
+    root.innerHTML = lead + kpis + '<div class="ab-row">' + donut + compareCard + '</div>' +
+      '<div class="ab-row ab-row-even">' + rankCard + kwRankCard + '</div>' + dailyCard;
+    const vsReadout = root.querySelector('.ab-vs-readout');
+    const showPair = (d) => {
+      if (!vsReadout || !d) return;
+      vsReadout.innerHTML = '<b>' + esc(dayLabel(d.day, true)) + '</b>' +
+        '<span><span class="ab-swatch ab-k1"></span>チャット ' + fmt(d.chat) + '回（' + fmt(d.chatUsers) + '人）</span>' +
+        '<span><span class="ab-swatch ab-k2"></span>キーワード検索 ' + fmt(d.kw) + '回（' + fmt(d.kwUsers) + '人）</span>';
+    };
+    const pairPeak = pairs.reduce((a, d) => (!a || d.chat + d.kw > a.chat + a.kw ? d : a), null);
+    showPair(pairPeak);
+    root.querySelectorAll('.ab-pair-col').forEach((b) => {
+      const d = pairs[Number(b.getAttribute('data-p'))];
+      const on = () => { root.querySelectorAll('.ab-pair-col.is-on').forEach((x) => x.classList.remove('is-on')); b.classList.add('is-on'); showPair(d); };
+      b.addEventListener('mouseenter', on); b.addEventListener('focus', on); b.addEventListener('click', on);
+    });
 
     // 棒にふれたら内訳を出す（ふれていないときは、いちばん多い日）
-    const readout = root.querySelector('.ab-readout');
+    const readout = root.querySelector('.ab-daily .ab-readout');
     const showDay = (d) => {
       if (!readout || !d) return;
       readout.innerHTML = '<b>' + esc(dayLabel(d.day, true)) + '</b> 合計 <b>' + fmt(d.total) + '件</b>' +

@@ -24,7 +24,9 @@ function clip(s: string, n = 280): string {
 }
 
 async function embedQuery(query: string): Promise<number[] | null> {
-  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+  // 2026-11-13: 従量課金の鍵は使わない。課金を無効にした無料枠専用の鍵だけ（無ければ語句検索に落ちる）。
+  // 送るのは質問文だけ。無料枠は Google が内容を製品改善に使うことがある点に注意。
+  const apiKey = (process.env.GEMINI_FREE_API_KEY || "").trim();
   if (!apiKey) return null;
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=` +

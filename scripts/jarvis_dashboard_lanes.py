@@ -302,14 +302,9 @@ def gemini_action_items(
     api_key: str,
     max_n: int,
 ) -> list[dict[str, Any]] | None:
-    if not blocks or not api_key or max_n <= 0:
+    # 2026-11-13: 従量課金の Gemini API はやめ、Mac の定額AI（GenCode → Codex → Cursor → Claude）で作る。
+    if not blocks or max_n <= 0:
         return None
-    models = [
-        (os.environ.get("GEMINI_MODEL") or "").strip(),
-        "gemini-flash-latest",
-        "gemini-flash-lite-latest",
-    ]
-    models = [m for i, m in enumerate(models) if m and m not in models[:i]]
     prompt = f"""あなたは不動産大家の秘書 Jarvis です。レーン「{lane_title}」の出典抜粋から、
 いま処置（返信・手配・確認・登録）が必要そうな項目だけを抽出してください。
 単なる情報共有・完了済み・雑談は除外。
@@ -335,64 +330,38 @@ def gemini_action_items(
 - 処置が無ければ items は空配列
 - suggested_due が不明なら null
 """
-    import urllib.error
-    import urllib.request
+    import jarvis_flat_ai as flat  # noqa: PLC0415
 
-    for model in models:
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{model}:generateContent?key={api_key}"
+    try:
+        obj, res = flat.generate_json(prompt)
+    except Exception as e:
+        print(f"# action_summary flat_ai: {e}", file=sys.stderr)
+        return None
+    if not isinstance(obj, dict):
+        return None
+    out: list[dict[str, Any]] = []
+    for it in obj.get("items") or []:
+        if not isinstance(it, dict):
+            continue
+        title = str(it.get("title") or "").strip()
+        if not title:
+            continue
+        due = it.get("suggested_due")
+        due_s = None
+        if isinstance(due, str) and re.match(r"^\d{4}-\d{2}-\d{2}", due.strip()):
+            due_s = due.strip()[:10]
+        out.append(
+            {
+                "title": title[:160],
+                "summary": str(it.get("summary") or "")[:800],
+                "suggested_due": due_s,
+                "source_excerpt": str(it.get("source_excerpt") or "")[:400],
+                "source_title": str(it.get("source_title") or "")[:160],
+            }
         )
-        payload = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.25, "maxOutputTokens": 2048},
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=90) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-        except Exception as e:
-            print(f"# action_summary gemini {model}: {e}", file=sys.stderr)
-            continue
-        cands = data.get("candidates") or []
-        if not cands:
-            continue
-        parts = (((cands[0] or {}).get("content") or {}).get("parts")) or []
-        text = "\n".join(
-            p.get("text", "") for p in parts if isinstance(p, dict) and p.get("text")
-        ).strip()
-        obj = _parse_gemini_json(text)
-        if not isinstance(obj, dict):
-            continue
-        out: list[dict[str, Any]] = []
-        for it in obj.get("items") or []:
-            if not isinstance(it, dict):
-                continue
-            title = str(it.get("title") or "").strip()
-            if not title:
-                continue
-            due = it.get("suggested_due")
-            due_s = None
-            if isinstance(due, str) and re.match(r"^\d{4}-\d{2}-\d{2}", due.strip()):
-                due_s = due.strip()[:10]
-            out.append(
-                {
-                    "title": title[:160],
-                    "summary": str(it.get("summary") or "")[:800],
-                    "suggested_due": due_s,
-                    "source_excerpt": str(it.get("source_excerpt") or "")[:400],
-                    "source_title": str(it.get("source_title") or "")[:160],
-                }
-            )
-            if len(out) >= max_n:
-                break
-        return out
-    return None
+        if len(out) >= max_n:
+            break
+    return out
 
 
 def fallback_action_items(
@@ -455,7 +424,7 @@ def collect_action_summaries(
         )
         if gem is not None:
             items = gem
-            via = "gemini"
+            via = "flat_ai"
         else:
             items = fallback_action_items(blocks, max_n)
             via = "fallback_snippet"

@@ -67,6 +67,7 @@
 - [x] 人が頼む（`/todoist`・「起票整理して」「認定して」「起票して」）
 - [x] 何かが届いたら（材料できたとき即: SB／111／JarvisBox／hawk create）
 - [x] 時間（取りこぼし保険・当面は相乗り。専用定時は後続）
+- [x] 台帳（comm_items）に「やること」が入ったら（2026-11-10〜・お試し）: `jarvis_todoist_312_collect.py` の collect が水曜の回だけ、受信・除外以外・14日以内・new／needs_reply（needs_reply は triage が pending のものだけ）と、自分の送信の「〜します」を最大 `JARVIS_312_COMM_MAX` 件（GHA リポジトリ変数。未設定＝止め、お試し 5）お題にする（source_kind=comm、comm_item_id、source_ref=`comm_items:<id>`）。チャットは依頼・問いかけの形があるものだけ、自動返信・お礼・自分の発言は外す。起票は Nody で選んだものだけ（reflect が Todoist へ、台帳に todoist_task のひもづけ・work_status=waiting）。台帳そのもの（取り込み）は台帳スレッドの担当
 - [ ] 変化・失敗を見回ったら（二重疑い・API失敗 → `#ops`）
 
 ## 3. 実行権限
@@ -163,3 +164,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-21 | Phase1＋1.5a **意図OK**（松野）。通しapplyは運用時任意 |
 | 2026-10-21 | 運用格上げ確定: A今／B 10-22ソフト／C 初回apply翌日or10-28／D 1.5bはC安定1週後（PROGRESS正本） |
 | 2026-10-22 | Phase2: Slack起票／見送りボタン（#127）。GAS #118 クローズ。問合せ Vercel failover（`45_`） |
+| 2026-11-10 | 入口に台帳（comm_items）を足す。Slack はそのまま、水曜だけ最大 `JARVIS_312_COMM_MAX` 件。#consult は「Slack N件・メール等 M件」 |

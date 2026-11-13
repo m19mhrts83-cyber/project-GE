@@ -23,6 +23,23 @@ alwaysApply: true
 
 （※同名衝突を避けるため、過去のGoogle Drive退避フォルダは `999_Obsidian_旧退避_202608` にリネーム済み。マイドライブ直下の `500_Obsidian_r1` はOGD本線用フォルダ1つに統一されています。ローカルの正本は常に `~/Documents/500_Obsidian_r1` です。）
 
+## 全エージェント共通（2026-11-10・R11）
+
+Jarvis／Miss Lemon／FRIDAY／Codex／Grok いずれも同じ。正本: `docs/AIエージェントチーム/49_共通ルール_AI使用量と入力_20261024.md` R11 · 入口: リポ根 `AGENTS.md`。
+
+- **Documents 正本だけ**に書く。マイドライブ直書き・Drive デスクトップ直書きは禁止（印が付かない）
+- 作成・更新の**報告前**に必ず `ogd_retag.py`（パス指定）
+- Grok が Drive コネクタでしか置けないときは、Jarvis が `ogd_retag` するまで完了にしない
+- 「他エージェントが書いたから iPhone に無い」は、多くの場合 **印付け忘れ**（トークン切れではない）
+
+### 同期・認証トラブル
+
+- iPhone にノートが無い場合は、まず Documents 正本の印と iPhone の Pull を確認する。
+- iPhone の OGD 画面が無反応なら iPhone 側のセッション／設定を切り分ける。Mac token が有効なときは、これだけを理由に Mac の再認証・token 再発行をしない。
+- Google で新しい refresh token を発行したら旧 token は失効する。iPhone と Mac の両方を更新し、両方の同期を確認する。token 値は共有しない。
+- `ogd_pull`／`ogd_retag` の API が HTTP 500 等で失敗したら、成功扱いにせず、同じ要求の反復や token 再発行で対処しない。エンドポイント／スクリプトを調べてから再実行する。
+- 通常の未反映確認では Reset を使わず Pull／Push を使う。Reset は原因・影響確認後に限る。
+
 ## Jarvis の必須動作
 
 | 依頼 | 先にやること | そのあと |
@@ -30,6 +47,7 @@ alwaysApply: true
 | Journal を読む・今日の日誌 | `ogd_pull.py --prefix '01_Journaling/★Journal'` | 書類の正本を読む |
 | 「Obsidian 同期して」 | `ogd_pull.py`（必要なら `--prefix`） | Remotely Save は実行しない |
 | ノートを新規作成・更新 | 書類に書く | 報告前に `ogd_retag.py` へそのパス（更新含む） |
+| iPhone が無反応／Pull 不能 | Mac の refresh は触らない（生きていれば） | ユーザーに **iPhone 側の再ログイン／空ボルト＋Pull** を案内 |
 
 ```bash
 cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
