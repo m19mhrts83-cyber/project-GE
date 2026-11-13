@@ -137,6 +137,18 @@ export default function HubPage() {
         <Icon name="next" size={18} />
       </Link>
 
+      <div className="eyebrow">画面</div>
+      <Link className="glass nav-card" href="/uiux">
+        <span className="ico">
+          <Icon name="list" size={22} />
+        </span>
+        <span className="txt">
+          <strong>画面の好み</strong>
+          <span className="meta">画面の案を 良い／違う で選ぶ／好み帳を育てる</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
       <div className="eyebrow">LOOP</div>
       <div className="glass loop">
         <div><span className="mono">01</span>AIが案</div>

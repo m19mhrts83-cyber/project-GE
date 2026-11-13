@@ -36,6 +36,9 @@ export const SURFACES = [
   "slide_fix", // 資料：作った後の直し（直す前と後）
   "slide_rule", // 資料：次回反映案の採否
   "kotoba", // ことばの棚：拾った言葉を残す／いらない／迷う・ひとこと（ダッシュボード /kotoba）
+  "uiux_plan", // UI/UX：作る前の案選び（案ごとの 良い／違う／迷う＋理由タグ。Nody /uiux）
+  "uiux_fix", // UI/UX：作った後の直し・「これいいね」（エージェントが scripts/jarvis_uiux_loop.py で記録）
+  "uiux_rule", // UI/UX：好みルール案の採否（採用したものだけが好み帳に入る）
 ] as const;
 export type Surface = (typeof SURFACES)[number];
 
@@ -245,6 +248,27 @@ export const SLIDE_RULE_REASON_TAGS = {
   wording: "言い方が違う",
 } as const;
 
+/** UI/UX：案を「良い／違う／迷う」にした理由（良いにも付けてよい） */
+export const UIUX_PLAN_REASON_TAGS = {
+  info_more: "情報が多い",
+  info_less: "情報が足りない",
+  layout: "配置",
+  color: "色",
+  text_size: "文字の大きさ",
+  motion: "動き",
+  ui_words: "言葉づかい",
+  phone: "スマホでの見やすさ",
+  steps: "操作の手数",
+} as const;
+
+/** UI/UX：好みルール案を「今回だけ／違う」にした理由 */
+export const UIUX_RULE_REASON_TAGS = {
+  by_chance: "たまたま",
+  app_only: "このアプリだけ",
+  already_rule: "もう決めている",
+  wording: "言い方が違う",
+} as const;
+
 /** 送った後の手応え */
 export const QUALITY = ["good", "meh", "none_fit"] as const;
 
@@ -261,6 +285,8 @@ const KNOWN_TAGS = new Set<string>([
   ...Object.keys(LEFT_REASON_TAGS),
   ...Object.keys(SLIDE_PLAN_REASON_TAGS),
   ...Object.keys(SLIDE_RULE_REASON_TAGS),
+  ...Object.keys(UIUX_PLAN_REASON_TAGS),
+  ...Object.keys(UIUX_RULE_REASON_TAGS),
   "hesitate",
 ]);
 
