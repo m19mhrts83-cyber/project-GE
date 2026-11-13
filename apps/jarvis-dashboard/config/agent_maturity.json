@@ -348,5 +348,5 @@
     "ops_fail_watch_at": 1,
     "yen_rate_pushed_at": 3
   },
-  "cost_ledger_complete": false
+  "cost_ledger_complete": true
 }
