@@ -6,6 +6,8 @@ PR を main にマージしても、この checkout が古いままだと直し�
 （2026-10-25〜26: FB 定型文・111 連投・211 クローズ案件の除外が丸1日効かなかった）。
 
 - 遅れていて、手元だけのコミットが無い → `git merge --ff-only origin/main`
+- ff を邪魔している未コミット変更が origin/main と同じ中身なら、手元の写しを外して ff する
+  （別 checkout で同じ修正を当てた・PR の中身を手で写した、で毎回止まっていた 2026-11-14）
 - 手元だけのコミットがある／ff できない → 自動では触らず #ops に1日1回知らせる
 - main 以外を checkout 中・merge/rebase 途中 → 何もしない
 
@@ -55,15 +57,78 @@ def _save(d: dict) -> None:
     STATE.write_text(json.dumps(d, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def build_alert(*, behind: int, ahead: int, reason: str) -> str:
+def _lines(out: str) -> list[str]:
+    return [x for x in out.splitlines() if x.strip()]
+
+
+def _blob(path: str) -> str:
+    """作業ツリーのファイルの blob ハッシュ。無ければ空。"""
+    if not (REPO / path).is_file():
+        return ""
+    code, out = _git("hash-object", "--", path)
+    return out if code == 0 else ""
+
+
+def _upstream_blob(path: str) -> str:
+    code, out = _git("rev-parse", "-q", "--verify", f"origin/main:{path}")
+    return out if code == 0 else ""
+
+
+def blocking_files() -> list[str]:
+    """origin/main で更新され、かつ手元で未コミット変更・未追跡になっているファイル。"""
+    code, out = _git("-c", "core.quotepath=false", "diff", "--name-only", "HEAD", "origin/main")
+    if code != 0:
+        return []
+    incoming = set(_lines(out))
+    _, mod = _git("-c", "core.quotepath=false", "diff", "--name-only", "HEAD")
+    _, untracked = _git("-c", "core.quotepath=false", "ls-files", "--others", "--exclude-standard")
+    local = set(_lines(mod)) | set(_lines(untracked))
+    return sorted(incoming & local)
+
+
+def same_as_upstream(path: str) -> bool:
+    """手元のファイルが origin/main と同じ中身（どちらも削除も含む）か。"""
+    return _blob(path) == _upstream_blob(path)
+
+
+def drop_identical(paths: list[str], *, dry: bool) -> tuple[list[str], list[str]]:
+    """origin/main と同じ中身の手元変更を外す。(外した, 残った) を返す。"""
+    dropped: list[str] = []
+    left: list[str] = []
+    for path in paths:
+        if not same_as_upstream(path):
+            left.append(path)
+            continue
+        if dry:
+            dropped.append(path)
+            continue
+        code, _ = _git("ls-files", "--error-unmatch", "--", path)
+        if code == 0:
+            ok, _ = _git("checkout", "HEAD", "--", path)
+        else:  # 未追跡（main で新規追加されるファイルと同じ中身）
+            try:
+                (REPO / path).unlink()
+                ok = 0
+            except OSError:
+                ok = 1
+        (dropped if ok == 0 else left).append(path)
+    return dropped, left
+
+
+def build_alert(*, behind: int, ahead: int, reason: str, files: list[str] | None = None) -> str:
     lines = [
         "【ops】Mac の作業フォルダが古いまま",
         f"main より {behind}件遅れ（手元だけのコミット {ahead}件）",
         "マージ済みの修正が Mac の定期処理に効いていません",
         "",
         f"理由: {reason}",
-        "次: Mac で `git pull --rebase origin main`（Jarvis に一声でも可）",
     ]
+    if files:
+        shown = files[:5]
+        lines.append("ぶつかっているファイル: " + "、".join(f"`{f}`" for f in shown))
+        if len(files) > len(shown):
+            lines[-1] += f" ほか{len(files) - len(shown)}件"
+    lines.append("次: Mac で `git pull --rebase origin main`（Jarvis に一声でも可）")
     return "\n".join(lines)
 
 
@@ -105,9 +170,15 @@ def main() -> int:
         return 0
 
     reason = ""
+    files: list[str] = []
     if ahead == 0:
+        dropped, files = drop_identical(blocking_files(), dry=dry)
+        for path in dropped:
+            print(f"♻️ origin/main と同じ中身の手元変更を外す: {path}")
         if dry:
             print("# dry-run: would git merge --ff-only origin/main")
+            if files:
+                print("# 中身が違うため残るファイル: " + ", ".join(files))
             return 0
         code, out = _git("merge", "--ff-only", "-q", "origin/main")
         if code == 0:
@@ -128,7 +199,7 @@ def main() -> int:
     if state.get("last_alert_date") == today:
         print("⏭ 本日通知済み")
         return 0
-    text = build_alert(behind=behind, ahead=ahead, reason=reason)
+    text = build_alert(behind=behind, ahead=ahead, reason=reason, files=files)
     if dry:
         print("--- dry-run #ops ---\n" + text)
         return 0
