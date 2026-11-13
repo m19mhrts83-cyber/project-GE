@@ -80,6 +80,27 @@ services:
     watch: false
     cancel_candidate: false
 
+  - id: claude
+    name: Claude（月100ドル）
+    category: ai
+    status: active
+    billing: monthly
+    amount_yen: 15973
+    watch: false
+    cancel_candidate: false
+    usage_note: "AIエージェントチーム（Claude Code・スレッド）の主力"
+    note: "月100ドル（2026-11-13 松野さん）。円は 2026-11-12 終値 USDJPY 159.725 で換算"
+
+  - id: grok
+    name: Grok
+    category: ai
+    status: active
+    billing: none
+    amount_yen: 0
+    watch: false
+    cancel_candidate: false
+    note: "Cursorの料金内で使えるので追加費用なし（2026-11-13 松野さん）"
+
   - id: chatgpt_plus
     name: ChatGPT Plus
     category: ai
