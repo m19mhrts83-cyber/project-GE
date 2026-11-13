@@ -6,7 +6,7 @@ import Icon from "./Icon";
 import LogJar, { type Bead } from "./LogJar";
 import VoicePanel from "./VoicePanel";
 import { MAIL_REASON_TAGS, STAY_REASON_TAGS, type WeekTally } from "@/lib/decisionContract";
-import { agoLabel, type DeskCard, type DeskChoice } from "@/lib/deskCore";
+import { agoLabel, stateLine, type DeskCard, type DeskChoice } from "@/lib/deskCore";
 
 /**
  * 判断デスク（/desk?surface=triage）。メールを1件ずつ大きく出して判断する。
@@ -303,9 +303,31 @@ export default function DeskClient() {
             {card.hesitatedAt ? <span className="pill hes">迷った</span> : null}
           </div>
           <h2 className="desk-subject">{card.subject}</h2>
+          <p className="desk-state">{stateLine(card)}</p>
+          {card.history.map((h) => (
+            <p key={h} className="desk-history">{h}</p>
+          ))}
           {card.summary ? <p className="desk-summary">{card.summary}</p> : null}
           {card.appliedRules.length ? (
             <p className="meta">効いているルール: {card.appliedRules.map((r) => <code key={r}>{r} </code>)}</p>
+          ) : null}
+
+          {card.thread.length ? (
+            <details className="desk-thread" open={card.thread.some((m) => m.mine)}>
+              <summary>
+                {card.thread.some((m) => m.mine) ? "あなたが送った前のメール" : "前のやりとり"}（{card.thread.length}通）
+              </summary>
+              {card.thread.map((m, i) => (
+                <div key={i} className={m.mine ? "thread-msg mine" : "thread-msg"}>
+                  <div className="thread-who">
+                    {m.mine ? "あなた" : "相手"} <span className="mono">{m.at}</span>
+                  </div>
+                  {m.body.split("\n").map((l, j) => (
+                    <p key={j}>{l || " "}</p>
+                  ))}
+                </div>
+              ))}
+            </details>
           ) : null}
 
           {card.bodyLines.length ? (
