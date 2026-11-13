@@ -78,6 +78,13 @@ DX互助会などの説明資料を、ループウェアの型で作る。エー
 - デッキ：`sync_meta`（key=`loopware_slides`）。`scripts/slides_loop.py put` で置く
 - 判断：`owner_decisions`（surface=`slide_plan`／`slide_fix`／`slide_rule`）
 
+## 画面の好み（`/uiux`）
+
+3アプリ（ダッシュボード・KURASHIFT・ループウェア）の画面づくりを、ループウェアの型で松野さんの好みに寄せる。エージェントが好み帳を読んで画面の案（画像つき）を置き → ここで案ごとに 良い／違う／迷う＋理由タグ（任意）、1つ選ぶか「どれも違う」→ 作った後の直しはエージェントが記録 → 土曜に好みルール案を 採用／今回だけ／違う。採用したものだけが好み帳に入り、次の案づくりで必ず読まれる。上部に「1案目OK率・平均往復回数」を出す。
+- アプリは AI を呼ばない。道具は `scripts/jarvis_uiux_loop.py`（リポジトリ直下）、手順は AGENTS.md「画面づくりの好み帳」
+- ラウンド：`sync_meta`（key=`loopware_uiux`）。画像は Supabase Storage の非公開バケット `uiux-shots`（`storage:<パス>` をサーバが1時間の署名付き URL にする）
+- 判断：`owner_decisions`（surface=`uiux_plan`／`uiux_fix`／`uiux_rule`、employee=814）。好み帳：`docs/AIエージェントチーム/800_俯瞰UI・投影更新室/uiux_taste.md`
+
 ## 声でフィードバック
 
 312・313 の下部バーのマイクで、字幕を見ながら声でコメントを残せる（T05「見ながら言う」）。
