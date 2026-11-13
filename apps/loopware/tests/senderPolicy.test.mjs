@@ -33,3 +33,14 @@ test('デスクから外すのは 出さない／自動で回答不要 だけ（
   m = sp.withPolicy(m, 'a@b.jp', 'always', 't4');
   assert.equal(sp.hiddenFromDesk(m, 'a@b.jp'), false);
 });
+
+test('自動で閉じた判断（auto_policy）は「採った」に数えない', () => {
+  const dc = loadLib('decisionContract');
+  const t = dc.tally([
+    { action: 'done', payload: { outcome: 'take' } },
+    { action: 'done', payload: { outcome: 'take', source_detail: 'auto_policy' } },
+  ]);
+  assert.equal(t.take, 1);
+  assert.equal(t.note, 1);
+  assert.equal(t.total, 2);
+});

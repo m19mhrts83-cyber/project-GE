@@ -95,6 +95,7 @@ export default function DeskClient() {
   const [left, setLeft] = useState(AUTO_MS);
   const [selLine, setSelLine] = useState<number | null>(null);
   const [pending, setPending] = useState(0);
+  const [autoClosed, setAutoClosed] = useState<{ id: string; subject: string; who: string; at: string }[]>([]);
 
   const shownAt = useRef<string>(new Date().toISOString());
   const firstTouch = useRef<string | null>(null);
@@ -137,6 +138,28 @@ export default function DeskClient() {
       }
     })();
   }, [item, flush]);
+
+  // 送り手の設定で自動で閉じた分（直近7日）。ここから戻せる
+  useEffect(() => {
+    fetch("/api/desk/auto-closed", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setAutoClosed(Array.isArray(j?.items) ? j.items : []))
+      .catch(() => undefined);
+  }, []);
+
+  const undoAuto = useCallback(async (id: string) => {
+    try {
+      const r = await post("/api/desk/auto-closed", { itemId: id, idemKey: `lw-undo-${uid()}` });
+      if (r.ok) {
+        setAutoClosed((a) => a.filter((x) => x.id !== id));
+        flash("戻しました。この送り手は「毎回見る」にしました（次の読み込みから出ます）");
+      } else {
+        flash(String(r.json.error || "戻せませんでした"));
+      }
+    } catch {
+      flash("戻せませんでした");
+    }
+  }, []);
 
   // カードが替わったら時計を戻す
   useEffect(() => {
@@ -300,6 +323,22 @@ export default function DeskClient() {
         </div>
         <LogJar week={tallyWeek} session={beads} />
       </header>
+
+      {autoClosed.length ? (
+        <details className="desk-auto">
+          <summary>自動で閉じた {autoClosed.length} 件（直近7日）</summary>
+          <ul>
+            {autoClosed.map((x) => (
+              <li key={x.id}>
+                <span>
+                  {x.who} <span className="meta">{x.subject}</span>
+                </span>
+                <button className="ghost" onClick={() => void undoAuto(x.id)}>戻す</button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
 
       {pending ? <p className="meta">端末に預かっている判断 {pending} 件（つながったら送ります）</p> : null}
       {error ? <p className="meta" style={{ color: "var(--alert)" }}>{error}</p> : null}

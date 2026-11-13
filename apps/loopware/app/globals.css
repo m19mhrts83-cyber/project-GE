@@ -2083,3 +2083,8 @@ main.wk-main { max-width: 600px; }
 
 .desk-sender { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line, rgba(128,128,128,.25)); }
 .desk-sender p { margin: 0 0 6px; }
+
+.desk-auto { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: rgba(128,128,128,.1); }
+.desk-auto summary { cursor: pointer; font-weight: 600; }
+.desk-auto ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.desk-auto li { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
