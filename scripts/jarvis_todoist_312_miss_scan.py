@@ -100,9 +100,42 @@ def scan_journal(days: int = 3) -> list[dict]:
     return out
 
 
+def push_supabase(payload: dict) -> bool:
+    """候補を sync_meta.loopware_312_candidates に置く（loopware /312 が読む。表の追加なし）。
+
+    ref はあなたの Mac のパスなので、本番へは出さない（source/folder/snippet/hypothesis だけ）。
+    """
+    url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
+    key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+    if not url or not key:
+        print("# supabase skip: JARVIS_SUPABASE_* 未設定", file=sys.stderr)
+        return False
+    try:
+        from supabase import create_client
+
+        slim = {
+            "at": payload["at"],
+            "candidates": [
+                {k: c.get(k, "") for k in ("source", "folder", "snippet", "hypothesis")}
+                for c in payload["candidates"]
+            ],
+        }
+        create_client(url, key).table("sync_meta").upsert(
+            {"key": "loopware_312_candidates", "value": json.dumps(slim, ensure_ascii=False), "updated_at": payload["at"]},
+            on_conflict="key",
+        ).execute()
+        print(f"# supabase sync_meta.loopware_312_candidates {len(slim['candidates'])}件", file=sys.stderr)
+        return True
+    except Exception as e:
+        print(f"# supabase skip: {e}", file=sys.stderr)
+        return False
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--push", action="store_true", help="Supabase の sync_meta へ候補を置く（loopware が読む）")
+    ap.add_argument("--dry-run", action="store_true", help="--push で置く中身を表示するだけ（書かない）")
     args = ap.parse_args(argv)
 
     cands = scan_yoritoori() + scan_journal()
@@ -111,7 +144,14 @@ def main(argv: list[str] | None = None) -> int:
         "at": datetime.now(JST).isoformat(timespec="seconds"),
         "candidates": cands,
     }
+    if args.push and args.dry_run:
+        for i, c in enumerate(cands, start=1):
+            print(f"  #{i} [{c['source']}] {c.get('folder','')} — {c.get('snippet','')}")
+        print(f"（dry-run: {len(cands)}件。Supabase には書いていません）")
+        return 0
     STATE.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if args.push:
+        push_supabase(payload)
 
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))

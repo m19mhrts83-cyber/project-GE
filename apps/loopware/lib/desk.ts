@@ -10,11 +10,14 @@ import { createHmac } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeDecision, type DecisionInput, type Timing } from "@/lib/decisionContract";
 import {
+  DECIDED_STATUSES,
+  historyNotes,
   isDeskRow,
   isLeftover,
   nextStepFor,
   orderCards,
   toCard,
+  type DecidedRow,
   type DeskCard,
   type NextStep,
   type TriageRow,
@@ -23,7 +26,7 @@ import {
 export type LeftCard = DeskCard & { next: NextStep };
 
 const COLS =
-  "id,status,subject,partner,from_email,lane,kind,summary,draft_text,original_body,received_at,priority,payload";
+  "id,status,subject,partner,from_email,lane,kind,summary,draft_text,original_body,received_at,priority,gmail_thread_id,payload";
 
 export function dashboardBase(): string {
   return (process.env.JARVIS_DASHBOARD_URL || "https://jarvis-dashboard-amber.vercel.app").replace(/\/$/, "");
@@ -49,7 +52,50 @@ export async function loadDeskCards(sb: SupabaseClient, opts: { item?: string | 
       if (one) cards = [toCard(one as TriageRow), ...cards];
     }
   }
-  return cards;
+  return attachHistory(sb, cards);
+}
+
+/** 同じスレッド・同じ相手の過去30日の判断（返信済み・見送り済み…）をカードに付ける */
+export async function attachHistory(sb: SupabaseClient, cards: DeskCard[]): Promise<DeskCard[]> {
+  const emails = Array.from(new Set(cards.map((c) => c.fromEmail.trim()).filter(Boolean)));
+  const threads = Array.from(new Set(cards.map((c) => c.threadId).filter(Boolean)));
+  if (!emails.length && !threads.length) return cards;
+  const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const cols = "id,status,from_email,gmail_thread_id,updated_at";
+  const decided: DecidedRow[] = [];
+  const seen = new Set<string>();
+  const take = (rows: unknown) => {
+    for (const r of (rows as DecidedRow[]) || []) {
+      if (!seen.has(r.id)) {
+        seen.add(r.id);
+        decided.push(r);
+      }
+    }
+  };
+  try {
+    if (emails.length) {
+      const { data } = await sb
+        .from("triage_items")
+        .select(cols)
+        .in("status", [...DECIDED_STATUSES])
+        .in("from_email", emails.slice(0, 80))
+        .gte("updated_at", since)
+        .limit(800);
+      take(data);
+    }
+    if (threads.length) {
+      const { data } = await sb
+        .from("triage_items")
+        .select(cols)
+        .in("status", [...DECIDED_STATUSES])
+        .in("gmail_thread_id", threads.slice(0, 80))
+        .limit(400);
+      take(data);
+    }
+  } catch {
+    return cards; // 履歴が取れなくてもカードは出す
+  }
+  return cards.map((c) => ({ ...c, history: historyNotes(c, decided) }));
 }
 
 function maSig(id: string, action: string): string | null {

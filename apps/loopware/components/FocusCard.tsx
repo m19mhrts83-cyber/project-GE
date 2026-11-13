@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Icon from "./Icon";
-import { SEED_PROPOSALS, propTopicId } from "@/lib/proposals";
+import { propTopicId } from "@/lib/proposals";
 import { jstDay, loadDaily, loadStore } from "@/lib/storage";
 
 /** 毎日の仕分け：今日の分が終われば「完了」。ログは溜まり、週1のレビューで基準へ。 */
 export default function FocusCard() {
-  const [total, setTotal] = useState(SEED_PROPOSALS.length);
-  const [ids, setIds] = useState<string[]>(SEED_PROPOSALS.map((p) => p.id));
+  const [total, setTotal] = useState(0);
+  const [ids, setIds] = useState<string[]>([]);
   const [doneIds, setDoneIds] = useState<string[]>([]);
   const [daysDone, setDaysDone] = useState(0);
   const [logs, setLogs] = useState(0);
@@ -24,7 +24,7 @@ export default function FocusCard() {
     fetch("/api/misses")
       .then((r) => r.json())
       .then((j) => {
-        if (Array.isArray(j?.candidates) && j.candidates.length) {
+        if (Array.isArray(j?.candidates)) {
           setIds(j.candidates.map((c: { id: string }) => c.id));
           setTotal(j.candidates.length);
         }
@@ -42,6 +42,16 @@ export default function FocusCard() {
   }
 
   const pending = ids.filter((id) => !doneIds.includes(propTopicId(day, id)));
+
+  if (!ids.length) {
+    return (
+      <div className="glass" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="eyebrow acc">今日の仕分け</div>
+        <p style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>いまは仕分ける提案がありません</p>
+        <p className="meta" style={{ margin: 0 }}>拾い漏れスキャンの結果が届くと、ここに件数が出ます。</p>
+      </div>
+    );
+  }
 
   if (!pending.length) {
     return (

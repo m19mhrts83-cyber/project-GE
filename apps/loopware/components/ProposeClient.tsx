@@ -9,7 +9,6 @@ import {
   EDIT_TAGS,
   NONE,
   propTopicId,
-  SEED_PROPOSALS,
   VERDICTS,
   WHY_TAGS,
   type Proposal,
@@ -33,7 +32,7 @@ const tid = (p: Proposal) => propTopicId(DAY, p.id);
 const vLabel = (v: Verdict) => VERDICTS.find((x) => x.id === v)?.label ?? v;
 
 export default function ProposeClient() {
-  const [items, setItems] = useState<Proposal[]>(SEED_PROPOSALS);
+  const [items, setItems] = useState<Proposal[]>([]);
   const [verdict, setVerdict] = useState<Record<string, Verdict>>({});
   const [comment, setComment] = useState<Record<string, string>>({});
   const [why, setWhy] = useState<Record<string, string[]>>({});
@@ -42,7 +41,7 @@ export default function ProposeClient() {
   const [editWhy, setEditWhy] = useState<Record<string, string[]>>({});
   const [scope, setScope] = useState<Record<string, "once" | "rule">>({});
   const [step, setStep] = useState<Step>("sort");
-  const [isSample, setIsSample] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const voice = useVoiceLog("312");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [saved, setSaved] = useState<{
@@ -59,7 +58,6 @@ export default function ProposeClient() {
       .then((r) => r.json())
       .then((j) => {
         if (Array.isArray(j?.candidates) && j.candidates.length) {
-          setIsSample(false);
           setItems(
             j.candidates.map((c: { id: string; source: string; folder: string; snippet: string; hypothesis: string }) => ({
               id: c.id,
@@ -73,7 +71,8 @@ export default function ProposeClient() {
           );
         }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setLoaded(true));
   }, []);
 
   // 音声の対象：タップしたカード。最初は先頭の未仕分けカード
@@ -268,6 +267,20 @@ export default function ProposeClient() {
   }
 
   /* ---------- 仕分け済み ---------- */
+  if (!loaded) {
+    return <p className="meta">候補を読み込んでいます…</p>;
+  }
+  if (!items.length) {
+    return (
+      <div className="glass" style={{ padding: 20 }}>
+        <p style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700 }}>いまは仕分ける提案がありません</p>
+        <p className="meta" style={{ margin: 0 }}>
+          Mac で拾い漏れスキャン（scripts/jarvis_todoist_312_miss_scan.py）を動かすと、ここに本物の候補が出ます。
+        </p>
+      </div>
+    );
+  }
+
   if (step === "done") {
     return (
       <div>
@@ -402,7 +415,7 @@ export default function ProposeClient() {
         </span>
       </div>
       <p className="meta" style={{ margin: "0 0 12px" }}>
-        {isSample ? "サンプルの提案です。" : "各ソースから拾った候補です。"}
+        各ソースから拾った候補です。
         採ったものだけ Todoist に出す前提で、コメントも一緒に残します。
       </p>
 
