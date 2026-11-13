@@ -14,7 +14,6 @@ import json
 import os
 import re
 import sys
-import urllib.request
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -198,14 +197,9 @@ def rule_digest(cands: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def gemini_digest(cands: list[dict[str, Any]], api_key: str) -> dict[str, Any] | None:
-    if not cands or not api_key:
+    # 2026-11-13: 従量課金の Gemini API はやめ、Mac の定額AI（GenCode → Codex → Cursor → Claude）で作る。
+    if not cands:
         return None
-    models = [
-        (os.environ.get("GEMINI_MODEL") or "").strip(),
-        "gemini-flash-latest",
-        "gemini-flash-lite-latest",
-    ]
-    models = [m for i, m in enumerate(models) if m and m not in models[:i]]
     prompt = f"""あなたは不動産大家の秘書です。神大家オープンチャットの抜粋から、大家業に役立つ情報だけをグループ別に要約してください。
 返信提案・対応催促は禁止。業者紹介依頼だけの投稿は無視。
 
@@ -226,76 +220,44 @@ def gemini_digest(cands: list[dict[str, Any]], api_key: str) -> dict[str, Any] |
 - 12東海北陸G で駐車場の記載があれば lines 先頭に「【駐車場】…」
 - 該当が無ければ groups は空配列
 """
-    for model in models:
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{model}:generateContent?key={api_key}"
+    import jarvis_flat_ai as flat  # noqa: PLC0415
+
+    try:
+        obj, res = flat.generate_json(prompt)
+    except Exception as e:
+        print(f"# openchat digest flat_ai: {e}", file=sys.stderr)
+        return None
+    if not isinstance(obj, dict):
+        return None
+
+    groups = []
+    for g in obj.get("groups") or []:
+        if not isinstance(g, dict):
+            continue
+        name = str(g.get("name") or "").strip()
+        if not name:
+            continue
+        lines = [str(x).strip()[:160] for x in (g.get("lines") or []) if str(x).strip()][
+            :3
+        ]
+        if not lines:
+            continue
+        groups.append(
+            {
+                "name": name,
+                "slug": slugify(name),
+                "lines": lines,
+                "updated_at": g.get("updated_at"),
+                "count": len(lines),
+            }
         )
-        payload = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.3, "maxOutputTokens": 2048},
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=90) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-        except Exception:
-            continue
-        cands_g = data.get("candidates") or []
-        if not cands_g:
-            continue
-        parts = (((cands_g[0] or {}).get("content") or {}).get("parts")) or []
-        text = "\n".join(
-            p.get("text", "") for p in parts if isinstance(p, dict) and p.get("text")
-        ).strip()
-        if text.startswith("```"):
-            text = re.sub(r"^```(?:json)?\s*", "", text)
-            text = re.sub(r"\s*```$", "", text)
-        try:
-            obj = json.loads(text)
-        except json.JSONDecodeError:
-            m = re.search(r"\{[\s\S]*\}", text)
-            if not m:
-                continue
-            try:
-                obj = json.loads(m.group(0))
-            except json.JSONDecodeError:
-                continue
-        if not isinstance(obj, dict):
-            continue
-        groups = []
-        for g in obj.get("groups") or []:
-            if not isinstance(g, dict):
-                continue
-            name = str(g.get("name") or "").strip()
-            if not name:
-                continue
-            lines = [str(x).strip()[:160] for x in (g.get("lines") or []) if str(x).strip()][
-                :3
-            ]
-            if not lines:
-                continue
-            groups.append(
-                {
-                    "name": name,
-                    "slug": slugify(name),
-                    "lines": lines,
-                    "updated_at": g.get("updated_at"),
-                    "count": len(lines),
-                }
-            )
-        return {
-            "generated_at": now_iso(),
-            "overview": str(obj.get("overview") or "")[:400]
-            or f"有益候補 {len(groups)} グループ。",
-            "groups": groups,
-            "via": "gemini",
-        }
+    return {
+        "generated_at": now_iso(),
+        "overview": str(obj.get("overview") or "")[:400]
+        or f"有益候補 {len(groups)} グループ。",
+        "groups": groups,
+        "via": res.provider,
+    }
     return None
 
 
@@ -309,8 +271,7 @@ def main(argv: list[str] | None = None) -> int:
     cands = collect_candidates(args.days)
     digest = rule_digest(cands)
     if not args.no_llm:
-        key = (os.environ.get("GEMINI_API_KEY") or "").strip()
-        gem = gemini_digest(cands, key)
+        gem = gemini_digest(cands, "")
         if gem:
             digest = gem
 

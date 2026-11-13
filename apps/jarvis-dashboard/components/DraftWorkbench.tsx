@@ -325,7 +325,7 @@ export default function DraftWorkbench({
             className={tab === "gemini" ? "draft-tab on" : "draft-tab"}
             onClick={() => applyTab("gemini")}
           >
-            Gemini案
+            定額AI案
           </button>
         ) : null}
         {cursor ? (
@@ -468,7 +468,7 @@ export default function DraftWorkbench({
             onChange={() => setEngine("gemini")}
             disabled={pending || polling}
           />
-          Gemini
+          定額AI（Mac）
         </label>
       </fieldset>
       {engine === "cursor" ? (
@@ -531,7 +531,7 @@ export default function DraftWorkbench({
             ? "見直し中…"
             : engine === "cursor"
               ? "Jarvis Cloudで見直し"
-              : "Geminiで見直し"}
+              : "定額AIで見直し"}
         </button>
         <button type="button" className="btn" onClick={localCursorCopy}>
           ローカルCursor用コピー

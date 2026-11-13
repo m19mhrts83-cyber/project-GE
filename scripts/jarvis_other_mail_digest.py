@@ -17,8 +17,6 @@ import json
 import os
 import re
 import sys
-import urllib.error
-import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -256,14 +254,9 @@ def rule_digest(items: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def gemini_digest(items: list[dict[str, Any]], api_key: str) -> dict[str, Any] | None:
-    if not items or not api_key:
+    # 2026-11-13: 従量課金の Gemini API はやめ、Mac の定額AI（GenCode → Codex → Cursor → Claude）で作る。
+    if not items:
         return None
-    models = [
-        (os.environ.get("GEMINI_MODEL") or "").strip(),
-        "gemini-flash-latest",
-        "gemini-flash-lite-latest",
-    ]
-    models = [m for i, m in enumerate(models) if m and m not in models[:i]]
 
     catalog = []
     for it in items[:50]:
@@ -310,106 +303,66 @@ def gemini_digest(items: list[dict[str, Any]], api_key: str) -> dict[str, Any] |
 - 各メール id はどれか1ジャンルにだけ入れる。捏造しない。
 """
 
-    last_err = ""
-    for model in models:
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{model}:generateContent?key={api_key}"
+    import jarvis_flat_ai as flat  # noqa: PLC0415
+
+    try:
+        obj, res = flat.generate_json(prompt)
+    except Exception as e:
+        print(f"# other_mail digest flat_ai: {e}", file=sys.stderr)
+        return None
+    if not isinstance(obj, dict):
+        return None
+    ids = {str(it.get("id")) for it in items}
+    actions = []
+    for a in obj.get("action_items") or []:
+        if not isinstance(a, dict):
+            continue
+        aid = str(a.get("id") or "")
+        if aid and aid not in ids:
+            continue
+        actions.append(
+            {
+                "id": aid or None,
+                "subject": a.get("subject") or "（件名なし）",
+                "from": a.get("from"),
+                "reason": a.get("reason") or "",
+            }
         )
-        payload = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.3, "maxOutputTokens": 2048},
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
+    genres = []
+    for g in obj.get("genres") or []:
+        if not isinstance(g, dict):
+            continue
+        gid = str(g.get("id") or "other")
+        if gid not in GENRE_LABELS:
+            gid = "other"
+        gids = [str(x) for x in (g.get("item_ids") or []) if str(x) in ids]
+        if not gids:
+            continue
+        genres.append(
+            {
+                "id": gid,
+                "label": str(g.get("label") or GENRE_LABELS.get(gid, gid)),
+                "item_ids": gids,
+                "bullets": [str(x) for x in (g.get("bullets") or []) if str(x).strip()][
+                    :5
+                ],
+                "ask_hint": str(g.get("ask_hint") or "")[:120],
+            }
         )
-        try:
-            with urllib.request.urlopen(req, timeout=90) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-        except Exception as e:
-            last_err = str(e)[:200]
-            continue
-        cands = data.get("candidates") or []
-        if not cands:
-            last_err = "empty candidates"
-            continue
-        parts = (((cands[0] or {}).get("content") or {}).get("parts")) or []
-        text = "\n".join(
-            p.get("text", "") for p in parts if isinstance(p, dict) and p.get("text")
-        ).strip()
-        if text.startswith("```"):
-            text = re.sub(r"^```(?:json)?\s*", "", text)
-            text = re.sub(r"\s*```$", "", text)
-        try:
-            obj = json.loads(text)
-        except json.JSONDecodeError:
-            m = re.search(r"\{[\s\S]*\}", text)
-            if not m:
-                last_err = "json parse"
-                continue
-            try:
-                obj = json.loads(m.group(0))
-            except json.JSONDecodeError:
-                last_err = "json parse2"
-                continue
-        if not isinstance(obj, dict):
-            continue
-        ids = {str(it.get("id")) for it in items}
-        actions = []
-        for a in obj.get("action_items") or []:
-            if not isinstance(a, dict):
-                continue
-            aid = str(a.get("id") or "")
-            if aid and aid not in ids:
-                continue
-            actions.append(
-                {
-                    "id": aid or None,
-                    "subject": a.get("subject") or "（件名なし）",
-                    "from": a.get("from"),
-                    "reason": a.get("reason") or "",
-                }
-            )
-        genres = []
-        for g in obj.get("genres") or []:
-            if not isinstance(g, dict):
-                continue
-            gid = str(g.get("id") or "other")
-            if gid not in GENRE_LABELS:
-                gid = "other"
-            gids = [str(x) for x in (g.get("item_ids") or []) if str(x) in ids]
-            if not gids:
-                continue
-            genres.append(
-                {
-                    "id": gid,
-                    "label": str(g.get("label") or GENRE_LABELS.get(gid, gid)),
-                    "item_ids": gids,
-                    "bullets": [str(x) for x in (g.get("bullets") or []) if str(x).strip()][
-                        :5
-                    ],
-                    "ask_hint": str(g.get("ask_hint") or "")[:120],
-                }
-            )
-        mail_n = sum(1 for it in items if (it.get("kind") or "mail") == "mail")
-        skim_n = sum(1 for it in items if (it.get("kind") or "") == "skim")
-        return {
-            "generated_at": now_iso(),
-            "pending_count": len(items),
-            "mail_count": mail_n,
-            "skim_count": skim_n,
-            "overview": str(obj.get("overview") or "").strip()
-            or rule_digest(items)["overview"],
-            "action_items": actions[:5],
-            "genres": genres,
-            "lines": [f"{g['label']}（{len(g['item_ids'])}）" for g in genres[:5]],
-            "via": f"gemini:{model}",
-        }
-    print(f"# digest llm failed: {last_err}", file=sys.stderr)
-    return None
+    mail_n = sum(1 for it in items if (it.get("kind") or "mail") == "mail")
+    skim_n = sum(1 for it in items if (it.get("kind") or "") == "skim")
+    return {
+        "generated_at": now_iso(),
+        "pending_count": len(items),
+        "mail_count": mail_n,
+        "skim_count": skim_n,
+        "overview": str(obj.get("overview") or "").strip()
+        or rule_digest(items)["overview"],
+        "action_items": actions[:5],
+        "genres": genres,
+        "lines": [f"{g['label']}（{len(g['item_ids'])}）" for g in genres[:5]],
+        "via": f"flat:{res.provider}",
+    }
 
 
 def push_digest(sb, digest: dict[str, Any]) -> None:
@@ -441,8 +394,7 @@ def build_and_maybe_push(
     items = fetch_pending_other(sb)
     digest = None
     if use_llm:
-        key = (os.environ.get("GEMINI_API_KEY") or "").strip()
-        digest = gemini_digest(items, key)
+        digest = gemini_digest(items, "")
     if digest is None:
         digest = rule_digest(items)
 

@@ -106,7 +106,7 @@ async function resolveAskReplyInternal(opts: {
       if (notices.length) notices.push(`次の経路へ上げます: ${label}`);
       if (route.id === "gemini") {
         const gem = await geminiReply(prompt, { maxAttempts: 1, timeoutMs: 20_000, maxOutputTokens: 2048 });
-        if (gem.ok) return { ok: true, text: gem.text, via: "gemini", fallbackNotices: [...notices, `自動: 許可済みの${label}（Gemini）で回答しました`] };
+        if (gem.ok) return { ok: true, text: gem.text, via: "gemini", fallbackNotices: [...notices, `自動: 許可済みの${label}（定額AI・Mac）で回答しました`] };
         notices.push(`Geminiで回答できませんでした（${shortReason(gem.error)}）`);
       } else {
         const apiKey = (process.env.CURSOR_API_KEY || "").trim();
@@ -141,13 +141,13 @@ async function resolveAskReplyInternal(opts: {
         };
       }
       notices.push(
-        `Jarvis Cloud が失敗したため、Gemini に切り替えます（${shortReason(cloud.error)}）`,
+        `Jarvis Cloud が失敗したため、Mac の定額AIに切り替えます（${shortReason(cloud.error)}）`,
       );
     }
 
     const gem = await geminiReply(prompt, { maxAttempts: 2, timeoutMs: 20_000, maxOutputTokens: 2048 });
     if (gem.ok) {
-      notices.push("Gemini で答えました");
+      notices.push("Mac の定額AIで答えました");
       return {
         ok: true,
         text: gem.text,
@@ -157,7 +157,7 @@ async function resolveAskReplyInternal(opts: {
       };
     }
     notices.push(
-      `Gemini も失敗したため、ローカル Cursor へ移ります（${shortReason(gem.error)}）`,
+      `定額AIも時間内に返らなかったため、ローカル Cursor へ移ります（${shortReason(gem.error)}）`,
     );
     return {
       ok: false,
@@ -177,7 +177,7 @@ async function resolveAskReplyInternal(opts: {
     };
   }
   notices.push(
-    `Gemini が失敗したため、ローカル Cursor へ移ります（${shortReason(gem.error)}）`,
+    `定額AIが時間内に返らなかったため、ローカル Cursor へ移ります（${shortReason(gem.error)}）`,
   );
   return {
     ok: false,
@@ -198,14 +198,14 @@ export function formatAskReplyBody(
     return `〔via: Jarvis Cloud〕\n\n${body}`;
   }
   if (fellBack) {
-    return `〔via: Gemini · Cloudから切替〕\n\n${body}`;
+    return `〔via: 定額AI（Mac） · Cloudから切替〕\n\n${body}`;
   }
-  return `〔via: Gemini〕\n\n${body}`;
+  return `〔via: 定額AI（Mac）〕\n\n${body}`;
 }
 
 export function viaLabel(via: AskVia | null | undefined): string {
   if (via === "cloud") return "Jarvis Cloud";
-  if (via === "gemini") return "Gemini";
+  if (via === "gemini") return "定額AI（Mac）";
   if (via === "local_worker") return "ローカル Cursor（Mac）";
   return "Jarvis";
 }

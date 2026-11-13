@@ -524,68 +524,15 @@ export async function reviseTriageDraftWithGemini(
   currentDraft: string,
   path: string,
 ): Promise<TriageActionResult & { draft?: string }> {
-  const key = (process.env.GEMINI_API_KEY || "").trim();
-  if (!key) {
-    return {
-      ok: false,
-      error:
-        "GEMINI_API_KEY 未設定。Cursor Agent 見直しを選ぶか、ローカル Cursor 用に下書きをコピーしてください。",
-    };
-  }
+  // 2026-11-13: 従量課金の Gemini API はやめ、Mac の定額 AI（Codex → Cursor → Claude）で作る。
   const prompt = revisePrompt(instruction, currentDraft);
-
-  // gemini-2.5-flash は新ユーザー向けに 404。night_triage / GHA と同様に latest 系を使う。
-  const models = [
-    (process.env.GEMINI_MODEL || "").trim(),
-    "gemini-flash-latest",
-    "gemini-3.6-flash",
-    "gemini-flash-lite-latest",
-  ].filter((m, i, arr) => m && arr.indexOf(m) === i);
-
-  let lastErr = "";
-  try {
-    for (const model of models) {
-      const url =
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=` +
-        encodeURIComponent(key);
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-        }),
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        lastErr = `${model} (${res.status}): ${t.slice(0, 160)}`;
-        continue;
-      }
-      const data = (await res.json()) as {
-        candidates?: { content?: { parts?: { text?: string }[] } }[];
-      };
-      const text =
-        data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") ||
-        "";
-      const draft = text.trim();
-      if (!draft) {
-        lastErr = `${model}: 応答が空`;
-        continue;
-      }
-
-      const save = await saveTriageDraft(id, draft, path);
-      if (!save.ok) return save;
-      return { ok: true, draft, message: `下書きを更新しました（${model}）` };
-    }
-    return {
-      ok: false,
-      error: `Gemini 失敗: ${lastErr || "利用可能なモデルなし"}。Cursor Agent 見直しを試してください。`,
-    };
-  } catch (e) {
-    return {
-      ok: false,
-      error: `${e instanceof Error ? e.message : String(e)}。Cursor Agent 見直しを試してください。`,
-    };
-  }
+  const { flatAiGenerate, PROVIDER_LABEL } = await import("@/lib/flatAi");
+  const r = await flatAiGenerate(prompt, { purpose: "triage_revise" });
+  if (!r.ok) return { ok: false, error: r.error };
+  const draft = r.text.trim();
+  const save = await saveTriageDraft(id, draft, path);
+  if (!save.ok) return save;
+  return { ok: true, draft, message: `下書きを更新しました（${PROVIDER_LABEL[r.provider] || "定額AI"}）` };
 }
 
 async function enqueueMacCursorRevise(args: {
@@ -929,6 +876,7 @@ export async function ensureMailJa(
   }
 
   const { geminiReply } = await import("@/lib/geminiReply");
+  // 画面表示を止めないよう待つのは短く。Mac が訳し終われば次に開いたとき出る。
   const r = await geminiReply(
     [
       "次の英語メールを日本語に翻訳してください。意味は変えず、JSONだけ返す。",
@@ -940,6 +888,7 @@ export async function ensureMailJa(
     ]
       .filter(Boolean)
       .join("\n\n"),
+    { waitMs: 8_000, purpose: "mail_ja" },
   );
   if (!r.ok) {
     return { ok: false, error: r.error, bodyJa, subjectJa, draftJa };

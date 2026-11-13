@@ -508,10 +508,10 @@ def run_pipeline(
     facility_count: int = 15,
     job_id: str | None = None,
 ) -> dict[str, Any]:
-    gemini_key = _env("GEMINI_API_KEY")
+    gemini_key = _env("SHUHEN_GEMINI_API_KEY") or _env("GEMINI_API_KEY")  # 周辺MAP専用の従量鍵（2026-11-13 松野さん: 周辺MAPは残す）
     maps_key = _env("GOOGLE_MAPS_API_KEY")
     if not gemini_key:
-        raise RuntimeError("GEMINI_API_KEY 未設定")
+        raise RuntimeError("SHUHEN_GEMINI_API_KEY 未設定")
     if not maps_key:
         raise RuntimeError("GOOGLE_MAPS_API_KEY 未設定")
 
@@ -789,10 +789,10 @@ def run_deep_research(
             "UIの「Step1.2渡す用をコピー」から進めてください。"
             "（実験再開: SHUHEN_AUTO_DEEP_API=1）"
         )
-    gemini_key = _env("GEMINI_API_KEY")
+    gemini_key = _env("SHUHEN_GEMINI_API_KEY") or _env("GEMINI_API_KEY")  # 周辺MAP専用の従量鍵（2026-11-13 松野さん: 周辺MAPは残す）
     maps_key = _env("GOOGLE_MAPS_API_KEY")
     if not gemini_key:
-        raise RuntimeError("GEMINI_API_KEY 未設定")
+        raise RuntimeError("SHUHEN_GEMINI_API_KEY 未設定")
     job_dir = JOBS_DIR / job_id
     result_path = job_dir / "result.json"
     if not result_path.exists():
@@ -1048,9 +1048,9 @@ def rebuild_from_exclusions(
 
 def run_c1(job_id: str, *, timeout_sec: int = 120) -> dict[str, Any]:
     """Optional C1: Gemini image edit on pin-less C0/clean base. Human accepts/rejects in UI."""
-    gemini_key = _env("GEMINI_API_KEY")
+    gemini_key = _env("SHUHEN_GEMINI_API_KEY") or _env("GEMINI_API_KEY")  # 周辺MAP専用の従量鍵（2026-11-13 松野さん: 周辺MAPは残す）
     if not gemini_key:
-        raise RuntimeError("GEMINI_API_KEY 未設定")
+        raise RuntimeError("SHUHEN_GEMINI_API_KEY 未設定")
     job_dir = JOBS_DIR / job_id
     meta_path = job_dir / "meta.json"
     if not meta_path.exists():
