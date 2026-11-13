@@ -62,3 +62,16 @@ test('添付なしは text/plain 1パート、添付ありは multipart/mixed', 
   assert.ok(mixed.includes(Buffer.from('本文').toString('base64')));
   assert.ok(mixed.trimEnd().endsWith('--BB--'));
 });
+
+test('依頼品目がないメールは本文の書類名から検索語を拾う（引用より前だけ）', () => {
+  const m = load();
+  const body = [
+    '松野様',
+    'それでは緑区物件の入居者募集依頼書を本メールに添付いたしますので、',
+    'ご記入の上、ご返信ください。',
+    '-----Original Message-----',
+    '前回の重要事項説明書について',
+  ].join('\n');
+  assert.deepEqual([...m.documentTermsFromText(body)], ['入居者募集依頼書']);
+  assert.deepEqual([...m.documentTermsFromText('最新の試算表と登記簿謄本をお送りください')], ['登記簿謄本']);
+});

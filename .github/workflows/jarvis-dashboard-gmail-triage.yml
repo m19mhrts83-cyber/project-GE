@@ -127,6 +127,34 @@ jobs:
           fi
           python scripts/jarvis_gha_partner_gmail_yoritoori.py "${ARGS[@]}"
 
+      - name: Slack/Web sent replies → OneDrive MD (Graph)
+        # 2026-11-13: Slack から送った返信を Mac が動かない日でも 5.やり取り.md に残す
+        if: ${{ github.event.inputs.skip_partner != 'true' }}
+        continue-on-error: true
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          MS_GRAPH_TENANT_ID: ${{ secrets.MS_GRAPH_TENANT_ID }}
+          MS_GRAPH_CLIENT_ID: ${{ secrets.MS_GRAPH_CLIENT_ID }}
+          MS_GRAPH_CLIENT_SECRET: ${{ secrets.MS_GRAPH_CLIENT_SECRET }}
+          MS_GRAPH_REFRESH_TOKEN: ${{ secrets.MS_GRAPH_REFRESH_TOKEN }}
+          MS_GRAPH_AUTHORITY: ${{ secrets.MS_GRAPH_AUTHORITY }}
+          MS_GRAPH_USER_UPN: ${{ secrets.MS_GRAPH_USER_UPN }}
+          MS_GRAPH_DRIVE_ID: ${{ secrets.MS_GRAPH_DRIVE_ID }}
+          DRY: ${{ github.event.inputs.dry_run || 'false' }}
+          PYTHONPATH: ${{ github.workspace }}/scripts:${{ github.workspace }}/215_kamiooya/C1_cursor/1b_Cursorマニュアル
+        run: |
+          set -euo pipefail
+          if [[ -z "${MS_GRAPH_REFRESH_TOKEN:-}" && -z "${MS_GRAPH_CLIENT_SECRET:-}" ]]; then
+            echo "::warning::MS_GRAPH_* missing — skip sent yoritoori"
+            exit 0
+          fi
+          ARGS=()
+          if [[ "$DRY" != "true" ]]; then
+            ARGS+=(--apply)
+          fi
+          python scripts/jarvis_gha_triage_sent_yoritoori.py "${ARGS[@]}"
+
       - name: Partner Chatwork → OneDrive MD (Graph)
         if: ${{ github.event.inputs.skip_partner != 'true' }}
         env:

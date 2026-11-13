@@ -444,6 +444,7 @@ export async function POST(request: NextRequest) {
         triggerId,
         channelId,
         messageTs,
+        messageBlocks: (payload.message as { blocks?: unknown } | undefined)?.blocks,
       });
       if (result.kind === "modal_opened") {
         if (result.run) after(result.run);
@@ -474,6 +475,8 @@ export async function POST(request: NextRequest) {
       if (responseUrl) {
         await postResponseUrl(responseUrl, body);
       }
+      // 「資料を集めて後回し」: 準備中に差し替えた後、資料探し＋回答案を走らせる
+      if (result.run) after(result.run);
       return NextResponse.json(body);
     }
 

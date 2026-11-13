@@ -83,3 +83,11 @@ test('指示なしなら指示ブロックを入れない', () => {
   const p = m.composePrompt({ who: 'A', subject: 'B', inbound: 'C' });
   assert.doesNotMatch(p, /松野さんの指示/);
 });
+
+test('チャット（LINE）は宛名・署名なしの短文の指示になる', () => {
+  const m = load(async () => ({ ok: false, error: 'x' }));
+  const p = m.composePrompt({ who: 'Tcell', subject: '', inbound: '鍵の件どうなりましたか', chat: 'LINE' });
+  assert.match(p, /LINEで届いたメッセージ/);
+  assert.match(p, /宛名（〇〇様）・署名/);
+  assert.doesNotMatch(p, /末尾署名は「松野」のみ/);
+});
