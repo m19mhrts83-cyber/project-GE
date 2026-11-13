@@ -22,12 +22,13 @@ from __future__ import annotations
 import argparse
 import filecmp
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import yaml
+
+from jarvis_cloud_file import copy_cloud  # noqa: E402 — import 時に Drive 読み込みを有効化
 
 REPO = Path(__file__).resolve().parents[1]
 HUB = REPO / "docs" / "AIエージェントチーム"
@@ -72,15 +73,21 @@ def wanted(path: Path) -> bool:
 
 
 def copy_if_changed(src: Path, dst: Path, *, dry: bool, stats: dict[str, int]) -> None:
-    if dst.is_file() and filecmp.cmp(src, dst, shallow=False):
-        stats["same"] += 1
-        return
+    try:
+        if dst.is_file() and filecmp.cmp(src, dst, shallow=False):
+            stats["same"] += 1
+            return
+    except OSError as exc:
+        # Drive 側が読めない（EDEADLK 等）なら比較をあきらめて上書きを試す。1件で全体を落とさない
+        print(f"# compare skip: {dst.name}: {exc}", file=sys.stderr)
     stats["copied"] += 1
     if dry:
         print(f"# dry-run copy {src.relative_to(REPO)} → {dst.relative_to(DRIVE_HUB)}")
         return
     dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
+    if not copy_cloud(src, dst):
+        stats["copied"] -= 1
+        stats["failed"] = stats.get("failed", 0) + 1
 
 
 def agent_files(folder: Path) -> list[Path]:
@@ -179,7 +186,7 @@ def main() -> int:
         guide.parent.mkdir(parents=True, exist_ok=True)
         guide.write_text(text, encoding="utf-8")
 
-    print(f"{LOG}: copied={stats['copied']} unchanged={stats['same']} → {DRIVE_HUB}")
+    print(f"{LOG}: copied={stats['copied']} unchanged={stats['same']} failed={stats.get('failed', 0)} → {DRIVE_HUB}")
     report_conflicts(find_conflicts(DRIVE_HUB), dry=args.dry_run)
     return 0
 
