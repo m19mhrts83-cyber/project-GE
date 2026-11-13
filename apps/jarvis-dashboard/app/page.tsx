@@ -13,6 +13,7 @@ import HomeOpenchatBand from "@/components/home/HomeOpenchatBand";
 import HomeMetaDetails from "@/components/home/HomeMetaDetails";
 import HomeKurashiftLink from "@/components/home/HomeKurashiftLink";
 import HomeLoopwareBand from "@/components/home/HomeLoopwareBand";
+import HomeUiuxScoreBand from "@/components/home/HomeUiuxScoreBand";
 
 /** 例: "SAT · 07 NOV 2026"（日本時間） */
 function todayLabel(): string {
@@ -83,6 +84,8 @@ export default function HomePage() {
       <Suspense fallback={<BandSkeleton label="神大家オプチャまとめ" />}>
         <HomeOpenchatBand />
       </Suspense>
+
+      <HomeUiuxScoreBand />
 
       <Suspense fallback={null}>
         <HomeMetaDetails />
