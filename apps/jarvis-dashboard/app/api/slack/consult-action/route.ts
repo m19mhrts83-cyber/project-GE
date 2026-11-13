@@ -39,8 +39,8 @@ import { handleS9BlockAction } from "@/lib/s9SlackInteract";
 import { handleD113BlockAction } from "@/lib/dealActive113SlackInteract";
 
 export const runtime = "nodejs";
-// 返信モーダルの誤字脱字チェック／見直し（Gemini）を応答後に走らせる
-export const maxDuration = 60;
+// 返信モーダルの誤字脱字チェック／見直し・返信案（Mac の定額AI）を応答後に走らせる。定額AIは 1 分ほどかかる
+export const maxDuration = 120;
 
 /**
  * Slack 物件進行ゲート Yes/No ＋ 業者返信 ＋ メール要対応 ＋ 313完了/延期

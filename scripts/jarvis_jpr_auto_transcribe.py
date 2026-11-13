@@ -9,7 +9,7 @@ launchd（install_jpr_auto_transcribe_launchd.sh）から 1 時間ごとに呼�
   ~/selenium_env/venv/bin/python scripts/jarvis_jpr_auto_transcribe.py
 
 - 対象: 隣に `*_文字起こし.md` が無い .m4a のうち、最終更新から --min-age-min 分以上たったもの（録音・同期の途中を避ける）
-- 1 回の上限 --limit 件（Gemini 無料枠の節約）
+- 1 回の上限 --limit 件（Mac のローカル Whisper で起こすので、1 件数分かかる）
 - 失敗（音声データ欠損など）は state に記録し、同じファイルは再試行しない（ファイルが更新されたら再試行）
 """
 from __future__ import annotations

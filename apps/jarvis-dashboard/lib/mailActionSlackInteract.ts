@@ -404,7 +404,7 @@ async function openReplyModal(opts: {
     showFileQuery: Boolean(opts.candidates?.length),
     busy: opts.composing,
     notice: opts.composing
-      ? "⏳ これまでのやり取りを踏まえて下書きを作成中…（10秒ほど）"
+      ? "⏳ これまでのやり取りを踏まえて下書きを作成中…（1分ほど）"
       : opts.candidates?.length
         ? "📎 過去資料の候補です。添付するものにチェックして「送信」"
         : undefined,
@@ -596,7 +596,7 @@ export async function handleMaModalAction(opts: {
       viewFrom(ctx, {
         version: busyVersion,
         busy: true,
-        notice: "⏳ これまでのやり取りを踏まえて下書きを作成中…（10秒ほど）",
+        notice: "⏳ これまでのやり取りを踏まえて下書きを作成中…（1分ほど）",
       }),
     );
     return {
@@ -1059,7 +1059,7 @@ async function startChatDraft(opts: {
   const busy = [
     {
       type: "section",
-      text: { type: "mrkdwn" as const, text: `⏳ *${channel}の返信案を作っています…*（${who.slice(0, 40)}）\n10秒ほどでこのカードに案が出ます。` },
+      text: { type: "mrkdwn" as const, text: `⏳ *${channel}の返信案を作っています…*（${who.slice(0, 40)}）\n1分ほどでこのカードに案が出ます（Macの定額AIで作成）。` },
     },
   ];
   return {
