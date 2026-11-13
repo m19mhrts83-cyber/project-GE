@@ -415,12 +415,12 @@ export default function CardTriageActions({
               onChange={() => setEngine("gemini")}
               disabled={pending || macPolling}
             />
-            Gemini
+            定額AI（Mac）
           </label>
         </fieldset>
         {engine === "cursor" ? (
           <p className="meta" style={{ margin: "6px 0 0" }}>
-            Jarvis Cloudを指定します。失敗時はGeminiへ切り替えます。APIの利用料金が発生する場合があります。
+            Jarvis Cloudを指定します。失敗時はMacの定額AIへ切り替えます（追加料金なし）。
           </p>
         ) : null}
         <label
@@ -483,7 +483,7 @@ export default function CardTriageActions({
                 ? "返答中…"
                 : engine === "cursor"
                   ? "送って Jarvis Cloud に聞く"
-                  : engine === "auto" ? "送って自動で聞く" : "送って Gemini に聞く"}
+                  : engine === "auto" ? "送って自動で聞く" : "送って定額AIに聞く"}
             </button>
           ) : (
             <>
@@ -505,7 +505,7 @@ export default function CardTriageActions({
                   ? "返答中…"
                   : engine === "cursor"
                     ? "Jarvis Cloud に聞く"
-                    : engine === "auto" ? "自動で聞く" : "Gemini に聞く"}
+                    : engine === "auto" ? "自動で聞く" : "定額AIに聞く"}
               </button>
             </>
           )}
