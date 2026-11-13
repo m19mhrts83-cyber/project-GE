@@ -18,8 +18,12 @@ export type TriageRow = {
   original_body?: string | null;
   received_at?: string | null;
   priority?: string | null;
+  gmail_thread_id?: string | null;
   payload?: Record<string, unknown> | null;
 };
+
+/** スレッドの1つ前までのやりとり（仕分けが payload.thread_context に入れる）。mine=松野さんが送ったもの */
+export type ThreadMsg = { at: string; mine: boolean; subject: string; body: string };
 
 export type DeskCard = {
   id: string;
@@ -33,6 +37,11 @@ export type DeskCard = {
   draftLines: string[];
   receivedAt: string | null;
   priority: string;
+  threadId: string;
+  /** 1つ前までのやりとり（古い順）。自分が送ったメールもここに入る */
+  thread: ThreadMsg[];
+  /** すでに返信・見送りした履歴の説明（同じスレッド／同じ相手） */
+  history: string[];
   score: number | null;
   appliedRules: string[];
   postedToSlack: boolean;
@@ -100,6 +109,18 @@ function bodyHead(text: string | null | undefined): string[] {
   return out;
 }
 
+function threadOf(x: unknown): ThreadMsg[] {
+  if (!Array.isArray(x)) return [];
+  const out: ThreadMsg[] = [];
+  for (const e of x.slice(-4)) {
+    const o = obj(e);
+    const body = String(o.body || "").slice(0, 900);
+    if (!body.trim()) continue;
+    out.push({ at: String(o.at || "").slice(0, 20), mine: Boolean(o.mine), subject: String(o.subject || "").slice(0, 120), body });
+  }
+  return out;
+}
+
 export function toCard(r: TriageRow): DeskCard {
   const pl = obj(r.payload);
   const digest = obj(pl.slack_ma_digest);
@@ -118,6 +139,9 @@ export function toCard(r: TriageRow): DeskCard {
     draftLines: lines(r.draft_text, 40),
     receivedAt: r.received_at || null,
     priority: String(r.priority || ""),
+    threadId: String(r.gmail_thread_id || ""),
+    thread: threadOf(pl.thread_context),
+    history: [],
     score,
     appliedRules: Array.from(new Set([...rules, ...draftRules])),
     postedToSlack: Boolean(pl.slack_ma_posted_at),
@@ -270,4 +294,75 @@ export function nextStepFor(c: DeskCard, now: Date = new Date()): NextStep {
     return { id: "week_skip", effect: "skip", text: "1週間以上残っています。見送ってよいですか", why: "7日以上" };
   }
   return { id: "default_todo", effect: "todo", text: "ToDo に入れて、ここからは外します", why: "迷ったまま" };
+}
+
+
+// ---------------------------------------------------------------- 返信済み・見送り済みの印（2026-11-13）
+// 「Slack でも見た気がする山本不動産は、お礼を送ったのか見送ったのか」が分からなかった。
+// カードを出すときに、同じスレッド・同じ相手の過去の判断を並べる。
+
+export type DecidedRow = {
+  id: string;
+  status: string;
+  from_email?: string | null;
+  gmail_thread_id?: string | null;
+  updated_at?: string | null;
+};
+
+export const DECIDED_STATUSES = ["sent", "skipped", "done", "todoist"] as const;
+const DECIDED_LABEL: Record<string, string> = { sent: "返信", skipped: "見送り", done: "回答不要", todoist: "ToDo" };
+const DECIDED_PAST: Record<string, string> = {
+  sent: "返信済み",
+  skipped: "見送り済み",
+  done: "回答不要にした",
+  todoist: "ToDo に入れた",
+};
+
+/** gha- / gha-p- / gha-cw- を外した共通の鍵（同じメールの双子） */
+export function twinKey(id: string): string {
+  return String(id || "").replace(/^gha-(cw-|p-)?/, "");
+}
+
+function mmdd(iso: string | null | undefined): string {
+  const t = Date.parse(iso || "");
+  if (!Number.isFinite(t)) return "";
+  const d = new Date(t + 9 * 3600_000); // JST
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+}
+
+/** 同じメールの双子・自分自身は数えない。同じスレッド → 同じ相手（30日）の順に文にする */
+export function historyNotes(
+  card: { id: string; fromEmail: string; threadId: string },
+  decided: DecidedRow[],
+): string[] {
+  const me = twinKey(card.id);
+  const rows = decided
+    .filter((r) => twinKey(r.id) !== me && r.status in DECIDED_LABEL)
+    .sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
+  const notes: string[] = [];
+  const same = card.threadId ? rows.filter((r) => r.gmail_thread_id && r.gmail_thread_id === card.threadId) : [];
+  if (same.length) {
+    const r = same[0];
+    notes.push(`同じスレッドで ${mmdd(r.updated_at)} に${DECIDED_PAST[r.status]}`);
+  }
+  const from = card.fromEmail.trim().toLowerCase();
+  const sender = from ? rows.filter((r) => String(r.from_email || "").trim().toLowerCase() === from) : [];
+  if (sender.length) {
+    const n: Record<string, number> = {};
+    for (const r of sender) n[r.status] = (n[r.status] || 0) + 1;
+    const parts = ["sent", "skipped", "done", "todoist"].filter((k) => n[k]).map((k) => `${DECIDED_LABEL[k]} ${n[k]}`);
+    const last = sender[0];
+    notes.push(`この相手の過去30日: ${parts.join("・")}（直近は ${mmdd(last.updated_at)} ${DECIDED_LABEL[last.status]}）`);
+  }
+  return notes;
+}
+
+/** カードの上に出す「いまの状態」の一行 */
+export function stateLine(c: Pick<DeskCard, "postedToSlack" | "hesitatedAt" | "history">): string {
+  const base = c.hesitatedAt
+    ? "迷って残っています"
+    : c.postedToSlack
+      ? "Slack に出ましたが、まだ返信も見送りもしていません"
+      : "まだ判断していません";
+  return base;
 }

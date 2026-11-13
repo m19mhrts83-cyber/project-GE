@@ -101,6 +101,12 @@ def _mail_payload(
         "message_id_header": c.get("message_id_header"),
         "ingest_kind": kind,
     }
+    # 判断デスクで「自分が送った1つ前のメール」を見せる
+    from jarvis_thread_context import compact_context
+
+    ctx = compact_context(c.get("context"), body_full)
+    if ctx:
+        pl["thread_context"] = ctx
     # 英語和訳は Gemini 課金のため既定オフ（課金削減 2026-09）
     if not allow_gemini:
         return pl

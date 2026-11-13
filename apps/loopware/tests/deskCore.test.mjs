@@ -97,3 +97,41 @@ test('見落としの判断は業者返信の id も受ける（デスクには�
   assert.equal(d.isTriageItemId('gha-cw-7790cf4'), true);
   assert.equal(d.isTriageItemId('bad id!'), false);
 });
+
+test('1つ前のやりとり: payload.thread_context をカードに載せる（自分が送ったものに印）', () => {
+  const c = d.toCard({
+    id: 'gha-aaaaaa1', gmail_thread_id: 'T1',
+    payload: { thread_context: [
+      { at: '2026/11/12 21:39', mine: true, subject: 'お礼', body: '山本様\nご注文ありがとうございます' },
+      { at: 'x', mine: false, subject: '', body: '   ' },
+    ] },
+  });
+  assert.equal(c.threadId, 'T1');
+  assert.equal(c.thread.length, 1);
+  assert.equal(c.thread[0].mine, true);
+  assert.deepEqual(plain(d.toCard({ id: 'bbbbbb1' }).thread), []);
+});
+
+test('返信済み・見送り済みの印: 同じスレッド → 同じ相手。双子と自分は数えない', () => {
+  const card = { id: 'gha-p-aaaaaa1', fromEmail: 'Yamamoto@x.jp', threadId: 'T1' };
+  const decided = [
+    { id: 'aaaaaa1', status: 'skipped', from_email: 'yamamoto@x.jp', gmail_thread_id: 'T1', updated_at: '2026-11-12T20:00:00Z' }, // 双子
+    { id: 'old0001', status: 'sent', from_email: 'yamamoto@x.jp', gmail_thread_id: 'T1', updated_at: '2026-11-10T03:00:00Z' },
+    { id: 'old0002', status: 'skipped', from_email: 'yamamoto@x.jp', gmail_thread_id: 'T9', updated_at: '2026-11-12T00:00:00Z' },
+    { id: 'old0003', status: 'skipped', from_email: 'yamamoto@x.jp', gmail_thread_id: 'T8', updated_at: '2026-11-11T00:00:00Z' },
+    { id: 'old0004', status: 'pending', from_email: 'yamamoto@x.jp', updated_at: '2026-11-12T00:00:00Z' },
+    { id: 'other01', status: 'done', from_email: 'z@y.jp', updated_at: '2026-11-12T00:00:00Z' },
+  ];
+  const notes = d.historyNotes(card, decided);
+  assert.deepEqual(plain(notes), [
+    '同じスレッドで 11/10 に返信済み',
+    'この相手の過去30日: 返信 1・見送り 2（直近は 11/12 見送り）',
+  ]);
+  assert.deepEqual(plain(d.historyNotes({ id: 'zzzzzz1', fromEmail: '', threadId: '' }, decided)), []);
+});
+
+test('いまの状態の一行', () => {
+  assert.equal(d.stateLine({ postedToSlack: true, hesitatedAt: null, history: [] }), 'Slack に出ましたが、まだ返信も見送りもしていません');
+  assert.equal(d.stateLine({ postedToSlack: false, hesitatedAt: 'x', history: [] }), '迷って残っています');
+  assert.equal(d.stateLine({ postedToSlack: false, hesitatedAt: null, history: [] }), 'まだ判断していません');
+});
