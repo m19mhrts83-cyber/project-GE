@@ -518,7 +518,9 @@ export type WeekTally = { take: number; ng: number; hesitate: number; none: numb
 export function tally(rows: { action: string; payload?: Record<string, unknown> | null }[]): WeekTally {
   const t: WeekTally = { take: 0, ng: 0, hesitate: 0, none: 0, later: 0, note: 0, total: 0 };
   for (const r of rows) {
-    const o = (r.payload && typeof r.payload.outcome === "string" ? r.payload.outcome : outcomeOf(r.action)) as Outcome;
+    // 送り手の設定で自動で閉じたもの（source_detail=auto_policy）は本人の判断ではないので、採ったに数えない
+    const auto = r.payload && r.payload.source_detail === "auto_policy";
+    const o = (auto ? "note" : r.payload && typeof r.payload.outcome === "string" ? r.payload.outcome : outcomeOf(r.action)) as Outcome;
     if (o in t) t[o] += 1;
     t.total += 1;
   }
