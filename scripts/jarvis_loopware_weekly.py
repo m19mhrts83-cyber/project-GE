@@ -48,6 +48,9 @@ def _pl(r: dict[str, Any]) -> dict[str, Any]:
 
 
 def outcome(r: dict[str, Any]) -> str:
+    # 送り手の設定で自動で閉じたもの（source_detail=auto_policy）は、本人の判断ではないので「採った」に数えない
+    if _pl(r).get("source_detail") == "auto_policy":
+        return "note"
     o = _pl(r).get("outcome")
     if isinstance(o, str):
         return o

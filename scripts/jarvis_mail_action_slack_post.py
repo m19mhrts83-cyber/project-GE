@@ -339,6 +339,8 @@ def auto_close_by_policy(sb: Any, row: dict[str, Any]) -> bool:
         pl = dict(row.get("payload") or {})
         now = datetime.now(timezone.utc).isoformat()
         pl["loopware_auto_policy"] = {"policy": "auto_done", "at": now, "source": "auto_policy"}
+        # DB トリガーが判断ログの source_detail にこの名前を残す（本人の判断と分けて数えるため）
+        pl["loopware_action"] = {"action": "done", "at": now, "source": "auto_policy"}
         sb.table("triage_items").update(
             {"status": "done", "payload": pl, "updated_at": now}
         ).eq("id", row.get("id")).eq("status", "pending").execute()

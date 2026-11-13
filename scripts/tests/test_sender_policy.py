@@ -46,6 +46,14 @@ class SenderPolicyTests(unittest.TestCase):
         self.assertEqual(calls["update"]["payload"]["x"], 1)
         self.assertEqual(calls["update"]["payload"]["loopware_auto_policy"]["source"], "auto_policy")
         self.assertIn(("status", "pending"), calls["eq"])
+        # DB トリガーが判断ログの source_detail に auto_policy を残すための印
+        self.assertEqual(calls["update"]["payload"]["loopware_action"]["source"], "auto_policy")
+
+    def test_weekly_does_not_count_auto_policy_as_take(self):
+        import jarvis_loopware_weekly as w
+
+        self.assertEqual(w.outcome({"action": "done", "payload": {"outcome": "take", "source_detail": "auto_policy"}}), "note")
+        self.assertEqual(w.outcome({"action": "done", "payload": {"outcome": "take"}}), "take")
 
 
 if __name__ == "__main__":
