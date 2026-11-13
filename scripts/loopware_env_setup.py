@@ -12,7 +12,9 @@
   2. Vercel の jarvis-loopware に LOOPWARE_ACCESS_KEY / MAIL_ACTION_TOKEN（無ければ PROPERTY_GATE_ACTION_TOKEN） /
      JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY / JARVIS_DASHBOARD_URL を登録（sensitive）
   3. Vercel の jarvis-dashboard に LOOPWARE_ACCESS_KEY を登録（Slack リンクの署名用）
-  4. --sql を付けたときだけ、その SQL を Supabase Management API で流す
+  4. GitHub Actions の secret LOOPWARE_ACCESS_KEY を登録（gh。312 の #consult に載せる Nody リンクの t= 署名用。
+     無いと Slack からのリンクがログイン画面に止まる。--skip-github で飛ばす）
+  5. --sql を付けたときだけ、その SQL を Supabase Management API で流す
 
 値は画面にもログにも出さない（指紋 8 桁だけ）。Vercel の値は次のデプロイから効く。
 """
@@ -23,6 +25,7 @@ import hashlib
 import json
 import os
 import secrets
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -113,6 +116,21 @@ def dashboard_project_id(env: dict[str, str]) -> str:
     return pid or DEFAULT_DASHBOARD_PROJECT
 
 
+GITHUB_SECRETS = ("LOOPWARE_ACCESS_KEY",)
+
+
+def github_secret_set(name: str, value: str) -> bool:
+    """gh secret set（値は標準入力で渡し、画面・引数に出さない）。"""
+    try:
+        r = subprocess.run(
+            ["gh", "secret", "set", name], input=value, text=True,
+            cwd=REPO, capture_output=True, timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return r.returncode == 0
+
+
 def run_sql(path: Path, token: str) -> list:
     q = path.read_text(encoding="utf-8")
     return _req("POST", f"https://api.supabase.com/v1/projects/{SUPABASE_REF}/database/query", token, {"query": q})
@@ -123,6 +141,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--sql", action="append", default=[], help="Supabase に流す SQL ファイル（複数可）")
     ap.add_argument("--skip-vercel", action="store_true")
+    ap.add_argument("--skip-github", action="store_true", help="GitHub Actions の secret 登録を飛ばす")
     args = ap.parse_args()
 
     if not ENV_FILE.exists():
@@ -167,6 +186,19 @@ def main() -> int:
                     rc = 1
         if token and not args.dry_run:
             print("・Vercel の値は次のデプロイから効きます（./scripts/vercel_loopware_deploy.sh）")
+
+    if not args.skip_github:
+        for k in GITHUB_SECRETS:
+            v = env.get(k) or ""
+            if not v:
+                continue
+            if args.dry_run:
+                print(f"  - GitHub Actions {k}: 登録予定（指紋 {fp(v)}）")
+            elif github_secret_set(k, v):
+                print(f"  ✓ GitHub Actions {k}（指紋 {fp(v)}）")
+            else:
+                print(f"  ✗ GitHub Actions {k}: gh secret set に失敗（gh auth status を確認）", file=sys.stderr)
+                rc = 1
 
     for s in args.sql:
         p = (REPO / s) if not Path(s).is_absolute() else Path(s)
