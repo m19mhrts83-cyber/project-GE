@@ -13,6 +13,8 @@
 - 内容が同じファイルは書かない。Drive にしか無いファイル（outbox/ など）は消さない
 - 秘密っぽい名前（env／secret／token／credential）と大きいファイル（20MB 超）は写さない
 - 同期衝突の「名前 2.md」等を見つけたら #ops に知らせる（消さない）
+- Drive 側が読めない（未ダウンロードの EDEADLK 等）ファイルは大きさ・時刻で比べ、
+  それでも書けないものは飛ばして次へ進む（1 件で全体を止めない）
 
 repo は書き換えないので launchd の日次実行に使える（install_agent_team_drive_sync_launchd.sh）。
 状態マーカー・ボードは jarvis_agent_team_status_sync.py 側が写す。
@@ -71,16 +73,32 @@ def wanted(path: Path) -> bool:
         return False
 
 
+def _same_content(src: Path, dst: Path) -> bool:
+    """中身が同じか。Drive 側が未ダウンロードで読めない（EDEADLK 等）ときは
+    大きさと更新時刻で見る（copy2 は更新時刻を写すので、前回写したままなら一致する）。"""
+    try:
+        return filecmp.cmp(src, dst, shallow=False)
+    except OSError:
+        s, d = src.stat(), dst.stat()
+        return s.st_size == d.st_size and int(d.st_mtime) >= int(s.st_mtime)
+
+
 def copy_if_changed(src: Path, dst: Path, *, dry: bool, stats: dict[str, int]) -> None:
-    if dst.is_file() and filecmp.cmp(src, dst, shallow=False):
-        stats["same"] += 1
-        return
-    stats["copied"] += 1
-    if dry:
-        print(f"# dry-run copy {src.relative_to(REPO)} → {dst.relative_to(DRIVE_HUB)}")
-        return
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
+    """1 ファイル読めない・書けないだけで同期全体を止めない（失敗は stats["failed"] に数える）。"""
+    try:
+        if dst.is_file() and _same_content(src, dst):
+            stats["same"] += 1
+            return
+        if dry:
+            stats["copied"] += 1
+            print(f"# dry-run copy {src.relative_to(REPO)} → {dst.relative_to(DRIVE_HUB)}")
+            return
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        stats["copied"] += 1
+    except OSError as e:
+        stats["failed"] += 1
+        print(f"{LOG}: skip {dst.relative_to(DRIVE_HUB)}: {e}", file=sys.stderr)
 
 
 def agent_files(folder: Path) -> list[Path]:
@@ -135,7 +153,7 @@ def main() -> int:
         print(f"{LOG}: Drive が見つからない（Google Drive 未起動？）: {DRIVE_HUB}", file=sys.stderr)
         return 1
 
-    stats = {"copied": 0, "same": 0}
+    stats = {"copied": 0, "same": 0, "failed": 0}
     agents = (yaml.safe_load(REG.read_text(encoding="utf-8")) or {}).get("agents") or {}
     for aid, a in sorted(agents.items(), key=lambda x: str(x[0])):
         rel = Path(str(a.get("path") or ""))
@@ -175,11 +193,19 @@ def main() -> int:
         "- `config/` … 権限・合図・Slack ハブ設定\n"
         "- `運用コマンド一覧.md` … 各仕組みの起動・停止コマンド\n"
     )
-    if not args.dry_run and (not guide.is_file() or guide.read_text(encoding="utf-8") != text):
-        guide.parent.mkdir(parents=True, exist_ok=True)
-        guide.write_text(text, encoding="utf-8")
+    if not args.dry_run:
+        try:
+            if not guide.is_file() or guide.read_text(encoding="utf-8") != text:
+                guide.parent.mkdir(parents=True, exist_ok=True)
+                guide.write_text(text, encoding="utf-8")
+        except OSError as e:
+            stats["failed"] += 1
+            print(f"{LOG}: skip {guide.relative_to(DRIVE_HUB)}: {e}", file=sys.stderr)
 
-    print(f"{LOG}: copied={stats['copied']} unchanged={stats['same']} → {DRIVE_HUB}")
+    print(
+        f"{LOG}: copied={stats['copied']} unchanged={stats['same']} "
+        f"failed={stats['failed']} → {DRIVE_HUB}"
+    )
     report_conflicts(find_conflicts(DRIVE_HUB), dry=args.dry_run)
     return 0
 
