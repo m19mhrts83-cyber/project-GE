@@ -21,6 +21,28 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
     }
   }
+  // 本番（Vercel）では Mac のファイルが読めないので、スキャンが sync_meta に置いた候補を読む
+  const sbm = serviceClient();
+  if (sbm) {
+    try {
+      const { data } = await sbm.from("sync_meta").select("value").eq("key", "loopware_312_candidates").maybeSingle();
+      const raw = data?.value;
+      const j = (typeof raw === "string" ? JSON.parse(raw) : raw) as { at?: string; candidates?: Record<string, string>[] } | null;
+      if (j && Array.isArray(j.candidates)) {
+        const list = j.candidates.map((c, i) => ({
+          id: `miss-${i + 1}`,
+          source: c.source || "",
+          folder: c.folder || "",
+          snippet: c.snippet || "",
+          hypothesis: c.hypothesis || "",
+          ref: c.ref,
+        }));
+        return NextResponse.json({ ok: true, at: j.at, candidates: list }, { headers: { "cache-control": "private, no-store" } });
+      }
+    } catch {
+      /* 次（Mac 上のファイル）へ */
+    }
+  }
   const home = process.env.HOME || "";
   const candidates = [
     path.join(home, "git-repos/.jarvis_state/todoist_312_miss_scan.json"),
