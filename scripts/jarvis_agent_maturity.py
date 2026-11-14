@@ -31,6 +31,10 @@ DASH = ROOT / "apps" / "jarvis-dashboard"
 WINDOW_DAYS = 28
 AI_MARKS = ("🤖", "🦾依頼")
 SIGNER_RE = re.compile(r"^【([^】・\s]+)")
+# PR 時のチェック（2026-11-14 に変更のあった所だけ動くよう分割。CI 通過率はこの合計）
+PR_CHECK_WORKFLOWS = (
+    "pr-checks.yml", "pr-jarvis-dashboard.yml", "pr-trade-desk.yml", "pr-loopware.yml", "pr-kamiooya-qa.yml",
+)
 FIX_RE = re.compile(r"^(fix|hotfix|revert)\b|修正|不具合|直す|直し", re.IGNORECASE)
 
 
@@ -239,14 +243,20 @@ def m_github(since: datetime, out: dict, missing: dict, meta: dict) -> None:
         missing["fix_pr_ratio"] = f"GitHub検索に失敗（{e}）"
     try:
         ok = ng = 0
-        for page in range(1, 11):
-            res = gh(f"/repos/{repo}/actions/workflows/pr-checks.yml/runs",
-                     {"created": f">={day}", "per_page": 100, "page": page, "status": "completed"})
-            runs = (res or {}).get("workflow_runs", [])
-            ok += sum(1 for r in runs if r.get("conclusion") == "success")
-            ng += sum(1 for r in runs if r.get("conclusion") == "failure")
-            if len(runs) < 100:
-                break
+        for wf in PR_CHECK_WORKFLOWS:
+            for page in range(1, 11):
+                try:
+                    res = gh(f"/repos/{repo}/actions/workflows/{wf}/runs",
+                             {"created": f">={day}", "per_page": 100, "page": page, "status": "completed"})
+                except urllib.error.HTTPError as e:
+                    if e.code == 404 and wf != "pr-checks.yml":
+                        break  # まだ main に無いワークフロー
+                    raise
+                runs = (res or {}).get("workflow_runs", [])
+                ok += sum(1 for r in runs if r.get("conclusion") == "success")
+                ng += sum(1 for r in runs if r.get("conclusion") == "failure")
+                if len(runs) < 100:
+                    break
         v = ratio(ok, ok + ng, meta["ci_pass_rate"].get("min_n", 1), "ci_pass_rate", missing, "CIの実行が少ない")
         if v:
             out["ci_pass_rate"] = v

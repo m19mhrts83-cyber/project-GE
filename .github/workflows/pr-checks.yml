@@ -1,80 +1,26 @@
-# PR 時の自動チェック（AI 不使用）。2026-10-24 Miss Lemon 起案・初回は PR 上で動作確認する
-# - アプリ: npm ci → build（型チェック込み）→ npm test。KURASHIFT は selftest も。loopware（判断デスク）も同じ
-# - scripts/tests: unittest
+# PR 時の自動チェック（AI 不使用）。2026-10-24 Miss Lemon 起案
+# 2026-11-14 適正化: ここは scripts/tests（Python）だけ。アプリと神大家 Q&A は変更があるときだけ動く別ワークフロー
+#   pr-jarvis-dashboard.yml / pr-trade-desk.yml / pr-loopware.yml（_app-build.yml を呼ぶ）/ pr-kamiooya-qa.yml
+#   これまでは scripts だけの PR でも 6 ジョブ（1 回約 9 分）動いていた
 name: PR Checks
 
 on:
   pull_request:
     paths:
-      - "apps/jarvis-dashboard/**"
-      - "apps/trade-desk/**"
-      - "apps/loopware/**"
-      - "apps/kamiooya-qa-web/**"
-      - "215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/**"
       - "scripts/**"
       - "line_unofficial_poc/**"
       - "launchd/openchat_md_db_sync_runner.sh"
       - ".github/workflows/pr-checks.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: pr-checks-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  attachment-access-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - run: node --experimental-strip-types --test apps/kamiooya-qa-web/tests/*.test.mjs
-      - run: node --check apps/kamiooya-qa-web/public/raimo/app.js
-      - name: Attachment source PostgreSQL integration (local WASM, no external database)
-        run: |
-          npm install --prefix "$RUNNER_TEMP/openchat-pg" --no-save --ignore-scripts @electric-sql/pglite@0.5.15
-          NODE_PATH="$RUNNER_TEMP/openchat-pg/node_modules" node --test scripts/tests/openchat_attachment_sources.integration.mjs
-
-  search-edge-typecheck:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.5.6
-      - run: deno check apps/kamiooya-qa-web/supabase/functions/raimo-auth/index.ts apps/kamiooya-qa-web/supabase/functions/semantic-search/index.ts
-      - run: deno test --allow-env --deny-net apps/kamiooya-qa-web/supabase/functions/semantic-search/handler.test.ts
-
-  app-build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [jarvis-dashboard, trade-desk, loopware]
-    defaults:
-      run:
-        working-directory: apps/${{ matrix.app }}
-    env:
-      # ビルド用のダミー（実データには繋がない）
-      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_dummy
-      NEXT_PUBLIC_SITE_URL: http://localhost
-      NEXT_TELEMETRY_DISABLED: "1"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
-      - run: npm ci
-      - run: npm run build
-      - run: npm test
-
   python-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -83,6 +29,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: .github/workflows/pr-checks.yml
       # Dashboard投影・Gmail処理の純粋関数テストもモジュールをimportする。
       - run: pip install requests pyyaml supabase google-api-python-client python-dotenv pillow
       # オプチャ常駐監視のランナー（launchd/open_chat_watch_runner.sh）は Mac の zsh 前提。テストで実際に動かすため入れる
