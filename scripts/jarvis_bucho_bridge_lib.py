@@ -11,6 +11,18 @@ except ImportError:  # pragma: no cover
     yaml = None  # type: ignore
 
 REPO = Path(__file__).resolve().parents[1]
+
+# 部長ボックスは Google Drive 上。launchd から起動した子スクリプト（Todoist inbox apply・
+# S9 候補 apply など）は「未ダウンロードのファイルを取りに行く」設定が OFF のままで、
+# 読むたびに EDEADLK（Resource deadlock avoided）になっていた。jarvis_cloud_file は
+# import 時にこのプロセスの設定を ON にする（9b6d9f43 と同じ対処を部長ブリッジにも。2026-11-14 314）。
+try:
+    import jarvis_cloud_file as _cloud_file  # noqa: F401,E402
+
+    DATALESS_ON = _cloud_file.enable_dataless_materialization()
+except Exception:  # pragma: no cover — 無くても従来どおり動く
+    DATALESS_ON = False
+
 CFG_PATH = REPO / "config" / "kurashift_grok_bridge_folders.yaml"
 STATE_DIR = REPO / ".jarvis_state"
 INBOX_STATE_PATH = STATE_DIR / "grok_bridge_inbox.json"
