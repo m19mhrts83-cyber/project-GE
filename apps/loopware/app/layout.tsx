@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import TabBar from "@/components/TabBar";
+import LogCelebration from "@/components/LogCelebration";
 
 export const metadata: Metadata = {
   title: "Nody",
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body>
         {children}
         <TabBar />
+        <LogCelebration />
       </body>
     </html>
   );

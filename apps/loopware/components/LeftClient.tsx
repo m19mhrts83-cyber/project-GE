@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import LogJar, { type Bead } from "./LogJar";
+import { logged } from "@/lib/logPulse";
 import { STAY_REASON_TAGS, type WeekTally } from "@/lib/decisionContract";
 import { agoLabel, type DeskCard, type NextStep } from "@/lib/deskCore";
 
@@ -70,6 +71,7 @@ export default function LeftClient() {
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || "失敗");
       setBeads((b) => [...b, verdict === "good" ? "take" : "note"]);
+      logged({ beads: [verdict === "good" ? "take" : "note"], label: verdict === "good" ? "この次でよい" : "違うと記録しました" });
       setState((s) => ({ ...s, [c.id]: verdict === "wrong" && !stayReason ? "ask" : "done" }));
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));

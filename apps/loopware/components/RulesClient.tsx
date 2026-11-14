@@ -1,5 +1,6 @@
 "use client";
 
+import { logged } from "@/lib/logPulse";
 import { useEffect, useState } from "react";
 import { LADDER, ladderStep, type AdoptedRule, type RuleCandidate } from "@/lib/rules";
 
@@ -50,7 +51,10 @@ export default function RulesClient() {
   }
 
   async function decide(c: RuleCandidate, verdict: "accept" | "once" | "reject") {
-    if (await send({ verdict, candidate: c })) setDecided((d) => ({ ...d, [c.id]: VERDICT_LABEL[verdict] }));
+    if (await send({ verdict, candidate: c })) {
+      setDecided((d) => ({ ...d, [c.id]: VERDICT_LABEL[verdict] }));
+      logged({ beads: [verdict === "accept" ? "take" : verdict === "once" ? "later" : "ng"], label: VERDICT_LABEL[verdict] });
+    }
   }
 
   async function revert(a: AdoptedRule) {

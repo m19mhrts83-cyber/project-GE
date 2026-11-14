@@ -1,5 +1,6 @@
 "use client";
 
+import { logged } from "@/lib/logPulse";
 import { useEffect, useState } from "react";
 import type { ZaimFix } from "@/lib/zaimCore";
 
@@ -46,6 +47,7 @@ export default function ZaimClient() {
       return;
     }
     setDone((d) => ({ ...d, [f.id]: verdict === "good" ? "正しいにしました" : "違うにしました（次から直しません）" }));
+    logged({ beads: [verdict === "good" ? "take" : "ng"], label: verdict === "good" ? "正しい" : "違う" });
   }
 
   const left = fixes ? fixes.filter((f) => !done[f.id]).length : null;

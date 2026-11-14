@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { UIUX_PLAN_REASON_TAGS, UIUX_RULE_REASON_TAGS } from "@/lib/decisionContract";
 import { UIUX_APP_LABEL, pickComplete, type PlanVerdict, type UiuxApp, type UiuxRound, type UiuxRule } from "@/lib/uiuxCore";
 import LogJar, { type Bead } from "./LogJar";
+import { logged } from "@/lib/logPulse";
 
 /**
  * 画面の好み（ループウェア）。
@@ -118,7 +119,9 @@ export default function UiuxClient() {
     const ok = await send({ kind: "plan", roundId: round.id, chosen, verdicts, tags, note: note.trim() || undefined });
     if (ok) {
       setPicked({ chosen, action: chosen ? "adopt" : "reject", verdicts, at: new Date().toISOString() });
-      setBeads((b) => [...b, ...round.plans.map((p) => (verdicts[p.id] ? BEAD_OF[verdicts[p.id]] : "none"))]);
+      const fresh = round.plans.map((p) => (verdicts[p.id] ? BEAD_OF[verdicts[p.id]] : "none"));
+      setBeads((b) => [...b, ...fresh]);
+      logged({ beads: fresh, label: chosen ? "案を決めました" : "今回は見送りました", big: true });
       setRedo(false);
     }
   }
@@ -127,7 +130,10 @@ export default function UiuxClient() {
     if (!round) return;
     if (await send({ kind: "rule", roundId: round.id, proposalId: pid, verdict, tags: ruleTags[pid] || [] })) {
       setDecided((d) => ({ ...d, [pid]: `rule_${verdict}` }));
-      setBeads((b) => [...b, verdict === "accept" ? "take" : verdict === "once" ? "later" : "ng"]);
+      const bead = verdict === "accept" ? "take" : verdict === "once" ? "later" : "ng";
+      setBeads((b) => [...b, bead]);
+      const rest = round.proposals.filter((p) => p.id !== pid && !decided[p.id]).length;
+      logged({ beads: [bead], label: rest ? undefined : "反映案をすべて判断しました", big: rest === 0 });
       const k = `${round.id}:${pid}`;
       if (verdict === "accept") {
         const p = round.proposals.find((x) => x.id === pid);
