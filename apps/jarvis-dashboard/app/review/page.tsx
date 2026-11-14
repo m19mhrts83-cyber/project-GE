@@ -1,5 +1,6 @@
 import Shell from "@/components/Shell";
 import ReviewCandidateActions from "@/components/ReviewCandidateActions";
+import StageReviewSection from "@/components/review/StageReviewSection";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { loopwareHref } from "@/lib/loopwareLink";
 import { parseReport, SIGNAL_ORDER } from "@/lib/agentWeeklyActivity";
@@ -143,6 +144,8 @@ export default async function ReviewPage() {
           ? `今週機能した社員 ${d.activity.worked_agents}/${d.activity.total_agents}（${SIGNAL_ORDER.map((k) => `${k}${d.activity?.summary[k] ?? 0}`).join(" ")}）・${md(d.activity.until)} 集計`
           : "土曜 9:00 に最初の集計が入ります"}
       </p>
+
+      <StageReviewSection />
 
       <h2 style={{ marginTop: 24 }}>1. 確認待ちのフィードバック（{pending.length} 件）</h2>
       <p className="sub">

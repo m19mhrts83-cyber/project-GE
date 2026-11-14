@@ -1,0 +1,25 @@
+# AI社員の段階（設計中 → 運用確認 → 運用）を週次レビューで見直す物差し。
+# 機械は「提案」を出すだけ。上げる・戻すは松野さんが /review で決め、理由つきで判断ログ（owner_decisions surface=agent_stage）に残る。
+# 採用した分だけ、土曜 9:30 の 314 点検が scripts/jarvis_agent_stage_review.py --apply --commit で registry に反映する。
+# 状態の意味は docs/AIエージェントチーム/22_運用状態の識別_20261011.md（運用確認=定時が動いている仕上げ中、運用=意図OK済み定常）。
+
+# 運用確認 → 運用 に上げる提案の条件
+promote_ops:
+  green_weeks: 2          # 直近この週数続けて週次稼働が 🟢
+  no_red_weeks: 4         # 直近この週数に 🔴 がない
+  decision_window_days: 28
+  decision_min_n: 5       # 判断ログがこの件数以上あるときだけ見送り率を見る
+  max_ng_rate: 0.3        # 松野さんの見送り（ng）がこの割合を超えたら「意図とずれ」で保留
+
+# 設計中 → 運用確認 に上げる提案の条件（定時が動き始めた）
+promote_check:
+  min_runs: 1             # 今週の起動回数
+  ok_signals: ["🟢", "🟡"]
+
+# 運用 → 運用確認 に戻す提案の条件
+demote_ops:
+  red_weeks: 2            # 直近この週数続けて 🔴
+
+# 見送った提案を出さない期間（「来週また」は翌週に出し直す）
+skip_cooldown_weeks: 4
+history_weeks: 6

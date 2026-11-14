@@ -1,9 +1,11 @@
 import MaturityCountUp from "@/components/agent-team/MaturityCountUp";
 import { SIGNAL_LABEL, SIGNAL_ORDER, loadWeeklyActivity, md } from "@/lib/agentWeeklyActivity";
+import { loadStageReview } from "@/lib/agentStageReview";
 
 /** ホームの「AI社員の週次稼働」要約。詳細は /agent-team#activity（土曜 9:00 集計） */
 export default async function HomeActivityBand() {
-  const { report } = await loadWeeklyActivity();
+  const [{ report }, { review: stage, decided }] = await Promise.all([loadWeeklyActivity(), loadStageReview()]);
+  const open = stage ? stage.proposals.filter((p) => !decided[p.key]) : [];
 
   return (
     <article className="card wa-band" style={{ marginBottom: 16 }}>
@@ -45,9 +47,29 @@ export default async function HomeActivityBand() {
           )}
         </>
       )}
-      <a className="btn" href="/agent-team#activity" style={{ marginTop: 10 }}>
-        社員ごとの稼働を見る →
-      </a>
+      {stage ? (
+        <p className="sum wa-band-stage">
+          段階: 設計中 {stage.counts["設計中"] ?? 0}・運用確認 {stage.counts["運用確認"] ?? 0}・運用 {stage.counts["運用"] ?? 0}
+          {open.length ? (
+            <>
+              {" "}
+              ／ <a href="/review#stage">決めてほしい提案 {open.length} 件（{open.slice(0, 2).map((p) => `${p.id}→${p.to}`).join("・")}）</a>
+            </>
+          ) : (
+            "／今週の提案なし"
+          )}
+        </p>
+      ) : null}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+        <a className="btn" href="/agent-team#activity">
+          社員ごとの稼働を見る →
+        </a>
+        {open.length ? (
+          <a className="btn primary" href="/review#stage">
+            段階の提案を決める →
+          </a>
+        ) : null}
+      </div>
     </article>
   );
 }

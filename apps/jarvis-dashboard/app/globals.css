@@ -5597,3 +5597,17 @@ tr.at-map-ai-only .at-map-missing {
 .wa-band-big { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
 .wa-band-sigs { display: inline-flex; gap: 10px; margin-left: 10px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .wa-band-list { margin: 6px 0 0; padding-left: 1.1em; display: grid; gap: 3px; font-size: 0.88rem; }
+
+/* /review「AI社員の段階」 */
+.stg-card { margin-bottom: 12px; }
+.stg-card.down { border-left: 3px solid var(--bad, #d9534f); }
+.stg-card.up { border-left: 3px solid var(--ok, #3aa76d); }
+.stg-card header { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.stg-weeks { display: inline-flex; gap: 2px; font-size: 0.85rem; letter-spacing: 1px; }
+.stg-why { margin: 6px 0 0; padding-left: 18px; font-size: 0.9rem; }
+.stg-act { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.stg-act textarea { width: 100%; padding: 8px; border-radius: 8px; font: inherit; }
+.stg-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.stg-watch ul { margin: 6px 0 0; padding-left: 18px; }
+.stg-watch li { margin: 4px 0; }
+.wa-band-stage { margin-top: 8px; }

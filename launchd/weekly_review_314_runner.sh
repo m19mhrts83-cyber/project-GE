@@ -24,4 +24,7 @@ mkdir -p "$REPO_DIR/.jarvis_state/loopware"
 # AI社員・Grok Bot の週次稼働（起動・実働・件数・失敗・Slack 報告・Grok の成果物メール）。AI なし・失敗しても 314 は止めない
 # 結果は metrics／sync_meta(agent_weekly_activity) → ダッシュ /agent-team「週次稼働」、314 の Slack に数行足す
 "$PY" "$REPO_DIR/scripts/jarvis_agent_weekly_activity.py" --push >/dev/null || echo "agent_weekly_activity failed" >&2
+# AI社員の段階（設計中→運用確認→運用）の上げる／戻す提案。週次稼働と判断ログから作り /review「AI社員の段階」に置く（AI なし）
+# 決めるのは松野さん（理由つきで owner_decisions surface=agent_stage）。採用分の registry 反映は 9:30 の 314 点検（--apply --commit）
+"$PY" "$REPO_DIR/scripts/jarvis_agent_stage_review.py" --push >/dev/null || echo "agent_stage_review failed" >&2
 exec "$PY" "$REPO_DIR/scripts/jarvis_weekly_review_314.py" --post

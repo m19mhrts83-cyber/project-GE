@@ -224,6 +224,10 @@ export default async function WeeklyActivityPanel() {
         </>
       ) : null}
 
+      <p className="meta">
+        この稼働をもとに、週次レビューで「設計中→運用確認」「運用確認→運用」を決めます → <a href="/review#stage">AI社員の段階</a>
+      </p>
+
       <h3 className="mx-h">
         AI社員 <span>押すと内訳・数えた場所</span>
       </h3>
