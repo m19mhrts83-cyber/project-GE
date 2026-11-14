@@ -7,6 +7,7 @@ export const HOME_DEFAULT_ORDER = [
   "today_queue",
   "uiux",
   "maturity",
+  "activity",
   "loopware",
   "partner",
   "metrics",

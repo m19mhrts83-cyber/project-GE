@@ -10,6 +10,7 @@
 - **FlowForge（開く）**: [flow_AzrNV2o5gb9M2JMFxeX5aZSa](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AzrNV2o5gb9M2JMFxeX5aZSa)
 - 流れ図: [`flow.md`](./flow.md)
 - 機械チェック CLI: `scripts/jarvis_weekly_review_314.py`（AI なし）
+- 週次稼働 CLI: `scripts/jarvis_agent_weekly_activity.py`（AI なし。9:30 のレビューでは 🔴🟡 の社員を先に見る）
 - launchd: `launchd/install_weekly_review_314_launchd.sh`（土曜 9:00）
 - Claude 定期タスク: `weekly-review-314`（土曜 9:30・Claude デスクトップ。`~/.claude/scheduled-tasks/weekly-review-314/SKILL.md`）
 
@@ -23,6 +24,7 @@
 | 時刻（JST） | 誰 | 何 |
 |---|---|---|
 | 土曜 9:00 | launchd（Mac） | 機械チェック → `.jarvis_state/weekly_review_314/facts_YYYYMMDD.md`＋`latest.json`、Slack（要確認あり `#ops`／なし `#report`） |
+| 土曜 9:00（同じ runner） | launchd（Mac） | **AI社員・Grok Bot の週次稼働**（`scripts/jarvis_agent_weekly_activity.py --push`。起動・実働・件数・失敗・Slack 報告・Grok の成果物メール）→ metrics／sync_meta `agent_weekly_activity` → ダッシュ `/agent-team#activity`。314 の Slack に「稼働: 機能した社員 n/N」と 🔴🟡 を数行足す（🟡 は週次まとめ）。数え方の正本 `config/agent_weekly_activity.yaml` |
 | 土曜 9:30 | Claude 定期タスク（Miss Lemon） | 事実ファイル＋今週の差分を読んでレビュー → 修正 PR＋`output/YYYYMMDD_週次レビュー.md` |
 | 手動 | 人 | 「314 週次レビューやって」でいつでも同じ手順 |
 
