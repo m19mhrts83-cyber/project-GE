@@ -11,6 +11,7 @@
 - 流れ図: [`flow.md`](./flow.md)
 - 機械チェック CLI: `scripts/jarvis_weekly_review_314.py`（AI なし）
 - 週次稼働 CLI: `scripts/jarvis_agent_weekly_activity.py`（AI なし。9:30 のレビューでは 🔴🟡 の社員を先に見る）
+- 段階の見直し CLI: `scripts/jarvis_agent_stage_review.py`（AI なし）。9:30 の点検で `--apply --commit` を流し、松野さんが /review で「上げる」を採用した社員だけ `agents_registry.yaml` の status を直す（1件1コミット・理由はコミット本文。PR はルール帳と同じ流れ）。採用されていない段階は変えない
 - launchd: `launchd/install_weekly_review_314_launchd.sh`（土曜 9:00）
 - Claude 定期タスク: `weekly-review-314`（土曜 9:30・Claude デスクトップ。`~/.claude/scheduled-tasks/weekly-review-314/SKILL.md`）
 
@@ -25,6 +26,7 @@
 |---|---|---|
 | 土曜 9:00 | launchd（Mac） | 機械チェック → `.jarvis_state/weekly_review_314/facts_YYYYMMDD.md`＋`latest.json`、Slack（要確認あり `#ops`／なし `#report`） |
 | 土曜 9:00（同じ runner） | launchd（Mac） | **AI社員・Grok Bot の週次稼働**（`scripts/jarvis_agent_weekly_activity.py --push`。起動・実働・件数・失敗・Slack 報告・Grok の成果物メール）→ metrics／sync_meta `agent_weekly_activity` → ダッシュ `/agent-team#activity`。314 の Slack に「稼働: 機能した社員 n/N」と 🔴🟡 を数行足す（🟡 は週次まとめ）。数え方の正本 `config/agent_weekly_activity.yaml` |
+| 土曜 9:00（同じ runner） | launchd（Mac） | **AI社員の段階の見直し**（`scripts/jarvis_agent_stage_review.py --push`）: 週次稼働の履歴と判断ログから「設計中→運用確認」「運用確認→運用」「運用→運用確認（戻す）」の提案 → sync_meta `agent_stage_review` → `/review#stage` で松野さんが 上げる／見送る／来週また＋理由（owner_decisions surface=`agent_stage`）。物差し `config/agent_stage_review.yaml` |
 | 土曜 9:30 | Claude 定期タスク（Miss Lemon） | 事実ファイル＋今週の差分を読んでレビュー → 修正 PR＋`output/YYYYMMDD_週次レビュー.md` |
 | 手動 | 人 | 「314 週次レビューやって」でいつでも同じ手順 |
 

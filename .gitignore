@@ -47,6 +47,7 @@ tmp_grok_*.md
 .jarvis_state/*.json
 .jarvis_state/loopware/
 .jarvis_state/agent_weekly_activity/
+.jarvis_state/agent_stage_review/
 !.jarvis_state/*.example.json
 !.jarvis_state/vpoint_audit_result.json
 !.jarvis_state/card_annual_fee.json

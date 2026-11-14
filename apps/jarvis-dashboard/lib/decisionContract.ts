@@ -40,6 +40,7 @@ export const SURFACES = [
   "uiux_plan", // UI/UX：作る前の案選び（案ごとの 良い／違う／迷う＋理由タグ。Nody /uiux）
   "uiux_fix", // UI/UX：作った後の直し・「これいいね」（エージェントが scripts/jarvis_uiux_loop.py で記録）
   "uiux_rule", // UI/UX：好みルール案の採否（採用したものだけが好み帳に入る）
+  "agent_stage", // AI社員の段階（設計中→運用確認→運用）の引き上げ・戻しの採否と理由（週次レビュー /review。採用分は 314 が registry に反映）
 ] as const;
 export type Surface = (typeof SURFACES)[number];
 

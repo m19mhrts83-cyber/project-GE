@@ -413,6 +413,7 @@ def render_md(facts: dict[str, Any]) -> str:
 
 ACTIVITY_LATEST = REPO / ".jarvis_state" / "agent_weekly_activity" / "latest.json"
 ACTIVITY_URL = "https://jarvis-dashboard-amber.vercel.app/agent-team#activity"
+STAGE_LATEST = REPO / ".jarvis_state" / "agent_stage_review" / "latest.json"
 
 
 def activity_lines(today: str, path: Path = ACTIVITY_LATEST) -> list[str]:
@@ -426,7 +427,23 @@ def activity_lines(today: str, path: Path = ACTIVITY_LATEST) -> list[str]:
     sys.path.insert(0, str(REPO / "scripts"))
     from jarvis_agent_weekly_activity import slack_lines  # noqa: E402
 
-    return slack_lines(rep) + [f"<{ACTIVITY_URL}|週次稼働を開く>"]
+    lines = slack_lines(rep) + [f"<{ACTIVITY_URL}|週次稼働を開く>"]
+    return lines + stage_lines(today)
+
+
+def stage_lines(today: str, path: Path = STAGE_LATEST) -> list[str]:
+    """同じ日に作った AI社員の段階の提案（scripts/jarvis_agent_stage_review.py）"""
+    try:
+        rep = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if str(rep.get("generated_at", ""))[:10] != today:
+        return []
+    sys.path.insert(0, str(REPO / "scripts"))
+    from jarvis_agent_stage_review import REVIEW_URL, slack_lines as stage_slack  # noqa: E402
+
+    out = stage_slack(rep)
+    return out + ([f"<{REVIEW_URL}|段階の提案を決める>"] if rep.get("proposals") else [])
 
 
 def slack_text(facts: dict[str, Any]) -> str:
