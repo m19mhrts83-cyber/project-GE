@@ -123,6 +123,7 @@ type TriageRow = {
   gmail_thread_id: string | null;
   gmail_message_id: string | null;
   payload: Record<string, unknown> | null;
+  received_at?: string | null;
 };
 
 function asPayload(raw: unknown): Record<string, unknown> {
@@ -206,7 +207,7 @@ export async function fetchMailActionTriage(
   const { data, error } = await sb
     .from("triage_items")
     .select(
-      "id,status,subject,draft_text,original_body,from_email,partner,account,lane,kind,channel,summary,folder,gmail_thread_id,gmail_message_id,payload",
+      "id,status,subject,draft_text,original_body,from_email,partner,account,lane,kind,channel,summary,folder,gmail_thread_id,gmail_message_id,payload,received_at",
     )
     .eq("id", id)
     .maybeSingle();

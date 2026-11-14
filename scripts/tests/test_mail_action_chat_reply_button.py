@@ -66,15 +66,24 @@ class ChatworkRoomTest(unittest.TestCase):
             if url_mode:
                 self.assertNotIn(m.CHAT_DRAFT_LABEL, labels)
             else:
-                self.assertEqual(els[1]["value"], "ma:chatdraft:t1")
+                self.assertEqual(els[1]["value"], "ma:full:t1")
+                self.assertEqual(els[2]["value"], "ma:chatdraft:t1")
             # primary は1つだけ
             self.assertEqual(sum(1 for e in els if e.get("style") == "primary"), 1)
 
     def test_buttons_mail_unchanged(self):
         els = m._button_elements("t1", url_mode=False)
-        self.assertEqual(els[0]["text"]["text"], "返信する")
-        self.assertEqual(els[0].get("style"), "primary")
+        # 2026-11-14: 先頭は「📄 全文を見る」、その次が primary の「返信する」
+        self.assertEqual(els[0]["value"], "ma:full:t1")
+        self.assertEqual(els[1]["text"]["text"], "返信する")
+        self.assertEqual(els[1].get("style"), "primary")
         self.assertNotIn("mail_action_open_app", [e.get("action_id") for e in els])
+
+    def test_full_button_only_in_app_mode(self):
+        app = [e.get("value") for e in m._button_elements("t1", url_mode=False)]
+        url = [e.get("value") for e in m._button_elements("t1", url_mode=True)]
+        self.assertIn("ma:full:t1", app)
+        self.assertNotIn("ma:full:t1", url)
 
     def test_line_gets_open_button(self):
         r = {"id": "x", "kind": "chat", "channel": "LINE", "original_body": "確認です"}

@@ -19,6 +19,7 @@ import {
   extractMaModalState,
   handleMaBlockAction,
   handleMaFollowupAction,
+  handleMaFullSubmit,
   maTimingFromMeta,
   handleMaModalAction,
   handleMaModalSubmit,
@@ -30,6 +31,7 @@ import {
   prepareMaModalSubmitWithFiles,
   parseMaModalMeta,
 } from "@/lib/mailActionSlackInteract";
+import { MA_FULL_CALLBACK } from "@/lib/maFullTextView";
 import { parseT313ButtonValue } from "@/lib/todoist313SlackAction";
 import { handleT313BlockAction } from "@/lib/todoist313SlackInteract";
 import { parseT312ButtonValue } from "@/lib/todoist312SlackAction";
@@ -188,6 +190,26 @@ export async function POST(request: NextRequest) {
       const view = (payload.view || {}) as Record<string, unknown>;
       const callbackId = String(view.callback_id || "");
 
+      // 全文モーダルの「返信する」→ 同じ窓を返信モーダルに差し替える
+      if (callbackId === MA_FULL_CALLBACK) {
+        const next = await handleMaFullSubmit(payload);
+        if (!next.view) {
+          return NextResponse.json({
+            response_action: "update",
+            view: {
+              type: "modal",
+              title: { type: "plain_text", text: "本文（全文）" },
+              close: { type: "plain_text", text: "閉じる" },
+              blocks: [
+                { type: "section", text: { type: "mrkdwn", text: `❌ ${next.error || "返信画面を開けませんでした"}` } },
+              ],
+            },
+          });
+        }
+        if (next.run) after(next.run);
+        return NextResponse.json({ response_action: "update", view: next.view });
+      }
+
       if (callbackId === MA_MODAL_CALLBACK) {
         const meta = parseMaModalMeta(String(view.private_metadata || ""));
         const bodyBlockId = maBodyBlockId(payload);
@@ -287,7 +309,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 「Chatworkで返信」等の URL ボタン: 開くのはアプリ側。ここでは受け取りだけ返す（警告マークを出さない）
-    if (actionId === "mail_action_open_app") {
+    if (actionId === "mail_action_open_app" || actionId === "mail_action_open_detail") {
       return new NextResponse("", { status: 200 });
     }
 
