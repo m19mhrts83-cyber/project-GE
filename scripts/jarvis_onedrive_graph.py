@@ -285,11 +285,18 @@ def _http_get_bytes(url: str, headers: dict[str, str] | None = None, timeout: in
 
 def read_file_graph(rel_path: str) -> bytes:
     token = get_access_token()
-    meta_url = (
-        _graph_item_api(rel_path)
-        + "?$select=id,name,size,@microsoft.graph.downloadUrl"
+    # 個人 OneDrive（consumers）では
+    # `$select=…,@microsoft.graph.downloadUrl` だと downloadUrl が欠落する。
+    # 欠落すると /content フォールバックへ落ち、GHA で HTML 401 になりやすい。
+    # → メタは $select なし（必要なら Prefer のみ）。
+    meta_url = _graph_item_api(rel_path)
+    req = urllib.request.Request(
+        meta_url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Prefer": "bypass-provider-caching",
+        },
     )
-    req = urllib.request.Request(meta_url, headers={"Authorization": f"Bearer {token}"})
     try:
         with urllib.request.urlopen(req, timeout=45) as r:
             meta = json.load(r)
@@ -337,13 +344,20 @@ def read_file(provider: str, path: str) -> bytes:
 
 
 def get_item_meta(rel_path: str) -> dict[str, Any]:
-    """id / eTag / size / name。無いファイルは FileNotFoundError。"""
+    """id / eTag / size / name（可能なら downloadUrl）。無いファイルは FileNotFoundError。
+
+    `$select` に `@microsoft.graph.downloadUrl` を含めると consumers で欠落するため、
+    ここでは $select なし。
+    """
     token = get_access_token()
-    meta_url = (
-        _graph_item_api(rel_path)
-        + "?$select=id,name,size,eTag,cTag,@microsoft.graph.downloadUrl"
+    meta_url = _graph_item_api(rel_path)
+    req = urllib.request.Request(
+        meta_url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Prefer": "bypass-provider-caching",
+        },
     )
-    req = urllib.request.Request(meta_url, headers={"Authorization": f"Bearer {token}"})
     try:
         with urllib.request.urlopen(req, timeout=45) as r:
             return json.load(r)
