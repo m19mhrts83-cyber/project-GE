@@ -1,0 +1,161 @@
+# AI社員・Grok Bot の週次稼働（どれだけ機能したか）の数え方
+#
+# 読むのは scripts/jarvis_agent_weekly_activity.py（土曜 9:00 の 314 週次に相乗り・Mac）。
+# 1社員につき「どこを見れば動いた跡が分かるか」を書く。推測では埋めない（取れないものは ⚪ 未計測）。
+#
+# 指標の意味（ダッシュ /agent-team「週次稼働」タブと同じ）
+#   起動   … トリガーが引かれた回数（GHA の実行、launchd の1回分のログ）
+#   実働   … 起動のうち、実際に何かを処理した回数（空振りは数えない）
+#   件数   … 処理した物の数（点検した下書き、判定した物件、送ったレポートなど）
+#   失敗   … 起動したが途中で止まった回数（GHA failure、exit≠0）
+#   詰まり … 処理できずに次回へ持ち越した数（例: 311 の「今は読めません」）
+#   報告   … Slack に出した報告の数（判定 🟢🟡🔴 の内訳つき）
+#
+# expected_per_week: 1週間に起動するはずの回数（なければ回数での判定はしない）
+#
+# ソースの種類
+#   gha:        workflows: [ファイル名]
+#   slack:      Slack の #report/#ops/#consult/#ai-hub で、1行目に社員番号がある投稿を数える（全社員共通・自動）
+#               items_regex: 報告本文から件数を拾う（1つ目のグループ）
+#   log_blocks: 追記型ログを「======== 日時 ========」の区切りで1回ずつ数える（~/Library/Logs からの相対）
+#   log_files:  1回1ファイルのログ（ファイル名の日時で週を判定）
+#   files:      リポジトリ内の成果物ファイル（ファイル名の日時で週を判定）
+#   （log_blocks の retry_regex: 処理できず次回へ回した回 ＝ 詰まり）
+#   output_files: 1件1ファイルの成果物で件数・OK/NG を数え直す（JSON の result_field）
+#   pending_dir: 受け口に残ったままの依頼（集計時点の数＝詰まり）
+#
+# Grok Bot は Grok 自身では数えられないので、成果物の報告（estate Gmail の件名・Slack）で数える。
+
+window_days: 7
+
+slack_channels: [report, ops, consult, hub]
+
+agents:
+  "111":
+    gha: { workflows: [jarvis-partner-day-report.yml] }
+    expected_per_week: 7
+    note: 昼GHA 11:50 を数える（夜 launchd 20:30 は更新時のみ #report）
+  "113":
+    gha: { workflows: [deal-active-113.yml] }
+    expected_per_week: 7
+  "114":
+    log_files:
+      dir: jarvis_property_gate
+      pattern: 'gate114_(\d{8}_\d{6})\.log$'
+      items_regex: 'KURASHIFT_RESULT:\{"ok": true, "count": (\d+)'
+      fail_regex: 'Traceback|KURASHIFT_RESULT:\{"ok": false'
+    expected_per_week: 7
+  "116":
+    gha: { workflows: [jarvis-mail-action-noon.yml, jarvis-mail-action-unseen.yml] }
+    expected_per_week: 10
+  "211":
+    gha: { workflows: [jarvis-reply-draft-211.yml] }
+    slack_items_regex: '起案:\s*(\d+)'
+    expected_per_week: 7
+  "311":
+    log_blocks:
+      path: jarvis_send_gate_311/poll.log
+      header_regex: '^======== (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ========'
+      items_regex: '^overall=(?:OK|NG)'
+      retry_regex: 'worst_exit=[1-9]'
+      ok_regex: '^overall=OK'
+      ng_regex: '^overall=NG'
+      fail_regex: '^❌|Traceback'
+    output_files:
+      glob: docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/output/gate_*.json
+      pattern: 'gate_(\d{8}_\d{6})\.json$'
+      result_field: overall
+    pending_dir:
+      path: docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/input
+    expected_per_week: 672
+    note: 15分ごとに受け口を見る。件数は届いた下書きの数（届かない週は空振りで正常）
+  "312":
+    gha: { workflows: [todoist-312-collect.yml] }
+  "313":
+    expected_per_week: 7
+    note: 毎日 20:00。Slack の「313 本日のタスク処置」で数える
+  "314":
+    files:
+      glob: .jarvis_state/weekly_review_314/facts_*.md
+      pattern: 'facts_(\d{8})\.md$'
+    expected_per_week: 1
+  "315":
+    gha: { workflows: [ops-health-315.yml] }
+    log_files:
+      dir: jarvis_ops_health_315
+      pattern: 'run_(\d{8}_\d{6})\.log$'
+      fail_regex: '# end exit=[1-9]'
+    expected_per_week: 2
+  "317":
+    gha: { workflows: [comment-dispatch-failover.yml] }
+    note: 本線は Mac launchd 300秒。GHA は落ちたときの保険
+  "511":
+    note: Slack の Yes で動く（イベント）。回数の目安なし
+  "516":
+    gha: { workflows: [kurashift-vendor-outreach-stall.yml] }
+    expected_per_week: 5
+  "614":
+    expected_per_week: 2
+    note: 月・木のテイチャン確認（Mac）。Slack の「614」で数える
+  "615":
+    gha: { workflows: [yen-rate-watch.yml] }
+    expected_per_week: 2
+  "715":
+    log_files:
+      dir: friday_family_meeting_weekly
+      pattern: 'run_(\d{8}_\d{6})\.log$'
+      fail_regex: '# end exit=[1-9]'
+    expected_per_week: 1
+  "814":
+    files:
+      glob: docs/AIエージェントチーム/800_俯瞰UI・投影更新室/814_*/logs/*_ui_cycle.md
+      pattern: '(\d{8}_\d{6})_ui_cycle\.md$'
+    expected_per_week: 7
+  "815":
+    files:
+      glob: docs/AIエージェントチーム/800_俯瞰UI・投影更新室/815_*/logs/*_ui_cycle.md
+      pattern: '(\d{8}_\d{6})_ui_cycle\.md$'
+    expected_per_week: 7
+
+# Grok Bot: 成果物メール（estate Gmail・自分宛て）の件名と、Slack 投稿で数える
+grok:
+  gmail_query: 'from:matsuno.estate@gmail.com to:matsuno.estate@gmail.com subject:Grok'
+  bots:
+    bucho_re:
+      name: 不動産賃貸部長
+      code: S
+      subjects:
+        日報: '^\[Grok部長\] 日報'
+        夕方: '^\[Grok部長\] 夕方'
+        週次: '^\[Grok部長\] 週次'
+      expected: { 日報: 7, 夕方: 7, 週次: 1 }
+    s1:
+      name: S1 物件調査
+      code: S1
+      subjects:
+        調査: '^\[Grok調査\]'
+      # 件名の末尾の結論を数える（聞く＝問合せ候補）
+      outcomes: { 聞く: '聞く', 保留: '保留', 見送り: '見送り' }
+      expected: { 調査: 7 }
+    s4:
+      name: S4 修繕業者開拓
+      code: S4
+      subjects:
+        候補: '^\[Grok修繕候補\]'
+      expected: { 候補: 7 }
+    app_dev:
+      name: アプリ開発統括
+      code: A
+      subjects:
+        週次: '^\[Grok開発\]'
+      expected: { 週次: 1 }
+    s9:
+      name: S9 管理会社開拓
+      code: S9
+      subjects: {}
+      note: 成果は Slack「S9 管理会社開拓」と 516 の送信数で見る
+    hawk:
+      name: ホークアイ（参謀）
+      code: H
+      subjects: {}
+      slack_regex: 'ホーク|Hawk|参謀'

@@ -2,6 +2,7 @@ import Shell from "@/components/Shell";
 import { Suspense } from "react";
 import AgentTeamClient from "@/components/agent-team/AgentTeamClient";
 import MaturityPanel from "@/components/agent-team/MaturityPanel";
+import WeeklyActivityPanel from "@/components/agent-team/WeeklyActivityPanel";
 import {
   getAgentTeam,
   getGenres,
@@ -39,6 +40,12 @@ export default function AgentTeamPage() {
         maturity={
           <Suspense fallback={<p className="meta">成熟度を読み込み中…</p>}>
             <MaturityPanel />
+          </Suspense>
+        }
+        activityCount={team.agents.filter((a) => a.status === "運用確認" || a.status === "運用" || a.status === "設計中").length}
+        activity={
+          <Suspense fallback={<p className="meta">週次稼働を読み込み中…</p>}>
+            <WeeklyActivityPanel />
           </Suspense>
         }
       />

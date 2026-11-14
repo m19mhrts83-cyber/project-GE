@@ -403,7 +403,27 @@ def render_md(facts: dict[str, Any]) -> str:
         for d in g["schedule_delay"]
     ]
     lines += ["", f"## テスト {facts['tests']['total']} 本・失敗 {len(facts['tests']['failed'])}", ""]
+    if facts.get("activity"):
+        lines += ["## AI社員の週次稼働", ""] + [x for x in facts["activity"] if not x.startswith("<")] + [""]
     return "\n".join(lines) + "\n"
+
+
+ACTIVITY_LATEST = REPO / ".jarvis_state" / "agent_weekly_activity" / "latest.json"
+ACTIVITY_URL = "https://jarvis-dashboard-amber.vercel.app/agent-team#activity"
+
+
+def activity_lines(today: str, path: Path = ACTIVITY_LATEST) -> list[str]:
+    """同じ日に集計した AI社員の週次稼働（scripts/jarvis_agent_weekly_activity.py）。古い・無いなら出さない"""
+    try:
+        rep = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if str(rep.get("until", ""))[:10] != today:
+        return []
+    sys.path.insert(0, str(REPO / "scripts"))
+    from jarvis_agent_weekly_activity import slack_lines  # noqa: E402
+
+    return slack_lines(rep) + [f"<{ACTIVITY_URL}|週次稼働を開く>"]
 
 
 def slack_text(facts: dict[str, Any]) -> str:
@@ -413,6 +433,10 @@ def slack_text(facts: dict[str, Any]) -> str:
     body += [f"・{x[:60]}" for x in facts["flags"][:5]]
     if n > 5:
         body.append(f"・ほか{n - 5}件")
+    # 🟡 は週次まとめ: 各AI社員がどれだけ機能したか（エラー以外の実働）
+    act = facts.get("activity") or []
+    if act:
+        body += [""] + act
     body.append("判断と修正は 9:30 の Claude 点検 → PR")
     return "\n".join(body)
 
@@ -465,6 +489,11 @@ def main() -> int:
     if isinstance(facts["deps_missing"], dict):
         facts["deps_missing"] = []
     facts["flags"] = build_flags(facts)
+    try:
+        facts["activity"] = activity_lines(facts["date"])
+    except Exception as exc:  # 稼働の集計が読めなくても 314 は止めない
+        print(f"{LOG}: activity FAIL: {exc}", file=sys.stderr)
+        facts["activity"] = []
     for key in ("commits", "gha", "tests"):
         if facts[key].get("error"):
             facts["flags"].append(f"収集失敗: {key} — {facts[key]['error'][:80]}")

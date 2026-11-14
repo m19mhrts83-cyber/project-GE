@@ -31,7 +31,7 @@ function genreHashDomId(): string | null {
 }
 
 const STATUS_FILTERS = ["すべて", "運用確認", "設計中", "運用", "候補", "停止"] as const;
-type Tab = "genre" | "ai" | "grok" | "map" | "perms" | "ops" | "maturity";
+type Tab = "genre" | "ai" | "grok" | "map" | "perms" | "ops" | "maturity" | "activity";
 type PermsSide = "ai" | "grok" | "site";
 type OpsView = "triggers" | "procedures" | "reports";
 
@@ -60,6 +60,9 @@ type Props = {
   opsMeta?: OpsMeta;
   /** 成熟度タブの中身（サーバーで描画した MaturityPanel） */
   maturity?: ReactNode;
+  /** 週次稼働タブの中身（サーバーで描画した WeeklyActivityPanel） */
+  activity?: ReactNode;
+  activityCount?: number;
 };
 
 export default function AgentTeamClient({
@@ -77,11 +80,15 @@ export default function AgentTeamClient({
   permissionsUpdated,
   opsMeta,
   maturity,
+  activity,
+  activityCount,
 }: Props) {
   const [tab, setTab] = useState<Tab>("genre");
   // ホームの「成熟度の詳細」から #maturity で来たら成熟度タブを開く
   useEffect(() => {
     if (window.location.hash === "#maturity") setTab("maturity");
+    // 週次レビュー（/review）・314 の Slack から #activity で来たら週次稼働タブを開く
+    if (window.location.hash === "#activity") setTab("activity");
   }, []);
   const [genreFilter, setGenreFilter] = useState<string>("すべて");
   const [statusFilter, setStatusFilter] = useState<string>("すべて");
@@ -271,6 +278,7 @@ export default function AgentTeamClient({
             ],
             ["ops", "運用", agents.length],
             ["maturity", "成熟度", 10],
+            ["activity", "週次稼働", activityCount ?? agents.length],
           ] as const
         ).map(([id, label, n]) => (
           <button
@@ -1456,6 +1464,7 @@ export default function AgentTeamClient({
         </>
       ) : null}
       {tab === "maturity" ? <div id="maturity">{maturity}</div> : null}
+      {tab === "activity" ? <div id="activity">{activity}</div> : null}
     </>
   );
 }
