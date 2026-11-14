@@ -1,0 +1,61 @@
+// Isolated PostgreSQL/WASM schema and RLS tests. No production connection.
+// Run with PGLITE_MODULE=/absolute/path/to/@electric-sql/pglite/dist/index.js node this-file
+import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
+import assert from 'node:assert/strict';
+const {PGlite} = await import(pathToFileURL(process.env.PGLITE_MODULE).href);
+const pg = new PGlite();
+await pg.exec(`
+ create role anon; create role authenticated; create role service_role bypassrls;
+ create schema auth; create schema storage;
+ create table auth.users(id uuid primary key);
+ create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ grant usage on schema public,auth,storage to anon,authenticated,service_role;
+ create table portfolio_accounts(id text primary key,active boolean);
+ create table liquidity_accounts(id text primary key,active boolean);
+ insert into portfolio_accounts values('sbi_index',true);
+ grant select on portfolio_accounts,liquidity_accounts to service_role;
+ create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+ create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text);
+ alter table storage.objects enable row level security;
+ grant select,insert,update,delete on storage.objects to anon,authenticated;
+ create policy existing_broad_storage_access on storage.objects for all to anon,authenticated using(true) with check(true);
+ insert into auth.users values('11111111-1111-4111-8111-111111111111'),('22222222-2222-4222-8222-222222222222');
+`);
+const migration = readFileSync(new URL('../../apps/jarvis-dashboard/supabase/migrations/20261114_asset_618_evidence.sql',import.meta.url),'utf8');
+await pg.exec(migration);
+const owner='11111111-1111-4111-8111-111111111111', other='22222222-2222-4222-8222-222222222222';
+const attempt='33333333-3333-4333-8333-333333333333', second='44444444-4444-4444-8444-444444444444';
+let checks=0;
+async function test(name, fn){await fn();checks++;console.log('ok',name);}
+async function role(name,id=''){await pg.exec(`reset role; select set_config('request.jwt.claim.sub','${id}',false); set role ${name};`);}
+const get = async()=> (await pg.query('select * from asset_evidence_latest')).rows[0];
+await test('migration creates a private bounded PNG bucket',async()=>{const row=(await pg.query("select * from storage.buckets where id='asset-evidence'")).rows[0];assert.equal(row.public,false);assert.equal(Number(row.file_size_limit),10485760);});
+await test('no owner is enrolled implicitly',async()=>assert.equal((await pg.query('select * from asset_evidence_owners')).rows.length,0));
+await pg.exec(`insert into asset_evidence_owners(user_id) values('${owner}'),('${other}');`);
+await role('service_role');
+await test('unknown account rejected before claiming slot',async()=>{await assert.rejects(pg.query('select asset_evidence_begin($1,$2,$3,$4,$5,$6)',[owner,'portfolio','unknown','primary','balance',attempt]));});
+await test('service writer claims initial slot',async()=>{await pg.query('select asset_evidence_begin($1,$2,$3,$4,$5,$6)',[owner,'portfolio','sbi_index','primary','balance',attempt]);assert.equal((await get()).last_attempt_status,'pending');});
+const id=(await get()).id;
+await test('another writer cannot steal pending attempt',async()=>{await assert.rejects(pg.query('select asset_evidence_begin($1,$2,$3,$4,$5,$6)',[owner,'portfolio','sbi_index','primary','balance',second]));});
+const captured=new Date(Date.now()-20000).toISOString(), asof=new Date(Date.now()-86400000).toISOString().slice(0,10), sha='a'.repeat(64);
+await test('commit switches a single latest pointer',async()=>{await pg.query('select asset_evidence_commit($1,$2,$3,$4,$5,$6,$7,$8)',[id,attempt,sha,captured,asof,attempt,second,'owner']);const row=await get();assert.equal(row.active_slot,'a');assert.equal(row.sha256,sha);});
+const path=(await get()).storage_path;
+await pg.exec('reset role');
+await pg.query('insert into storage.objects(bucket_id,name) values($1,$2),($1,$3)',['asset-evidence',path,path.replace('.a.png','.b.png')]);
+await role('authenticated',owner);
+await test('owner sees only the active proof',async()=>{assert.equal((await pg.query('select * from asset_evidence_latest')).rows.length,1);assert.equal((await pg.query("select * from storage.objects where bucket_id='asset-evidence'")).rows.length,1);});
+await test('authenticated owner cannot alter evidence metadata or call writer RPC',async()=>{await assert.rejects(pg.query("update asset_evidence_latest set last_attempt_status='ok'"));await assert.rejects(pg.query('select asset_evidence_fail($1,$2)',[id,attempt]));});
+await test('broad existing storage policy cannot grant client writes',async()=>{await assert.rejects(pg.query("insert into storage.objects(bucket_id,name) values('asset-evidence','bad.png')"));assert.equal((await pg.query("delete from storage.objects where bucket_id='asset-evidence' returning *")).rows.length,0);});
+await role('authenticated',other);
+await test('other enrolled user sees neither metadata nor image',async()=>{assert.equal((await pg.query('select * from asset_evidence_latest')).rows.length,0);assert.equal((await pg.query("select * from storage.objects where bucket_id='asset-evidence'")).rows.length,0);});
+await role('anon');
+await test('anonymous metadata and private image access denied',async()=>{await assert.rejects(pg.query('select * from asset_evidence_latest'));await assert.rejects(pg.query("select * from storage.objects where bucket_id='asset-evidence'"));});
+await role('service_role');
+await test('failed replacement preserves prior normal metadata',async()=>{await pg.query('select asset_evidence_begin($1,$2,$3,$4,$5,$6)',[owner,'portfolio','sbi_index','primary','balance',second]);await pg.query('select asset_evidence_fail($1,$2)',[id,second]);const row=await get();assert.equal(row.storage_path,path);assert.equal(row.sha256,sha);assert.equal(row.last_attempt_status,'failed');});
+await test('older proof cannot replace a normal proof',async()=>{await pg.query('select asset_evidence_begin($1,$2,$3,$4,$5,$6)',[owner,'portfolio','sbi_index','primary','balance',attempt]);await assert.rejects(pg.query('select asset_evidence_commit($1,$2,$3,$4,$5,$6,$7,$8)',[id,attempt,'b'.repeat(64),new Date(Date.now()-40000).toISOString(),asof,attempt,second,'owner']));assert.equal((await get()).storage_path,path);});
+await test('wrong recovery token cannot release pending writer',async()=>{await pg.query('select asset_evidence_recover($1,$2)',[id,second]);assert.equal((await get()).last_attempt_status,'pending');});
+await test('explicit recovery of current attempt permits another update',async()=>{await pg.query('select asset_evidence_recover($1,$2)',[id,attempt]);assert.equal((await get()).last_attempt_status,'failed');await pg.query('select asset_evidence_begin($1,$2,$3,$4,$5,$6)',[owner,'portfolio','sbi_index','primary','balance',second]);});
+await test('next good image alternates the bounded slot',async()=>{await pg.query('select asset_evidence_commit($1,$2,$3,$4,$5,$6,$7,$8)',[id,second,'b'.repeat(64),new Date(Date.now()-10000).toISOString(),asof,second,attempt,'codex']);assert.equal((await get()).active_slot,'b');assert.equal((await pg.query('select * from asset_evidence_latest')).rows.length,1);});
+console.log(JSON.stringify({postgres_migration_checks:checks,production_writes:0}));
+await pg.close();

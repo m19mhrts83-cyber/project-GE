@@ -79,6 +79,22 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
     py = str(PY if PY.exists() else sys.executable)
     year = str(payload.get("fiscal_year") or datetime.now().year)
     scope = str(payload.get("scope") or "personal")
+    asset_args = []
+    if job_type == 'portfolio_weekly':
+        from jarvis_asset_618_runtime import ident
+        import uuid
+        retry = payload.get('retry_run')
+        only = payload.get('target_ids')
+        if retry and (only or payload.get('force')):
+            raise ValueError('ambiguous_asset_retry_scope')
+        if retry:
+            if str(uuid.UUID(str(retry))) != retry:
+                raise ValueError('invalid_asset_retry_id')
+            asset_args += ['--retry-run', retry]
+        if only is not None:
+            if not isinstance(only, list) or not only:
+                raise ValueError('invalid_asset_targets')
+            asset_args += ['--only', ','.join(ident(x) for x in only)]
     mapping = {
         "lifeplan_ingest_actuals": [
             py,
@@ -156,6 +172,7 @@ def command_for(job_type: str, payload: dict[str, Any]) -> list[str]:
         "portfolio_weekly": [
             py,
             str(REPO / "scripts" / "jarvis_portfolio_weekly.py"),
+            *asset_args,
             # Mac worker 本線はフル収集（クラウドは GHA trade-desk-weekly）。手動ボタンは force 可。
             *(["--force"] if payload.get("force") else []),
             *(["--cloud-only"] if payload.get("cloud_only") else []),

@@ -1,0 +1,8 @@
+.note { color: var(--muted); font-size: .88rem; margin: 12px 0; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 16px 0; }
+.rows { display: grid; gap: 10px; padding-top: 12px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; }
+.row > span:not(.value) { grid-column: 1 / -1; color: var(--muted); font-size: .85rem; }
+.value { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.image { display: block; width: 100%; height: auto; margin-top: 14px; border: 1px solid var(--line); }
+@media (max-width: 480px) { .row { grid-template-columns: minmax(0, 1fr); } .value { white-space: normal; } }
