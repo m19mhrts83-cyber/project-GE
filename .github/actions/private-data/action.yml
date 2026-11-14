@@ -1,0 +1,29 @@
+# 非公開リポ project-GE-private の中身（連絡先の写しなど）を checkout の同じ場所に置く（2026-11-14）。
+# 鍵（secrets.PRIVATE_DATA_DEPLOY_KEY、読み取り専用の deploy key）が無ければ何もしない。
+# 連絡先は OneDrive（Graph）が本線で、これは Graph が落ちたときの写し。コミットはしない。
+name: private-data
+description: project-GE-private を作業フォルダに重ねる
+inputs:
+  ssh-key:
+    description: deploy key（secrets.PRIVATE_DATA_DEPLOY_KEY）
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - if: ${{ inputs.ssh-key != '' }}
+      uses: actions/checkout@v4
+      with:
+        repository: m19mhrts83-cyber/project-GE-private
+        ssh-key: ${{ inputs.ssh-key }}
+        path: _private_data
+        persist-credentials: false
+    - if: ${{ inputs.ssh-key != '' }}
+      shell: bash
+      run: |
+        rsync -a --exclude .git --exclude README.md _private_data/ ./
+        rm -rf _private_data
+        echo "private data: placed"
+    - if: ${{ inputs.ssh-key == '' }}
+      shell: bash
+      run: echo 'private data skipped (no PRIVATE_DATA_DEPLOY_KEY)'

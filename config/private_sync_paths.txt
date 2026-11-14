@@ -1,0 +1,34 @@
+# 非公開リポ project-GE-private へ写す（バックアップする）もの（2026-11-14）
+# config/private_paths.txt は「公開してはいけないもの」の一覧で、.jarvis_state/ 全体を含む。
+# こちらは、そのうち非公開リポへ写すものだけ。.jarvis_state/ は動かしたときの実データ
+# （ブラウザのプロファイル・Cookie・キャッシュで 2GB 超）を含むので、写すのは下に名前を出したものだけ。
+# ブラウザのプロファイルや Cookie は、非公開リポでも GitHub に置かない。
+# 書式は .gitignore と同じ。新しく非公開にした場所を写したいときは、両方のファイルに足す。
+
+215_kamiooya/C2_ルーティン作業/
+215_kamiooya/C1_cursor/1b_Cursorマニュアル/連絡先一覧.snapshot.yaml
+215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/採点自動化/**/forum_comments_*.csv
+215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/採点自動化/05_calibration_samples.csv
+215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/inbox/
+215_kamiooya/C1_cursor/browser_automation/振込自動入力_設計.md
+
+# .jarvis_state のうち、以前リポに入っていた小さな記録だけ
+.jarvis_state/car_loan.json
+.jarvis_state/card_annual_fee.json
+.jarvis_state/card_settlement_sep2026_checklist.md
+.jarvis_state/chrline_version.json
+.jarvis_state/genmail_action_needed.md
+.jarvis_state/line_export_reminder.json
+.jarvis_state/nagoya_water_card/
+.jarvis_state/night_triage/engine_decision.md
+.jarvis_state/night_triage/夜間トリアージ.webloc
+.jarvis_state/openchat_join_qr_missing/
+.jarvis_state/openchat_westudy_page.html
+.jarvis_state/sbi_vpoint_up_checklist.json
+.jarvis_state/square_probe.json
+.jarvis_state/todoist_filter_simple_browser.md
+.jarvis_state/todoist_pro_filters_recipe.md
+.jarvis_state/todoist_pro_trial_rollback.md
+.jarvis_state/vpoint_audit_result.json
+.jarvis_state/vpoint_cadence.json
+.jarvis_state/westudy_weekly_watch.json
