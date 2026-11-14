@@ -1,0 +1,1577 @@
+<title>東海DX互助会 第10回</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: 1600×900の舞台を画面に合わせて縮める。枠（表紙・Q・章扉・下部帯）はブランドの紺と水色で固定し、モーションページだけ話題ごとに配色を変える（いけとも式） */
+:root{
+  --brand:#084690; --sky:#43adff; --ink:#131f39; --sub:#56627a; --line:#dbe1ea; --paper:#ffffff; --tint:#f3f6fa;
+  --night:#03040a;
+  --f-body:"Noto Sans JP","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--night);overflow:hidden;font-family:var(--f-body);
+  padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
+#deck{position:absolute;left:50%;top:50%;width:1600px;height:900px;transform-origin:center;overflow:hidden;background:var(--paper)}
+.pg{position:absolute;inset:0;display:none;overflow:hidden}
+.pg.on{display:block}
+.abs{position:absolute}
+.mono{font-family:var(--f-mono)}
+h1,h2,h3,p{margin:0}
+
+/* ===== 入場アニメ（共通の語彙） ===== */
+.act [data-a]{animation-duration:var(--t,.7s);animation-delay:var(--d,0s);animation-fill-mode:both;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+.act [data-a=up]{animation-name:aUp}.act [data-a=left]{animation-name:aLeft}.act [data-a=right]{animation-name:aRight}
+.act [data-a=fade]{animation-name:aFade}
+.act [data-a=type]{animation-name:aFade;animation-timing-function:linear}
+.act [data-a=rise]{animation-name:aRise;animation-timing-function:cubic-bezier(.2,.9,.2,1)}
+.act [data-a=pop]{animation-name:aPop;animation-timing-function:cubic-bezier(.3,1.6,.5,1)}
+.act [data-a=slam]{animation-name:aSlam;animation-timing-function:cubic-bezier(.2,.9,.25,1)}
+.act [data-a=stamp]{animation-name:aStamp;animation-timing-function:cubic-bezier(.2,.9,.25,1)}
+.act [data-a=bar]{animation-name:aBar;transform-origin:left center;animation-timing-function:cubic-bezier(.6,0,.3,1)}
+.act [data-a=draw]{animation-name:aDraw;animation-timing-function:ease-out}
+.act [data-a=wipe]{animation-name:aWipe;animation-timing-function:cubic-bezier(.7,0,.2,1)}
+.act [data-a=gather]{animation-name:aGather;animation-timing-function:cubic-bezier(.5,0,.2,1)}
+.act [data-a=shine]{animation-name:aShine;animation-timing-function:ease-in-out}
+@keyframes aUp{from{opacity:0;transform:translateY(46px);filter:blur(10px)}}
+@keyframes aLeft{from{opacity:0;transform:translateX(-90px);filter:blur(8px)}}
+@keyframes aRight{from{opacity:0;transform:translateX(90px);filter:blur(8px)}}
+@keyframes aFade{from{opacity:0}}
+@keyframes aRise{from{transform:translateY(112%)}}
+@keyframes aPop{from{opacity:0;transform:scale(.3)}}
+@keyframes aSlam{0%{opacity:0;transform:scale(2.4);filter:blur(22px)}55%{opacity:1;transform:scale(.95);filter:blur(0)}75%{transform:scale(1.02)}}
+@keyframes aStamp{0%{opacity:0;transform:scale(2.2)}60%{opacity:1;transform:scale(.94)}100%{transform:none}}
+@keyframes aBar{from{transform:scaleX(0)}}
+@keyframes aDraw{from{stroke-dashoffset:1}}
+@keyframes aWipe{from{clip-path:inset(-20% 100% -20% 0)}to{clip-path:inset(-20% -2% -20% 0)}}
+@keyframes aGather{from{opacity:0;transform:translate(var(--x,0px),var(--y,0px)) rotate(var(--r,0deg)) scale(1.15)}}
+@keyframes aShine{from{background-position:120% 0}to{background-position:-20% 0}}
+.mask{display:block;overflow:hidden;padding-bottom:.06em}.mask>*{display:inline-block}
+.mg.done [data-a],.mg.done .cam{animation:none!important}
+.mg.paused *{animation-play-state:paused!important}
+
+/* ===== 静止ページ（本文） ===== */
+.st{background:var(--paper);color:var(--ink)}
+.st .hd,.q .hd{position:absolute;left:80px;top:44px;display:flex;align-items:center;gap:14px;font-size:22px;font-weight:700;letter-spacing:.12em;color:var(--sub);z-index:3}
+.st .hd::before,.q .hd::before{content:"";width:36px;height:4px;background:var(--sky)}
+.st .tag{position:absolute;right:80px;top:40px;padding:6px 14px;border:2px solid #c9d3e2;font:700 15px var(--f-mono);letter-spacing:.2em;color:var(--sub)}
+.st .body{position:absolute;left:80px;right:80px;top:112px;bottom:92px;display:flex;flex-direction:column;gap:30px}
+.st .t{font-size:72px;font-weight:900;line-height:1.22;letter-spacing:-.01em;text-wrap:balance}
+.st .t em,.sm em{font-style:normal;color:var(--brand);background:linear-gradient(transparent 64%,rgba(67,173,255,.32) 64%)}
+.st .ld{font-size:32px;font-weight:700;line-height:1.55;color:var(--sub);max-width:1300px}
+.st .note{font-size:22px;color:var(--sub);line-height:1.6}
+.foot{position:absolute;left:0;right:0;bottom:0;height:56px;border-top:4px solid var(--brand);display:flex;align-items:center;justify-content:space-between;padding:0 80px;font:700 17px var(--f-body);letter-spacing:.08em;color:var(--sub);background:var(--paper)}
+.foot b{font:700 18px var(--f-mono);color:var(--brand)}
+.g2,.g3,.g4,.g5{display:grid;gap:24px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}.g5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.box{border:2px solid var(--line);border-radius:16px;padding:26px 30px;background:var(--tint);display:flex;flex-direction:column;gap:10px;min-width:0}
+.box .k{font:700 18px var(--f-mono);letter-spacing:.2em;color:var(--brand)}
+.box h3{font-size:36px;font-weight:900;line-height:1.3}
+.box p{font-size:25px;line-height:1.55;color:#3b475e}
+.box.hi{background:var(--brand);border-color:var(--brand);color:#fff}
+.box.hi .k{color:var(--sky)}.box.hi p{color:#d9e7fb}
+.shime{display:flex;align-items:center;gap:20px;background:var(--brand);color:#fff;border-radius:12px;padding:18px 28px;font-size:30px;font-weight:900;line-height:1.4;margin-top:auto}
+.shime::before{content:"AI社員";flex:none;font:900 18px var(--f-body);letter-spacing:.1em;background:var(--sky);color:#061a2f;border-radius:999px;padding:6px 14px}
+.chip{display:inline-flex;align-items:center;gap:8px;border:2px solid var(--line);border-radius:999px;padding:8px 18px;font-size:22px;font-weight:700;color:var(--ink);background:var(--paper)}
+.chip.on{background:var(--sky);border-color:var(--sky);color:#061a2f}
+
+/* ===== Q（問いかけ） ===== */
+.q{background:var(--paper);color:var(--ink)}
+.q .band{position:absolute;left:0;top:0;bottom:0;width:432px;background:var(--brand)}
+.q .Q{position:absolute;left:96px;top:150px;font:900 400px/1 "Arial Black",Arial,var(--f-body);color:#fff}
+.q .ql{position:absolute;left:112px;top:620px;width:150px;height:8px;border-radius:4px;background:var(--sky)}
+.q .hd{left:520px}
+.q .qbox{position:absolute;left:520px;right:100px;top:230px;display:flex;flex-direction:column;gap:30px}
+.q .qlbl{font:700 22px var(--f-mono);letter-spacing:.3em;color:var(--brand)}
+.q .qq{font-size:82px;font-weight:900;line-height:1.3;text-wrap:balance}
+.q .qq em{font-style:normal;color:var(--brand)}
+.q .qs{font-size:32px;font-weight:700;color:var(--sub);line-height:1.55}
+
+/* ===== 章扉・表紙 ===== */
+.door,.cover{background:radial-gradient(120% 95% at 28% 42%,#111c33,#080c16 52%,#03040a);color:#fff}
+.door .no{position:absolute;left:120px;top:250px;font:700 24px var(--f-mono);letter-spacing:.3em;color:var(--sky)}
+.door h2,.cover h1{font-weight:900;letter-spacing:-.01em;line-height:1.16}
+.door h2{position:absolute;left:120px;top:300px;width:1380px;font-size:118px}
+.shn{background:linear-gradient(100deg,#fff 0 42%,#bfe3ff 50%,#fff 58% 100%);background-size:260% 100%;background-position:-20% 0;-webkit-background-clip:text;background-clip:text;color:transparent}
+.door .tm{position:absolute;left:124px;top:480px;font-size:34px;font-weight:700;color:rgba(255,255,255,.74)}
+.door .tm b{font-family:var(--f-mono);font-weight:700;color:#fff;margin-right:10px}
+.chs{position:absolute;left:120px;bottom:110px;display:flex;gap:12px;flex-wrap:wrap;width:1360px}
+.chs span{border:1.5px solid rgba(255,255,255,.22);border-radius:999px;padding:9px 18px;font-size:20px;font-weight:700;color:rgba(255,255,255,.5)}
+.chs span.cur{background:var(--sky);border-color:var(--sky);color:#061a2f}
+.chs span.past{color:rgba(255,255,255,.75);border-color:rgba(255,255,255,.4)}
+.cover .grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 2px,transparent 2px),linear-gradient(90deg,rgba(255,255,255,.05) 2px,transparent 2px);background-size:200px 200px}
+.cover .lbl{position:absolute;left:120px;top:190px;display:flex;align-items:center;gap:16px;font:700 24px var(--f-body);letter-spacing:.2em;color:#c9dcf2}
+.cover .lbl::before{content:"";width:48px;height:5px;background:var(--sky)}
+.cover h1{position:absolute;left:120px;top:250px;font-size:124px}
+.cover h1 em{font-style:normal;color:var(--sky)}
+.cover .sub{position:absolute;left:124px;top:560px;font-size:40px;font-weight:700;color:#c9dcf2}
+.cover .meta{position:absolute;left:124px;top:650px;display:flex;gap:14px}
+.cover .meta span{border:2px solid rgba(201,220,242,.4);padding:8px 18px;font:700 22px var(--f-body);color:#fff;border-radius:6px}
+.cover .meta span.m{font-family:var(--f-mono)}
+.hint{position:absolute;right:80px;bottom:44px;font:700 18px var(--f-body);color:rgba(201,220,242,.6);letter-spacing:.06em}
+.hint kbd{font:700 16px var(--f-mono);border:1.5px solid rgba(201,220,242,.5);border-radius:6px;padding:2px 8px;margin:0 4px;color:#fff}
+
+/* ===== まとめ（SUMMARY・静止） ===== */
+.sm{background:#07203a;color:#fff}
+.sm .grid,.mg .grid{position:absolute;inset:0;background-image:linear-gradient(var(--gridc,rgba(255,255,255,.08)) 2px,transparent 2px),linear-gradient(90deg,var(--gridc,rgba(255,255,255,.08)) 2px,transparent 2px);background-size:200px 200px}
+.sm .hd{position:absolute;left:80px;top:44px;display:flex;align-items:center;gap:14px;font-size:22px;font-weight:700;letter-spacing:.12em;color:#c9dcf2}
+.sm .hd::before{content:"";width:36px;height:4px;background:var(--sky)}
+.sm em{color:#fff;background:linear-gradient(transparent 62%,rgba(67,173,255,.55) 62%)}
+
+/* ===== モーションページ ===== */
+.mo .mg{position:absolute;inset:0;background:var(--bg);color:var(--fg);font-family:var(--f-body)}
+.mg .hd{position:absolute;left:80px;top:44px;display:flex;gap:14px;align-items:center;font-size:22px;font-weight:700;letter-spacing:.12em;color:var(--mute);z-index:6}
+.mg .hd::before{content:"";width:36px;height:4px;background:var(--acc)}
+.mg .tag{position:absolute;right:80px;top:40px;z-index:6;padding:6px 14px;border:2px solid var(--line);font:700 15px var(--f-mono);letter-spacing:.2em;color:var(--mute)}
+.mg .scene{position:absolute;inset:0;z-index:2;visibility:hidden}
+.mg .scene.on{visibility:visible;animation:mgIn .5s ease-out both}
+.mg .scene.out{visibility:visible;animation:mgOut .45s ease-in forwards;z-index:1}
+@keyframes mgIn{from{opacity:0}}
+@keyframes mgOut{to{opacity:0;transform:scale(1.05);filter:blur(8px)}}
+.mg .scene.on .cam{animation:mgCam var(--sd,6s) linear both}
+@keyframes mgCam{from{transform:scale(1.06)}}
+.mg .cam{position:absolute;inset:0}
+.mg .em{font-style:normal;color:var(--acc)}
+.mg .ttl{margin:0;font-weight:900;line-height:1.2;letter-spacing:-.01em}
+.mg .lbl{font:700 22px var(--f-mono);letter-spacing:.3em;color:var(--mute)}
+.mg .lbl.a{color:var(--acc)}
+.mg .sub{font-size:36px;font-weight:700;color:var(--mute);line-height:1.5}
+.mg .card{border:3px solid var(--fg);background:var(--card);padding:20px 26px;font-size:32px;font-weight:900;line-height:1.35;border-radius:4px}
+.mg .card small{display:block;font-size:20px;letter-spacing:.12em;color:var(--mute);font-weight:700;margin-bottom:4px}
+.mg .card.acc{border-color:var(--acc);background:var(--acc);color:var(--ink2)}
+.mg .card.acc small{color:var(--ink2);opacity:.8}
+.mg .card.ghost{border-style:dashed;border-color:var(--line);color:var(--mute)}
+.mg .ex{font-size:26px;font-weight:700;color:var(--mute);line-height:1.55;border-left:4px solid var(--acc);padding-left:18px}
+.mg .stampbox{display:inline-block;border:5px solid var(--acc);color:var(--acc);padding:8px 22px;font-size:36px;font-weight:900;border-radius:8px;background:var(--bg)}
+.mg ol.sum{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.mg ol.sum li,.sm ol.sum li{display:grid;grid-template-columns:48px 1fr;gap:18px;align-items:center;padding:14px 22px;border:2px solid var(--line);border-radius:12px;background:var(--card);font-size:27px;font-weight:900;line-height:1.35}
+.mg ol.sum li i,.sm ol.sum li i{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:var(--acc);color:var(--ink2);font:700 22px var(--f-mono);font-style:normal}
+.mg ol.sum li small,.sm ol.sum li small{display:block;font-size:20px;font-weight:700;color:var(--mute)}
+.sm ol.sum{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.sm{--line:rgba(201,220,242,.35);--card:rgba(4,18,36,.8);--acc:var(--sky);--ink2:#061a2f;--mute:#c9dcf2}
+.mg svg.ln{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.mg svg.ln path,.mg svg.ln rect,.mg svg.ln circle{fill:none;stroke:var(--fg);stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+.mg svg.ln .r{stroke:var(--acc);stroke-width:6}
+.mg svg.ln .m{stroke:var(--line);stroke-width:3}
+.mg .arrow{font:900 44px var(--f-body);color:var(--acc)}
+.mg .segs{position:absolute;left:28px;bottom:30px;z-index:5;display:flex;gap:6px;width:860px}
+.mg .seg{flex:1;min-width:0;padding:8px 0 6px;border:0;background:none;cursor:pointer;text-align:left;color:var(--mute);font:700 15px var(--f-body);white-space:nowrap;overflow:hidden}
+.mg .seg u{display:block;height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:6px}
+.mg .seg i{display:block;height:100%;width:0;background:var(--acc)}
+.mg .seg.cur{color:var(--fg)}
+.mg .ctl{position:absolute;right:28px;bottom:22px;z-index:5;display:flex;gap:8px}
+.mg .ctl button{height:48px;padding:0 20px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--mute);font:700 18px var(--f-body);cursor:pointer}
+.mg .ctl button:hover{color:var(--fg)}
+button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+
+/* 建物（5段階） */
+.bld{position:absolute;left:1010px;top:150px;width:470px}
+.bld .roof{display:block;width:470px;height:60px;overflow:visible}
+.bld .roof path{fill:none;stroke:var(--line);stroke-width:4;stroke-linejoin:round}
+.bld .fl{position:relative;height:96px;margin-top:10px;border:3px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 22px;font-size:30px;font-weight:900;color:var(--mute)}
+.bld .fl b{font:700 22px var(--f-mono);width:40px}
+.bld .fl.past{border-color:var(--acc);color:var(--fg);background:rgba(255,122,92,.14)}
+.bld .fl.cur{border-color:var(--acc);background:var(--acc);color:var(--ink2)}
+.bld .gnd{height:5px;margin-top:10px;background:var(--fg);margin-left:-30px;margin-right:-30px}
+.bld .here{position:absolute;right:-14px;top:-26px;transform:rotate(-6deg)}
+.bld .here span{display:block;background:var(--fg);color:var(--bg);font-size:22px;font-weight:900;padding:6px 14px;border-radius:6px}
+
+/* 7段の階段（バイブコーディング） */
+.stp{position:absolute;width:183px;border:3px solid var(--line);border-bottom:0;padding:12px 14px;display:flex;flex-direction:column;gap:4px;color:var(--mute);background:var(--bg)}
+.stp b{font:700 22px var(--f-mono)}
+.stp span{font-size:22px;font-weight:900;line-height:1.3}
+.stp.past{border-color:var(--acc);color:var(--fg);background:rgba(115,67,188,.12)}
+.stp.cur{border-color:var(--acc);background:var(--acc);color:var(--ink2)}
+.stbase{position:absolute;left:90px;width:1420px;top:760px;height:5px;background:var(--fg)}
+.stmark{position:absolute;font-size:22px;font-weight:900;white-space:nowrap}
+.stmark span{display:inline-block;background:var(--fg);color:var(--bg);padding:6px 14px;border-radius:6px}
+
+/* 5歩・階段 */
+.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:18px;align-items:stretch}
+.step{position:relative;border-radius:14px;padding:22px 20px;background:var(--tint);border:2px solid var(--line);display:flex;flex-direction:column;gap:8px;min-width:0}
+.step .n{font:700 40px var(--f-mono);color:var(--brand)}
+.step h3{font-size:30px;font-weight:900;line-height:1.3}
+.step p{font-size:22px;line-height:1.5;color:#3b475e}
+.step.last{background:var(--brand);border-color:var(--brand);color:#fff}
+.step.last .n{color:var(--sky)}.step.last p{color:#d9e7fb}
+.stair{display:flex;align-items:flex-end;gap:18px;height:440px}
+.stair>div{flex:1;border-radius:14px 14px 0 0;background:var(--tint);border:2px solid var(--line);border-bottom:0;padding:24px;display:flex;flex-direction:column;gap:8px}
+.stair .n{font:700 24px var(--f-mono);color:var(--brand);letter-spacing:.1em}
+.stair h3{font-size:36px;font-weight:900}
+.stair p{font-size:22px;color:#3b475e;line-height:1.5}
+.stair .today{background:var(--brand);border-color:var(--brand);color:#fff}
+.stair .today .n{color:var(--sky)}.stair .today p{color:#d9e7fb}
+.agenda{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:14px}
+.agenda>div{border-top:6px solid var(--line);padding-top:16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.agenda .n{font:700 46px var(--f-mono);color:var(--brand)}
+.agenda h3{font-size:29px;font-weight:900;line-height:1.3}
+.agenda p{font-size:20px;color:var(--sub);line-height:1.5}
+.agenda .tm{font:700 19px var(--f-mono);color:var(--sub)}
+.agenda .hi{border-top-color:var(--sky)}
+.tree{font:500 27px/1.75 var(--f-mono);color:var(--ink);background:var(--tint);border:2px solid var(--line);border-radius:16px;padding:24px 34px;white-space:pre}
+.tree b{color:var(--brand);font-weight:700}
+.tbl{width:100%;border-collapse:collapse;font-size:22px}
+.tbl td{padding:9px 0;border-bottom:1.5px solid var(--line);vertical-align:top;line-height:1.45}
+.tbl td:first-child{font-weight:900;width:38%;padding-right:12px}
+.tbl td:last-child{color:#3b475e}
+.tbl.s td{padding:5px 0;line-height:1.38}.tbl.s td:first-child{width:34%}
+.bubble{position:relative;border:4px solid var(--ink);border-radius:28px;padding:34px 44px;font-size:44px;font-weight:900;line-height:1.45;background:var(--paper)}
+.bubble::after{content:"";position:absolute;left:90px;bottom:-34px;width:40px;height:40px;background:var(--paper);border-right:4px solid var(--ink);border-bottom:4px solid var(--ink);transform:rotate(45deg) skew(10deg,10deg)}
+.bubble small{display:block;font-size:22px;font-weight:700;color:var(--sub);letter-spacing:.1em;margin-bottom:8px}
+.tbl.t3{font-size:18px}.tbl.t3 th{text-align:left;font-size:15px;font-weight:700;color:#56627a;padding:0 0 6px;border-bottom:2px solid var(--line)}.tbl.t3 td{padding:7px 0;line-height:1.38}.tbl.t3 td:first-child{width:27%}.tbl.t3 td:nth-child(2){width:30%;font-weight:800;color:var(--brand);padding-right:12px}
+.flow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.flow .chip{font-size:23px}
+.flow .to{font:900 26px var(--f-body);color:var(--sky)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="deck">
+
+<!-- 1 表紙 -->
+<section class="pg cover" data-ch="0">
+  <div class="grid"></div>
+  <div class="lbl" data-a="fade" style="--d:.1s">神大家 東海DX互助会｜第10回</div>
+  <h1>
+    <span class="mask"><span data-a="rise" style="--d:.3s">頼めば、アプリが</span></span>
+    <span class="mask"><span data-a="rise" style="--d:.44s"><em>できる</em>時代に。</span></span>
+  </h1>
+  <div class="sub" data-a="up" style="--d:1.1s">賃貸業務の紙・転記・確認を、一つずつ楽にする</div>
+  <div class="meta" data-a="up" style="--d:1.4s"><span class="m">2026.11.15（日）20:00–22:00</span><span>Teams</span><span>発表：松野</span><span style="border-color:var(--sky);color:var(--sky)">Claude（Artifacts）で作成｜いけとも式</span></div>
+  <div class="hint" data-a="fade" style="--d:2s"><kbd>→</kbd>進む <kbd>←</kbd>戻る <kbd>F</kbd>全画面</div>
+</section>
+
+<!-- 1b MOTION はじめに：この資料の作り方 -->
+<section class="pg mo" data-ch="0">
+<div class="mg" style="--bg:#F3F6FA;--fg:#131f39;--mute:#56627a;--acc:#084690;--card:#ffffff;--line:rgba(19,31,57,.2);--ink2:#ffffff;--gridc:rgba(19,31,57,.06)">
+  <div class="grid"></div>
+  <div class="hd">はじめに｜この資料の作り方</div><div class="tag">INTRO</div>
+
+  <section class="scene" data-dur="3.5" data-name="問い"><div class="cam">
+    <div class="lbl abs" style="left:120px;top:250px;--d:.2s" data-a="fade">QUESTION</div>
+    <h2 class="ttl abs" style="left:120px;top:300px;width:1360px;font-size:104px">
+      <span class="mask"><span data-a="rise" style="--d:.4s">この動く資料、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.54s"><em class="em">どうやって</em>作った？</span></span>
+    </h2>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="材料"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">STEP 1｜材料</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:820px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">いけともさんの資料を</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s"><em class="em">Claude</em>に渡した</span></span>
+    </h2>
+    <div class="sub abs" style="left:124px;top:440px;width:760px;font-size:30px;--d:1.1s" data-a="up">講座で配られた、動きのあるHTML資料</div>
+    <div class="card abs" style="left:960px;top:240px;width:520px;--d:1.4s;--t:.5s" data-a="right"><small>10/3 AIエージェントチーム Day1</small>76ページ（動き20ページ）</div>
+    <div class="card abs" style="left:960px;top:400px;width:520px;--d:1.52s;--t:.5s" data-a="right"><small>11/8 ループウェア Day2</small>84ページ（動き21ページ）</div>
+    <div class="arrow abs" style="left:1190px;top:540px;font-size:60px;--d:2s" data-a="fade">↓</div>
+    <div class="card acc abs" style="left:960px;top:630px;width:520px;text-align:center;--d:2.3s;--t:.6s" data-a="pop"><small>CLAUDE｜ARTIFACTS</small>中身を読み取る</div>
+  </div></section>
+
+  <section class="scene" data-dur="7.5" data-name="分解"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">STEP 2｜分解して数える</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;font-size:72px"><span class="mask"><span data-a="rise" style="--d:.3s">分かりやすさを<em class="em">数字</em>にした</span></span></h2>
+    <div class="abs" style="left:120px;top:370px;--d:.9s;--t:.8s" data-a="slam"><span style="font:900 150px/1 var(--f-mono);color:var(--acc)">36</span><span style="font-size:40px;font-weight:900;color:var(--mute);margin-left:10px">秒</span></div>
+    <div class="sub abs" style="left:124px;top:550px;width:640px;font-size:30px;--d:1.6s" data-a="up">動くページ1枚の平均。約5つの場面に分けて、最後は止める</div>
+    <div class="card abs" style="left:860px;top:380px;width:620px;font-size:28px;--d:2s;--t:.5s" data-a="left"><small>出し方</small>ほぼ5種類で回す（全体の約6割）</div>
+    <div class="card abs" style="left:860px;top:500px;width:620px;font-size:28px;--d:2.12s;--t:.5s" data-a="left"><small>順番</small>並んだ項目は0.12秒ずつずらす</div>
+    <div class="card abs" style="left:860px;top:620px;width:620px;font-size:28px;--d:2.24s;--t:.5s" data-a="left"><small>割合</small>動くページは全体の約4分の1</div>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="型にする"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">STEP 3｜型にする</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;font-size:72px"><span class="mask"><span data-a="rise" style="--d:.3s">次も使えるように<em class="em">型</em>に残した</span></span></h2>
+    <div class="card abs" style="left:120px;top:400px;width:430px;height:260px;--d:1s;--t:.5s" data-a="up"><small>1</small>解析レポート<span style="display:block;font-size:24px;color:var(--mute);font-weight:700;margin-top:12px;line-height:1.5">色・文字・動き・時間の決め方</span></div>
+    <div class="card abs" style="left:585px;top:400px;width:430px;height:260px;--d:1.12s;--t:.5s" data-a="up"><small>2</small>雛形のHTML<span style="display:block;font-size:24px;color:var(--mute);font-weight:700;margin-top:12px;line-height:1.5">1ファイルで動くページ</span></div>
+    <div class="card acc abs" style="left:1050px;top:400px;width:430px;height:260px;--d:1.24s;--t:.5s" data-a="up"><small>3</small>スキル<span style="display:block;font-size:24px;font-weight:700;margin-top:12px;line-height:1.5;opacity:.9">「いけとも式で作って」と頼めば、この手順で作る</span></div>
+  </div></section>
+
+  <section class="scene" data-dur="6" data-name="できたもの"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:200px;--d:.1s" data-a="fade">STEP 4｜できたもの</div>
+    <h2 class="ttl abs" style="left:120px;top:260px;width:1360px;font-size:104px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">そして作ったのが、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s"><em class="em">この資料</em>です</span></span>
+    </h2>
+    <div class="abs" style="left:1060px;top:600px;transform:rotate(-5deg)"><div data-a="stamp" style="--d:1.6s;--t:.6s"><span class="stampbox" style="font-size:40px">Claudeで作成</span></div></div>
+    <div class="sub abs" style="left:124px;top:620px;width:860px;font-size:30px;--d:1.2s" data-a="up">中身は互助会の話。作りだけを借りた（資料の画面は転載していません）</div>
+  </div></section>
+
+  <section class="scene" data-dur="8" data-name="まとめ"><div class="cam">
+    <div class="abs" style="left:120px;top:160px;width:580px">
+      <div class="lbl a" data-a="fade" style="--d:.1s">SUMMARY</div>
+      <h2 class="ttl" style="font-size:60px;margin-top:20px">
+        <span class="mask"><span data-a="rise" style="--d:.25s">良い資料は、</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.39s"><em class="em">分解すれば型</em>に</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.53s">なる</span></span>
+      </h2>
+    </div>
+    <ol class="sum abs" style="left:760px;top:160px;width:720px">
+      <li data-a="left" style="--d:.5s;--t:.5s"><i>1</i><span>いけともさんの資料を材料に<small>講座で配られたHTML</small></span></li>
+      <li data-a="left" style="--d:.62s;--t:.5s"><i>2</i><span>Claudeが分解して数える<small>時間・出し方・色・割合</small></span></li>
+      <li data-a="left" style="--d:.74s;--t:.5s"><i>3</i><span>型（雛形・スキル）に残す</span></li>
+      <li data-a="left" style="--d:.86s;--t:.5s"><i>4</i><span>型で、今日の資料を作った</span></li>
+    </ol>
+  </div></section>
+
+  <div class="segs"></div>
+  <div class="ctl"><button type="button" data-c="restart">最初から</button><button type="button" data-c="play">一時停止</button><button type="button" data-c="skip">スキップ</button></div>
+</div>
+</section>
+
+<!-- 2 今日の流れ -->
+<section class="pg st" data-ch="1">
+  <div class="hd">開会｜今日の流れ</div><div class="tag">AGENDA</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">今日は<em>7つ</em>の話をします</h2>
+    <div class="agenda" style="margin-top:20px">
+      <div data-a="up" style="--d:.6s"><span class="n">01</span><h3>開会</h3><p>今村さん歓迎・運営からの共有</p><span class="tm">20:00</span></div>
+      <div data-a="up" style="--d:.72s"><span class="n">02</span><h3>AI進化といま地点</h3><p>5段階の地図</p><span class="tm">20:10</span></div>
+      <div data-a="up" style="--d:.84s"><span class="n">03</span><h3>バイブコーディング</h3><p>頼めば作れる時代</p><span class="tm">20:20</span></div>
+      <div class="hi" data-a="up" style="--d:.96s"><span class="n">04</span><h3>初学者講座 第1回</h3><p>Cursor・3R・1社員1フォルダ</p><span class="tm">20:35</span></div>
+      <div data-a="up" style="--d:1.08s"><span class="n">05</span><h3>松野の実践</h3><p>ツールの使い分け・Todoist・Slack</p><span class="tm">21:10</span></div>
+      <div data-a="up" style="--d:1.2s"><span class="n">06</span><h3>おせっかいAI</h3><p>Grok bot・Muse</p><span class="tm">21:35</span></div>
+      <div data-a="up" style="--d:1.32s"><span class="n">07</span><h3>持ち帰り</h3><p>12月のご相談</p><span class="tm">21:45</span></div>
+    </div>
+    <p class="note" data-a="fade" style="--d:1.8s;margin-top:auto">全体を通すたとえ：AIを「AI社員」として扱います。各章の最後に、AI社員の一言で締めます。</p>
+  </div>
+</section>
+
+<!-- 3 章扉① -->
+<section class="pg door" data-ch="1">
+  <div class="no" data-a="fade" style="--d:.1s">CHAPTER 01</div>
+  <h2><span class="shn" data-a="shine" style="--d:.3s;--t:1.6s">開会</span></h2>
+  <div class="tm" data-a="up" style="--d:.9s"><b>20:00–20:10</b>（10分）｜新しい仲間と、運営からの共有</div>
+  <div class="chs"></div>
+</section>
+
+<!-- 4 ようこそ -->
+<section class="pg st" data-ch="1">
+  <div class="hd">開会｜新しい仲間</div><div class="tag">SECTION 01</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">ようこそ、<em>今村さん</em></h2>
+    <p class="ld" data-a="up" style="--d:.6s">運営とメンバーをつなぐパイプ役として参加してくださいます。よろしくお願いします。</p>
+    <div class="g2" style="margin-top:10px">
+      <div class="box hi" data-a="left" style="--d:1s"><span class="k">WELCOME</span><h3>今村さん</h3><p>神・大家さん倶楽部の運営スタッフ。10/28から参加</p></div>
+      <div class="box" data-a="left" style="--d:1.12s"><span class="k">TOGETHER</span><h3>友利さんと一緒に</h3><p>先月から参加の友利さんと、今月から「初学者講座」（月1回30分）を始めます</p></div>
+    </div>
+    <p class="note" data-a="fade" style="--d:1.6s;margin-top:auto">今日は言葉をやさしく、実演を多めにします。</p>
+  </div>
+</section>
+
+<!-- 5 Q&Aチャットボット -->
+<section class="pg st" data-ch="1">
+  <div class="hd">開会｜運営打ち合わせの共有</div><div class="tag">SECTION 01</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">Q&amp;Aチャットボットは、<em>11月末</em>に先行公開</h2>
+    <div class="g3">
+      <div class="box hi" data-a="up" style="--d:.7s"><span class="k">11月末</span><h3>先行公開</h3><p>エグゼクティブラウンジで公開予定</p></div>
+      <div class="box" data-a="up" style="--d:.82s"><span class="k">これから</span><h3>公式に使う</h3><p>これから公式に使っていきます</p></div>
+      <div class="box" data-a="up" style="--d:.94s"><span class="k">いま</span><h3>機能を充実中</h3><p>11月末に向けて、機能を足しているところ</p></div>
+    </div>
+    <p class="ld" data-a="up" style="--d:1.4s">皆さん、検証へのご協力ありがとうございました。</p>
+    <p class="note" data-a="fade" style="--d:1.8s;margin-top:auto">中身は当日、チャットボットの画面を映して補足します。</p>
+  </div>
+</section>
+
+<!-- 6 Q -->
+<section class="pg q" data-ch="2">
+  <div class="band"></div><div class="Q" data-a="pop" style="--d:.1s">Q</div><div class="ql" data-a="bar" style="--d:.5s"></div>
+  <div class="qbox">
+    <div class="qlbl" data-a="fade" style="--d:.4s">QUESTION｜考えてみよう</div>
+    <p class="qq" data-a="up" style="--d:.6s">AIの使い方、あなたは<em>いま</em>どの段階？</p>
+    <p class="qs" data-a="up" style="--d:1.1s">頼み方の工夫だけ？ 資料も渡している？ 仕組みで回している？</p>
+  </div>
+</section>
+
+<!-- 7 章扉② -->
+<section class="pg door" data-ch="2">
+  <div class="no" data-a="fade" style="--d:.1s">CHAPTER 02</div>
+  <h2><span class="shn" data-a="shine" style="--d:.3s;--t:1.6s">AI進化といま地点</span></h2>
+  <div class="tm" data-a="up" style="--d:.9s"><b>20:10–20:20</b>（10分）｜5つの階を、ざっと上る</div>
+  <div class="chs"></div>
+</section>
+
+<!-- 8 MOTION 5段階 -->
+<section class="pg mo" data-ch="2">
+<div class="mg" style="--bg:#07203a;--fg:#fff;--mute:#c9dcf2;--acc:#ff7a5c;--card:rgba(4,18,36,.85);--line:rgba(201,220,242,.35);--ink2:#061a2f;--gridc:rgba(255,255,255,.08)">
+  <div class="grid"></div>
+  <div class="hd">AI進化といま地点｜5つの階</div><div class="tag">SECTION 02</div>
+
+  <section class="scene" data-dur="3.5" data-name="問い"><div class="cam">
+    <div class="lbl abs" style="left:120px;top:250px;--d:.2s" data-a="fade">QUESTION</div>
+    <h2 class="ttl abs" style="left:120px;top:300px;width:1360px;font-size:104px">
+      <span class="mask"><span data-a="rise" style="--d:.4s">AIの使い方は、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.54s"><em class="em">何段階</em>で進化してきた？</span></span>
+    </h2>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="1〜2階"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">FLOOR 1–2｜土台</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:820px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">まずは<em class="em">頼み方</em>と、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s">渡す資料</span></span>
+    </h2>
+    <div class="card abs" style="left:120px;top:440px;width:800px;--d:1.1s;--t:.5s" data-a="left"><small>① プロンプト</small>頼み方を工夫する</div>
+    <div class="card abs" style="left:120px;top:580px;width:800px;--d:1.22s;--t:.5s" data-a="left"><small>② コンテキスト</small>資料・履歴・ルールを渡す</div>
+    <div class="ex abs" style="left:124px;top:720px;width:800px;--d:1.9s" data-a="up">松野：LINE・メール・やり取りの記録を、AIが読める所に集めて渡している</div>
+    <div data-bld="2"></div>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="3階"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">FLOOR 3｜ハーネス</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:820px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">AIが動く<em class="em">環境</em>を</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s">整える</span></span>
+    </h2>
+    <div class="sub abs" style="left:124px;top:440px;width:800px;--d:1.1s" data-a="up">道具とルール。ミスを、人の注意ではなく仕組みで止める</div>
+    <div class="ex abs" style="left:124px;top:620px;width:800px;--d:1.7s" data-a="up">松野：外に送る前に必ず人が確認／Slackは本人名義で投稿できない設定</div>
+    <div data-bld="3"></div>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="4階"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">FLOOR 4｜ループ</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:820px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">人の判断を<em class="em">記録</em>して、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s">次を良くする</span></span>
+    </h2>
+    <div class="ex abs" style="left:124px;top:450px;width:800px;--d:1.2s" data-a="up">松野：直した理由をルールに残し、次の依頼に渡す。Slackのボタンで押した判断も記録に残る</div>
+    <div class="abs" style="left:120px;top:640px;--d:2.4s;--t:.6s" data-a="stamp"><span class="stampbox">松野はいまここ</span></div>
+    <div data-bld="4" data-here="4"></div>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="5階"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">FLOOR 5｜グラフ（次）</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:820px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">作業と判断の<em class="em">関門</em>を</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s">つなぐ</span></span>
+    </h2>
+    <div class="abs" style="left:120px;top:450px;width:820px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-size:26px;font-weight:900">
+      <span class="card" style="font-size:24px;padding:10px 16px;--d:1s;--t:.5s" data-a="pop">受信</span><span class="arrow" style="font-size:28px;--d:1.06s" data-a="fade">→</span>
+      <span class="card" style="font-size:24px;padding:10px 16px;--d:1.12s;--t:.5s" data-a="pop">要約</span><span class="arrow" style="font-size:28px;--d:1.18s" data-a="fade">→</span>
+      <span class="card" style="font-size:24px;padding:10px 16px;--d:1.24s;--t:.5s" data-a="pop">返信の下書き</span><span class="arrow" style="font-size:28px;--d:1.3s" data-a="fade">→</span>
+      <span class="card" style="font-size:24px;padding:10px 16px;--d:1.36s;--t:.5s" data-a="pop">チェック</span><span class="arrow" style="font-size:28px;--d:1.42s" data-a="fade">→</span>
+      <span class="card acc" style="font-size:24px;padding:10px 16px;--d:2.2s;--t:.6s" data-a="stamp">承認＝人</span><span class="arrow" style="font-size:28px;--d:1.54s" data-a="fade">→</span>
+      <span class="card" style="font-size:24px;padding:10px 16px;--d:1.6s;--t:.5s" data-a="pop">送信</span><span class="arrow" style="font-size:28px;--d:1.66s" data-a="fade">→</span>
+      <span class="card" style="font-size:24px;padding:10px 16px;--d:1.72s;--t:.5s" data-a="pop">記録</span>
+    </div>
+    <div class="ex abs" style="left:124px;top:690px;width:800px;--d:2.8s" data-a="up">例題：管理会社からの連絡。承認のところで人が判断する</div>
+    <div data-bld="5" data-here="4"></div>
+  </div></section>
+
+  <section class="scene" data-dur="8" data-name="まとめ"><div class="cam">
+    <div class="abs" style="left:120px;top:160px;width:560px">
+      <div class="lbl a" data-a="fade" style="--d:.1s">SUMMARY</div>
+      <h2 class="ttl" style="font-size:64px;margin-top:20px">
+        <span class="mask"><span data-a="rise" style="--d:.25s">AIの使い方は、</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.39s"><em class="em">5つの階</em>を</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.53s">上ってきた</span></span>
+      </h2>
+      <p class="ex" style="margin-top:40px;font-size:22px;--d:1.4s" data-a="up">出典：いけともさん（池田朋弘さん）ループウェア講座 Day1（2026-11-07）。詳しくは当日、資料のページを開いて紹介</p>
+    </div>
+    <ol class="sum abs" style="left:740px;top:150px;width:740px">
+      <li data-a="left" style="--d:.5s;--t:.5s"><i>1</i><span>プロンプト<small>頼み方を工夫する</small></span></li>
+      <li data-a="left" style="--d:.62s;--t:.5s"><i>2</i><span>コンテキスト<small>資料・履歴・ルールを渡す</small></span></li>
+      <li data-a="left" style="--d:.74s;--t:.5s"><i>3</i><span>ハーネス<small>道具とルールで、ミスを仕組みで止める</small></span></li>
+      <li data-a="left" style="--d:.86s;--t:.5s"><i>4</i><span>ループ（松野はいまここ）<small>人の判断を記録して、次を良くする</small></span></li>
+      <li data-a="left" style="--d:.98s;--t:.5s"><i>5</i><span>グラフ（次）<small>作業と判断の関門をつなぐ</small></span></li>
+    </ol>
+  </div></section>
+
+  <div class="segs"></div>
+  <div class="ctl"><button type="button" data-c="restart">最初から</button><button type="button" data-c="play">一時停止</button><button type="button" data-c="skip">スキップ</button></div>
+</div>
+</section>
+
+<!-- 9 章扉③ -->
+<section class="pg door" data-ch="3">
+  <div class="no" data-a="fade" style="--d:.1s">CHAPTER 03</div>
+  <h2><span class="shn" data-a="shine" style="--d:.3s;--t:1.6s">バイブコーディング</span></h2>
+  <div class="tm" data-a="up" style="--d:.9s"><b>20:20–20:35</b>（15分）｜今は、頼めばアプリができる</div>
+  <div class="chs"></div>
+</section>
+
+<!-- 10 MOTION レシピから料理へ -->
+<section class="pg mo" data-ch="3">
+<div class="mg" style="--bg:#F6F5FB;--fg:#16193A;--mute:#5b5f80;--acc:#3F3CD8;--card:#ffffff;--line:rgba(22,25,58,.2);--ink2:#ffffff;--gridc:rgba(22,25,58,.06)">
+  <div class="grid"></div>
+  <div class="hd">バイブコーディング｜レシピから料理へ</div><div class="tag">SECTION 03</div>
+
+  <section class="scene" data-dur="3.5" data-name="問い"><div class="cam">
+    <div class="lbl abs" style="left:120px;top:250px;--d:.2s" data-a="fade">QUESTION</div>
+    <h2 class="ttl abs" style="left:120px;top:300px;width:1360px;font-size:104px">
+      <span class="mask"><span data-a="rise" style="--d:.4s">AIに頼むと、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.54s"><em class="em">何</em>が返ってくる？</span></span>
+    </h2>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="少し前"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">BEFORE｜少し前</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;font-size:88px"><span class="mask"><span data-a="rise" style="--d:.3s"><em class="em">レシピ</em>が返ってきた</span></span></h2>
+    <div class="sub abs" style="left:124px;top:350px;--d:1s" data-a="up">チャットにコードやマクロが出て、作るのは人</div>
+    <div class="card abs" style="left:120px;top:500px;width:360px;--d:1.5s;--t:.5s" data-a="left"><small>AI</small>コードが出る</div>
+    <div class="arrow abs" style="left:500px;top:520px;--d:1.7s" data-a="fade">→</div>
+    <div class="card abs" style="left:570px;top:500px;width:400px;--d:1.62s;--t:.5s" data-a="left"><small>人</small>コピーして貼る</div>
+    <div class="arrow abs" style="left:990px;top:520px;--d:1.82s" data-a="fade">→</div>
+    <div class="card abs" style="left:1060px;top:500px;width:420px;--d:1.74s;--t:.5s" data-a="left"><small>人</small>動かない…</div>
+    <svg class="ln" viewBox="0 0 1600 900"><path class="r" d="M1270 610 C1270 720 770 720 770 618" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:2.6s;--t:.9s"/><path class="r" d="M752 640 L770 616 L790 640" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:3.4s;--t:.3s"/></svg>
+    <div class="abs" style="left:900px;top:700px;font-size:30px;font-weight:900;color:var(--acc);--d:3.3s" data-a="up">また聞く（くり返し）</div>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="今"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">NOW｜今</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;font-size:88px"><span class="mask"><span data-a="rise" style="--d:.3s"><em class="em">料理</em>が出てくる</span></span></h2>
+    <div class="sub abs" style="left:124px;top:350px;--d:1s" data-a="up">頼むと、資料やアプリそのものができる</div>
+    <div class="card abs" style="left:120px;top:500px;width:360px;--d:1.5s;--t:.5s" data-a="left"><small>人</small>言葉で頼む</div>
+    <div class="arrow abs" style="left:500px;top:520px;--d:1.7s" data-a="fade">→</div>
+    <div class="card acc abs" style="left:570px;top:480px;width:440px;font-size:40px;padding:30px 30px;--d:2.1s;--t:.8s" data-a="slam"><small>AI</small>資料・アプリができる</div>
+    <div class="arrow abs" style="left:1030px;top:520px;--d:2.6s" data-a="fade">→</div>
+    <div class="card abs" style="left:1100px;top:500px;width:380px;--d:2.8s;--t:.5s" data-a="left"><small>人</small>「ここを直して」</div>
+    <div class="ex abs" style="left:124px;top:700px;width:1300px;--d:3.4s" data-a="up">貼り付けも動作確認も、CursorやClaude CodeではAIが自分でやる</div>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="必要な力"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">SKILL｜人に必要な力</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;font-size:88px"><span class="mask"><span data-a="rise" style="--d:.3s">必要なのは<em class="em">2つ</em>の力</span></span></h2>
+    <div class="card abs" style="left:120px;top:420px;width:640px;font-size:44px;padding:30px 34px;--d:1.1s;--t:.6s" data-a="up"><small>1</small>言葉にする力<span style="display:block;font-size:26px;color:var(--mute);margin-top:8px">何を作りたいかを伝える</span></div>
+    <div class="card abs" style="left:820px;top:420px;width:660px;font-size:44px;padding:30px 34px;--d:1.24s;--t:.6s" data-a="up"><small>2</small>確かめる力<span style="display:block;font-size:26px;color:var(--mute);margin-top:8px">できたものを見て「ここを直して」</span></div>
+    <div class="abs" style="left:124px;top:690px;font-size:30px;font-weight:700;color:var(--mute);--d:2.2s" data-a="fade">プログラムを読む力は、<span style="text-decoration:line-through;text-decoration-color:var(--acc);text-decoration-thickness:4px">必須</span> 参加条件ではありません</div>
+  </div></section>
+
+  <section class="scene" data-dur="8" data-name="まとめ"><div class="cam">
+    <div class="abs" style="left:120px;top:160px;width:580px">
+      <div class="lbl a" data-a="fade" style="--d:.1s">SUMMARY</div>
+      <h2 class="ttl" style="font-size:64px;margin-top:20px">
+        <span class="mask"><span data-a="rise" style="--d:.25s">人の仕事は、</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.39s"><em class="em">頼んで確かめる</em></span></span>
+        <span class="mask"><span data-a="rise" style="--d:.53s">こと</span></span>
+      </h2>
+    </div>
+    <ol class="sum abs" style="left:760px;top:160px;width:720px">
+      <li data-a="left" style="--d:.5s;--t:.5s"><i>1</i><span>少し前＝レシピ<small>コードをコピーして、人が作る</small></span></li>
+      <li data-a="left" style="--d:.62s;--t:.5s"><i>2</i><span>今＝料理<small>頼むと資料やアプリができる</small></span></li>
+      <li data-a="left" style="--d:.74s;--t:.5s"><i>3</i><span>必要なのは2つの力<small>言葉にする力と、確かめる力</small></span></li>
+    </ol>
+  </div></section>
+
+  <div class="segs"></div>
+  <div class="ctl"><button type="button" data-c="restart">最初から</button><button type="button" data-c="play">一時停止</button><button type="button" data-c="skip">スキップ</button></div>
+</div>
+</section>
+
+<!-- 11 バイブコーディングとは -->
+<section class="pg st" data-ch="3">
+  <div class="hd">バイブコーディング｜手段と目的</div><div class="tag">SECTION 03</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">バイブコーディングは<em>手段</em>。目的は業務を楽にすること</h2>
+    <p class="ld" data-a="up" style="--d:.6s">普段の言葉で話しかけると、AIがプログラムを書き、直してくれる作り方。</p>
+    <div class="g2">
+      <div class="box" data-a="left" style="--d:1s"><span class="k">手段</span><h3>バイブコーディング</h3><p>会話と同じ感覚で、アプリや資料を作る。上達そのものは目的にしない</p></div>
+      <div class="box hi" data-a="left" style="--d:1.12s"><span class="k">目的</span><h3>紙・転記・確認を、一つずつ楽に</h3><p>賃貸業務の手間を、一つずつ自動化していく</p></div>
+    </div>
+    <p class="note" data-a="fade" style="--d:1.6s;margin-top:auto">コードが書けることは、この会の参加条件ではありません。</p>
+  </div>
+</section>
+
+<!-- 11b MOTION バイブコーディング7段 -->
+<section class="pg mo" data-ch="3">
+<div class="mg" style="--bg:#F2EDF9;--fg:#211833;--mute:#5d5270;--acc:#7343BC;--card:#ffffff;--line:rgba(33,24,51,.2);--ink2:#ffffff;--gridc:rgba(33,24,51,.06)">
+  <div class="grid"></div>
+  <div class="hd">バイブコーディング｜7つのレベル</div><div class="tag">SECTION 03</div>
+
+  <section class="scene" data-dur="3.5" data-name="問い"><div class="cam">
+    <div class="lbl abs" style="left:120px;top:250px;--d:.2s" data-a="fade">QUESTION</div>
+    <h2 class="ttl abs" style="left:120px;top:300px;width:1360px;font-size:104px">
+      <span class="mask"><span data-a="rise" style="--d:.4s">業務で使えるのは、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.54s"><em class="em">何段目</em>から？</span></span>
+    </h2>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="L1〜3"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:160px;--d:.1s" data-a="fade">LEVEL 1–3｜ブラウザの中で試す</div>
+    <h2 class="ttl abs" style="left:120px;top:205px;font-size:66px"><span class="mask"><span data-a="rise" style="--d:.3s">まずは<em class="em">ブラウザの中</em>で作ってみる</span></span></h2>
+    <div class="ex abs" style="left:124px;top:310px;width:940px;font-size:24px;--d:1.1s" data-a="up">L1 チャットで画面（HTML）／L2 Excel VBA・GASで事務作業／L3 Replitで試作してURLで共有</div>
+    <div data-stairs="3"></div>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="L4"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:160px;--d:.1s" data-a="fade">LEVEL 4｜手元のフォルダ</div>
+    <h2 class="ttl abs" style="left:120px;top:205px;font-size:66px"><span class="mask"><span data-a="rise" style="--d:.3s">不動産業務で使えるのは<em class="em">ここから</em></span></span></h2>
+    <div class="ex abs" style="left:124px;top:310px;width:940px;font-size:24px;--d:1.1s" data-a="up">Cursorで手元のファイル・フォルダを処理。自前の資料を直せて、データを外に出さない</div>
+    <div data-stairs="4" data-mark="1"></div>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="L5〜6"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:160px;--d:.1s" data-a="fade">LEVEL 5–6｜クラウドと記録</div>
+    <h2 class="ttl abs" style="left:120px;top:205px;font-size:66px"><span class="mask"><span data-a="rise" style="--d:.3s">クラウドと手元を<em class="em">行き来</em>する</span></span></h2>
+    <div class="ex abs" style="left:124px;top:310px;width:940px;font-size:24px;--d:1.1s" data-a="up">L5 クラウドのAIが作り、手元で直す／L6 Gitで履歴を残し、取り返しのつかないミスを防ぐ</div>
+    <div data-stairs="6" data-mark="1"></div>
+  </div></section>
+
+  <section class="scene" data-dur="7.5" data-name="L7"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:160px;--d:.1s" data-a="fade">LEVEL 7｜AIチーム</div>
+    <h2 class="ttl abs" style="left:120px;top:205px;font-size:66px"><span class="mask"><span data-a="rise" style="--d:.3s">AIエージェントを<em class="em">チームメイト</em>に</span></span></h2>
+    <div class="ex abs" style="left:124px;top:310px;width:940px;font-size:24px;--d:1.1s" data-a="up">複数のAIが並行で作業してプルリクエストを出す。人はレビューとマージに集中</div>
+    <div data-stairs="7" data-mark="1" data-here="7"></div>
+  </div></section>
+
+  <section class="scene" data-dur="8" data-name="まとめ"><div class="cam">
+    <div class="abs" style="left:120px;top:150px;width:580px">
+      <div class="lbl a" data-a="fade" style="--d:.1s">SUMMARY</div>
+      <h2 class="ttl" style="font-size:58px;margin-top:20px">
+        <span class="mask"><span data-a="rise" style="--d:.25s">まずは<em class="em">レベル4</em></span></span>
+        <span class="mask"><span data-a="rise" style="--d:.39s">（Cursorで自分の</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.53s">フォルダ）から</span></span>
+      </h2>
+      <p class="ex" style="margin-top:30px;font-size:22px;--d:1.4s" data-a="up">上の段は、必要になったら一段ずつ。出典：いけともch「バイブコーディング完全入門（レベル7）」2025-05-27</p>
+    </div>
+    <ol class="sum abs" style="left:740px;top:140px;width:740px;gap:9px">
+      <li data-a="left" style="--d:.5s;--t:.5s;padding:9px 20px;font-size:24px"><i>1</i><span>チャットで画面（HTML）を作る</span></li>
+      <li data-a="left" style="--d:.62s;--t:.5s;padding:9px 20px;font-size:24px"><i>2</i><span>Excel VBA・GASで事務作業</span></li>
+      <li data-a="left" style="--d:.74s;--t:.5s;padding:9px 20px;font-size:24px"><i>3</i><span>Replitで試作し、URLで共有</span></li>
+      <li data-a="left" style="--d:.86s;--t:.5s;padding:9px 20px;font-size:24px;border-color:var(--acc)"><i>4</i><span>Cursorで手元のフォルダ<small>不動産業務はここから</small></span></li>
+      <li data-a="left" style="--d:.98s;--t:.5s;padding:9px 20px;font-size:24px"><i>5</i><span>クラウドと手元の二刀流</span></li>
+      <li data-a="left" style="--d:1.1s;--t:.5s;padding:9px 20px;font-size:24px"><i>6</i><span>Gitで履歴を残す</span></li>
+      <li data-a="left" style="--d:1.22s;--t:.5s;padding:9px 20px;font-size:24px"><i>7</i><span>AIエージェントをチームメイトに<small>松野はいまここ（入口）</small></span></li>
+    </ol>
+  </div></section>
+
+  <div class="segs"></div>
+  <div class="ctl"><button type="button" data-c="restart">最初から</button><button type="button" data-c="play">一時停止</button><button type="button" data-c="skip">スキップ</button></div>
+</div>
+</section>
+
+<!-- 12 MOTION 松野の場合 -->
+<section class="pg mo" data-ch="3">
+<div class="mg" style="--bg:#F4EDE0;--fg:#1E1B18;--mute:#5A554D;--acc:#BC3359;--card:#fffaf2;--line:rgba(30,27,24,.22);--ink2:#ffffff;--gridc:rgba(30,27,24,.06)">
+  <div class="grid"></div>
+  <div class="hd">バイブコーディング｜松野の場合</div><div class="tag">SECTION 03</div>
+
+  <section class="scene" data-dur="3.5" data-name="問い"><div class="cam">
+    <div class="lbl abs" style="left:120px;top:250px;--d:.2s" data-a="fade">QUESTION</div>
+    <h2 class="ttl abs" style="left:120px;top:300px;width:1360px;font-size:104px">
+      <span class="mask"><span data-a="rise" style="--d:.4s">作れるようになったら、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.54s"><em class="em">楽</em>になる？</span></span>
+    </h2>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="①集めた"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">STEP 1｜集めた</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:700px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">散らかった材料を</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s"><em class="em">1か所</em>に</span></span>
+    </h2>
+    <div class="sub abs" style="left:124px;top:440px;width:640px;--d:1.1s" data-a="up">LINE・メール・記録などのやり取りを、AIが読めるフォルダへ</div>
+    <svg class="ln" viewBox="0 0 1600 900"><rect x="900" y="300" width="560" height="420" rx="18" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:.8s;--t:.8s"/></svg>
+    <div class="abs" style="left:930px;top:250px;font:700 22px var(--f-mono);letter-spacing:.2em;color:var(--mute);--d:1s" data-a="fade">1か所（フォルダ）</div>
+    <div class="card abs" style="left:940px;top:340px;width:230px;font-size:28px;--x:-520px;--y:-120px;--r:-14deg;--d:1.5s;--t:.9s" data-a="gather">LINE</div>
+    <div class="card abs" style="left:1200px;top:340px;width:230px;font-size:28px;--x:120px;--y:-200px;--r:12deg;--d:1.62s;--t:.9s" data-a="gather">メール</div>
+    <div class="card abs" style="left:940px;top:460px;width:230px;font-size:28px;--x:-460px;--y:260px;--r:9deg;--d:1.74s;--t:.9s" data-a="gather">対応の記録</div>
+    <div class="card abs" style="left:1200px;top:460px;width:230px;font-size:28px;--x:160px;--y:240px;--r:-10deg;--d:1.86s;--t:.9s" data-a="gather">物件の資料</div>
+    <div class="card abs" style="left:940px;top:580px;width:490px;font-size:28px;--x:-300px;--y:300px;--r:6deg;--d:1.98s;--t:.9s" data-a="gather">パートナー社とのやり取り</div>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="②作った"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">STEP 2｜作った</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:760px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">集めた材料で、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s"><em class="em">いろいろ</em>作れた</span></span>
+    </h2>
+    <div class="card abs" style="left:120px;top:480px;width:380px;--d:.9s;--t:.5s" data-a="fade"><small>1か所</small>集めた材料</div>
+    <svg class="ln" viewBox="0 0 1600 900">
+      <path class="r" d="M500 540 C640 540 700 380 860 380" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:1.3s;--t:.6s"/>
+      <path class="r" d="M500 540 H860" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:1.42s;--t:.6s"/>
+      <path class="r" d="M500 540 C640 540 700 700 860 700" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:1.54s;--t:.6s"/>
+    </svg>
+    <div class="card abs" style="left:880px;top:330px;width:600px;--d:1.9s;--t:.5s" data-a="pop">メール下書きアプリ</div>
+    <div class="card abs" style="left:880px;top:490px;width:600px;--d:2.02s;--t:.5s" data-a="pop">やりたいことをまとめたアプリ</div>
+    <div class="card abs" style="left:880px;top:650px;width:600px;--d:2.14s;--t:.5s" data-a="pop">業務ごとの資料づくり</div>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="③続かなかった"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">STEP 3｜続かなかった</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:1360px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">でも、作っただけでは<em class="em">続かなかった</em></span></span>
+    </h2>
+    <div class="card abs" style="left:120px;top:380px;width:600px;height:300px;font-size:40px;--d:.9s;--t:.5s" data-a="fade"><small>例</small>メール下書きアプリ</div>
+    <div class="abs" style="left:300px;top:560px;transform:rotate(-8deg)"><div data-a="stamp" style="--d:2.6s;--t:.6s"><span class="stampbox" style="font-size:44px">止まった</span></div></div>
+    <div class="ex abs" style="left:800px;top:400px;width:680px;--d:1.3s" data-a="left">返すべきメールを選べず、全部拾ってしまう</div>
+    <div class="ex abs" style="left:800px;top:500px;width:680px;--d:1.42s" data-a="left">1つずつ返すのが面倒</div>
+    <div class="ex abs" style="left:800px;top:600px;width:680px;--d:1.54s" data-a="left">下書きの生成で、従量課金もかさんだ</div>
+  </div></section>
+
+  <section class="scene" data-dur="8" data-name="まとめ"><div class="cam">
+    <div class="abs" style="left:120px;top:160px;width:580px">
+      <div class="lbl a" data-a="fade" style="--d:.1s">SUMMARY</div>
+      <h2 class="ttl" style="font-size:64px;margin-top:20px">
+        <span class="mask"><span data-a="rise" style="--d:.25s">作るだけでは</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.39s">回らない。</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.53s"><em class="em">回す仕組み</em>へ</span></span>
+      </h2>
+    </div>
+    <ol class="sum abs" style="left:760px;top:160px;width:720px">
+      <li data-a="left" style="--d:.5s;--t:.5s"><i>1</i><span>集めた<small>散らかった材料を1か所に</small></span></li>
+      <li data-a="left" style="--d:.62s;--t:.5s"><i>2</i><span>作った<small>集めた材料で、いろいろ作れた</small></span></li>
+      <li data-a="left" style="--d:.74s;--t:.5s"><i>3</i><span>続かなかった<small>作っただけでは、仕事は回らない</small></span></li>
+      <li data-a="left" style="--d:.86s;--t:.5s"><i>4</i><span>回す仕組みへ<small>後半：Todoist と Slack</small></span></li>
+    </ol>
+  </div></section>
+
+  <div class="segs"></div>
+  <div class="ctl"><button type="button" data-c="restart">最初から</button><button type="button" data-c="play">一時停止</button><button type="button" data-c="skip">スキップ</button></div>
+</div>
+</section>
+
+<!-- 13 メンバーも作っている -->
+<section class="pg st" data-ch="3">
+  <div class="hd">バイブコーディング｜メンバーの事例</div><div class="tag">SECTION 03</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">メンバーも、もう<em>作っている</em></h2>
+    <div class="g3">
+      <div class="box" data-a="up" style="--d:.7s"><span class="k">本多さん</span><h3>周辺マップ</h3><p>Cursorで物件の周辺マップを作った（10/18に紹介）</p></div>
+      <div class="box" data-a="up" style="--d:.82s"><span class="k">岡田さん</span><h3>物件探しの自動化</h3><p>集める・見分ける・問い合わせるを、Claudeとスプレッドシートで。人は投資判断に集中</p></div>
+      <div class="box" data-a="up" style="--d:.94s"><span class="k">松野</span><h3>やりたいことアプリ</h3><p>自分がやりたいことをまとめたアプリを作った</p></div>
+    </div>
+    <div class="shime" data-a="up" style="--d:1.6s">バイブコーディングで、アプリも成果物も作れる。AIは「社員」として働ける時代</div>
+  </div>
+</section>
+
+<!-- 14 Q -->
+<section class="pg q" data-ch="4">
+  <div class="band"></div><div class="Q" data-a="pop" style="--d:.1s">Q</div><div class="ql" data-a="bar" style="--d:.5s"></div>
+  <div class="qbox">
+    <div class="qlbl" data-a="fade" style="--d:.4s">QUESTION｜考えてみよう</div>
+    <p class="qq" data-a="up" style="--d:.6s">AIに頼むとき、<em>何</em>を伝えていますか？</p>
+    <p class="qs" data-a="up" style="--d:1.1s">一言だけ？ 役割も？ 見てほしい資料も？</p>
+  </div>
+</section>
+
+<!-- 15 章扉④ -->
+<section class="pg door" data-ch="4">
+  <div class="no" data-a="fade" style="--d:.1s">CHAPTER 04</div>
+  <h2><span class="shn" data-a="shine" style="--d:.3s;--t:1.6s">初学者講座 第1回</span></h2>
+  <div class="tm" data-a="up" style="--d:.9s"><b>20:35–21:10</b>（35分）｜まずはCursorを作業台に</div>
+  <div class="chs"></div>
+</section>
+
+<!-- 16 シリーズ -->
+<section class="pg st" data-ch="4">
+  <div class="hd">初学者講座｜シリーズの全体</div><div class="tag">SECTION 04</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">目指すのは、<em>自分で作れる</em>ところまで</h2>
+    <p class="ld" data-a="up" style="--d:.5s;font-size:28px">シリーズ「AI社員と一緒に、大家業を一つずつ楽にする」</p>
+    <div class="stair" style="margin-top:auto">
+      <div class="today" style="height:46%;--d:.9s" data-a="up"><span class="n">STEP 1｜今日</span><h3>頼んで使える</h3><p>Cursorを作業台に、AIに頼む</p></div>
+      <div style="height:64%;--d:1.02s" data-a="up"><span class="n">STEP 2</span><h3>指示書を直せる</h3><p>うまくいった手順を書き残す</p></div>
+      <div style="height:82%;--d:1.14s" data-a="up"><span class="n">STEP 3</span><h3>機能を足せる</h3><p>外のサービスとつなぐ</p></div>
+      <div style="height:100%;--d:1.26s" data-a="up"><span class="n">STEP 4</span><h3>自分で作れる</h3><p>業務のアプリを自分で作る</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 17 Cursorは棚と机 -->
+<section class="pg st" data-ch="4">
+  <div class="hd">初学者講座｜Cursorとは</div><div class="tag">SECTION 04</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">Cursorは、<em>棚と机</em>がついたAI</h2>
+    <div class="g3" style="flex:1">
+      <div class="box" data-a="up" style="--d:.7s"><span class="k">左｜棚</span><h3>フォルダ</h3><p>資料の棚。業務ごとに資料を並べておく</p></div>
+      <div class="box" data-a="up" style="--d:.82s"><span class="k">真ん中｜机</span><h3>ファイル</h3><p>作業机。いま開いている資料や成果物</p></div>
+      <div class="box hi" data-a="up" style="--d:.94s"><span class="k">右｜隣の席</span><h3>AIチャット</h3><p>隣に座るアシスタント。話しかけて頼む</p></div>
+    </div>
+    <p class="ld" data-a="up" style="--d:1.4s">チャットAIとの違い：AIが<span style="color:var(--brand)">自分でファイルを読み、作り、直す</span></p>
+  </div>
+</section>
+
+<!-- 18 拡張機能 -->
+<section class="pg st" data-ch="4">
+  <div class="hd">初学者講座｜入れておきたい拡張機能</div><div class="tag">SECTION 04</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">拡張機能で、<em>見られるもの</em>が増える</h2>
+    <div class="g4">
+      <div class="box" data-a="pop" style="--d:.7s"><span class="k">日本語化</span><h3>メニューが日本語に</h3><p>Japanese Language Pack</p></div>
+      <div class="box" data-a="pop" style="--d:.82s"><span class="k">PDF</span><h3>PDFを開ける</h3><p>vscode-pdf など</p></div>
+      <div class="box" data-a="pop" style="--d:.94s"><span class="k">EXCEL</span><h3>表のまま見られる</h3><p>Excel Viewer など</p></div>
+      <div class="box" data-a="pop" style="--d:1.06s"><span class="k">CSV</span><h3>列ごとに色分け</h3><p>Rainbow CSV など</p></div>
+    </div>
+    <p class="ld" data-a="up" style="--d:1.4s">入れ方：左の「拡張機能」から名前で探して入れる（当日、画面で）</p>
+    <p class="note" data-a="fade" style="--d:1.7s;margin-top:auto">Markdownのプレビューは最初から使えます。</p>
+  </div>
+</section>
+
+<!-- 19 音声入力 -->
+<section class="pg st" data-ch="4">
+  <div class="hd">初学者講座｜頼み方①</div><div class="tag">SECTION 04</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">頼み方①：まずは<em>話して</em>伝える</h2>
+    <p class="ld" data-a="up" style="--d:.5s">メンバーの大勢が「絶対にやった方がいい」。まずは無料の音声入力から。</p>
+    <div class="g2">
+      <div class="box" data-a="left" style="--d:.9s"><span class="k">TYPELESS</span><h3>整った長文向き</h3><p>話した内容を、読みやすい文章に整えてくれる</p></div>
+      <div class="box" data-a="left" style="--d:1.02s"><span class="k">AQUA VOICE</span><h3>速い短文向き</h3><p>すばやく入力できて、料金を抑えやすい</p></div>
+    </div>
+    <p class="note" data-a="fade" style="--d:1.5s;margin-top:auto">料金は米ドル建てで変わりやすいので、当日までに公式で確認します。</p>
+  </div>
+</section>
+
+<!-- 20 MOTION 3R -->
+<section class="pg mo" data-ch="4">
+<div class="mg" style="--bg:#0E2B25;--fg:#F4F7F2;--mute:#b9cbbf;--acc:#FFB84D;--card:rgba(5,22,18,.85);--line:rgba(185,203,191,.35);--ink2:#1b1300;--gridc:rgba(255,255,255,.07)">
+  <div class="grid"></div>
+  <div class="hd">初学者講座｜頼み方②：3R</div><div class="tag">SECTION 04</div>
+
+  <section class="scene" data-dur="4" data-name="問い"><div class="cam">
+    <div class="lbl abs" style="left:120px;top:250px;--d:.2s" data-a="fade">QUESTION</div>
+    <h2 class="ttl abs" style="left:120px;top:300px;width:1360px;font-size:104px">
+      <span class="mask"><span data-a="rise" style="--d:.4s">超優秀な新人に、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.54s"><em class="em">何</em>を伝える？</span></span>
+    </h2>
+    <div class="sub abs" style="left:124px;top:580px;--d:1.4s;--t:.6s" data-a="up">ただし指示待ち。AIはそんな新人（RAIMO講座のたとえ）</div>
+  </div></section>
+
+  <section class="scene" data-dur="6" data-name="Role"><div class="cam">
+    <div class="abs" style="left:110px;top:150px;font:900 340px/1 var(--f-body);color:var(--acc);--d:.2s;--t:.8s" data-a="slam">R</div>
+    <div class="lbl a abs" style="left:520px;top:200px;--d:.5s" data-a="fade">ROLE</div>
+    <h2 class="ttl abs" style="left:520px;top:250px;font-size:88px"><span class="mask"><span data-a="rise" style="--d:.6s"><em class="em">誰として</em>働くか</span></span></h2>
+    <div class="card abs" style="left:520px;top:400px;width:960px;--d:1.4s;--t:.5s" data-a="left"><small>例</small>あなたは修繕受付係です</div>
+    <div data-rrr="1"></div>
+  </div></section>
+
+  <section class="scene" data-dur="6" data-name="Request"><div class="cam">
+    <div class="abs" style="left:110px;top:150px;font:900 340px/1 var(--f-body);color:var(--acc);--d:.2s;--t:.8s" data-a="slam">R</div>
+    <div class="lbl a abs" style="left:520px;top:200px;--d:.5s" data-a="fade">REQUEST</div>
+    <h2 class="ttl abs" style="left:520px;top:250px;font-size:88px"><span class="mask"><span data-a="rise" style="--d:.6s"><em class="em">何を</em>、何をしないか</span></span></h2>
+    <div class="card abs" style="left:520px;top:400px;width:960px;--d:1.4s;--t:.5s" data-a="left"><small>例</small>表にする。分からないところは「未確認」と書く</div>
+    <div data-rrr="2"></div>
+  </div></section>
+
+  <section class="scene" data-dur="6" data-name="Reference"><div class="cam">
+    <div class="abs" style="left:110px;top:150px;font:900 340px/1 var(--f-body);color:var(--acc);--d:.2s;--t:.8s" data-a="slam">R</div>
+    <div class="lbl a abs" style="left:520px;top:200px;--d:.5s" data-a="fade">REFERENCE</div>
+    <h2 class="ttl abs" style="left:520px;top:250px;font-size:88px"><span class="mask"><span data-a="rise" style="--d:.6s"><em class="em">何を見て</em>やるか</span></span></h2>
+    <div class="card abs" style="left:520px;top:400px;width:960px;--d:1.4s;--t:.5s" data-a="left"><small>例</small>修繕ルール.md と、受信メール</div>
+    <div data-rrr="3"></div>
+  </div></section>
+
+  <section class="scene" data-dur="9" data-name="頼んでみる"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">3R を1つの頼みごとに</div>
+    <div class="card abs" style="left:120px;top:230px;width:1360px;font-size:44px;line-height:1.6;padding:36px 44px;font-weight:700;--d:.2s;--t:.4s" data-a="fade">
+      <span data-type="0.6"><b style="color:var(--acc)">あなたは修繕受付係です。</b>受信メールを読んで、修繕の依頼を<b style="color:var(--acc)">表にしてください。分からないところは「未確認」と書いてください。</b><b style="color:var(--acc)">修繕ルール.md</b> に従ってください。</span>
+    </div>
+    <div class="sub abs" style="left:124px;top:640px;--d:5.6s" data-a="up">話して伝えてもOK（音声入力）</div>
+  </div></section>
+
+  <section class="scene" data-dur="8" data-name="まとめ"><div class="cam">
+    <div class="abs" style="left:120px;top:160px;width:580px">
+      <div class="lbl a" data-a="fade" style="--d:.1s">SUMMARY</div>
+      <h2 class="ttl" style="font-size:62px;margin-top:20px">
+        <span class="mask"><span data-a="rise" style="--d:.25s">3Rは、新しく入った</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.39s"><em class="em">AI社員</em>への</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.53s">頼み方</span></span>
+      </h2>
+    </div>
+    <ol class="sum abs" style="left:760px;top:160px;width:720px">
+      <li data-a="left" style="--d:.5s;--t:.5s"><i>R</i><span>Role<small>誰として（修繕受付係）</small></span></li>
+      <li data-a="left" style="--d:.62s;--t:.5s"><i>R</i><span>Request<small>何を・何をしないか（表に／分からなければ「未確認」）</small></span></li>
+      <li data-a="left" style="--d:.74s;--t:.5s"><i>R</i><span>Reference<small>何を見て（修繕ルール.md と受信メール）</small></span></li>
+    </ol>
+  </div></section>
+
+  <div class="segs"></div>
+  <div class="ctl"><button type="button" data-c="restart">最初から</button><button type="button" data-c="play">一時停止</button><button type="button" data-c="skip">スキップ</button></div>
+</div>
+</section>
+
+<!-- 21 5歩 -->
+<section class="pg st" data-ch="4">
+  <div class="hd">初学者講座｜自動化の進め方</div><div class="tag">SECTION 04</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">「これ自動化したい」は、<em>5歩</em>で形にする</h2>
+    <div class="steps" style="flex:1">
+      <div class="step" data-a="up" style="--d:.7s"><span class="n">1</span><h3>業務を1つ決める</h3><p>例：修繕依頼のメールを一覧にしたい</p></div>
+      <div class="step" data-a="up" style="--d:.82s"><span class="n">2</span><h3>フォルダに材料</h3><p>業務のフォルダを作り、受信メールやルールを入れる</p></div>
+      <div class="step" data-a="up" style="--d:.94s"><span class="n">3</span><h3>3Rで頼む</h3><p>話してOK</p></div>
+      <div class="step" data-a="up" style="--d:1.06s"><span class="n">4</span><h3>見比べて直す</h3><p>できたものを見て「ここを直して」</p></div>
+      <div class="step last" data-a="up" style="--d:1.18s"><span class="n">5</span><h3>指示書に残す</h3><p>次からは一言で頼める＝AI社員の誕生</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 22 フォルダは資料の棚 -->
+<section class="pg st" data-ch="4">
+  <div class="hd">初学者講座｜フォルダの作り方</div><div class="tag">SECTION 04</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">フォルダの構成は、<em>AIに提案</em>させればいい</h2>
+    <div class="g2" style="flex:1;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:14px;min-width:0;--d:.7s" data-a="left">
+        <span class="mono" style="font-size:18px;letter-spacing:.2em;color:var(--sub)">松野の例｜問い合わせの種類で分ける</span>
+<div class="tree"><b>C2_ルーティン作業/</b>
+├ 24_空室対策メール履歴/
+├ 25_契約確認/
+└ 26_パートナー社への相談/</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+        <div class="box" data-a="up" style="--d:1s"><span class="k">迷ったら</span><h3>「フォルダ構成を提案して」</h3><p>AIに聞けば、案を出してくれる</p></div>
+        <div class="box" data-a="up" style="--d:1.12s"><span class="k">好みでよい</span><h3>業務の中に物件？ 物件の中に業務？</h3><p>どちらでも働けます</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 23 MOTION 1社員1フォルダ -->
+<section class="pg mo" data-ch="4">
+<div class="mg" style="--bg:#F7F8FA;--fg:#142137;--mute:#56627a;--acc:#174CFA;--card:#ffffff;--line:rgba(20,33,55,.2);--ink2:#ffffff;--gridc:rgba(20,33,55,.06)">
+  <div class="grid"></div>
+  <div class="hd">初学者講座｜1社員1フォルダ</div><div class="tag">SECTION 04</div>
+
+  <section class="scene" data-dur="3.5" data-name="問い"><div class="cam">
+    <div class="lbl abs" style="left:120px;top:250px;--d:.2s" data-a="fade">QUESTION</div>
+    <h2 class="ttl abs" style="left:120px;top:300px;width:1360px;font-size:104px">
+      <span class="mask"><span data-a="rise" style="--d:.4s">AI社員の<em class="em">席</em>は、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.54s">どこにある？</span></span>
+    </h2>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="席＝フォルダ"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">SEAT｜席</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:760px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">業務ごとに<em class="em">1フォルダ</em></span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s">＝AI社員1人の席</span></span>
+    </h2>
+    <svg class="ln" viewBox="0 0 1600 900"><path class="r" d="M900 330 H1080 L1120 380 H1460 V740 H900 Z" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:.9s;--t:1s"/></svg>
+    <div class="card acc abs" style="left:1000px;top:480px;width:360px;text-align:center;font-size:40px;--d:1.9s;--t:.6s" data-a="pop"><small>名札</small>修繕受付係</div>
+    <div class="card ghost abs" style="left:120px;top:500px;width:340px;font-size:28px;--d:2.4s" data-a="fade">空室対策係</div>
+    <div class="card ghost abs" style="left:490px;top:500px;width:340px;font-size:28px;--d:2.52s" data-a="fade">契約確認係</div>
+    <div class="sub abs" style="left:124px;top:640px;width:720px;font-size:30px;--d:2.9s" data-a="up">ほかの業務にも、それぞれの席を</div>
+  </div></section>
+
+  <section class="scene" data-dur="8" data-name="3つの書類"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">3 DOCUMENTS｜いけともさん「AI社員」の3要素</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;font-size:80px"><span class="mask"><span data-a="rise" style="--d:.3s">席には<em class="em">3つ</em>の書類を置く</span></span></h2>
+    <div class="card abs" style="left:120px;top:380px;width:430px;height:330px;--d:1s;--t:.5s" data-a="up"><small>① 作業手順</small>指示書<span style="display:block;font-size:24px;color:var(--mute);font-weight:700;margin-top:14px;line-height:1.5">どうやって進めるか</span></div>
+    <div class="card abs" style="left:585px;top:380px;width:430px;height:330px;--d:1.14s;--t:.5s" data-a="up"><small>② 実行権限</small>使ってよい道具<span style="display:block;font-size:24px;color:var(--mute);font-weight:700;margin-top:14px;line-height:1.5">メール・ブラウザなど。お金・外部への送信・削除は人が確認</span></div>
+    <div class="card abs" style="left:1050px;top:380px;width:430px;height:330px;--d:1.28s;--t:.5s" data-a="up"><small>③ 報告先</small>いつも見るところ<span style="display:block;font-size:24px;color:var(--mute);font-weight:700;margin-top:14px;line-height:1.5">メールやSlack。AI専用ならSlackアプリが便利</span></div>
+    <div class="abs" style="left:1240px;top:690px;transform:rotate(-6deg)"><div data-a="stamp" style="--d:2.6s;--t:.6s"><span class="stampbox">3つで働ける</span></div></div>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="同じ席"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">SHARE｜だれが座っても</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;font-size:80px"><span class="mask"><span data-a="rise" style="--d:.3s">どのAIも、<em class="em">同じ席</em>で働ける</span></span></h2>
+    <div class="card acc abs" style="left:620px;top:470px;width:360px;text-align:center;font-size:36px;--d:.9s;--t:.5s" data-a="pop"><small>フォルダ</small>修繕受付係</div>
+    <svg class="ln" viewBox="0 0 1600 900">
+      <path class="r" d="M450 430 L620 500" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:1.5s;--t:.5s"/>
+      <path class="r" d="M800 400 V470" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:1.62s;--t:.5s"/>
+      <path class="r" d="M1150 430 L980 500" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:1.74s;--t:.5s"/>
+    </svg>
+    <div class="card abs" style="left:170px;top:380px;width:280px;text-align:center;--d:1.2s;--t:.5s" data-a="pop">Cursor</div>
+    <div class="card abs" style="left:660px;top:320px;width:280px;text-align:center;--d:1.32s;--t:.5s" data-a="pop">Claude Code</div>
+    <div class="card abs" style="left:1150px;top:380px;width:280px;text-align:center;--d:1.44s;--t:.5s" data-a="pop">Codex</div>
+    <div class="sub abs" style="left:124px;top:660px;width:1360px;font-size:32px;--d:2.4s" data-a="up">ツールが変わっても、席（フォルダ）と書類はそのまま使える</div>
+  </div></section>
+
+  <section class="scene" data-dur="8" data-name="まとめ"><div class="cam">
+    <div class="abs" style="left:120px;top:160px;width:580px">
+      <div class="lbl a" data-a="fade" style="--d:.1s">SUMMARY</div>
+      <h2 class="ttl" style="font-size:60px;margin-top:20px">
+        <span class="mask"><span data-a="rise" style="--d:.25s">フォルダは</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.39s">AI社員の席。</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.53s"><em class="em">手順・権限・報告先</em></span></span>
+        <span class="mask"><span data-a="rise" style="--d:.67s">で働ける</span></span>
+      </h2>
+      <p class="ex" style="margin-top:36px;font-size:22px;--d:1.4s" data-a="up">出典：いけともさん AIエージェントチーム構築術 Day1（2026-10-03）</p>
+    </div>
+    <ol class="sum abs" style="left:760px;top:150px;width:720px">
+      <li data-a="left" style="--d:.5s;--t:.5s"><i>1</i><span>業務ごとに1フォルダ<small>AI社員1人の席</small></span></li>
+      <li data-a="left" style="--d:.62s;--t:.5s"><i>2</i><span>作業手順＝指示書</span></li>
+      <li data-a="left" style="--d:.74s;--t:.5s"><i>3</i><span>実行権限＝使ってよい道具<small>お金・送信・削除は人が確認</small></span></li>
+      <li data-a="left" style="--d:.86s;--t:.5s"><i>4</i><span>報告先＝メールやSlack</span></li>
+      <li data-a="left" style="--d:.98s;--t:.5s"><i>5</i><span>どのAIも同じ席で働ける</span></li>
+    </ol>
+  </div></section>
+
+  <div class="segs"></div>
+  <div class="ctl"><button type="button" data-c="restart">最初から</button><button type="button" data-c="play">一時停止</button><button type="button" data-c="skip">スキップ</button></div>
+</div>
+</section>
+
+<!-- 24 課題 -->
+<section class="pg st" data-ch="4">
+  <div class="hd">初学者講座｜次回までに</div><div class="tag">SECTION 04</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">次回までに、<em>3つ</em>だけやってみる</h2>
+    <div class="g2" style="grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);flex:1;align-items:start">
+      <div class="box" data-a="left" style="--d:.7s"><span class="k">設定のコツ</span><h3>手順のMarkdownを保存して</h3><p>AIに「これで設定して」と頼む。設定もAIに任せられる</p></div>
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <div class="box hi" data-a="left" style="--d:.9s;flex-direction:row;align-items:center;gap:20px"><span class="k" style="font-size:34px">1</span><h3 style="font-size:32px">Cursorを入れて、自分のフォルダを作る</h3></div>
+        <div class="box" data-a="left" style="--d:1.02s;flex-direction:row;align-items:center;gap:20px"><span class="k" style="font-size:34px">2</span><h3 style="font-size:32px">AIにフォルダ構成を1回提案してもらう</h3></div>
+        <div class="box" data-a="left" style="--d:1.14s;flex-direction:row;align-items:center;gap:20px"><span class="k" style="font-size:34px">3</span><h3 style="font-size:32px">楽にしたい業務のフォルダを1つ作る</h3></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 25 Q -->
+<section class="pg q" data-ch="5">
+  <div class="band"></div><div class="Q" data-a="pop" style="--d:.1s">Q</div><div class="ql" data-a="bar" style="--d:.5s"></div>
+  <div class="qbox">
+    <div class="qlbl" data-a="fade" style="--d:.4s">QUESTION｜考えてみよう</div>
+    <p class="qq" data-a="up" style="--d:.6s">AIに頼んだ仕事、<em>どこ</em>で管理していますか？</p>
+    <p class="qs" data-a="up" style="--d:1.1s">終わったかどうか、すぐに分かりますか？</p>
+  </div>
+</section>
+
+<!-- 26 章扉⑤ -->
+<section class="pg door" data-ch="5">
+  <div class="no" data-a="fade" style="--d:.1s">CHAPTER 05</div>
+  <h2><span class="shn" data-a="shine" style="--d:.3s;--t:1.6s">松野の実践</span></h2>
+  <div class="tm" data-a="up" style="--d:.9s"><b>21:10–21:35</b>（25分）｜ツールの使い分けと、回す仕組み</div>
+  <div class="chs"></div>
+</section>
+
+<!-- 27 MOTION 4つのツール -->
+<section class="pg mo" data-ch="5">
+<div class="mg" style="--bg:#14130F;--fg:#F5F1E6;--mute:#c9c2ae;--acc:#FFD60A;--card:rgba(30,28,20,.9);--line:rgba(201,194,174,.35);--ink2:#14130F;--gridc:rgba(255,255,255,.06)">
+  <div class="grid"></div>
+  <div class="hd">松野の実践｜4つのツールの使い分け</div><div class="tag">SECTION 05</div>
+
+  <section class="scene" data-dur="3.5" data-name="問い"><div class="cam">
+    <div class="lbl abs" style="left:120px;top:250px;--d:.2s" data-a="fade">QUESTION</div>
+    <h2 class="ttl abs" style="left:120px;top:300px;width:1360px;font-size:104px">
+      <span class="mask"><span data-a="rise" style="--d:.4s">AIツールは、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.54s"><em class="em">1つ</em>に絞るべき？</span></span>
+    </h2>
+  </div></section>
+
+  <section class="scene" data-dur="10" data-name="4人の社員"><div class="cam">
+    <h2 class="ttl abs" style="left:120px;top:150px;font-size:76px"><span class="mask"><span data-a="rise" style="--d:.3s">AI社員にも<em class="em">得意・不得意</em>がある</span></span></h2>
+    <div class="card abs" style="left:120px;top:320px;width:320px;height:410px;--d:1s;--t:.6s" data-a="pop"><small>CURSOR</small>自分の<br>作業部屋<span style="display:block;font-size:22px;color:var(--mute);font-weight:700;margin-top:16px;line-height:1.55">棚と机が見えて、成果物を見やすく作れる。やりやすさが一番</span></div>
+    <div class="card abs" style="left:466px;top:320px;width:320px;height:410px;--d:1.8s;--t:.6s" data-a="pop"><small>CODEX</small>資料室の<br>職人<span style="display:block;font-size:22px;color:var(--mute);font-weight:700;margin-top:16px;line-height:1.55">手元のフォルダの資料を読み込んで作るのが得意</span></div>
+    <div class="card abs" style="left:812px;top:320px;width:320px;height:410px;--d:2.6s;--t:.6s" data-a="pop"><small>CLAUDE CODE</small>段取り上手な<br>現場監督<span style="display:block;font-size:22px;color:var(--mute);font-weight:700;margin-top:16px;line-height:1.55">デザインやアプリ作りに強い。タスクを一覧で見て抜け漏れが少ない</span></div>
+    <div class="card abs" style="left:1158px;top:320px;width:320px;height:410px;--d:3.4s;--t:.6s" data-a="pop"><small>GENCODE</small>控えの<br>助っ人<span style="display:block;font-size:22px;color:var(--mute);font-weight:700;margin-top:16px;line-height:1.55">Gensparkの機能の1つ。定期業務のバックアップとして補助的に</span></div>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="選び方"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">HOW TO CHOOSE</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;font-size:76px"><span class="mask"><span data-a="rise" style="--d:.3s">迷ったら、<em class="em">この一言</em>で選ぶ</span></span></h2>
+    <div class="abs" style="left:120px;top:370px;width:1360px;display:grid;gap:16px">
+      <div class="card" style="display:grid;grid-template-columns:1fr 520px;font-size:30px;--d:.9s;--t:.5s" data-a="left"><span>自分の棚を見ながら作る</span><span style="color:var(--acc)">→ 作業部屋（Cursor）</span></div>
+      <div class="card" style="display:grid;grid-template-columns:1fr 520px;font-size:30px;--d:1.02s;--t:.5s" data-a="left"><span>手元の資料で作る</span><span style="color:var(--acc)">→ 職人（Codex）</span></div>
+      <div class="card" style="display:grid;grid-template-columns:1fr 520px;font-size:30px;--d:1.14s;--t:.5s" data-a="left"><span>たくさんの作業を抜けなく進める</span><span style="color:var(--acc)">→ 現場監督（Claude Code）</span></div>
+      <div class="card" style="display:grid;grid-template-columns:1fr 520px;font-size:30px;--d:1.26s;--t:.5s" data-a="left"><span>みんな手一杯のとき</span><span style="color:var(--acc)">→ 控えの助っ人（GenCode）</span></div>
+    </div>
+  </div></section>
+
+  <section class="scene" data-dur="8" data-name="まとめ"><div class="cam">
+    <div class="abs" style="left:120px;top:160px;width:580px">
+      <div class="lbl a" data-a="fade" style="--d:.1s">SUMMARY</div>
+      <h2 class="ttl" style="font-size:62px;margin-top:20px">
+        <span class="mask"><span data-a="rise" style="--d:.25s">1人に全部任せず、</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.39s"><em class="em">得意な社員</em>に</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.53s">振り分ける</span></span>
+      </h2>
+      <p class="ex" style="margin-top:36px;font-size:22px;--d:1.4s" data-a="up">松野の使い方と体感（2026-11）。公式の比較ではありません。料金や上限は変わりやすいので数字は載せていません</p>
+    </div>
+    <ol class="sum abs" style="left:760px;top:160px;width:720px">
+      <li data-a="left" style="--d:.5s;--t:.5s"><i>1</i><span>Cursor＝作業部屋</span></li>
+      <li data-a="left" style="--d:.62s;--t:.5s"><i>2</i><span>Codex＝資料室の職人</span></li>
+      <li data-a="left" style="--d:.74s;--t:.5s"><i>3</i><span>Claude Code＝現場監督</span></li>
+      <li data-a="left" style="--d:.86s;--t:.5s"><i>4</i><span>GenCode＝控えの助っ人</span></li>
+    </ol>
+  </div></section>
+
+  <div class="segs"></div>
+  <div class="ctl"><button type="button" data-c="restart">最初から</button><button type="button" data-c="play">一時停止</button><button type="button" data-c="skip">スキップ</button></div>
+</div>
+</section>
+
+<!-- 28 MOTION Todoist・Slack・ループ -->
+<section class="pg mo" data-ch="5">
+<div class="mg" style="--bg:#0A1238;--fg:#ffffff;--mute:#b9c4ef;--acc:#3FE3F2;--card:rgba(6,12,40,.88);--line:rgba(185,196,239,.35);--ink2:#04122a;--gridc:rgba(255,255,255,.07)">
+  <div class="grid"></div>
+  <div class="hd">松野の実践｜Todoist・Slack・ループ</div><div class="tag">SECTION 05</div>
+
+  <section class="scene" data-dur="3.5" data-name="問い"><div class="cam">
+    <div class="lbl abs" style="left:120px;top:250px;--d:.2s" data-a="fade">QUESTION</div>
+    <h2 class="ttl abs" style="left:120px;top:300px;width:1360px;font-size:104px">
+      <span class="mask"><span data-a="rise" style="--d:.4s">AIに頼んだ仕事、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.54s"><em class="em">終わった</em>か分かる？</span></span>
+    </h2>
+  </div></section>
+
+  <section class="scene" data-dur="6" data-name="困りごと"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">BEFORE｜困っていたこと</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:760px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">頼んだ仕事が、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s"><em class="em">流れて</em>消えていた</span></span>
+    </h2>
+    <div class="sub abs" style="left:124px;top:440px;width:700px;font-size:30px;--d:1.1s" data-a="up">途中までやって、終わっていないまま話が流れる。何が終わったか見えない</div>
+    <div class="abs" style="left:930px;top:300px;transform:rotate(-7deg)"><div class="card ghost" style="font-size:30px;--d:1.4s" data-a="pop">途中まで…</div></div>
+    <div class="abs" style="left:1180px;top:380px;transform:rotate(6deg)"><div class="card ghost" style="font-size:30px;--d:1.52s" data-a="pop">どこまで終わった？</div></div>
+    <div class="abs" style="left:960px;top:500px;transform:rotate(4deg)"><div class="card ghost" style="font-size:30px;--d:1.64s" data-a="pop">あれ、どのAIに頼んだ？</div></div>
+    <div class="abs" style="left:1100px;top:640px;transform:rotate(-5deg)"><div class="card ghost" style="font-size:30px;--d:1.76s" data-a="pop">やりかけ</div></div>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="Todoist"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">TODOIST｜仕事の置き場</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:760px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">頼んだら、必ず</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s"><em class="em">1件</em>登録する</span></span>
+    </h2>
+    <div class="sub abs" style="left:124px;top:440px;width:700px;font-size:30px;--d:1.1s" data-a="up">どのAIから頼んでも、置き場は1つ。終わったか分かり、履歴も残る</div>
+    <div class="ex abs" style="left:124px;top:640px;width:700px;font-size:22px;--d:2.6s" data-a="up">公式のMCP（AIとつなぐ口）があり、ClaudeやCursorとすぐにつながった</div>
+    <svg class="ln" viewBox="0 0 1600 900"><rect x="900" y="290" width="580" height="460" rx="18" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:.8s;--t:.8s"/></svg>
+    <div class="abs" style="left:930px;top:250px;font:700 22px var(--f-mono);letter-spacing:.2em;color:var(--mute);--d:1s" data-a="fade">TODOIST</div>
+    <div class="card abs" style="left:930px;top:320px;width:520px;font-size:26px;--d:1.4s;--t:.5s" data-a="left">✓ 修繕メールを一覧に</div>
+    <div class="card abs" style="left:930px;top:425px;width:520px;font-size:26px;--d:1.52s;--t:.5s" data-a="left">✓ 空室対策の文面を作る</div>
+    <div class="card abs" style="left:930px;top:530px;width:520px;font-size:26px;--d:1.64s;--t:.5s" data-a="left">□ 契約書の差分を確認</div>
+    <div class="card abs" style="left:930px;top:635px;width:520px;font-size:26px;--d:1.76s;--t:.5s" data-a="left">□ 互助会の資料を直す</div>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="Slack"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">SLACK｜報告の窓口（トライアル中）</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:760px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">AI社員の報告は、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s"><em class="em">1か所</em>に届く</span></span>
+    </h2>
+    <div class="ex abs" style="left:124px;top:440px;width:700px;--d:1.1s" data-a="left">定型の確認は、ボタンで答える</div>
+    <div class="ex abs" style="left:124px;top:530px;width:700px;--d:1.22s" data-a="left">スレッドに返信すると、AIが巡回して対処</div>
+    <div class="ex abs" style="left:124px;top:620px;width:700px;--d:1.34s" data-a="left">ボタンも、言葉で頼めばAIが作ってくれる</div>
+    <svg class="ln" viewBox="0 0 1600 900"><rect x="1010" y="230" width="400" height="560" rx="44" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:.8s;--t:.8s"/></svg>
+    <div class="card abs" style="left:1040px;top:320px;width:340px;font-size:24px;line-height:1.5;border-radius:14px;--d:1.6s;--t:.5s" data-a="up"><small>AI社員</small>下書きを作りました。この内容で送ってよいですか？</div>
+    <div class="abs" style="left:1040px;top:560px;--d:2.4s;--t:.6s" data-a="stamp"><span class="card acc" style="display:inline-block;font-size:30px;padding:12px 30px;border-radius:12px">はい</span></div>
+    <div class="abs" style="left:1210px;top:560px;--d:2.2s;--t:.5s" data-a="pop"><span class="card" style="display:inline-block;font-size:30px;padding:12px 30px;border-radius:12px">直す</span></div>
+  </div></section>
+
+  <section class="scene" data-dur="7.5" data-name="ループ"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">LOOP｜5段階の④</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:640px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">押した判断が、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s"><em class="em">次</em>を良くする</span></span>
+    </h2>
+    <div class="sub abs" style="left:124px;top:440px;width:600px;font-size:30px;--d:1.1s" data-a="up">ボタンで押した判断が記録になり、次のAIが良くなる</div>
+    <svg class="ln" viewBox="0 0 1600 900"><circle class="r" cx="1110" cy="510" r="230" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:.9s;--t:1.4s"/></svg>
+    <div class="card abs" style="left:990px;top:245px;width:240px;text-align:center;font-size:26px;--d:1.3s;--t:.5s" data-a="pop">AIが作る</div>
+    <div class="card abs" style="left:1240px;top:470px;width:240px;text-align:center;font-size:26px;--d:1.6s;--t:.5s" data-a="pop">人が押す</div>
+    <div class="card abs" style="left:990px;top:700px;width:240px;text-align:center;font-size:26px;--d:1.9s;--t:.5s" data-a="pop">記録に残る</div>
+    <div class="card abs" style="left:740px;top:470px;width:240px;text-align:center;font-size:26px;--d:2.2s;--t:.5s" data-a="pop">次が良くなる</div>
+    <div class="abs" style="left:1010px;top:480px;--d:3s;--t:.6s" data-a="stamp"><span class="stampbox" style="font-size:30px">いまここ</span></div>
+  </div></section>
+
+  <section class="scene" data-dur="8" data-name="まとめ"><div class="cam">
+    <div class="abs" style="left:120px;top:160px;width:580px">
+      <div class="lbl a" data-a="fade" style="--d:.1s">SUMMARY</div>
+      <h2 class="ttl" style="font-size:60px;margin-top:20px">
+        <span class="mask"><span data-a="rise" style="--d:.25s">Todoistは仕事の一覧。</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.39s">Slackは<em class="em">報告</em>の窓口</span></span>
+      </h2>
+    </div>
+    <ol class="sum abs" style="left:760px;top:150px;width:720px">
+      <li data-a="left" style="--d:.5s;--t:.5s"><i>1</i><span>頼んだことは、必ずTodoistに1件</span></li>
+      <li data-a="left" style="--d:.62s;--t:.5s"><i>2</i><span>AI社員の報告は、Slackに一本化</span></li>
+      <li data-a="left" style="--d:.74s;--t:.5s"><i>3</i><span>定型の確認は、ボタンで答える</span></li>
+      <li data-a="left" style="--d:.86s;--t:.5s"><i>4</i><span>押した判断が記録に＝ループ<small>松野はいまここ</small></span></li>
+      <li data-a="left" style="--d:.98s;--t:.5s"><i>5</i><span>初学者は、まず「使う側」から</span></li>
+    </ol>
+  </div></section>
+
+  <div class="segs"></div>
+  <div class="ctl"><button type="button" data-c="restart">最初から</button><button type="button" data-c="play">一時停止</button><button type="button" data-c="skip">スキップ</button></div>
+</div>
+</section>
+
+<!-- 29 章扉⑥ -->
+<section class="pg door" data-ch="6">
+  <div class="no" data-a="fade" style="--d:.1s">CHAPTER 06</div>
+  <h2><span class="shn" data-a="shine" style="--d:.3s;--t:1.6s">おせっかいAI</span></h2>
+  <div class="tm" data-a="up" style="--d:.9s"><b>21:35–21:45</b>（10分）｜頼まれる前に、声をかけてくれる</div>
+  <div class="chs"></div>
+</section>
+
+<!-- 30 おせっかいAI -->
+<section class="pg st" data-ch="6">
+  <div class="hd">おせっかいAI｜とは</div><div class="tag">SECTION 06</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">おせっかいAIは、<em>頼まれる前</em>に声をかける</h2>
+    <div class="g2" style="grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr);align-items:center;flex:1">
+      <div class="bubble" data-a="pop" style="--d:.8s"><small>たとえば（イメージ）</small>そろそろ、あの返信の期限ですよ</div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="box" data-a="left" style="--d:1.2s"><span class="k">ふつうのAI</span><p>頼まれたら動く</p></div>
+        <div class="box hi" data-a="left" style="--d:1.32s"><span class="k">おせっかいAI</span><p>自分から気づいて、声をかける</p></div>
+      </div>
+    </div>
+    <p class="note" data-a="fade" style="--d:1.6s">Dot は月額がかかるので見送り。まずは無料で試せるものから。</p>
+    <div class="shime" data-a="up" style="--d:1.8s;margin-top:0">頼まれる前に声をかけてくれるAI社員もいる</div>
+  </div>
+</section>
+
+<!-- 31 Grok bot と Muse -->
+<section class="pg st" data-ch="6">
+  <div class="hd">おせっかいAI｜道具の紹介</div><div class="tag">SECTION 06</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">スマホから頼める、<em>2つ</em>のAI</h2>
+    <div class="g2" style="flex:1">
+      <div class="box" data-a="up" style="--d:.7s"><span class="k">GROK BOT</span><h3>定期実行と提案</h3><p>スマホから頼める。決まった時間に動いたり、提案してくれたりするボット</p></div>
+      <div class="box" data-a="up" style="--d:.82s"><span class="k">MUSE｜META</span><h3>代わりに動いてくれる</h3><p>Facebook・Instagramの会社Metaの個人向けAIエージェント。メール送信・予約・ブラウザ操作を代行し、承認が要るときは通知。日本は2026-10-23から。基本無料</p></div>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;--d:1.4s" data-a="fade">
+      <span class="chip">Museは招待コードで使える枠が増えます（コードはLINEで送ります）</span>
+      <span class="chip">個人情報の扱いには注意しましょう</span>
+    </div>
+  </div>
+</section>
+
+<!-- 32 メンバー事例 -->
+<section class="pg st" data-ch="6">
+  <div class="hd">メンバー事例</div><div class="tag">SHARE</div>
+  <div class="body">
+    <h2 class="t" data-a="up" style="--d:.2s">メンバー事例：<em>ぜひ</em>聞かせてください</h2>
+    <div class="bubble" data-a="pop" style="--d:.8s;margin-top:30px;max-width:1100px;font-size:52px;padding:50px 56px"><small>発表したい方どうぞ</small>最近、AIで楽になったことは？</div>
+    <p class="ld" data-a="up" style="--d:1.3s;margin-top:auto">本多さん・岡田さん など。うまくいかなかった話も歓迎です。</p>
+  </div>
+</section>
+
+<!-- 33 章扉⑦ -->
+<section class="pg door" data-ch="7">
+  <div class="no" data-a="fade" style="--d:.1s">CHAPTER 07</div>
+  <h2><span class="shn" data-a="shine" style="--d:.3s;--t:1.6s">持ち帰りと12月のご相談</span></h2>
+  <div class="tm" data-a="up" style="--d:.9s"><b>21:45–22:00</b>（15分）｜今日のまとめと、次の一歩</div>
+  <div class="chs"></div>
+</section>
+
+<!-- 34 SUMMARY -->
+<section class="pg sm" data-ch="7">
+  <div class="grid"></div>
+  <div class="hd">持ち帰り｜SUMMARY</div>
+  <div class="abs" style="left:120px;top:150px;width:580px">
+    <div class="mono" style="font-size:22px;letter-spacing:.3em;color:var(--sky);font-weight:700" data-a="fade">SUMMARY</div>
+    <h2 style="font-size:62px;font-weight:900;line-height:1.3;margin-top:20px">
+      <span class="mask"><span data-a="rise" style="--d:.25s">ツールは入れ替わっても、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.39s"><em>AI社員の席</em>は残る</span></span>
+    </h2>
+    <p style="margin-top:36px;font-size:22px;line-height:1.7;color:#c9dcf2;border-left:4px solid var(--sky);padding-left:18px;--d:1.4s" data-a="up">AIは日進月歩。1つに決めず、どれも使えるようにしておき、同じフォルダでやり取りしながら成果を作る。そのための考え方が「AI社員」</p>
+  </div>
+  <ol class="sum abs" style="left:760px;top:140px;width:720px">
+    <li data-a="left" style="--d:.5s;--t:.5s"><i>1</i><span>頼めばアプリができる時代<small>AIは社員として働ける</small></span></li>
+    <li data-a="left" style="--d:.62s;--t:.5s"><i>2</i><span>Cursorを作業台に、3Rで頼む<small>1社員1フォルダ（手順・権限・報告先）</small></span></li>
+    <li data-a="left" style="--d:.74s;--t:.5s"><i>3</i><span>ツールは特徴をふまえて使い分ける</span></li>
+    <li data-a="left" style="--d:.86s;--t:.5s"><i>4</i><span>頼んだことはTodoist、報告はSlack</span></li>
+    <li data-a="left" style="--d:.98s;--t:.5s"><i>5</i><span>先回りするAIも、まず無料で</span></li>
+  </ol>
+</section>
+
+<!-- 35 12月 -->
+<section class="pg st" data-ch="7">
+  <div class="hd">持ち帰り｜12月のご相談</div><div class="tag">PROPOSAL</div>
+  <div class="body" style="gap:24px">
+    <h2 class="t" data-a="up" style="--d:.2s">12月、<em>一緒に</em>やってみませんか？</h2>
+    <p class="ld" data-a="up" style="--d:.5s;font-size:28px">いけともさん提供の「AIエージェント社員」の内容で、自分の仕事のどこを任せられるかを、具体化するところまで。</p>
+    <div class="g3">
+      <div class="box" data-a="up" style="--d:.8s;padding:20px 24px"><span class="k">準備</span><p>ツールとプロンプトは事前にLINEで送ります</p></div>
+      <div class="box" data-a="up" style="--d:.92s;padding:20px 24px"><span class="k">当日</span><p>代表1人の画面を、みんなで見ながら進めます</p></div>
+      <div class="box" data-a="up" style="--d:1.04s;padding:20px 24px"><span class="k">続き</span><p>2時間で終わらなければ、次回以降に</p></div>
+    </div>
+    <div class="flow" data-a="left" style="--d:1.3s">
+      <span class="chip on">P1 仕事の棚卸し</span><span class="to">→</span><span class="chip">P2 最初の1体</span><span class="to">→</span><span class="chip">P3 流れの図</span><span class="to">→</span><span class="chip">P4 報告と相談</span><span class="to">→</span><span class="chip">P5 まとめ</span><span class="to">→</span><span class="chip">ビルダー</span><span class="to">→</span><span class="chip">AIオートメーション</span>
+    </div>
+    <p class="note" data-a="fade" style="--d:1.7s">できる方は12月の互助会までに、棚卸し（P1）を一度試しておく。ループウェアは、AI社員が働き始めてからの話なので、まずはAI社員づくりから。</p>
+    <div class="shime" data-a="up" style="--d:1.9s">まずは一度、一緒に試してみませんか</div>
+  </div>
+</section>
+
+<!-- 補足 MOTION MCPとAPIの違い -->
+<section class="pg mo" data-ch="7">
+<div class="mg" style="--bg:#EDF6F3;--fg:#10261F;--mute:#4E6660;--acc:#0B8468;--card:#ffffff;--line:rgba(16,38,31,.2);--ink2:#ffffff;--gridc:rgba(16,38,31,.06)">
+  <div class="grid"></div>
+  <div class="hd">補足｜MCPとAPIの違い</div><div class="tag">APPENDIX</div>
+
+  <section class="scene" data-dur="3.5" data-name="問い"><div class="cam">
+    <div class="lbl abs" style="left:120px;top:250px;--d:.2s" data-a="fade">QUESTION</div>
+    <h2 class="ttl abs" style="left:120px;top:300px;width:1360px;font-size:104px">
+      <span class="mask"><span data-a="rise" style="--d:.4s"><em class="em">MCP</em>と<em class="em">API</em>、</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.54s">何が違う？</span></span>
+    </h2>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="API＝窓口"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">API｜受付窓口</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:760px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">APIは、お店ごとの</span></span>
+      <span class="mask"><span data-a="rise" style="--d:.44s"><em class="em">受付窓口</em></span></span>
+    </h2>
+    <div class="sub abs" style="left:124px;top:440px;width:700px;font-size:30px;--d:1.1s" data-a="up">店ごとに注文票の書き方が違う。頼み方を覚えて、プログラム（人が書いたコード）が頼む</div>
+    <div class="card abs" style="left:900px;top:220px;width:580px;font-size:30px;--d:1.4s;--t:.5s" data-a="right"><small>Gmailの窓口</small>注文票A</div>
+    <div class="card abs" style="left:900px;top:370px;width:580px;font-size:30px;--d:1.52s;--t:.5s" data-a="right"><small>Googleドライブの窓口</small>注文票B</div>
+    <div class="card abs" style="left:900px;top:520px;width:580px;font-size:30px;--d:1.64s;--t:.5s" data-a="right"><small>Slackの窓口</small>注文票C</div>
+    <div class="abs" style="left:1060px;top:680px;transform:rotate(-4deg)"><div data-a="stamp" style="--d:2.4s;--t:.6s"><span class="stampbox" style="font-size:30px">店ごとに書き方が違う</span></div></div>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="MCP＝共通コンセント"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">MCP｜共通コンセント</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:1360px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">MCPは、AI用の<em class="em">共通コンセント</em></span></span>
+    </h2>
+    <div class="sub abs" style="left:124px;top:330px;width:1300px;font-size:30px;--d:.9s" data-a="up">どの店にも同じ形で注文できる「共通の注文アプリ」。一度用意すれば、どのAIからも同じように使える</div>
+    <div class="card abs" style="left:120px;top:455px;width:330px;font-size:28px;padding:14px 22px;--d:1.3s;--t:.5s" data-a="left"><small>AI</small>Claude</div>
+    <div class="card abs" style="left:120px;top:575px;width:330px;font-size:28px;padding:14px 22px;--d:1.42s;--t:.5s" data-a="left"><small>AI</small>Cursor</div>
+    <div class="card abs" style="left:120px;top:695px;width:330px;font-size:28px;padding:14px 22px;--d:1.54s;--t:.5s" data-a="left"><small>AI</small>Codex</div>
+    <div class="arrow abs" style="left:490px;top:595px;font-size:56px;--d:1.9s" data-a="fade">→</div>
+    <div class="card acc abs" style="left:580px;top:520px;width:420px;height:220px;text-align:center;display:flex;flex-direction:column;justify-content:center;font-size:44px;--d:2.1s;--t:.6s" data-a="pop"><small>同じつなぎ方</small>MCP</div>
+    <div class="arrow abs" style="left:1040px;top:595px;font-size:56px;--d:2.5s" data-a="fade">→</div>
+    <div class="card abs" style="left:1130px;top:455px;width:350px;font-size:28px;padding:14px 22px;--d:2.7s;--t:.5s" data-a="right"><small>サービス</small>Gmail</div>
+    <div class="card abs" style="left:1130px;top:575px;width:350px;font-size:28px;padding:14px 22px;--d:2.82s;--t:.5s" data-a="right"><small>サービス</small>Googleドライブ</div>
+    <div class="card abs" style="left:1130px;top:695px;width:350px;font-size:28px;padding:14px 22px;--d:2.94s;--t:.5s" data-a="right"><small>サービス</small>Slack</div>
+  </div></section>
+
+  <section class="scene" data-dur="6.5" data-name="関係"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">関係</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:1360px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">MCPの中では、たいてい<em class="em">APIを呼んでいる</em></span></span>
+    </h2>
+    <div class="card abs" style="left:120px;top:430px;width:290px;text-align:center;font-size:34px;--d:1s;--t:.5s" data-a="up"><small>頼む</small>AI社員</div>
+    <div class="arrow abs" style="left:430px;top:450px;font-size:52px;--d:1.3s" data-a="fade">→</div>
+    <div class="card acc abs" style="left:510px;top:430px;width:290px;text-align:center;font-size:34px;--d:1.5s;--t:.5s" data-a="pop"><small>通訳</small>MCP</div>
+    <div class="arrow abs" style="left:820px;top:450px;font-size:52px;--d:1.8s" data-a="fade">→</div>
+    <div class="card abs" style="left:900px;top:430px;width:290px;text-align:center;font-size:34px;--d:2s;--t:.5s" data-a="up"><small>受付窓口</small>API</div>
+    <div class="arrow abs" style="left:1210px;top:450px;font-size:52px;--d:2.3s" data-a="fade">→</div>
+    <div class="card abs" style="left:1290px;top:430px;width:190px;text-align:center;font-size:30px;--d:2.5s;--t:.5s" data-a="up"><small>店</small>Gmail</div>
+    <div class="sub abs" style="left:124px;top:640px;width:1300px;font-size:32px;--d:3s" data-a="up">MCPは、AIとAPIの間に立つ<b style="color:var(--acc)">通訳</b>。APIがなくなるわけではない</div>
+  </div></section>
+
+  <section class="scene" data-dur="7" data-name="第1回の例"><div class="cam">
+    <div class="lbl a abs" style="left:120px;top:170px;--d:.1s" data-a="fade">第1回の例</div>
+    <h2 class="ttl abs" style="left:120px;top:220px;width:1360px;font-size:72px">
+      <span class="mask"><span data-a="rise" style="--d:.3s">メール一括送信で<em class="em">見比べる</em></span></span>
+    </h2>
+    <div class="card abs" style="left:120px;top:390px;width:640px;height:300px;--d:1s;--t:.5s" data-a="left"><small>第1回（1月）｜API</small>Gmail APIで一括送信<span style="display:block;font-size:26px;color:var(--mute);font-weight:700;margin-top:16px;line-height:1.5">プログラムを書いて、窓口に直接頼んだ</span></div>
+    <div class="arrow abs" style="left:780px;top:500px;font-size:60px;--d:1.6s" data-a="fade">→</div>
+    <div class="card acc abs" style="left:860px;top:390px;width:620px;height:300px;--d:1.9s;--t:.5s" data-a="right"><small>いま｜MCP</small>GmailのMCPをつなぐ<span style="display:block;font-size:28px;font-weight:700;margin-top:16px;line-height:1.5;opacity:.95" data-type="2.6">AIに「このメールを送って」と頼めばよい</span></div>
+  </div></section>
+
+  <section class="scene" data-dur="8" data-name="まとめ"><div class="cam">
+    <div class="abs" style="left:120px;top:160px;width:580px">
+      <div class="lbl a" data-a="fade" style="--d:.1s">SUMMARY</div>
+      <h2 class="ttl" style="font-size:64px;margin-top:20px">
+        <span class="mask"><span data-a="rise" style="--d:.25s">APIは<em class="em">窓口</em>、</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.39s">MCPはAI用の</span></span>
+        <span class="mask"><span data-a="rise" style="--d:.53s"><em class="em">共通コンセント</em></span></span>
+      </h2>
+    </div>
+    <ol class="sum abs" style="left:760px;top:160px;width:720px">
+      <li data-a="left" style="--d:.5s;--t:.5s"><i>1</i><span>API＝サービスが頼みを受け付ける入口<small>主にプログラムが使う。店ごとに頼み方が違う</small></span></li>
+      <li data-a="left" style="--d:.62s;--t:.5s"><i>2</i><span>MCP＝AIが同じつなぎ方で使う決まり<small>主にAIが使う。一度用意すれば、どのAIからも</small></span></li>
+      <li data-a="left" style="--d:.74s;--t:.5s"><i>3</i><span>MCPの中で、APIを呼んでいる<small>MCPはAIとAPIの間の通訳</small></span></li>
+      <li data-a="left" style="--d:.86s;--t:.5s"><i>4</i><span>公式のMCPがあれば、まずそれをつなぐ<small>例：TodoistのMCP（今日の実践編）</small></span></li>
+    </ol>
+  </div></section>
+
+  <div class="segs"></div>
+  <div class="ctl"><button type="button" data-c="restart">最初から</button><button type="button" data-c="play">一時停止</button><button type="button" data-c="skip">スキップ</button></div>
+</div>
+</section>
+
+<!-- 補足 たとえで見る用語（道具と場所） -->
+<section class="pg st" data-ch="7">
+  <div class="hd">補足｜たとえで見る用語①</div><div class="tag">APPENDIX</div>
+  <div class="body" style="gap:18px">
+    <h2 class="t" style="font-size:56px" data-a="up">たとえで見る用語：<em>道具と場所</em></h2>
+    <p class="note" data-a="fade" style="--d:.3s">全体を「AI社員が働く会社」に見立てると、言葉の役割が見えてきます。</p>
+    <div class="g2" style="align-items:start">
+      <div class="box" data-a="up" style="--d:.5s;padding:16px 22px"><table class="tbl t3"><tr><th>用語</th><th>たとえ</th><th>一言で</th></tr><tr><td>AIエージェント</td><td>AI社員</td><td>指示書を読んで、自分で作業してくれるAI</td></tr><tr><td>Cursor</td><td>作業部屋（資料の棚と作業机つき）</td><td>自分のパソコンのフォルダで、AIと一緒に作業するアプリ</td></tr><tr><td>Codex</td><td>職人</td><td>頼んだ作業を黙々と仕上げる</td></tr><tr><td>Claude Code</td><td>現場監督</td><td>段取りを組んで、手を動かす</td></tr><tr><td>GenCode</td><td>控えの助っ人</td><td>ほかが使えないときの予備</td></tr><tr><td>Claude（Artifacts）</td><td>資料づくりの相棒</td><td>資料や画面をその場で作って見せる</td></tr><tr><td>Replit</td><td>ネットの貸し工房</td><td>ブラウザだけで試作して見せる。業務データは入れない</td></tr></table></div>
+      <div class="box" data-a="up" style="--d:.62s;padding:16px 22px"><table class="tbl t3"><tr><th>用語</th><th>たとえ</th><th>一言で</th></tr><tr><td>フォルダ</td><td>資料の棚／AI社員の席</td><td>1業務1フォルダ。手順・権限・報告先を書く</td></tr><tr><td>指示書（mdファイル）</td><td>業務マニュアル</td><td>AGENTS.md や CLAUDE.md。1行直すとAI社員の動きが変わる</td></tr><tr><td>ルール</td><td>社内規則</td><td>毎回守ってほしい決まり</td></tr><tr><td>スキル</td><td>手順カード</td><td>よくやる作業の手順。必要なときだけ読む</td></tr><tr><td>プロンプト</td><td>頼みごとのメモ</td><td>3R（誰として・何を・何を見て）で書く</td></tr><tr><td>ターミナル</td><td>指令室</td><td>文字でパソコンに命令する画面</td></tr><tr><td>MCP／API</td><td>共通コンセント／受付窓口</td><td>前のページの通り</td></tr></table></div>
+    </div>
+  </div>
+</section>
+
+<!-- 補足 たとえで見る用語（保存と公開・秘密） -->
+<section class="pg st" data-ch="7">
+  <div class="hd">補足｜たとえで見る用語②</div><div class="tag">APPENDIX</div>
+  <div class="body" style="gap:18px">
+    <h2 class="t" style="font-size:56px" data-a="up">たとえで見る用語：<em>保存と公開・秘密</em></h2>
+    <div class="g2" style="align-items:start">
+      <div class="box" data-a="up" style="--d:.5s;padding:16px 22px"><table class="tbl t3"><tr><th>用語</th><th>たとえ</th><th>一言で</th></tr><tr><td>リポジトリ</td><td>案件ファイル一式（履歴つき）</td><td>プロジェクトのフォルダと変更の記録</td></tr><tr><td>コミット</td><td>ゲームのセーブ</td><td>「ここまで」と記録する</td></tr><tr><td>ブランチ</td><td>下書き用のコピー</td><td>本番に影響しない作業用の枝</td></tr><tr><td>プルリクエスト</td><td>上司への確認依頼</td><td>「この変更を入れてよいか見てください」</td></tr><tr><td>マージ</td><td>本番の書類に反映</td><td>ブランチの変更を合流させる</td></tr><tr><td>プッシュ／プル</td><td>本社の保管庫に預ける／最新版を取り寄せる</td><td>GitHubへ送る／GitHubから持ってくる</td></tr><tr><td>GitHub</td><td>本社の保管庫</td><td>変更の履歴が全部残る</td></tr></table></div>
+      <div class="box" data-a="up" style="--d:.62s;padding:16px 22px"><table class="tbl t3"><tr><th>用語</th><th>たとえ</th><th>一言で</th></tr><tr><td>デプロイ</td><td>開店</td><td>作ったものを公開する</td></tr><tr><td>Vercel</td><td>お店の場所</td><td>Webアプリを公開する場所</td></tr><tr><td>Supabase</td><td>倉庫と台帳</td><td>データをためておく場所</td></tr><tr><td>.env</td><td>金庫の鍵</td><td>APIキーやパスワード。人に見せない、GitHubに上げない</td></tr><tr><td>.gitignore</td><td>持ち出し禁止リスト</td><td>GitHubに上げないファイルの一覧</td></tr><tr><td>ログ</td><td>業務日報</td><td>動いた記録。エラーのときはまずここ</td></tr></table></div>
+    </div>
+    <div class="flow" data-a="fade" style="--d:1s"><span class="chip">作業部屋で作る</span><span class="to">→</span><span class="chip">セーブ（コミット）</span><span class="to">→</span><span class="chip">保管庫へ（プッシュ）</span><span class="to">→</span><span class="chip">開店（Vercel）</span><span class="to">→</span><span class="chip">倉庫と台帳（Supabase）</span></div>
+    <div class="shime" data-a="up" style="--d:1.3s;margin-top:0">AI社員が働く会社だと思えば、言葉の役割が見えてくる</div>
+  </div>
+</section>
+
+<!-- 36 補足 AIの動き -->
+<section class="pg st" data-ch="7">
+  <div class="hd">補足｜AIの動き</div><div class="tag">APPENDIX</div>
+  <div class="body" style="gap:24px">
+    <h2 class="t" style="font-size:60px" data-a="up">補足：つなげるものは<em>つなぐ</em>。画面操作は最後の手段</h2>
+    <p class="ld" data-a="up" style="--d:.4s;font-size:28px">AIが仕事をする5つの方法（いけともさんの紹介順）</p>
+    <div class="g5">
+      <div class="box" data-a="up" style="--d:.7s;padding:22px"><span class="k">1</span><h3 style="font-size:30px">チャットの中</h3><p style="font-size:22px">話して、答えをもらう</p></div>
+      <div class="box" data-a="up" style="--d:.82s;padding:22px"><span class="k">2</span><h3 style="font-size:30px">外部サービスとつなぐ</h3><p style="font-size:22px">MCP・API。画面を見ずにデータをやり取り</p></div>
+      <div class="box" data-a="up" style="--d:.94s;padding:22px"><span class="k">3</span><h3 style="font-size:30px">パソコンのファイル</h3><p style="font-size:22px">CLI。フォルダのファイルを読み書き</p></div>
+      <div class="box" data-a="up" style="--d:1.06s;padding:22px"><span class="k">4</span><h3 style="font-size:30px">ブラウザ操作</h3><p style="font-size:22px">ページを開いて読む・クリックする</p></div>
+      <div class="box hi" data-a="up" style="--d:1.18s;padding:22px"><span class="k">5</span><h3 style="font-size:30px">画面を操作</h3><p style="font-size:22px">マウスとキーボード。何でもできるが重い</p></div>
+    </div>
+    <p class="note" data-a="fade" style="--d:1.6s;margin-top:auto">出典：いけともさん 自分専用AIエージェントチーム構築術 Day1（2026-10-03、30枚目）。資料に「消費が多い順」とは書かれていないので、重さは目安です。</p>
+  </div>
+</section>
+
+<!-- 補足 もう少しよく使う言葉 -->
+<section class="pg st" data-ch="7">
+  <div class="hd">補足｜もう少しよく使う言葉</div><div class="tag">APPENDIX</div>
+  <div class="body" style="gap:18px">
+    <h2 class="t" style="font-size:56px" data-a="up">補足：GitHubまわりで<em>よく見る</em>言葉</h2>
+    <div class="g3" style="align-items:start">
+      <div class="box" data-a="up" style="--d:.5s;padding:18px 22px"><span class="k">よく使う言葉</span><table class="tbl s" style="font-size:16px"><tr><td>リポジトリ（レポジトリ）</td><td>1つのプロジェクトのフォルダ一式と、その変更の記録。GitHubに置くとチームで共有できる</td></tr><tr><td>ブランチ</td><td>本番に影響しないように作る「作業用の枝」。試して良ければ本番に合流させる</td></tr><tr><td>プルリクエスト（PR）</td><td>「この変更を本番に入れてよいか見てください」という確認のお願い</td></tr><tr><td>マージ</td><td>ブランチの変更を本番に合流させること</td></tr><tr><td>クローン</td><td>GitHubのリポジトリを、自分のパソコンに丸ごと写すこと</td></tr><tr><td>ターミナル</td><td>文字でパソコンに命令する黒い画面。Cursorの下の方にもある</td></tr><tr><td>ローカル／本番</td><td>ローカル＝自分のパソコンの中で試す場所。本番＝みんなが実際に使う場所</td></tr></table></div>
+      <div class="box" data-a="up" style="--d:.62s;padding:18px 22px"><span class="k">リポジトリの中のファイル</span><table class="tbl s" style="font-size:16px"><tr><td>README.md</td><td>そのプロジェクトの説明書。最初に読むファイル</td></tr><tr><td>.env</td><td>パスワードやAPIキーなど「秘密の設定」を書くファイル。GitHubには絶対に上げない</td></tr><tr><td>.env.example</td><td>.env の見本。中身は空にして、どんな設定が要るかだけを書く。こちらは共有してよい</td></tr><tr><td>.gitignore</td><td>GitHubに上げないファイルの一覧。.env や大きなファイルをここに書く</td></tr><tr><td>package.json</td><td>そのアプリが使う部品（ライブラリ）と、起動などのコマンドの一覧</td></tr><tr><td>AGENTS.md／CLAUDE.md</td><td>AIへの指示書。このリポジトリで守るルールや作業手順を書く</td></tr><tr><td>.cursor/rules</td><td>Cursorに毎回守ってほしいルールを置く場所</td></tr></table></div>
+      <div class="box" data-a="up" style="--d:.74s;padding:18px 22px"><span class="k">運用とデータ</span><table class="tbl s" style="font-size:16px"><tr><td>APIキー</td><td>サービスを使うための鍵。人に見せない。.env に書く</td></tr><tr><td>環境変数</td><td>.env やVercelの設定画面に入れる「秘密の設定」の正式な呼び方</td></tr><tr><td>ログ</td><td>アプリが動いた記録。エラーが出たらまずここを見る</td></tr><tr><td>エラー</td><td>うまく動かなかったときのメッセージ。そのままAIに貼って「直して」と頼めばよい</td></tr><tr><td>JSON（.json）</td><td>データを「名前：値」の組で書くファイル。設定ファイルやアプリ同士のデータのやり取りでよく見る（package.json もJSON）</td></tr><tr><td>CSV（.csv）</td><td>表をカンマ区切りの文字で書いたファイル。Excelで開ける</td></tr></table></div>
+    </div>
+    <div class="shime" data-a="up" style="--d:1.2s;font-size:24px;padding:12px 24px;margin-top:0">.env の中身（APIキーやパスワード）は、チャット・スライド・LINEに貼らない。漏れたら鍵を作り直す</div>
+  </div>
+</section>
+
+<!-- 補足 第1回のおさらい -->
+<section class="pg st" data-ch="7">
+  <div class="hd">補足｜第1回のおさらい</div><div class="tag">APPENDIX</div>
+  <div class="body" style="gap:18px">
+    <h2 class="t" style="font-size:56px" data-a="up">おさらい：第1回で出てきた<em>言葉</em></h2>
+    <p class="note" data-a="fade" style="--d:.3s">第1回（2026-01-31）「Cursor × Markdown活用入門」の資料から。重複しても、もう一度。</p>
+    <div class="g2" style="align-items:start">
+      <div class="box" data-a="up" style="--d:.5s;padding:18px 22px"><table class="tbl s" style="font-size:17px"><tr><td>Markdown（マークダウン）</td><td>文書に「ここは見出し」「ここは箇条書き」と印をつける書き方。#で見出し、-で箇条書き。AIが読みやすい</td></tr><tr><td>マークアップ言語とプログラミング言語</td><td>Markdownは「読み書きするもの」（実行されない）。Pythonなどのプログラムは「実行するもの」</td></tr><tr><td>Python（パイソン）</td><td>AIがよく書くプログラミング言語。メール送信やExcel処理の自動化に使った</td></tr><tr><td>スクリプト</td><td>決まった作業を自動でやる、小さなプログラム</td></tr><tr><td>HTML</td><td>Webページの書き方。チラシや資料もHTMLで作ってPDFにできる</td></tr><tr><td>Gmail API</td><td>プログラムからGmailを送るための窓口。第1回のメール一括送信で使った</td></tr><tr><td>プランモード／エージェントモード</td><td>プラン＝まず作り方を相談して方針を決める。エージェント＝AIが実際に作業する</td></tr></table></div>
+      <div class="box" data-a="up" style="--d:.62s;padding:18px 22px"><table class="tbl s" style="font-size:17px"><tr><td>@参照（@ファイル・@Web）</td><td>チャットで @ を打って、見てほしいファイルやWeb検索を指定する</td></tr><tr><td>Ctrl+K／Ctrl+L（Macは Cmd）</td><td>K＝選んだ部分をその場でAIに書き換えさせる。L＝チャットを開く</td></tr><tr><td>Accept／Reject</td><td>AIが直した所を、受け入れる（Accept）か、やめる（Reject）か選ぶボタン</td></tr><tr><td>.cursor/rules（.mdc）</td><td>Cursorに毎回守らせるルールを書く場所</td></tr><tr><td>MCP</td><td>AIが外のサービス（Googleドライブや検索など）を使えるようにする共通のつなぎ方</td></tr><tr><td>プライバシーモード</td><td>自分のデータをAIの学習に使わせない設定。業務で使うならオンにする</td></tr><tr><td>標準フォルダ構成</td><td>00_inbox（仮置き）／01_prompts（指示のひな形）／02_inputs（材料）／03_outputs（AIが作ったもの）／04_logs（記録）など。番号で並べるので迷わない</td></tr></table></div>
+    </div>
+  </div>
+</section>
+</div>
+
+<script>
+(function(){
+var deck=document.getElementById('deck');
+var pages=[].slice.call(deck.querySelectorAll('.pg'));
+var N=pages.length;
+var CH=['開会','AI進化といま地点','バイブコーディング','初学者講座','松野の実践','おせっかいAI','持ち帰り'];
+var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function fit(){var s=Math.min(innerWidth/1600,innerHeight/900);deck.style.transform='translate(-50%,-50%) scale('+s+')';}
+fit();addEventListener('resize',fit);
+
+/* 下部帯（静止本文ページ） */
+pages.forEach(function(p,i){
+  if(p.classList.contains('st')){var f=document.createElement('div');f.className='foot';f.innerHTML='<span>神大家 東海DX互助会 第10回｜2026.11.15</span><b>'+String(i+1).padStart(2,'0')+' / '+N+'</b>';p.appendChild(f);}
+  var chs=p.querySelector('.chs');
+  if(chs){var c=+p.getAttribute('data-ch');CH.forEach(function(n,j){var s=document.createElement('span');s.textContent=(j+1)+' '+n;if(j+1===c)s.className='cur';else if(j+1<c)s.className='past';chs.appendChild(s);});}
+});
+
+/* 建物（5段階） */
+var FL=['プロンプト','コンテキスト','ハーネス','ループ','グラフ'];
+[].forEach.call(deck.querySelectorAll('[data-bld]'),function(el){
+  var n=+el.getAttribute('data-bld'),here=+el.getAttribute('data-here')||0;
+  var h='<div class="bld"><svg class="roof" viewBox="0 0 470 60"><path d="M0 58 L235 4 L470 58" pathLength="1" stroke-dasharray="1" data-a="draw" style="--d:.6s;--t:.6s"/></svg>';
+  for(var f=5;f>=1;f--){
+    var cls=f===n?'cur':(f<n?'past':'');
+    var d=(f===n?1.5:.7+(f-1)*.08);
+    h+='<div class="fl '+cls+'" data-a="'+(f===n?'pop':'up')+'" style="--d:'+d+'s;--t:.5s"><b>'+f+'F</b>'+FL[f-1]+(f===here?'<span class="here"><span data-a="stamp" style="--d:2.2s;--t:.6s">いまここ</span></span>':'')+'</div>';
+  }
+  h+='<div class="gnd" data-a="bar" style="--d:.4s;--t:.6s"></div></div>';
+  el.outerHTML=h;
+});
+
+/* 3Rの進み具合 */
+[].forEach.call(deck.querySelectorAll('[data-rrr]'),function(el){
+  var n=+el.getAttribute('data-rrr'),names=['Role','Request','Reference'];
+  var h='<div class="abs" style="left:520px;top:600px;width:960px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px">';
+  names.forEach(function(nm,j){var k=j+1;var st=k===n?'card acc':(k<n?'card':'card ghost');h+='<div class="'+st+'" style="font-size:28px;text-align:center;--d:'+(1.9+j*.12)+'s;--t:.5s" data-a="up"><small>R'+k+'</small>'+nm+'</div>';});
+  el.outerHTML=h+'</div>';
+});
+
+/* バイブコーディング7段の階段 */
+var SN=['画面を作る','VBA・GAS','Replitで試作','Cursorで手元','クラウド×手元','Gitで履歴','AIチーム'];
+[].forEach.call(deck.querySelectorAll('[data-stairs]'),function(el){
+  var n=+el.getAttribute('data-stairs'),mark=el.hasAttribute('data-mark'),here=+el.getAttribute('data-here')||0;
+  var h='<div class="stbase" data-a="bar" style="--d:.4s;--t:.6s"></div>';
+  for(var i=1;i<=7;i++){
+    var ht=92+(i-1)*50,top=760-ht,left=120+(i-1)*195;
+    var cls=i===n?'cur':(i<n?'past':'');
+    h+='<div class="stp '+cls+'" style="left:'+left+'px;top:'+top+'px;height:'+ht+'px;--d:'+(i===n?1.6:.6+(i-1)*.12)+'s;--t:.5s" data-a="'+(i===n?'pop':'up')+'"><b>L'+i+'</b><span>'+SN[i-1]+'</span></div>';
+  }
+  if(mark)h+='<div class="stmark" style="left:705px;top:470px;--d:'+(n===4?2.3:.9)+'s;--t:.6s" data-a="'+(n===4?'stamp':'fade')+'"><span>▼ 不動産業務はここから</span></div>';
+  if(here)h+='<div class="stmark" style="left:1230px;top:314px;transform:rotate(-4deg)"><span data-a="stamp" style="--d:2.4s;--t:.6s;background:var(--acc);color:var(--ink2)">松野はいまここ（入口）</span></div>';
+  el.outerHTML=h;
+});
+
+/* 1文字ずつ打つ */
+[].forEach.call(deck.querySelectorAll('[data-type]'),function(el){
+  var d=parseFloat(el.getAttribute('data-type'))||0,step=.045,i=0;
+  (function walk(node){
+    [].slice.call(node.childNodes).forEach(function(c){
+      if(c.nodeType===3){var frag=document.createDocumentFragment();c.textContent.split('').forEach(function(ch){var s=document.createElement('span');s.textContent=ch;s.setAttribute('data-a','type');s.style.setProperty('--d',(d+i*step).toFixed(3)+'s');s.style.setProperty('--t','.05s');i++;frag.appendChild(s);});c.parentNode.replaceChild(frag,c);}
+      else if(c.nodeType===1)walk(c);
+    });
+  })(el);
+});
+
+/* モーションページの再生エンジン（いけとも式） */
+function makeEngine(pg){
+  var root=pg.querySelector('.mg');
+  var scenes=[].slice.call(root.querySelectorAll('.scene'));
+  var durs=scenes.map(function(s){var d=parseFloat(s.getAttribute('data-dur'))||6;s.style.setProperty('--sd',d+'s');return d;});
+  var bar=root.querySelector('.segs');
+  var segs=scenes.map(function(s,j){var b=document.createElement('button');b.type='button';b.className='seg';b.textContent=s.getAttribute('data-name')||('章'+(j+1));var u=document.createElement('u');u.appendChild(document.createElement('i'));b.appendChild(u);b.addEventListener('click',function(e){e.stopPropagation();show(j);setPlay(true);});bar.appendChild(b);return b;});
+  var bPlay=root.querySelector('[data-c=play]');
+  var idx=-1,t=0,playing=false,done=false;
+  function setBar(){segs.forEach(function(s,j){var w=done||j<idx?1:(j===idx?Math.min(1,t/durs[j]):0);s.querySelector('i').style.width=(w*100).toFixed(1)+'%';s.classList.toggle('cur',j===idx);});}
+  function setPlay(p){playing=p;root.classList.toggle('paused',!p&&!done);bPlay.textContent=p?'一時停止':'再生';}
+  function show(n){
+    if(idx>=0&&idx!==n){var p=scenes[idx];p.classList.remove('on','act');p.classList.add('out');setTimeout(function(){p.classList.remove('out');},480);}
+    var s=scenes[n];s.classList.remove('out','on','act');void s.offsetWidth;s.classList.add('on','act');
+    idx=n;t=0;done=false;root.classList.remove('done');setBar();
+  }
+  function finish(){done=true;root.classList.add('done');root.classList.remove('paused');t=durs[idx];setPlay(false);setBar();}
+  root.querySelector('[data-c=skip]').addEventListener('click',function(e){e.stopPropagation();api.next();});
+  root.querySelector('[data-c=restart]').addEventListener('click',function(e){e.stopPropagation();api.start();});
+  bPlay.addEventListener('click',function(e){e.stopPropagation();api.toggle();});
+  var api={
+    start:function(){if(reduce){api.final();return;}show(0);setPlay(true);},
+    final:function(){show(scenes.length-1);finish();},
+    stop:function(){setPlay(false);},
+    next:function(){if(done)return false;if(idx<scenes.length-1){show(idx+1);setPlay(true);}else finish();return true;},
+    toggle:function(){if(done){api.start();}else setPlay(!playing);},
+    tick:function(dt){if(playing&&!done){t+=dt;if(t>=durs[idx]){if(idx<scenes.length-1)show(idx+1);else finish();}setBar();}},
+    isDone:function(){return done;}
+  };
+  return api;
+}
+var engines=pages.map(function(p){return p.classList.contains('mo')?makeEngine(p):null;});
+
+var cur=-1;
+function go(n,back){
+  n=Math.max(0,Math.min(N-1,n));if(n===cur)return;
+  if(cur>=0){pages[cur].classList.remove('on','act');if(engines[cur])engines[cur].stop();}
+  var p=pages[n];p.classList.remove('on','act');void p.offsetWidth;p.classList.add('on');
+  if(engines[n]){if(back)engines[n].final();else engines[n].start();}
+  else if(!reduce)p.classList.add('act');
+  cur=n;
+  try{history.replaceState(null,'','#p'+(n+1));}catch(e){}
+}
+function next(){if(engines[cur]&&engines[cur].next())return;go(cur+1);}
+function prev(){go(cur-1,true);}
+
+addEventListener('keydown',function(e){
+  var k=e.key;
+  if(k==='ArrowRight'||k==='PageDown'||k==='Enter'){e.preventDefault();next();}
+  else if(k==='ArrowLeft'||k==='PageUp'){e.preventDefault();prev();}
+  else if(k===' '){e.preventDefault();if(engines[cur])engines[cur].toggle();else next();}
+  else if(k==='Home'){go(0);}else if(k==='End'){go(N-1);}
+  else if(k==='f'||k==='F'){var d=document.documentElement;if(!document.fullscreenElement){if(d.requestFullscreen)d.requestFullscreen().catch(function(){});}else if(document.exitFullscreen)document.exitFullscreen().catch(function(){});}
+});
+deck.addEventListener('click',function(e){if(e.target.closest('button'))return;var r=deck.getBoundingClientRect();if(e.clientX<r.left+r.width*.25)prev();else next();});
+var tx=null;
+addEventListener('touchstart',function(e){tx=e.touches[0].clientX;},{passive:true});
+addEventListener('touchend',function(e){if(tx===null)return;var dx=e.changedTouches[0].clientX-tx;tx=null;if(Math.abs(dx)>50){if(dx<0)next();else prev();}},{passive:true});
+
+var last=0;
+function tick(now){var dt=last?Math.min(.1,(now-last)/1000):0;last=now;if(engines[cur])engines[cur].tick(dt);requestAnimationFrame(tick);}
+requestAnimationFrame(tick);
+
+var m=/^#p(\d+)$/.exec(location.hash||'');
+go(m?(+m[1]-1):0);
+addEventListener('hashchange',function(){var m=/^#p(\d+)$/.exec(location.hash||'');if(m&&+m[1]-1!==cur)go(+m[1]-1);});
+})();
+</script>
