@@ -19,7 +19,8 @@ REPO = Path(__file__).resolve().parents[1]
 # Financial targets only; Zaim propagation and trade jobs are separate operations.
 PORTFOLIO_IDS = (
     'axa_life', 'sbi_index', 'mhi_stock', 'akatsuki_bond', 'bloomo',
-    'sony_life', 'sony_life_chikage', 'sony_life_sovani',
+    'sony_life', 'sony_life_chikage', 'sony_life_sovani', 'sony_life_sovani_kids',
+    'sony_life_policy_loan', 'sony_life_chikage_policy_loan',
     'prudential_life', 'prudential_life_chikage',
     'prudential_life_policy_loan', 'prudential_life_chikage_policy_loan',
 )
@@ -78,8 +79,12 @@ def read_database(client: Any, run_id: str | None = None) -> dict[str, Any]:
                                   'accounts': [], 'snapshots': []}
         result[scope] = record
         try:
-            record['accounts'] = paged(client.table(accounts_table).select('id')
+            record['accounts'] = paged(client.table(accounts_table).select('id,kind')
                                        .eq('active', True).order('id'))
+            record['excluded_non_balance'] = []
+            if scope == 'liquidity':
+                record['excluded_non_balance'] = [r['id'] for r in record['accounts'] if r.get('kind') == 'card']
+                record['accounts'] = [r for r in record['accounts'] if r.get('kind') != 'card']
             record['accounts_ok'] = True
         except Exception:
             continue  # Do not serialize raw exceptions, URLs or credentials.

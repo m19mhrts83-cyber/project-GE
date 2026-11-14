@@ -1,0 +1,39 @@
+name: 618 evidence observation
+
+on:
+  schedule:
+    - cron: '30 0 * * *' # 09:30 JST; normal days included, no quiet-green suppression.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: asset-618-observation
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    if: github.event_name == 'workflow_dispatch' || vars.ASSET618_REPORT_APPROVED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -q supabase
+      - name: Read evidence metadata and report if explicitly approved
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
+          ASSET618_REPORT_APPROVED: ${{ vars.ASSET618_REPORT_APPROVED }}
+          ASSET618_REPORT_UNTIL: ${{ vars.ASSET618_REPORT_UNTIL }}
+        run: python scripts/jarvis_asset_618_observe.py --out work/618-observation --post
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 618-evidence-inventory
+          path: work/618-observation/
+          retention-days: 30
