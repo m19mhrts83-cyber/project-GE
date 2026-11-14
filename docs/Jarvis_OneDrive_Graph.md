@@ -86,6 +86,7 @@ python scripts/jarvis_onedrive_graph.py --path "215_神・大家さん倶楽部/
 
 - Obsidian Journal（Google Drive）は Graph 対象外 → GHA では `journal_recent` をスキップ（Mac push で補完）
 - 個人 OneDrive のファイル本体は `@microsoft.graph.downloadUrl`（認証なし CDN）で取得する。`/content` を Authorization 付きで 302 追従すると 401 になる
+- **注意**: `$select=…,@microsoft.graph.downloadUrl` だと consumers で downloadUrl が欠落する。メタ取得は `$select` なし（`Prefer: bypass-provider-caching` 可）
 - **refresh_token の耐久本線は `.env.jarvis_private` ＋ GHA/Vercel Secrets**（`MS_GRAPH_REFRESH_TOKEN`）。  
   `sync_meta.ms_graph_refresh_token` は **既定で使わない**（DB に秘密を置かない）。互換が必要なときだけ `JARVIS_MS_GRAPH_USE_SYNC_META=1` または `--supabase`。  
   Mac で private を揃える／Secrets も追従するとき:
