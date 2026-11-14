@@ -5592,3 +5592,8 @@ tr.at-map-ai-only .at-map-missing {
 @keyframes wa-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .wa-sigs li { animation: none; } }
 @media (max-width: 560px) { .wa-big { font-size: 2.4rem; } .wa-sigs { grid-template-columns: 1fr 1fr; width: 100%; } }
+/* ホームの週次稼働カード（HomeActivityBand） */
+.wa-band-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
+.wa-band-big { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.wa-band-sigs { display: inline-flex; gap: 10px; margin-left: 10px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wa-band-list { margin: 6px 0 0; padding-left: 1.1em; display: grid; gap: 3px; font-size: 0.88rem; }

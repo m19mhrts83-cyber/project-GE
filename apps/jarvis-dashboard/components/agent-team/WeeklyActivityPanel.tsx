@@ -187,7 +187,7 @@ export default async function WeeklyActivityPanel() {
         <div>
           <p className="wa-eyebrow">今週機能したAI社員・Grok Bot</p>
           <p className="wa-big">
-            <MaturityCountUp value={report.worked_agents} />
+            <MaturityCountUp value={report.worked_agents} decimals={0} />
             <small> / {report.total_agents}</small>
           </p>
           <p className="wa-sub">

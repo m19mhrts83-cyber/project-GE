@@ -16,6 +16,7 @@ import HomeKurashiftLink from "@/components/home/HomeKurashiftLink";
 import HomeLoopwareBand from "@/components/home/HomeLoopwareBand";
 import HomeUiuxScoreBand from "@/components/home/HomeUiuxScoreBand";
 import HomeMaturityBand from "@/components/home/HomeMaturityBand";
+import HomeActivityBand from "@/components/home/HomeActivityBand";
 import HomeSections, { type HomeSection } from "@/components/home/HomeSections";
 import {
   HOME_DEFAULT_ORDER,
@@ -58,6 +59,15 @@ export default async function HomePage() {
       node: (
         <Suspense fallback={null}>
           <HomeMaturityBand />
+        </Suspense>
+      ),
+    },
+    {
+      id: "activity",
+      label: "AI社員の週次稼働",
+      node: (
+        <Suspense fallback={null}>
+          <HomeActivityBand />
         </Suspense>
       ),
     },
