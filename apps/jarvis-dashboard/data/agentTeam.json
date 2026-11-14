@@ -13,7 +13,7 @@
   },
   "counts": {
     "候補": 22,
-    "設計中": 9,
+    "設計中": 10,
     "運用確認": 11,
     "運用": 0,
     "停止": 0,
@@ -111,16 +111,17 @@
         "614",
         "615",
         "616",
-        "617"
+        "617",
+        "618"
       ],
       "grok_bot_ids": [
         "resource"
       ],
       "counts": {
-        "ai": 7,
+        "ai": 8,
         "grok": 1,
         "paired": 1,
-        "ai_only": 6,
+        "ai_only": 7,
         "grok_only": 0
       }
     },
@@ -6493,6 +6494,179 @@
       }
     },
     {
+      "id": "618",
+      "name": "資産記録・エビデンス係",
+      "path": "600_リソース・家計室/618_資産記録・エビデンス係",
+      "department_id": "600",
+      "department_name": "リソース・家計室",
+      "genre_id": "resource",
+      "genre_name": "リソース・家計",
+      "status": "設計中",
+      "status_icon": "🔵",
+      "report": "report",
+      "trigger": "時間",
+      "schedule": "数値=既存09:10起動・週単位収集／最新画像=音声・チャット依頼／未取得分=依頼された対象だけ取り直し",
+      "tool_assigned": "jarvis",
+      "tool_fit": "B",
+      "tool_notes": "撮影本体は scripts/jarvis_purchase_asset_evidence.py（Mac Playwright）。停滞の手当て=ミスレモン、改修=Jarvis。照会のみ・振込しない",
+      "note": "数値は財務DB履歴、画像は同じSupabaseの非公開Storageに正常な最新参照のみ。KURASHIFTで読戻し/表示照合/証拠閲覧。Slackは出口専用。Phase 1–3実装済・本番反映作業中。",
+      "summary": "数値は財務DB履歴、画像は同じSupabaseの非公開Storageに正常な最新参照のみ。KURASHIFTで読戻し/表示照合/証拠閲覧。Slackは出口専用。Phase 1–3実装済・本番反映作業中。",
+      "flow_summary": "",
+      "builder_tag": "",
+      "mixup_kind": "none",
+      "grok_counterpart": "",
+      "flowforge_id": "flow_fQRxeChymx2NZAzi70ppxMtb",
+      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_fQRxeChymx2NZAzi70ppxMtb",
+      "flowforge_share_url": "",
+      "flowforge_edit_url": "",
+      "permissions": {
+        "can_do": "数値記録・読戻し、確認済み最新証拠の非公開保存、KURASHIFT照合。銀行IB・OTPはJarvis担当、Slack実送信は本人了承後。",
+        "methods": [
+          {
+            "name": "チャット・検索",
+            "level": "○",
+            "detail": "一覧の要約、`#consult`／`#report` の文面"
+          },
+          {
+            "name": "外部連携（API/MCP）",
+            "level": "○",
+            "detail": "Supabase 読み取り（財務の対象一覧・`sync_meta`）"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`scripts/jarvis_purchase_asset_evidence.py --out <月フォルダ> --only all`"
+          },
+          {
+            "name": "ブラウザ／Playwright",
+            "level": "○",
+            "detail": "Mac 専有。各社マイページの照会画面のみ"
+          },
+          {
+            "name": "画面操作（OTP）",
+            "level": "△",
+            "detail": "**ログイン用** OTP だけ（メール・Messages の既存経路）。値はチャットに出さない。振込用コードには触れない"
+          }
+        ],
+        "methods_filled": true,
+        "env_keys": [
+          "SLACK_WEBHOOK_OPS"
+        ],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "停滞時のまとめ承認／追加候補の承認／月次一覧のレビュー／先方への送付。",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": true,
+            "detail": "「最新の資産エビデンス取って」「資産証明のスクショ更新して」→ 即時実行",
+            "raw": "**人が頼む**: 「最新の資産エビデンス取って」「資産証明のスクショ更新して」→ 即時実行"
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "毎週日曜 **09:10** JST（launchd `com.matsunoma.jarvis.portfolio-weekly`）＋ Mac 起動時（RunAtLoad）＋ 朝オープンの取りこぼし。成功済みの週はスキップ。手動は KURASHIFT ホームのボタン／`--force` / 毎月 **第1日曜 10:30 JST**（launchd、松野さんの了承後に登録。週次 09:10 の後にずらし、同じロック `~/Library/Logs/jarvis_portfolio/weekly.lock.d` を共有して OTP 競合を避ける）",
+            "raw": "**時間（週次・運用中）**: 毎週日曜 **09:10** JST（launchd `com.matsunoma.jarvis.portfolio-weekly`）＋ Mac 起動時（RunAtLoad）＋ 朝オープンの取りこぼし。成功済みの週はスキップ。手動は KURASHIFT ホームのボタン／`--force`"
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "撮れなかった分が残ったら `#consult` に承認依頼1件 → 松野さんが承認 → 止まった分をバッチで再実行 / 財務の一覧に金融機関が増えたら次回の撮影時に追加候補として報告",
+            "raw": "**停滞時（副）**: 撮れなかった分が残ったら `#consult` に承認依頼1件 → 松野さんが承認 → 止まった分をバッチで再実行"
+          }
+        ],
+        "trigger_kinds_on": [
+          "human",
+          "schedule"
+        ],
+        "trigger_kinds_label": "人依頼 · 時間",
+        "triggers_filled": true,
+        "when": "週次=日曜09:10 launchd portfolio-weekly（運用中）／月次撮影=第1日曜10:30（launchd未登録）＋人依頼／停滞時はまとめ承認1回→バッチ再実行",
+        "registry_trigger": "時間",
+        "registry_schedule": "週次=日曜09:10 launchd portfolio-weekly（運用中）／月次撮影=第1日曜10:30（launchd未登録）＋人依頼／停滞時はまとめ承認1回→バッチ再実行",
+        "primary_report": "report",
+        "report_channels": [
+          "report",
+          "consult",
+          "ops"
+        ],
+        "reports": [
+          {
+            "kind": "完了報告",
+            "destination": "Slack `#report`（件数・ok/skip・保存先パスのみ。金額・口座番号は書かない）",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "週次の数値",
+            "destination": "KURASHIFT／財務（Supabase）。失敗した取得元は ダッシュの「次にやること」に出る",
+            "channels": []
+          },
+          {
+            "kind": "要判断（停滞のまとめ承認・追加候補）",
+            "destination": "Slack `#consult`",
+            "channels": [
+              "consult"
+            ]
+          },
+          {
+            "kind": "失敗・障害",
+            "destination": "Slack `#ops`",
+            "channels": [
+              "ops"
+            ]
+          }
+        ],
+        "procedures": [
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "README.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/README.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/README.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/AGENTS.md",
+            "kind": "doc"
+          }
+        ],
+        "procedure_count": 5,
+        "source": "claude+registry+ops_yaml",
+        "summary": ""
+      }
+    },
+    {
       "id": "711",
       "name": "家族Journal週次材料係",
       "path": "700_コーチング支援室/711_家族Journal週次材料係",
@@ -12431,13 +12605,25 @@
         ],
         "grok_department": "総務計画",
         "role_split": "山下向けコーチング"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "618",
+        "agent_name": "資産記録・エビデンス係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "2026-11-14 新設（松野さん依頼・Claudeチャット準備）。同日、資産週次(portfolio-weekly・数値)を統合し改名。月次=画面証拠。対象は財務の一覧と突合。保存先 OneDrive 240_融資/資産エビデンス_月次。"
       }
     ],
     "mapping_counts": {
       "paired": 18,
-      "ai_only": 25,
+      "ai_only": 26,
       "grok_only": 23,
-      "all": 66
+      "all": 67
     },
     "note": "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
   },

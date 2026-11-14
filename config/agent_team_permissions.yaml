@@ -26,6 +26,9 @@ defaults:
 # methods は CLAUDE.md §3 から sync が自動抽出。ここは上書き・補足用。
 # site_logins: ブラウザ／Playwright 等でログインしうるサービス（値は書かない）
 agents:
+  "618":
+    can_do: "資産数値の記録・読戻し、確認済み画像の非公開保存、KURASHIFT表示照合、Slack下書き（実送信は本人了承後）"
+    human_gate: "対外送信・金融操作・削除。銀行IBとOTPを自動処理し得る取得器はJarvis担当。"
   "111":
     can_do: "パートナー連絡の差分取込・要約・#report 材料（送信は人）"
     site_logins:

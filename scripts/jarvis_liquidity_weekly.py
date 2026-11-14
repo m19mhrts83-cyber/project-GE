@@ -24,8 +24,6 @@ FINANCE = REPO / "215_kamiooya" / "C1_cursor" / "finance" / "zaim_budget_sync"
 sys.path.insert(0, str(FINANCE))
 sys.path.insert(0, str(REPO / "scripts"))
 
-import jarvis_zaim_mhi_balance as zaim_acc  # noqa: E402
-import zaim_budget_apply as zaim  # noqa: E402
 
 YEN_INLINE = re.compile(
     r"(?:[¥￥]\s*(-?[0-9]{1,3}(?:,[0-9]{3})+|-?[0-9]+)|(-?[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)円)"
@@ -97,6 +95,8 @@ def match_balances(
 
 def scrape_zaim(*, headless: bool) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
     """口座一覧 + 週次収支テキストを1セッションで取得。"""
+    import jarvis_zaim_mhi_balance as zaim_acc
+    import zaim_budget_apply as zaim
     from playwright.sync_api import sync_playwright
 
     ws = week_start()
@@ -179,19 +179,17 @@ def scrape_zaim(*, headless: bool) -> tuple[list[dict[str, Any]], dict[str, Any]
     return list(merged.values()), cashflow, texts[0][:500]
 
 
-def upsert_liquidity(sb: Any, hits: list[dict[str, Any]], as_of: str) -> int:
+def upsert_liquidity(sb: Any, hits: list[dict[str, Any]], as_of: str, *, readbacks: dict | None = None) -> int:
     n = 0
+    from jarvis_asset_618_readback import verify_snapshot
     for h in hits:
-        sb.table("liquidity_snapshots").upsert(
-            {
-                "account_id": h["account_id"],
-                "as_of": as_of,
-                "balance_jpy": h["balance_jpy"],
-                "source": "zaim",
-                "note": f"Zaim {h['zaim_name']}",
-            },
-            on_conflict="account_id,as_of",
-        ).execute()
+        row = {"account_id": h["account_id"], "as_of": as_of,
+               "balance_jpy": h["balance_jpy"], "source": "zaim",
+               "note": f"Zaim {h['zaim_name']}"}
+        sb.table("liquidity_snapshots").upsert(row, on_conflict="account_id,as_of").execute()
+        check = verify_snapshot(sb, "liquidity_snapshots", row)
+        if readbacks is not None:
+            readbacks[h['account_id']] = check
         n += 1
     return n
 
@@ -272,7 +270,9 @@ def main() -> int:
     }
 
     if not args.dry_run and sb is not None:
-        n = upsert_liquidity(sb, bank_hits, as_of)
+        readbacks: dict = {r["id"]: {"status": "not_collected"} for r in liq_rows if r.get("kind") in ("bank","cash","emoney")}
+        n = upsert_liquidity(sb, bank_hits, as_of, readbacks=readbacks)
+        out["numeric_readbacks"] = readbacks
         upsert_cashflow(sb, cashflow)
         out["upserted_balances"] = n
         print(

@@ -1,3 +1,5 @@
+import {Suspense} from "react";
+import Asset618Status from "@/components/Asset618Status";
 import Shell from "@/components/Shell";
 import EnqueueJobButton from "@/components/EnqueueJobButton";
 import { createClient } from "@/lib/supabase/server";
@@ -342,6 +344,8 @@ export default async function PortfolioPage() {
         週次スクレイプ／Zaim から入れたスナップショット。ログインは{" "}
         <a href="/settings">設定</a> から。
       </p>
+
+      <Suspense fallback={<p className="meta">保存状況を確認中…</p>}><Asset618Status userId={user?.id ?? null}/></Suspense>
 
       <div className="card" style={{ marginTop: 12 }}>
         <header>

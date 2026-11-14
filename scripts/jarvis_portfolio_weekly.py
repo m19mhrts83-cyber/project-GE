@@ -19,6 +19,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from jarvis_asset_618_runtime import (Run, Busy, Blocked, CURRENT, current_metadata,
+                                      target_allowed, restricted, retry_targets)
+from jarvis_asset_618_report import PORTFOLIO_IDS, OPERATIONS
+from jarvis_asset_618_readback import verify_snapshot
 from jarvis_supabase_errors import abort_on_quota
 from jarvis_trade_common import JST, REPO, sb_client, today_jst
 
@@ -163,10 +167,19 @@ def upsert_snapshot(
     }
     if cost_jpy is not None:
         row["cost_jpy"] = cost_jpy
+    run = CURRENT.get()
+    if run:
+        run.record({account_id: {"status": "unverified"}})
+        run.data.setdefault("numeric_readbacks", {}).setdefault("portfolio_snapshots", {})[account_id] = {"status": "pending"}
     sb.table("portfolio_snapshots").upsert(
         row,
         on_conflict="account_id,as_of",
     ).execute()
+    verified = verify_snapshot(sb, "portfolio_snapshots", row, source_as_of=as_of)
+    if run:
+        run.data["numeric_readbacks"]["portfolio_snapshots"][account_id] = verified
+        run.record({account_id: {"status": "ok", "note": str(note or '') + ' ' + source}})
+
 
 
 def upsert_akatsuki_holding(sb, rec: dict[str, Any], *, as_of: str | None = None) -> None:
@@ -825,6 +838,8 @@ def upsert_sync_meta(sb, payload: dict[str, Any]) -> None:
         "last_full_iso_week": payload.get("last_full_iso_week"),
         "finished_at": payload.get("finished_at"),
         "sources": sources_brief,
+        "asset_618": payload.get("asset_618", {}),
+        "partial_scope": payload.get("partial_scope", False),
     }
     raw = json.dumps(meta, ensure_ascii=False)
     # sync_meta.value は長文可。sources を落とさないよう余裕を持たせる
@@ -854,6 +869,8 @@ def ingest_sony(sb, sources: dict[str, Any], *, dry_run: bool) -> None:
         print(f"# sony cost estimate warn: {costs['_error'].get('note')}")
     if sony_multi.get("status") == "ok":
         for aid, rec in (sony_multi.get("accounts") or {}).items():
+            if not target_allowed(aid):
+                continue
             cost_rec = costs.get(aid) or {}
             # 公式 paid_in を優先。無ければ Zaim 推計
             if rec.get("cost_jpy") is None and cost_rec.get("cost_jpy") is not None:
@@ -881,6 +898,8 @@ def ingest_sony(sb, sources: dict[str, Any], *, dry_run: bool) -> None:
                     ),
                 )
         for aid, rec in (sony_multi.get("loans") or {}).items():
+            if not target_allowed(aid):
+                continue
             sources[aid] = rec
             print(
                 f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
@@ -897,7 +916,7 @@ def ingest_sony(sb, sources: dict[str, Any], *, dry_run: bool) -> None:
         # value=0 で上書きしない。既存評価があるときだけ cost を更新。
         fetched = set((sony_multi.get("accounts") or {}).keys())
         for aid, cost_rec in costs.items():
-            if aid.startswith("_") or aid in fetched:
+            if not target_allowed(aid) or aid.startswith("_") or aid in fetched:
                 continue
             if cost_rec.get("cost_jpy") is None:
                 continue
@@ -948,13 +967,13 @@ def ingest_sony(sb, sources: dict[str, Any], *, dry_run: bool) -> None:
                     note=cost_rec.get("note"),
                     cost_jpy=float(cost_rec["cost_jpy"]),
                 )
-        if "sony_life_chikage" not in (sony_multi.get("accounts") or {}):
+        if target_allowed("sony_life_chikage") and "sony_life_chikage" not in (sony_multi.get("accounts") or {}):
             sources["sony_life_chikage"] = {
                 "status": "skipped",
                 "reason": "SONYLIFE_USERNAME_2 未設定または取得0件",
             }
             print("# sony_life_chikage: skipped SONYLIFE_USERNAME_2 未設定または取得0件")
-        if "sony_life_sovani" not in (sony_multi.get("accounts") or {}):
+        if target_allowed("sony_life_sovani") and "sony_life_sovani" not in (sony_multi.get("accounts") or {}):
             sources.setdefault(
                 "sony_life_sovani",
                 {
@@ -964,22 +983,13 @@ def ingest_sony(sb, sources: dict[str, Any], *, dry_run: bool) -> None:
             )
             print("# sony_life_sovani: skipped 契約未検出")
         return
-    sources["sony_life"] = sony_multi
-    sources["sony_life_chikage"] = {
-        "status": sony_multi.get("status") or "error",
-        "reason": sony_multi.get("reason") or "sony parent failed",
-    }
-    sources["sony_life_sovani"] = {
-        "status": sony_multi.get("status") or "error",
-        "reason": sony_multi.get("reason") or "sony parent failed",
-    }
-    print(
-        f"# sony_life: {sony_multi.get('status')} "
-        f"{sony_multi.get('reason') or sony_multi.get('note') or ''}"
-    )
+    for aid in ("sony_life", "sony_life_chikage", "sony_life_sovani", "sony_life_policy_loan", "sony_life_chikage_policy_loan"):
+        if target_allowed(aid):
+            sources[aid] = sony_multi
+    return
 
 
-def main() -> int:
+def parse_args():
     ap = argparse.ArgumentParser(description="資産全体 週次収集")
     ap.add_argument("--cloud-only", action="store_true", help="Yahoo / 既存DBのみ（GHA向け）")
     ap.add_argument("--dry-run", action="store_true")
@@ -989,26 +999,32 @@ def main() -> int:
         action="store_true",
         help="ソニー生命のみ取得（解約返戻＋Zaim払込推計）",
     )
-    args = ap.parse_args()
+    ap.add_argument("--only", help="Explicit comma-separated source IDs")
+    ap.add_argument("--run-id", help="Reserved UUID for an explicit once-only decision")
+    ap.add_argument("--retry-run", help="Retry unfinished targets from a local run ID")
+    return ap.parse_args()
 
-    load_private_env()
 
+def _collect_main(args, run) -> int:
     if os.environ.get("JARVIS_PORTFOLIO_WEEKLY_DISABLE") == "1":
         print("# skip: JARVIS_PORTFOLIO_WEEKLY_DISABLE=1")
         return 0
 
     if args.sony_only:
         print(f"# portfolio_weekly sony-only {now_iso()}")
-        sb = sb_client()
+        sb = run.client
         sources: dict[str, Any] = {}
         ingest_sony(sb, sources, dry_run=args.dry_run)
+        run.record(sources)
         print(json.dumps({"sony_only": True, "sources": sources}, ensure_ascii=False, default=str))
         return 0
 
     prev = load_state()
     if (
         not args.force
+        and not restricted()
         and not args.cloud_only
+        and not prev.get("partial_scope")
         and prev.get("last_full_iso_week") == iso_week()
         and prev.get("last_full_ok")
     ):
@@ -1019,7 +1035,9 @@ def main() -> int:
     # ただし前回が営業時間外スキップ（hours_skip）を含むときは、後刻の再取得を許す。
     if (
         not args.force
+        and not restricted()
         and not args.cloud_only
+        and not prev.get("partial_scope")
         and not prev.get("cloud_only")
         and prev.get("iso_week") == iso_week()
         and int(prev.get("ok") or 0) > 0
@@ -1087,7 +1105,7 @@ def main() -> int:
         )
         return 0
 
-    sb = None if args.dry_run else sb_client()
+    sb = run.client
     sources: dict[str, Any] = {}
 
     jobs: list[tuple[str, Any]] = []
@@ -1100,8 +1118,10 @@ def main() -> int:
             ("bloomo", fetch_bloomo),
         ]
 
+    jobs = [(aid, fn) for aid, fn in jobs if target_allowed(aid)]
+
     # プルデンシャルも Web 一括 → 失敗時のみ手登録
-    if not args.cloud_only:
+    if not args.cloud_only and any(target_allowed(x) for x in PORTFOLIO_IDS if x.startswith("prudential_")):
         try:
             pru_multi = fetch_prudential_by_account()
         except Exception as exc:
@@ -1114,6 +1134,8 @@ def main() -> int:
         )
         if pru_multi.get("status") == "ok":
             for aid, rec in (pru_multi.get("accounts") or {}).items():
+                if not target_allowed(aid):
+                    continue
                 sources[aid] = rec
                 print(
                     f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
@@ -1127,6 +1149,8 @@ def main() -> int:
                         note=rec.get("note"),
                     )
             for aid, rec in (pru_multi.get("loans") or {}).items():
+                if not target_allowed(aid):
+                    continue
                 sources[aid] = rec
                 print(
                     f"# {aid}: {rec.get('status')} {rec.get('reason') or rec.get('note') or ''}"
@@ -1145,6 +1169,8 @@ def main() -> int:
                 f"{pru_multi.get('reason') or ''}"
             )
             for aid in pru_ids:
+                if not target_allowed(aid):
+                    continue
                 rec = fetch_prudential_manual(aid)
                 sources[aid] = rec
                 print(
@@ -1164,6 +1190,7 @@ def main() -> int:
         # bloomo が落ち続けて catchup が繰り返されても、成功済み akatsuki を壊さない
         if (
             not args.force
+            and not restricted()
             and prev.get("iso_week") == iso_week()
             and account_id in ("akatsuki_bond",)
         ):
@@ -1225,11 +1252,11 @@ def main() -> int:
                 print(f"# akatsuki holdings: {exc}", file=sys.stderr)
 
     # ソニーは他サイトのあと（9:00 開店直後の混雑回避）
-    if not args.cloud_only:
+    if not args.cloud_only and any(target_allowed(x) for x in ALL_TARGETS if x.startswith("sony_")):
         ingest_sony(sb, sources, dry_run=args.dry_run)
 
     # 保険配分ビュー（スクレイプは fetch_axa 内で実施済み。ここでは表示用 merge）
-    if not args.cloud_only:
+    if not args.cloud_only and not restricted():
         try:
             alloc_script = REPO / "scripts" / "jarvis_insurance_allocations.py"
             out = subprocess.run(
@@ -1247,7 +1274,7 @@ def main() -> int:
             print(f"# insurance_allocations: {exc}", file=sys.stderr)
 
     # 証券内訳（SBI=Zaim／Bloomo=MF。失敗しても週次本体は継続）
-    if not args.cloud_only and not args.dry_run:
+    if not args.cloud_only and not args.dry_run and not restricted():
         try:
             hold_script = REPO / "scripts" / "jarvis_securities_holdings.py"
             out = subprocess.run(
@@ -1265,7 +1292,7 @@ def main() -> int:
             print(f"# securities_holdings: {exc}", file=sys.stderr)
 
     # 流動性・週次家計（銀行残高＋収支要約）
-    if not args.cloud_only and not args.dry_run:
+    if not args.cloud_only and not args.dry_run and target_allowed("liquidity_weekly"):
         try:
             liq_script = REPO / "scripts" / "jarvis_liquidity_weekly.py"
             out = subprocess.run(
@@ -1283,11 +1310,23 @@ def main() -> int:
                 "status": "ok" if out.returncode == 0 else "error",
                 "reason": f"exit={out.returncode}",
             }
+            if out.returncode == 0:
+                try:
+                    child = json.loads(out.stdout)
+                    checks = child['numeric_readbacks']
+                    if not isinstance(checks, dict) or not checks or any(not isinstance(v, dict) or v.get('status') not in ('verified','not_collected') for v in checks.values()):
+                        raise ValueError()
+                    run.data.setdefault('numeric_readbacks', {})['liquidity_snapshots'] = checks
+                    run.persist()
+                    if any(v.get('status') != 'verified' for v in checks.values()):
+                        sources['liquidity_weekly'] = {'status':'error','reason':'liquidity_partially_uncollected'}
+                except (ValueError, KeyError, TypeError):
+                    sources['liquidity_weekly'] = {'status': 'error', 'reason': 'liquidity_readback_unverified'}
         except Exception as exc:
             sources["liquidity_weekly"] = {"status": "error", "reason": str(exc)[:300]}
             print(f"# liquidity_weekly: {exc}", file=sys.stderr)
 
-    if not args.cloud_only and not args.dry_run:
+    if not args.cloud_only and not args.dry_run and target_allowed("tachibana_trade"):
         try:
             rec = fetch_tachibana(sb)
         except Exception as exc:
@@ -1302,7 +1341,7 @@ def main() -> int:
                 source="trade_risk_state",
                 note=rec.get("note"),
             )
-    elif args.cloud_only and not args.dry_run:
+    elif args.cloud_only and not args.dry_run and target_allowed("tachibana_trade"):
         try:
             rec = fetch_tachibana(sb)
             sources["tachibana_trade"] = rec
@@ -1320,9 +1359,17 @@ def main() -> int:
         except Exception as exc:
             sources["tachibana_trade"] = {"status": "error", "reason": str(exc)[:300]}
 
+    if restricted() and prev.get('iso_week') == iso_week():
+        for operation, origin in (('akatsuki_zaim', 'akatsuki_bond'), ('bloomo_zaim', 'bloomo')):
+            old = (prev.get('sources') or {}).get(origin) or {}
+            note = str(old.get('note') or '').lower()
+            if target_allowed(operation) and not target_allowed(origin) and old.get('status') == 'ok' and old.get('value_jpy') is not None and not any(x in note for x in ('manual', 'preserved', 'reused', 'cost-update')):
+                sources[origin] = {**old, 'status': 'ok', 'note': 'reused same-week observation for propagation only'}
+
     if (
         not args.cloud_only
         and not args.dry_run
+        and target_allowed("akatsuki_zaim")
         and sources.get("akatsuki_bond", {}).get("status") == "ok"
     ):
         zaim_script = REPO / "scripts" / "jarvis_zaim_akatsuki_weekly.py"
@@ -1367,6 +1414,7 @@ def main() -> int:
     if (
         not args.cloud_only
         and not args.dry_run
+        and target_allowed("bloomo_zaim")
         and sources.get("bloomo", {}).get("status") == "ok"
     ):
         zaim_script = REPO / "scripts" / "jarvis_zaim_bloomo_weekly.py"
@@ -1410,7 +1458,7 @@ def main() -> int:
 
     # 同週の並行再実行で、一度成功した口座を error で上書きしない
     # （あかつき OTP 競合など。--force 時は上書きする）
-    if not args.force and prev.get("iso_week") == iso_week():
+    if not args.force and not restricted() and prev.get("iso_week") == iso_week():
         for aid, old in (prev.get("sources") or {}).items():
             if not isinstance(old, dict):
                 continue
@@ -1432,6 +1480,20 @@ def main() -> int:
                     flush=True,
                 )
 
+    for aid in run.allowed:
+        sources.setdefault(aid, {"status": "skipped", "reason": "not_collected_or_dependency_missing"})
+    run.record(sources)
+    for aid, rec in list(sources.items()):
+        if aid not in run.allowed and aid not in run.data["decision_context"]["held_targets"] and aid not in run.data["decision_context"]["excluded_targets"]:
+            sources[aid] = {**rec, "status": "reference", "reason": "not_requested_this_run"}
+    for aid in run.data['decision_context']['held_targets']:
+        sources[aid] = {"status": "skipped", "reason": "owner_judgment_required"}
+    for aid in run.data['decision_context']['excluded_targets']:
+        sources[aid] = {"status": "skipped", "reason": "owner_decision_excluded"}
+    if restricted():
+        for aid, old in (prev.get('sources') or {}).items():
+            if aid not in sources and isinstance(old, dict):
+                sources[aid] = {**old, "status": "reference", "reason": "not_requested_this_run"}
     ok_n = sum(1 for r in sources.values() if r.get("status") == "ok")
     err_n = sum(1 for r in sources.values() if r.get("status") == "error")
     skip_n = sum(1 for r in sources.values() if r.get("status") == "skipped")
@@ -1444,11 +1506,13 @@ def main() -> int:
         for r in sources.values()
     )
     last_ok = err_n == 0 and ok_n > 0
-    full_ok = (not args.cloud_only) and err_n == 0 and not hours_skip
+    full_ok = (not args.cloud_only) and not restricted() and bool(run.data["results"]) and all(v == "ok" for v in run.data["results"].values())
 
     payload = {
         **prev,
         "iso_week": iso_week(),
+        "partial_scope": restricted(),
+        "asset_618": current_metadata(),
         "cloud_only": args.cloud_only,
         "ok": ok_n,
         "error": err_n,
@@ -1478,6 +1542,46 @@ def main() -> int:
         f"last_ok={last_ok} last_full_ok={full_ok}"
     )
     return 0 if err_n == 0 else 1
+
+
+ALL_TARGETS = tuple(dict.fromkeys((*PORTFOLIO_IDS, *OPERATIONS,
+    'sony_life_policy_loan', 'sony_life_chikage_policy_loan')))
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        if sum(bool(x) for x in (args.only, args.retry_run, args.sony_only)) > 1:
+            raise Blocked('choose_one_scope')
+        if args.retry_run and args.force:
+            raise Blocked('retry_does_not_accept_force')
+        targets = (retry_targets(args.retry_run, 'weekly') if args.retry_run else
+                   args.only.split(',') if args.only else
+                   [x for x in ALL_TARGETS if x.startswith('sony_')] if args.sony_only else
+                   ['tachibana_trade'] if args.cloud_only else list(ALL_TARGETS))
+        if not targets or any(x not in ALL_TARGETS for x in targets):
+            raise Blocked('unknown_or_empty_target_scope')
+        if args.cloud_only and any(x != 'tachibana_trade' for x in targets):
+            raise Blocked('target_unavailable_in_cloud_mode')
+        load_private_env()
+        if os.environ.get('JARVIS_PORTFOLIO_WEEKLY_DISABLE') == '1':
+            print('# disabled'); return 0
+        client = None if args.dry_run else sb_client()
+        with Run('weekly', targets, client, preview=args.dry_run, retry_of=args.retry_run, run_id=args.run_id) as run:
+            run.data['restricted'] = bool(args.only or args.retry_run or args.sony_only or
+                run.data['decision_context']['held_targets'] or run.data['decision_context']['excluded_targets'])
+            if args.dry_run:
+                print(json.dumps({'preview': True, 'target_ids': run.allowed, **current_metadata()}))
+                return 0
+            if not run.allowed:
+                print('# no executable targets; owner judgment or exclusion')
+                return 2 if run.data['decision_context']['held_targets'] else 0
+            rc = _collect_main(args, run)
+            print(json.dumps({'asset_618': current_metadata(), 'run_status_pending': True}))
+            return rc if rc else (2 if run.data['decision_context']['held_targets'] else 0)
+    except (Busy, Blocked) as exc:
+        print('# asset618: ' + str(exc), file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
