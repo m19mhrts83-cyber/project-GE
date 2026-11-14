@@ -1,6 +1,6 @@
 # 資産記録・エビデンス係（618）
 
-状態: 設計中。Phase 1–3を本番DB/非公開Storage/KURASHIFT/既存Mac実行コードへ反映し、画面と権限を確認済み。初回実画像取得と新しい実行記録の照合は次の依頼・定期実行で確認する。最新記録はdeploy_report.md。
+状態: 設計中。Phase 1–3を本番DB/非公開Storage/KURASHIFT/既存Mac実行コードへ反映し、画面と権限を確認済み。初回実画像取得と新しい実行記録の照合は次の依頼・定期実行で確認する。本番反映はdeploy_report.md、正常時報告と最新の保存状況はobservation_report.md。
 
 正本: 本書（運用方針）／[flow.md](./flow.md)（現状と工程）／[output_spec.md](./output_spec.md)（トリガー・保存・画面反映）／[TASK.md](./TASK.md)（残作業）。
 
@@ -16,12 +16,12 @@ FlowForge（保存確認済み）: https://flowforge-259747770348.asia-northeast
 - 数値: 既存launchd `com.matsunoma.jarvis.portfolio-weekly` は毎日09:10 JST＋Mac起動。朝補完もあり。収集は週単位。GHAはcloud-only補助。
 - 最新画像: 松野さんが音声・チャットで「最新の資産エビデンスを保存して」と声をかけた時。通常取得の正常画像をlatestへ更新してもよいが、画像だけのために毎回ログインしない。
 - 未取得分の取り直し: 松野さんが報告やKURASHIFTを見て、音声・チャットで「未取得分を取り直して」と依頼した時に、その分だけ再取得する。
-- 月次ジョブ新設は基本案から外す。共通ロックはPhase 2で実装済み、本番切替は未実施。
+- 月次ジョブ新設は基本案から外す。共通ロックはPhase 2で実装、本番Macへ反映済み。
 
 ## 3. アウトプットと保存先
 
 - 数値: 財務用Supabase `portfolio_snapshots` / `liquidity_snapshots`。口座×日付で保存。同日再取得は更新。画像なしでも数値記録の成功を判定する。
-- 最新画像: 同じSupabaseの非公開Storage `asset-evidence / 618/latest/{owner_uuid}/{scope}/{account_id}/{contract_key}/{view_key}.{a|b}.png`（ローカル実装済、本番未適用）。正常参照は1組、更新用の2スロットを交互に使う。メタデータ `asset_evidence_latest`（SQL準備済、本番未適用）に撮影日時・基準日・パス・検証結果を持つ。
+- 最新画像: 同じSupabaseの非公開Storage `asset-evidence / 618/latest/{owner_uuid}/{scope}/{account_id}/{contract_key}/{view_key}.{a|b}.png`（本番適用済み）。正常参照は1組、更新用の2スロットを交互に使う。メタデータ `asset_evidence_latest`（本番適用済み）に撮影日時・基準日・パス・検証結果を持つ。
 - 社員フォルダ: 仕様・手順・機密を含まない記録のみ。画像や残高明細をGit・Driveへ載せない。
 - 古い画像・転記メモを今回の画面証拠に数えない。更新失敗は前回正常画像と撮影日を維持する。
 - 既存OneDrive・debug画像はこの改定で移動・削除しない。詳細・更新途中の整合性はoutput_spec参照。
@@ -30,7 +30,7 @@ FlowForge（保存確認済み）: https://flowforge-259747770348.asia-northeast
 
 数値の反映・確認先は既存KURASHIFT `/portfolio`。DBへの保存・読み戻し後に画面を再読込し、金額・基準日・未取得状況を照合する。DB保存済みでも表示を確認していなければ「KURASHIFT反映未検証」とする。
 
-最新証拠はKURASHIFTに認証付き画面を追加する案（`/portfolio/evidence`）。JARVISは最終更新・未取得状況とKURASHIFTへの入口という補助役。JARVIS状態カードの追加を、数値反映確認の必須条件にしない。金額をJARVISへ二重転記しない。KURASHIFTの保存確認欄と証拠画面はPhase 3で実装・ローカル検証済み、本番未適用。JARVIS補助カードは追加していない。
+最新証拠はKURASHIFTの認証付き画面（`/portfolio/evidence`）で確認する。JARVISは最終更新・未取得状況とKURASHIFTへの入口という補助役。JARVIS状態カードの追加を、数値反映確認の必須条件にしない。金額をJARVISへ二重転記しない。KURASHIFTの保存確認欄と証拠画面はPhase 3で実装・本番反映済み。JARVIS補助カードは追加していない。
 
 ## 5. Slack報告（出口専用）
 
@@ -57,7 +57,7 @@ Slackの投稿・返信・リアクションは起動条件にしない。報告
 
 ## 8. 判断ログの記録・取得（2026-11-14）
 
-共通DB owner_decisionsを再利用し、employee=618 / surface=asset_618（追加案）で判断・本人の理由・対象・今回だけ／次回基準・期限・runを追記する。今回だけの判断を次回へ持ち越さず、本人が明示採用した未取消の有効基準だけを実行前に取得・適用する。適用decision_idと結果をrun記録に残す。対象変更、未取得対応、基準変更で人の判断を明示。判断は音声・チャットで受け、Slackは出口専用。競合・読取失敗・記録未保存を黙って通さない。詳細の正本はoutput_specの判断ログ節。記録・取得の配線とsurface追加はPhase 2でローカル実装済み、本番未反映。
+共通DB owner_decisionsを再利用し、employee=618 / surface=asset_618（追加案）で判断・本人の理由・対象・今回だけ／次回基準・期限・runを追記する。今回だけの判断を次回へ持ち越さず、本人が明示採用した未取消の有効基準だけを実行前に取得・適用する。適用decision_idと結果をrun記録に残す。対象変更、未取得対応、基準変更で人の判断を明示。判断は音声・チャットで受け、Slackは出口専用。競合・読取失敗・記録未保存を黙って通さない。詳細の正本はoutput_specの判断ログ節。記録・取得の配線とsurface追加はPhase 2で実装・本番反映済み。
 
 図の戻り線: 青破線は依頼があった今回の取り直し（03へ）、茶破線は採用基準を次回開始時に取得（05へ）。いずれも無条件の自動リトライを示さない。
 
@@ -84,3 +84,9 @@ Slackの投稿・返信・リアクションは起動条件にしない。報告
 ## 11. 本番反映（2026-11-14・了承済み）
 
 PR #413をCI成功後にマージ。DB/非公開Storage/既存利用者1人の所有者登録/KURASHIFT/既存Mac実行コードへ反映し、認証付き画面・匿名拒否・未登録画像と旧runの未確認表示を確認。詳細は[deploy_report.md](./deploy_report.md)。実金融取得・OTP・画像登録・Slack投稿は未実施。次の実依頼/定期取得で新runを確認する。
+
+
+## 12. 正常時も報告・保存漏れの観察（2026-11-14）
+
+本人依頼で正常・変化なしでも保存状況を報告する方針へ変更。詳細は[observation_report.md](./observation_report.md)。数値保存28/29（今週23・古い5・未取得1）、手入力参考4、正常画像登録0をSELECTで確認。カード2件を除外、子どもSOVANIの対象漏れを修正。
+毎朝09:30 JST〜2026-12-12のGHA日次報告を準備。現時点は送信承認変数未設定で無効。#report宛の具体的本文と期間中の継続投稿の了承後に有効化。期間後は自動延長しない。未登録画像を失敗と決めつけない。数値の書込・画像本体の閲覧・KURASHIFTの当該run照合は別々に確認する。初回金融取得はJarvis境界を守る。
