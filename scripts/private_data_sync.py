@@ -4,6 +4,8 @@
 公開リポ（~/git-repos）では config/private_paths.txt の場所を .gitignore で外している。
 ファイル自体は Mac の同じ場所に置いたままにして、スクリプトのパスは変えない。
 非公開リポの clone（既定 ~/git-repos-private/project-GE-private）に同じ相対パスで写して push する。
+写す範囲は config/private_sync_paths.txt（.jarvis_state/ は名前を出した小さな記録だけ。
+ブラウザのプロファイル・Cookie・キャッシュは写さない）。1 ファイル 20MB を超えるものも写さない。
 
   push    : 公開側の作業フォルダ → 非公開 clone へ写し、変化があれば commit・push
   restore : 非公開 clone → 公開側の作業フォルダへ、無いファイルだけ戻す（上書きしない）
@@ -22,7 +24,8 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-PATTERNS = REPO / "config" / "private_paths.txt"
+PATTERNS = REPO / "config" / "private_sync_paths.txt"
+MAX_BYTES = 20 * 1024 * 1024
 DEFAULT_PRIVATE = Path.home() / "git-repos-private" / "project-GE-private"
 
 
@@ -36,10 +39,14 @@ def _git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProce
 
 
 def public_files() -> list[str]:
-    """公開側の作業フォルダにある、private_paths に当たるファイル（追跡中・未追跡とも）。"""
+    """公開側の作業フォルダにある、private_sync_paths に当たるファイル（追跡中・未追跡とも）。"""
     out = _git(REPO, "ls-files", "-z", "--cached", "--others", "--ignored",
                f"--exclude-from={PATTERNS}").stdout
-    return sorted({p for p in out.split("\0") if p and (REPO / p).is_file()})
+    return sorted({p for p in out.split("\0") if p and small_file(REPO / p)})
+
+
+def small_file(p: Path) -> bool:
+    return p.is_file() and not p.is_symlink() and p.stat().st_size <= MAX_BYTES
 
 
 def private_files(dst: Path) -> list[str]:

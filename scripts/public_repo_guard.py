@@ -38,6 +38,7 @@ SELF_FILES = {
     "scripts/tests/test_public_repo_guard.py",
     "config/public_guard_allow.txt",
     "config/private_paths.txt",
+    "config/private_sync_paths.txt",
     ".gitignore",
 }
 
