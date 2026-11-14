@@ -511,7 +511,7 @@ agents:
     tool_notes: 撮影本体は scripts/jarvis_purchase_asset_evidence.py（Mac Playwright）。停滞の手当て=ミスレモン、改修=Jarvis。照会のみ・振込しない
     schedule: 数値=既存09:10起動・週単位収集／最新画像=音声・チャット依頼／未取得分=依頼された対象だけ取り直し
     note: 数値は財務DB履歴、画像は同じSupabaseの非公開Storageに正常な最新参照のみ。KURASHIFTで読戻し/表示照合/証拠閲覧。Slackは出口専用。Phase
-      1–3実装済・本番反映作業中。
+      1–3本番反映・画面確認済み。初回画像取得と新run照合は次の実行時。
   '711':
     name: 家族Journal週次材料係
     path: 700_コーチング支援室/711_家族Journal週次材料係
