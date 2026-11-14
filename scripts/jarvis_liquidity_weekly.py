@@ -24,8 +24,6 @@ FINANCE = REPO / "215_kamiooya" / "C1_cursor" / "finance" / "zaim_budget_sync"
 sys.path.insert(0, str(FINANCE))
 sys.path.insert(0, str(REPO / "scripts"))
 
-import jarvis_zaim_mhi_balance as zaim_acc  # noqa: E402
-import zaim_budget_apply as zaim  # noqa: E402
 
 YEN_INLINE = re.compile(
     r"(?:[¥￥]\s*(-?[0-9]{1,3}(?:,[0-9]{3})+|-?[0-9]+)|(-?[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)円)"
@@ -97,6 +95,8 @@ def match_balances(
 
 def scrape_zaim(*, headless: bool) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
     """口座一覧 + 週次収支テキストを1セッションで取得。"""
+    import jarvis_zaim_mhi_balance as zaim_acc
+    import zaim_budget_apply as zaim
     from playwright.sync_api import sync_playwright
 
     ws = week_start()
