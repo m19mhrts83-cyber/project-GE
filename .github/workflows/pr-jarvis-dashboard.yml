@@ -1,0 +1,23 @@
+# PR 時の jarvis-dashboard 確認（AI 不使用）。jarvis-dashboard に変更があるときだけ動く（2026-11-14 適正化）
+name: PR Checks (jarvis-dashboard)
+
+on:
+  pull_request:
+    paths:
+      - "apps/jarvis-dashboard/**"
+      - ".github/workflows/pr-jarvis-dashboard.yml"
+      - ".github/workflows/_app-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-jarvis-dashboard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/_app-build.yml
+    with:
+      app: jarvis-dashboard
