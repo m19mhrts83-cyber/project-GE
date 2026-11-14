@@ -17,6 +17,7 @@ export const CONTRACT_VERSION = 1;
 
 /** どの判断か */
 export const SURFACES = [
+  "asset_618", // 資産記録：音声・チャットで確定した判断と適用基準
   "triage", // メール要対応（返信する／見送る／ToDo）
   "triage_miss", // 拾い漏れ（出てこなかったが本当は要対応だった）
   "triage_rule", // 送り手ルールの確認（Slack メール側）

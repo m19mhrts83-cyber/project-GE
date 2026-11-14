@@ -90,3 +90,13 @@ test('今週の粒を数え、週は月曜0時（JST）から', () => {
   assert.equal(c.weekStartIso(new Date('2026-11-08T05:00:00Z')), '2026-11-01T15:00:00.000Z');
   assert.equal(c.weekStartIso(new Date('2026-11-01T15:00:00Z')), '2026-11-01T15:00:00.000Z');
 });
+
+test('618の確定判断は共通契約で受け付け、独自payloadを保持する', () => {
+  const n = c.normalizeDecision({ ...base, surface: 'asset_618', action: 'rule_accept',
+    source: 'script', employee: '618', targetType: 'asset618_decision', targetId: 'rule-1',
+    payload: { asset_618: { owner_confirmed: true, targets: ['sbi_index'] } },
+  });
+  assert.equal(n.ok, true);
+  assert.equal(n.row.surface, 'asset_618');
+  assert.equal(n.row.payload.asset_618.owner_confirmed, true);
+});
