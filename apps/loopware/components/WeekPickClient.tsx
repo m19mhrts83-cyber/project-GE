@@ -1,5 +1,6 @@
 "use client";
 
+import { logged } from "@/lib/logPulse";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Icon from "./Icon";
 import {
@@ -153,6 +154,7 @@ export default function WeekPickClient() {
       setStatus({ commit: { id: 0, decided_at: new Date().toISOString() }, applied: null });
       setRecommit(false);
       flash(`確定しました（判断 ${j.saved + 1} 件を記録）`);
+      logged({ beads: Array.from({ length: Math.max(1, Number(j.saved) + 1 || 1) }, () => "take" as const), label: "今週の9件を確定しました", big: true });
     } catch (e) {
       flash(e instanceof Error ? e.message : String(e));
     } finally {

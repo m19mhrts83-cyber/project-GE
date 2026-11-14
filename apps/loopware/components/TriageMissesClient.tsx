@@ -1,5 +1,6 @@
 "use client";
 
+import { logged } from "@/lib/logPulse";
 import { useEffect, useState } from "react";
 import { agoLabel, isVendorItemId, type DeskCard } from "@/lib/deskCore";
 
@@ -54,6 +55,7 @@ export default function TriageMissesClient() {
         ? "要対応だったと記録しました（業者返信なので、返信は業者返信のカードから）"
         : "要対応に戻しました（判断デスクの先頭に出ます）";
       setDone((d) => ({ ...d, [c.id]: verdict === "miss" ? missText : "このままにしました" }));
+      logged({ beads: [verdict === "miss" ? "take" : "note"], label: verdict === "miss" ? "要対応に戻しました" : "このままにしました" });
     } catch (e) {
       // 失敗はそのカードの下に出す（ページ上部だと押しても何も起きないように見える）
       setDone((d) => ({ ...d, [c.id]: "" }));

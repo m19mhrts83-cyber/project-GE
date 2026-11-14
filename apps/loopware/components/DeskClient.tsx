@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
 import LogJar, { type Bead } from "./LogJar";
+import { logged } from "@/lib/logPulse";
 import VoicePanel from "./VoicePanel";
 import { MAIL_REASON_TAGS, STAY_REASON_TAGS, type WeekTally } from "@/lib/decisionContract";
 import { SENDER_POLICIES, type SenderPolicy } from "@/lib/senderPolicyCore";
@@ -208,6 +209,7 @@ export default function DeskClient() {
         } else {
           const n = (tallyWeek?.total || 0) + beads.length + 1;
           flash(`✓ ${CHOICE_LABEL[choice]}・判断ログに記録（今週 ${n} 件）`);
+          logged({ beads: [CHOICE_BEAD[choice]], compact: true });
         }
       } catch {
         writeQueue([...readQueue(), { url: "/api/desk/decide", body }]);
