@@ -40,8 +40,11 @@ REPEAT_FLAG = 5
 ERROR_RE = re.compile(
     r"Traceback|Error|FAIL|not_in_channel|HTTP [45]\d\d|❌|soft-fail", re.I
 )
-# 「failed=0」「failed: なし」のような正常の集計行はエラーとみなさない
-ZERO_COUNT_RE = re.compile(r"\b(fail|failed|errors?)\s*[=:]?\s*(0|なし)(?!\d)", re.I)
+# 「failed=0」「failed: なし」のような正常の集計行はエラーとみなさない。
+# JSON の `"streams_failed": 0` も正常（2026-11-14: openchat_sync が毎週 ×20 前後の誤検知）
+ZERO_COUNT_RE = re.compile(
+    r"(?<![a-z])(fail|failed|errors?)\"?\s*[=:]?\s*(0|なし)(?!\d)", re.I
+)
 AI_CALL_RE = re.compile(
     r"openai|anthropic|chat\.completions|find_cursor_agent|launch_cloud_agent"
     r"|api\.x\.ai|generativelanguage|claude -p|cursor-agent"

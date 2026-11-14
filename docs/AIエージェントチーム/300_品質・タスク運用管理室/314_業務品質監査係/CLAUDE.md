@@ -84,7 +84,8 @@ Claude デスクトップが閉じていると 9:30 の回は次の起動時に�
 
 週次スクリプトは**両方**を読み、片方が読めなければ「⚠ 読めなかった」と出す（黙って0件にしない）。
 
-1. `~/selenium_env/venv/bin/python scripts/jarvis_owner_decisions_weekly.py --out <worktree>/docs/…/314_業務品質監査係/output/YYYYMMDD_判断ログ.md`
+1. `~/selenium_env/venv/bin/python scripts/jarvis_owner_decisions_weekly.py --out ~/git-repos/.jarvis_state/weekly_review_314/YYYYMMDD_判断ログ.md --ledger <worktree>/docs/…/314_業務品質監査係/output/improvements.md`
+   - **判断ログ本体はコミットしない**（メールの件名・相手の名前・返信の書き換えが入る。リポ `project-GE` は public。2026-11-14）。`.jarvis_state/` は ignore 済み。週次レビュー MD と improvements.md には**件数・率・根拠 ID だけ**書き、名前・件名・本文は書かない
    - 出るもの: 今週と前週の **承認／修正／見送り**（件数・母数・率・前週比）、**共通パターン**（同じ理由タグ・見送り理由が2件以上。根拠 ID＝判断ログ ID・Todoist ID つき）、**改善台帳の効果**（`output/improvements.md` の「実装済」「効果測定中」の行の指標を今週の値と並べる）
    - 承認＝提案どおり、修正＝直して使った・延期・やめる、見送り＝提案を採らなかった（どれも違う・後でを含む）
 2. 共通パターンから改善候補を **最大3件**。分類は「コード条件分岐／プロンプト／運用ルール／松野判断が必要」。**1件だけのものは一般化しない**（来週以降に重なったら候補）
@@ -133,4 +134,5 @@ PR: <url>
 | 2026-10-24 | 週次レビューを定期化。機械チェック（launchd 土曜 9:00）＋Miss Lemon レビュー（Claude 定期タスク 9:30）。status 運用確認（松野了承） |
 | 2026-10-31 | 3回目（`output/20261031_週次レビュー.md`）＋3か月バックログ（危険度順）。機械チェックの誤検知 2 件を修正（workflow のコメント行を依存に数えない・`scripts/tests` を AI 追加から除外）、**Gemini 呼び出し（`geminiReply`／`gemini.generate`／`GEMINI_API_KEY`）も AI 追加として拾う**ように。Supabase 402 のように1つの原因で多数の GHA が落ちた週は、系統ごとではなく原因ごとに1行にまとめて仕分ける |
 | 2026-11-08 | 判断ログの週次を改訂（§6.1）: Loopware 312 の `task_loop_*` も読む、承認／修正／見送りを前週と比べる、同じ理由2件以上だけ共通パターンにする、改善台帳 `output/improvements.md` で提案→承認→実装→効果を追う。機械チェックはネット不通時に取り直し、Slack に出せなければ exit 2 と `latest.json` の `slack_posted:false` で残す。11/07 は fetch・gh・Slack が全部失敗したのに exit 0 だった |
+| 2026-11-14 | 5回目（`output/20261114_週次レビュー.md`）。**リポが public** と分かったので、判断ログ本体（件名・名前入り）は `.jarvis_state/weekly_review_314/` に出してコミットしない（§6.1）。機械チェックの「0 件は正常」を JSON の `"streams_failed": 0` にも効かせた。新しい常駐（定額AIの係）も「Supabase 失敗中は倍々で最大 300 秒」の型に揃えた |
 | 2026-11-07 | 4回目（`output/20261107_週次レビュー.md`）。機械チェックの launchd ログは**前回の本番実行（`--post`）で読んだ位置から後だけ**数えるように（`.jarvis_state/weekly_review_314/log_offsets.json`。`--dry-run` は位置を動かさない）。各エラーに「最後に出たファイルの時刻」も付く。それでも件数だけで判断せず、**最後の発生を見てから**仕分ける |
