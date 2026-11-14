@@ -106,3 +106,6 @@ review manifestの書式：
 - `scripts/tests/asset_618_http_fixture.py`（localhost:6418）、`asset_618_browser_check.py`（localhost:6419）。Nextを同fixture用の匿名キー・URLで起動し、`ASSET618_TEST_OUT`で画面出力先を指定する。実サービスの鍵をfixtureへ渡さない。
 - 実装上の確認：[Supabase private bucket](https://supabase.com/docs/guides/storage/buckets/fundamentals)、[Storage access control](https://supabase.com/docs/guides/storage/security/access-control)、[private download](https://supabase.com/docs/reference/javascript/file-buckets-download)。
 - 検証DB：[PGlite API](https://pglite.dev/docs/api)。本番SupabaseのStorageエンジン自体の代替検証とは区別する。
+
+
+本番反映前のCI修正：DB読戻しテストのimportでMac用Playwrightまで読まれていたため、liquidityのブラウザ依存をscrape_zaim実行時に遅延読込へ変更。ローカル全Python720件成功。CIと本番適用結果はdeploy_report.mdへ追記する。
