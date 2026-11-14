@@ -85,6 +85,9 @@ def make_text(r):
         old = [f'ソニー{len(old)}件（詳細は対象別一覧）']
     portfolio_saved = sum(x['scope'] == 'portfolio' and x['database'] in ('current_week', 'older') for x in r['items'])
     cash_saved = sum(x['scope'] == 'liquidity' and x['database'] in ('current_week', 'older') for x in r['items'])
+    image_labels = [x['label'] for x in r['items'] if x['image'] in ('registered', 'previous_good_held')]
+    image_targets = ['画像登録先対象：' + '、'.join(image_labels[i:i + 2])
+                     for i in range(0, len(image_labels), 2)] or ['画像登録先対象：まだありません']
     normal = r['scope_verified'] and not r['database_read_failures'] and r['image_read_ok']
     return '\n\n'.join([
         '【報告】618 資産証拠・日次確認',
@@ -97,6 +100,7 @@ def make_text(r):
         f"手入力参考値：{r['manual_reference_count']}件\n今週の記録日も取得元の日付保証ではありません",
         (f"正常画像登録：{ic.get('registered', 0) + ic.get('previous_good_held', 0)}対象\n未登録{ic.get('not_registered', 0)}／失敗{ic.get('failed', 0)}／確認待ち{ic.get('pending', 0)}"
          if r['image_read_ok'] else '画像登録状況：読取不可'),
+        *(image_targets if r['image_read_ok'] else []),
         f"前回正常画像を維持：{ic.get('previous_good_held', 0)}対象\n未登録は撮影失敗を意味しません",
         '今回の数値書込・画面照合：未検証\n登録メタデータ確認のみ。画像本体の再検証なし',
         '数値：https://jarvis-trade-desk.vercel.app/portfolio\n画像：https://jarvis-trade-desk.vercel.app/portfolio/evidence',
