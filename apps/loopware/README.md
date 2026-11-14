@@ -102,6 +102,13 @@ iPhone は **Chrome** 前提。
 - Slack からのリンクは `?t=<期限>.<署名>`（7日有効。`lib/access.ts` の `linkToken`）でそのまま入れる
 - 鍵が未設定の本番では、従来の `/` `/312` `/313` だけ開き、新しい画面と `/api/log` は止める
 
+## 判断ログに残ったときの演出
+
+- 記録できた（ok）ときだけ、各画面が `logged()`（`lib/logPulse.ts`）を呼ぶ。失敗・端末預かりでは出さない
+- 演出は `components/LogCelebration.tsx`（layout に1つ）：チェックの輪 → 粒が右上の瓶へ飛ぶ → 瓶がせり上がり、今週の件数（`/api/log`）が繰り上がる
+- 案の確定・反映案を全部決め終えた・10件ごとの区切りは `big`（紙吹雪＋ひと言）。判断デスクは連打するので `compact`（瓶だけ）
+- 動きを減らす設定の端末では、動かさずに件数だけ出す
+
 ## 判断ログの書き込み（契約 v1）
 
 - 契約: `lib/decisionContract.ts`（正本。`apps/jarvis-dashboard/lib/decisionContract.ts` は写し）
