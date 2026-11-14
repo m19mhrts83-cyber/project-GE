@@ -108,3 +108,10 @@ status: running / executor: codex。松野さんの「反映進めて良いで�
 ## 2026-11-14：本番反映完了
 
 status: done_deployment / executor: codex。了承範囲のDB/非公開Storage/所有者登録/KURASHIFT/Mac既存コードを適用。PR #413、CI成功、本番READY、本人ログインと空状態/旧run未確認表示、匿名拒否を確認。詳細deploy_report.md。金融取得・画像登録・Slack送信はこの反映作業に含めず未実施。新runの照合は次の定期/実依頼時。
+
+
+## 正常時報告と証拠保存の観察（2026-11-14）
+
+executor: codex / status: implemented_pending_send_approval。正常稼働も含む報告、保存済み対象・未保存理由・次の手当てを明示する。数値DBと画像を区別し、カードを未取得扱いしない。子どもSOVANIの対象漏れを修正。毎朝のGHA報告を準備し、送信前の本文・継続投稿の了承ルールに従い、実投稿は有効化前の確認まで行わない。
+
+観察スクリプト・GHAゲート・対象漏れ/カード除外と11テストを追加、618関連95件成功。本番SELECT確認・対象別一覧と手当てはobservation_report.md。金融取得・実画像登録・Slack投稿なし。残りは継続投稿の了承→変数有効化→実投稿確認、およびJarvisの初回取得/画像保存/当該run画面照合。
