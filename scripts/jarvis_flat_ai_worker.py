@@ -8,6 +8,8 @@ ai_jobs に依頼を置いて待つ。この係が 3 秒ごとに見て、script
 - 心拍: sync_meta.flat_ai_worker_at を 1 分ごとに更新（Mac 見張りが読む）
 - 古い依頼（3 日超）は消す（メール等の私的な文面を残さない）
 - 15 分以上 running のままの依頼は queued に戻す（係が途中で落ちたとき）
+- Supabase が失敗（402 制限・オフライン等）している間は 10 秒から 2 倍ずつ最大 300 秒まで
+  間を空ける（3 秒ごとに打ち続けて egress と制限を悪化させない。2026-11-14 314・glucon 修正と同じ型）
 
 launchd: launchd/install_flat_ai_worker_launchd.sh（KeepAlive）
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
@@ -35,6 +37,8 @@ POLL_SEC = 3
 HEARTBEAT_SEC = 60
 KEEP_DAYS = 3
 STUCK_MIN = 15
+FAIL_WAIT_BASE_SEC = 10
+FAIL_WAIT_MAX_SEC = 300
 HEARTBEAT_KEY = "flat_ai_worker_at"
 EXT = {"image/png": ".png", "image/jpeg": ".jpg", "image/jpg": ".jpg", "image/webp": ".webp", "image/heic": ".heic"}
 
@@ -120,6 +124,12 @@ def run_job(sb: Any, row: dict[str, Any]) -> str:
     return f"done via {res.label}"
 
 
+def fail_wait_sec(streak: int) -> float:
+    """連続失敗 streak 回目（1 始まり）の待ち秒。10, 20, 40, … 最大 300。"""
+    n = max(1, streak) - 1
+    return float(min(FAIL_WAIT_MAX_SEC, FAIL_WAIT_BASE_SEC * (2 ** min(n, 10))))
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--once", action="store_true", help="1 巡だけ")
@@ -136,6 +146,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     last_hb = 0.0
     last_hk = 0.0
+    fail_streak = 0
     while True:
         now = time.time()
         try:
@@ -146,12 +157,22 @@ def main(argv: list[str] | None = None) -> int:
                 housekeeping(sb)
                 last_hk = now
             row = claim(sb)
+            fail_streak = 0
             if row:
                 print(f"{now_iso()} job {row['id']} {row.get('purpose')}: {run_job(sb, row)}", flush=True)
                 continue  # 溜まっていれば続けて処理
         except Exception as e:
-            print(f"{now_iso()} worker error: {type(e).__name__}: {str(e)[:200]}", flush=True)
-            time.sleep(10)
+            fail_streak += 1
+            wait = fail_wait_sec(fail_streak)
+            print(
+                f"{now_iso()} worker error (streak={fail_streak}, wait={wait:.0f}s): "
+                f"{type(e).__name__}: {str(e)[:200]}",
+                flush=True,
+            )
+            if args.once:
+                return 1
+            time.sleep(wait)
+            continue
         if args.once:
             return 0
         time.sleep(POLL_SEC)
