@@ -81,6 +81,8 @@ def make_text(r):
     saved = c.get('current_week', 0) + c.get('older', 0)
     gaps = [x['label'] for x in r['items'] if x['database'] == 'missing']
     old = [x['label'] for x in r['items'] if x['database'] == 'older']
+    if old and all(x.startswith('ソニー') for x in old):
+        old = [f'ソニー{len(old)}件（詳細は対象別一覧）']
     portfolio_saved = sum(x['scope'] == 'portfolio' and x['database'] in ('current_week', 'older') for x in r['items'])
     cash_saved = sum(x['scope'] == 'liquidity' and x['database'] in ('current_week', 'older') for x in r['items'])
     normal = r['scope_verified'] and not r['database_read_failures'] and r['image_read_ok']
@@ -88,6 +90,7 @@ def make_text(r):
         '【報告】618 資産証拠・日次確認',
         r['checked_at'][:10] + (' 確認処理は正常' if normal else ' 確認処理に読取障害'),
         f"数値DB：記録あり{saved}/{r['target_count']}件\n今週{c.get('current_week', 0)}／古い{c.get('older', 0)}／未取得{c.get('missing', 0)}",
+        f"DB読取障害：{r['database_read_failures']}件\n未来日付：{c.get('invalid_date', 0)}対象",
         f"保存先：Supabase\n資産・保険等{portfolio_saved}／銀行・現金等{cash_saved}件",
         '未取得：' + ('、'.join(gaps) if gaps else 'なし（読取不可の範囲は除く）'),
         '古い記録：' + ('、'.join(old) if old else 'なし（読取不可の範囲は除く）'),
@@ -96,7 +99,8 @@ def make_text(r):
          if r['image_read_ok'] else '画像登録状況：読取不可'),
         f"前回正常画像を維持：{ic.get('previous_good_held', 0)}対象\n未登録は撮影失敗を意味しません",
         '今回の数値書込・画面照合：未検証\n登録メタデータ確認のみ。画像本体の再検証なし',
-        '閲覧：https://jarvis-trade-desk.vercel.app/portfolio/evidence\n取り直しの依頼は音声・チャットへ',
+        '数値：https://jarvis-trade-desk.vercel.app/portfolio\n画像：https://jarvis-trade-desk.vercel.app/portfolio/evidence',
+        '取り直しの依頼は音声・チャットへ',
     ])
 
 
@@ -124,7 +128,7 @@ def main(argv=None):
     if args.post:
         if not posting_allowed(now, os.getenv('ASSET618_REPORT_APPROVED'), os.getenv('ASSET618_REPORT_UNTIL')):
             print('Report saved; posting disabled or expired.')
-            return 0
+            return 0 if result['scope_verified'] and not result['database_read_failures'] and result['image_read_ok'] else 2
         webhook = os.getenv('SLACK_WEBHOOK_AI_TEAM_REPORT')
         if not webhook:
             print('Report saved; report webhook unavailable.')
