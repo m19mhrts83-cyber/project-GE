@@ -15,6 +15,12 @@
 # 311 送信前品質係に届いた依頼（取引先名・下書きの場所を含む。README・見本は公開のまま）
 docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/input/2*.md
 
+# 銀行・保険・証券サイトの自動操作で残ったログ・画面の写し・ログイン状態（2026-11-14 履歴調査で追加）
+215_kamiooya/C1_cursor/browser_automation/東海労金_振込_実行ログ_*.txt
+215_kamiooya/C1_cursor/browser_automation/debug_*.html
+215_kamiooya/C1_cursor/finance/debug/
+215_kamiooya/C1_cursor/finance/zaim_budget_sync/downloads/
+
 # .jarvis_state のうち、以前リポに入っていた小さな記録だけ
 .jarvis_state/car_loan.json
 .jarvis_state/card_annual_fee.json
