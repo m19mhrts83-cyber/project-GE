@@ -337,6 +337,23 @@ def comm_hub_sync(
     return len(ids_by_dk)
 
 
+def protected_status_by_id(sb, ids: list[str], protected: set[str], chunk: int = 80) -> dict[str, str]:
+    """id → status（閉じた状態のものだけ）。id で引くので行数上限（既定 1000）に掛からない。"""
+    out: dict[str, str] = {}
+    uniq = sorted({i for i in ids if i})
+    for i in range(0, len(uniq), chunk):
+        r = (
+            sb.table("triage_items")
+            .select("id,status")
+            .in_("id", uniq[i : i + chunk])
+            .in_("status", sorted(protected))
+            .execute()
+        )
+        for row in r.data or []:
+            out[str(row.get("id"))] = str(row.get("status"))
+    return out
+
+
 def push_rows(rows: list[dict[str, Any]]) -> int:
     from supabase import create_client
 
@@ -348,14 +365,8 @@ def push_rows(rows: list[dict[str, Any]]) -> int:
     PROTECTED = {"sent", "skipped", "snoozed", "done", "todoist"}
     remote_map: dict[str, str] = {}
     try:
-        r = (
-            sb.table("triage_items")
-            .select("id,status")
-            .in_("status", list(PROTECTED))
-            .execute()
-        )
-        for row in r.data or []:
-            remote_map[str(row.get("id"))] = str(row.get("status"))
+        # 送る id だけ引く（status で全件引くと 1000 行で切れ、閉じた行が pending に戻る）
+        remote_map = protected_status_by_id(sb, [str(x.get("id") or "") for x in rows], PROTECTED)
     except Exception as e:
         print(f"# protect lookup soft-fail: {e}", file=sys.stderr)
 
