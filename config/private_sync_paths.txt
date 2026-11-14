@@ -12,6 +12,9 @@
 215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/inbox/
 215_kamiooya/C1_cursor/browser_automation/振込自動入力_設計.md
 
+# 311 送信前品質係に届いた依頼（取引先名・下書きの場所を含む。README・見本は公開のまま）
+docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/input/2*.md
+
 # .jarvis_state のうち、以前リポに入っていた小さな記録だけ
 .jarvis_state/car_loan.json
 .jarvis_state/card_annual_fee.json
