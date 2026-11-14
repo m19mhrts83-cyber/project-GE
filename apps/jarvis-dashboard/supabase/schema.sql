@@ -585,6 +585,7 @@ create policy glucon_carry_memos_auth_all on public.glucon_carry_memos
 -- （migrations/20260908_kurashift_openchat_logs.sql）
 -- todoist_webhook_events（Todoist App Webhook 受信ログ）
 -- （migrations/20260922_todoist_webhook_events.sql）
+-- 　＋共通列 event_id/kind/status/claimed_by/attempts/last_error（migrations/20261114_todoist_webhook_events_common_cols.sql・58_）
 -- line_oa_events（LINE公式アカウント Messaging API Webhook 受信ログ・グループ本文）
 -- （migrations/20260930_line_oa_events.sql）
 -- yen_rate_daily（615 円動向・USD/JPY 日次投影）
