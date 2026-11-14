@@ -35,6 +35,9 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/private-data
+        with:
+          ssh-key: ${{ secrets.PRIVATE_DATA_DEPLOY_KEY }}
 
       - uses: actions/setup-python@v5
         with:

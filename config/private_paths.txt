@@ -1,0 +1,21 @@
+# 公開リポ（project-GE）に入れないもの。非公開リポ project-GE-private にだけ置く（2026-11-14 松野さん判断）。
+# 書式は .gitignore と同じ。ここに足したら .gitignore の「非公開リポへ移したもの」にも同じ行を足す。
+# 使う所: scripts/private_data_sync.py（Mac → 非公開リポへ写す・戻す）、scripts/public_repo_guard.py（PR で止める）
+# フォルダ名に取引先名などが出ないよう、ここは上位のフォルダで書く。
+
+# 取引先・管理会社とのやり取り、契約書、空室対策のメール履歴、連絡先
+215_kamiooya/C2_ルーティン作業/
+215_kamiooya/C1_cursor/1b_Cursorマニュアル/連絡先一覧.snapshot.yaml
+
+# 神大家メンバーの投稿（名前・メール・IP）と講義の録音書き起こし
+215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/採点自動化/**/forum_comments_*.csv
+215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/採点自動化/05_calibration_samples.csv
+215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/inbox/
+
+# Jarvis の実行時 state（カード・ローン・オプチャ参加 QR・画面写真など）。ひな形 *.example.* だけ公開
+.jarvis_state/**
+!.jarvis_state/**/
+!.jarvis_state/**/*.example.*
+
+# 振込の口座情報
+215_kamiooya/C1_cursor/browser_automation/振込自動入力_設計.md

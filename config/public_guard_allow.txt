@@ -1,0 +1,10 @@
+# 公開してよいメールの宛先・ドメイン（1 行 1 件、小文字）。サービスの公式窓口など。
+# 個人の宛先・取引先の担当者は書かない（非公開リポへ）。
+github.com
+anthropic.com
+vercel.com
+supabase.io
+supabase.com
+google.com
+googleapis.com
+gserviceaccount.com
