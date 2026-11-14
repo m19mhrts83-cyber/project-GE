@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-14T18:04:30+09:00",
+  "updated": "2026-11-12T23:16:06+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -111,17 +111,16 @@
         "614",
         "615",
         "616",
-        "617",
-        "618"
+        "617"
       ],
       "grok_bot_ids": [
         "resource"
       ],
       "counts": {
-        "ai": 8,
+        "ai": 7,
         "grok": 1,
         "paired": 1,
-        "ai_only": 7,
+        "ai_only": 6,
         "grok_only": 0
       }
     },
@@ -2839,7 +2838,7 @@
       "grok_counterpart": "",
       "flowforge_id": "flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
-      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG",
+      "flowforge_share_url": "",
       "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_8mwIkbI0S9kV2u5kSwl2I-Oi",
       "permissions": {
         "can_do": "Slack FB／Todoistコメントの常駐拾い・Ack・許可リスト内AI処置（対外・金は人）。冗長はGHA L1／Cloud L2",
@@ -2971,7 +2970,7 @@
           {
             "title": "FlowForge（作業フロー）",
             "path": "",
-            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
             "kind": "flowforge"
           },
           {
@@ -6505,22 +6504,22 @@
       "status_icon": "🔵",
       "report": "report",
       "trigger": "時間",
-      "schedule": "週次=日曜09:10 launchd portfolio-weekly（運用中）／月次撮影=第1日曜10:30（launchd未登録）＋人依頼／停滞時はまとめ承認1回→バッチ再実行",
+      "schedule": "数値=既存09:10起動・週単位収集／最新画像=音声・チャット依頼／未取得分=依頼された対象だけ取り直し",
       "tool_assigned": "jarvis",
       "tool_fit": "B",
       "tool_notes": "撮影本体は scripts/jarvis_purchase_asset_evidence.py（Mac Playwright）。停滞の手当て=ミスレモン、改修=Jarvis。照会のみ・振込しない",
-      "note": "2026-11-14 新設（松野さん依頼・Claudeチャット準備）。同日、資産週次(portfolio-weekly・数値)を統合し改名。月次=画面証拠。対象は財務の一覧と突合。保存先 OneDrive 240_融資/資産エビデンス_月次。",
-      "summary": "2026-11-14 新設（松野さん依頼・Claudeチャット準備）。同日、資産週次(portfolio-weekly・数値)を統合し改名。月次=画面証拠。対象は財務の一覧と突合。保存先 OneDrive 240_融資/資産エビデンス_月次。",
+      "note": "数値は財務DB履歴、画像は同じSupabaseの非公開Storageに正常な最新参照のみ。KURASHIFTで読戻し/表示照合/証拠閲覧。Slackは出口専用。Phase 1–3実装済・本番反映作業中。",
+      "summary": "数値は財務DB履歴、画像は同じSupabaseの非公開Storageに正常な最新参照のみ。KURASHIFTで読戻し/表示照合/証拠閲覧。Slackは出口専用。Phase 1–3実装済・本番反映作業中。",
       "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "none",
       "grok_counterpart": "",
-      "flowforge_id": "",
-      "flowforge_url": "",
+      "flowforge_id": "flow_fQRxeChymx2NZAzi70ppxMtb",
+      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_fQRxeChymx2NZAzi70ppxMtb",
       "flowforge_share_url": "",
       "flowforge_edit_url": "",
       "permissions": {
-        "can_do": "2026-11-14 新設（松野さん依頼・Claudeチャット準備）。同日、資産週次(portfolio-weekly・数値)を統合し改名。月次=画面証拠。対象は財務の一覧と突合。保存先 OneDrive 240_融資/資産エビデンス_月次。",
+        "can_do": "数値記録・読戻し、確認済み最新証拠の非公開保存、KURASHIFT照合。銀行IB・OTPはJarvis担当、Slack実送信は本人了承後。",
         "methods": [
           {
             "name": "チャット・検索",
@@ -6662,7 +6661,8 @@
           }
         ],
         "procedure_count": 5,
-        "source": "claude+registry+ops_yaml"
+        "source": "claude+registry+ops_yaml",
+        "summary": ""
       }
     },
     {
@@ -12090,18 +12090,6 @@
         "role_split": "2026-10-21 新設。他社員と位置づけが異なる（実行依頼はJarvisのみ）。正本 CLAUDE.md／jarvis-agent-617-fund-transfer.mdc。"
       },
       {
-        "side": "ai_only",
-        "agent_id": "618",
-        "agent_name": "資産記録・エビデンス係",
-        "builder_tag": "",
-        "mixup_kind": "ai_only",
-        "grok_counterpart": "",
-        "grok_ids": [],
-        "grok_labels": [],
-        "grok_department": "",
-        "role_split": "2026-11-14 新設（松野さん依頼・Claudeチャット準備）。同日、資産週次(portfolio-weekly・数値)を統合し改名。月次=画面証拠。対象は財務の一覧と突合。保存先 OneDrive 240_融資/資産エビデンス_月次。"
-      },
-      {
         "side": "paired",
         "agent_id": "711",
         "agent_name": "家族Journal週次材料係",
@@ -12616,6 +12604,18 @@
         ],
         "grok_department": "総務計画",
         "role_split": "山下向けコーチング"
+      },
+      {
+        "side": "ai_only",
+        "agent_id": "618",
+        "agent_name": "資産記録・エビデンス係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "2026-11-14 新設（松野さん依頼・Claudeチャット準備）。同日、資産週次(portfolio-weekly・数値)を統合し改名。月次=画面証拠。対象は財務の一覧と突合。保存先 OneDrive 240_融資/資産エビデンス_月次。"
       }
     ],
     "mapping_counts": {
