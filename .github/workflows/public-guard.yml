@@ -29,4 +29,10 @@ jobs:
           HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
           if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then BASE="$HEAD~1"; fi
+          # 履歴を書き換えた force push では前のコミットが無いので、全ファイル名を見る
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "前のコミット $BASE が無い（履歴の書き換え）→ 全ファイル名を確認"
+            python3 scripts/public_repo_guard.py --tree "$HEAD"
+            exit $?
+          fi
           python3 scripts/public_repo_guard.py --base "$BASE" --head "$HEAD"

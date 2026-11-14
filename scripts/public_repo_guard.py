@@ -18,6 +18,7 @@ project-GE は public。取引先とのやり取り・契約・神大家メン�
   python3 scripts/public_repo_guard.py --base origin/main            # 手元のブランチの変更
   python3 scripts/public_repo_guard.py --base <sha> --head <sha>      # GHA
   python3 scripts/public_repo_guard.py --staged                       # pre-commit
+  python3 scripts/public_repo_guard.py --tree HEAD                    # 履歴を書き換えた push など、差分が取れないとき（全ファイル名だけ見る）
 どうしても公開してよい行は、その行に `public-ok` と書く（理由も添える）。
 """
 from __future__ import annotations
@@ -178,7 +179,7 @@ def check(names: list[str], added: dict[str, list[tuple[int, str]]],
             continue
         if is_private(n, patterns):
             problems.append(f"{n}: 非公開リポに置くファイル（config/private_paths.txt）")
-        elif Path(n).suffix.lower() in MEDIA_EXT:
+        elif Path(n).suffix.lower() in MEDIA_EXT and "fixtures" not in Path(n).parts:  # テスト用の作り物は除く
             problems.append(f"{n}: 録音・書き起こしは公開リポに置かない")
     for n, rows in added.items():
         if n in SELF_FILES or is_private(n, patterns):
@@ -196,10 +197,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--base")
     ap.add_argument("--head")
     ap.add_argument("--staged", action="store_true")
+    ap.add_argument("--tree", help="このコミットの全ファイル名だけを見る（差分の行は見ない）")
     a = ap.parse_args(argv)
-    if not a.staged and not a.base:
-        ap.error("--base か --staged を指定")
-    names, added = changed(a.base, a.head, a.staged)
+    if not a.staged and not a.base and not a.tree:
+        ap.error("--base か --staged か --tree を指定")
+    if a.tree:
+        names, added = _git("ls-tree", "-r", "--name-only", a.tree).splitlines(), {}
+    else:
+        names, added = changed(a.base, a.head, a.staged)
     probs = check(names, added, load_patterns(), load_allow())
     if not probs:
         print(f"public guard: OK（{len(names)} ファイル）")

@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -65,6 +66,13 @@ class LineScanTest(unittest.TestCase):
         added = {"data/members.csv": [(1, "投稿者名,投稿者メール,本文")]}
         probs = g.check(names, added, PAT, set())
         self.assertEqual(len(probs), 3, probs)
+
+    def test_media_fixture_is_allowed(self) -> None:
+        self.assertEqual(g.check(["app/fixtures/notta/with_ts.srt"], {}, PAT, set()), [])
+
+    def test_tree_mode_on_head(self) -> None:
+        with mock.patch("builtins.print"):
+            self.assertEqual(g.main(["--tree", "HEAD"]), 0)
 
 
 if __name__ == "__main__":
