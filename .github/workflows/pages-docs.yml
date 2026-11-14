@@ -15,6 +15,7 @@ on:
       - 'shuhen-osm.html'
       - 'shuhen-osm.js'
       - '.github/workflows/pages-docs.yml'
+      - 'scripts/pages_collect_public.py'
   workflow_dispatch:
 
 permissions:
@@ -38,7 +39,8 @@ jobs:
       - name: Assemble site (docs/ under /docs URL path)
         run: |
           mkdir -p _site/docs
-          rsync -a --exclude='.git*' --exclude='mac引き継ぎ.md' docs/ _site/docs/
+          # docs/ は丸ごと出さない。HTML とそれが読み込む画像・PDF・CSS だけ（.md 等は出さない。2026-11-14 314）
+          python3 scripts/pages_collect_public.py docs _site/docs
           if [ -f index.html ]; then
             cp index.html _site/index.html
           fi
