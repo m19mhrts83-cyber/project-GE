@@ -1,0 +1,41 @@
+# PR 時の神大家 Q&A 確認（AI 不使用）。Q&A に変更があるときだけ動く（2026-11-14 適正化）
+# 添付アクセスのテストと Edge Function の型チェックを 1 ジョブにまとめた（ジョブごとに 1 分切り上げで数えられるため）
+name: PR Checks (kamiooya-qa)
+
+on:
+  pull_request:
+    paths:
+      - "apps/kamiooya-qa-web/**"
+      - "215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/**"
+      - "scripts/kamiooya_*.py"
+      - "scripts/tests/openchat_attachment_sources.integration.mjs"
+      - ".github/workflows/pr-kamiooya-qa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-kamiooya-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kamiooya-qa-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --experimental-strip-types --test apps/kamiooya-qa-web/tests/*.test.mjs
+      - run: node --check apps/kamiooya-qa-web/public/raimo/app.js
+      - name: Attachment source PostgreSQL integration (local WASM, no external database)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/openchat-pg" --no-save --ignore-scripts @electric-sql/pglite@0.5.15
+          NODE_PATH="$RUNNER_TEMP/openchat-pg/node_modules" node --test scripts/tests/openchat_attachment_sources.integration.mjs
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.5.6
+      - run: deno check apps/kamiooya-qa-web/supabase/functions/raimo-auth/index.ts apps/kamiooya-qa-web/supabase/functions/semantic-search/index.ts
+      - run: deno test --allow-env --deny-net apps/kamiooya-qa-web/supabase/functions/semantic-search/handler.test.ts

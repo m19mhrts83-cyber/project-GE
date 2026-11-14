@@ -1,0 +1,35 @@
+# PR のアプリ確認（npm ci → build（型チェック込み）→ npm test）。呼び出し元が変更のあったアプリだけ呼ぶ。
+# 2026-11-14: これまでは PR Checks が scripts だけの変更でも 3 アプリ全部をビルドしていた（1 回約 9 分、月約 7,000 分）。
+name: app-build (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        required: true
+        type: string
+
+jobs:
+  app-build:
+    name: app-build (${{ inputs.app }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/${{ inputs.app }}
+    env:
+      # ビルド用のダミー（実データには繋がない）
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_dummy
+      NEXT_PUBLIC_SITE_URL: http://localhost
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/${{ inputs.app }}/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
