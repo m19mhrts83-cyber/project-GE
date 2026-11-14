@@ -88,7 +88,8 @@ class NumericTests(unittest.TestCase):
 class EvidenceTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.path=Path(self.tmp.name)/'proof.png'
-        start=datetime.now(timezone.utc).isoformat();Image.new('RGB',(200,100),'white').save(self.path)
+        # ファイルの更新時刻は時計より少し前に丸められることがあるので、開始を1秒前にする（CI で時々落ちていた）
+        start=(datetime.now(timezone.utc)-timedelta(seconds=1)).isoformat();Image.new('RGB',(200,100),'white').save(self.path)
         self.receipt=ev.capture_receipt(self.path,run_id=RUN,step='axa',started_at=start,finished_at=datetime.now(timezone.utc).isoformat(),fresh_screen=True)
         self.item={'account_scope':'portfolio','account_id':'sbi_index','contract_key':'primary','view_key':'balance','source_as_of':(date.today()-timedelta(days=1)).isoformat(),'reviewed_by':'owner','validation':{k:True for k in ('normal_page','account_match','contract_match','source_date_match')}}
     def test_valid_reviewed_image(self):self.assertEqual(ev.reviewed_artifact(self.receipt,self.item)[1]['sha256'],self.receipt['sha256'])
