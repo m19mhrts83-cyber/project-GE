@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { SLIDE_PLAN_REASON_TAGS, SLIDE_RULE_REASON_TAGS } from "@/lib/decisionContract";
+import { logged } from "@/lib/logPulse";
 import { planComplete, type SlideDeck, type SlideRule } from "@/lib/slidesCore";
 
 /**
@@ -105,6 +106,7 @@ export default function SlidesClient() {
       setPlanned({ plan, axes: ax, at: new Date().toISOString() });
       setRedo(false);
       setMsg("");
+      logged({ beads: ["take", ...notChosen.map(() => "ng" as const)], label: "資料の構成を決めました", big: true });
     }
   }
 
@@ -112,6 +114,12 @@ export default function SlidesClient() {
     if (!deck) return;
     if (await send({ kind: "rule", deckId: deck.id, proposalId: pid, verdict, tags: ruleTags[pid] || [] })) {
       setDecided((d) => ({ ...d, [pid]: `rule_${verdict}` }));
+      const rest = deck.proposals.filter((p) => p.id !== pid && !decided[p.id]).length;
+      logged({
+        beads: [verdict === "accept" ? "take" : verdict === "once" ? "later" : "ng"],
+        label: rest ? VERDICT_LABEL[`rule_${verdict}`] : "反映案をすべて判断しました",
+        big: rest === 0,
+      });
       if (verdict === "accept") {
         const p = deck.proposals.find((x) => x.id === pid);
         if (p) setRules((rs) => [{ key: `${deck.id}:${pid}`, deckId: deck.id, text: p.text, concept: p.concept || null, at: new Date().toISOString(), reverted: false }, ...rs.filter((r) => r.key !== `${deck.id}:${pid}`)]);
@@ -124,6 +132,7 @@ export default function SlidesClient() {
   async function revert(r: SlideRule) {
     if (await send({ kind: "rule", verdict: "revert", ruleKey: r.key, text: r.text })) {
       setRules((rs) => rs.filter((x) => x.key !== r.key));
+      logged({ beads: ["note"], label: "基準を取り消しました" });
       if (deck && r.deckId === deck.id) setDecided((d) => ({ ...d, [r.key.split(":")[1]]: "rule_revert" }));
     }
   }
