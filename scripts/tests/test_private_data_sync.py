@@ -44,5 +44,36 @@ class CopyTest(unittest.TestCase):
             self.assertEqual(pds.main(["push"]), 0)
 
 
+class ScopeTest(unittest.TestCase):
+    """写す範囲: ブラウザのプロファイル等の実データは写さず、名前を出した記録だけ写す。"""
+
+    def test_sync_list_skips_runtime_data(self) -> None:
+        import subprocess
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            (root / "config").mkdir()
+            (root / "config/private_sync_paths.txt").write_text(
+                (REPO / "config/private_sync_paths.txt").read_text(encoding="utf-8"), encoding="utf-8")
+            files = {
+                ".jarvis_state/car_loan.json": True,
+                ".jarvis_state/nagoya_water_card/07_done.png": True,
+                ".jarvis_state/mf_me_browser_profile/Default/Cookies": False,
+                ".jarvis_state/cursor_usage_chrome/Cache/data_0": False,
+                "215_kamiooya/C2_ルーティン作業/a.md": True,
+                "scripts/x.py": False,
+            }
+            for rel in files:
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_text("x", encoding="utf-8")
+            big = root / "215_kamiooya/C2_ルーティン作業/big.bin"
+            with big.open("wb") as f:
+                f.truncate(pds.MAX_BYTES + 1)
+            with mock.patch.object(pds, "REPO", root), \
+                    mock.patch.object(pds, "PATTERNS", root / "config/private_sync_paths.txt"):
+                got = set(pds.public_files())
+            self.assertEqual(got, {k for k, v in files.items() if v})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -10,7 +10,7 @@
 - 口座番号・カード・ローン・残高など松野さんのお金の情報、`.jarvis_state/` の実データ（ひな形 `*.example.*` だけ公開）
 
 決まり:
-1. 場所の一覧は `config/private_paths.txt`（`.gitignore` にも同じ行）。新しい種類の機微なフォルダを作ったら、そこに足してから使う
+1. 場所の一覧は `config/private_paths.txt`（`.gitignore` にも同じ行）。新しい種類の機微なフォルダを作ったら、そこに足してから使う。非公開リポへ写す（バックアップする）範囲は `config/private_sync_paths.txt` で、写したいなら両方に足す。ブラウザのプロファイル・Cookie・キャッシュは非公開リポにも置かない
 2. Mac ではファイルは今の場所のまま。`launchd/main_checkout_sync_runner.sh` が 30 分ごとに `scripts/private_data_sync.py` で非公開リポへ写す（push）・戻す（restore）。スクリプトのパスは変えない
 3. Actions で写しが要るときは `.github/actions/private-data`（`secrets.PRIVATE_DATA_DEPLOY_KEY`、読み取り専用）で重ねる。コミットはしない
 4. PR と main への push は `Public guard`（`scripts/public_repo_guard.py`）が変更分を見て、非公開の場所・メールアドレス・電話番号・口座番号らしき数字・IP・会員の列を持つ CSV・録音を止める。Mac では `sh scripts/install_git_hooks.sh` でコミット前にも止まる
