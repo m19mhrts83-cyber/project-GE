@@ -5549,3 +5549,46 @@ tr.at-map-ai-only .at-map-missing {
 .home-sort-arrow { height: 40px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 1rem; cursor: pointer; }
 .home-sort-arrow:disabled { opacity: .3; cursor: default; }
 ::view-transition-group(*) { animation-duration: .35s; animation-timing-function: cubic-bezier(.2,.8,.2,1); }
+
+/* 週次稼働タブ（WeeklyActivityPanel）: 機能した社員の数 → 次の一手 → 社員ごとの表 */
+.wa { --wa-g: #0d9488; --wa-y: #d97706; --wa-r: #dc2626; --wa-n: #a8a29e; margin-top: 12px; }
+.wa-hero {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px;
+  border-radius: 22px; padding: 20px 22px; color: #e6fffb;
+  background: radial-gradient(520px 260px at 12% 0%, #14b8a633, transparent 70%), linear-gradient(150deg, #0b1f1d 0%, #0f2a2e 55%, #102236 100%);
+  box-shadow: 0 18px 40px #0b1f1d33;
+}
+.wa-eyebrow { margin: 0; font-size: 0.8rem; letter-spacing: 0.06em; color: #99f6e4; }
+.wa-big { margin: 4px 0 2px; font-size: 3rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.wa-big small { font-size: 1.2rem; font-weight: 600; color: #99f6e4; }
+.wa-sub { margin: 0; font-size: 0.82rem; color: #ccfbf1; }
+.wa-sigs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 8px; }
+.wa-sigs li {
+  display: flex; align-items: baseline; gap: 8px; padding: 8px 12px; border-radius: 12px; background: #ffffff12; font-size: 0.82rem;
+  animation: wa-in 420ms ease-out both; animation-delay: var(--d, 0ms);
+}
+.wa-sig-n { font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.wa-sigs li.s-r .wa-sig-n { color: #fca5a5; }
+.wa-sigs li.s-y .wa-sig-n { color: #fcd34d; }
+.wa-sigs li.s-g .wa-sig-n { color: #5eead4; }
+.wa-next { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.wa-next li { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid var(--wa-n); border-radius: 12px; background: var(--card); font-size: 0.86rem; }
+.wa-next li.s-r { border-left-color: var(--wa-r); }
+.wa-next li.s-y { border-left-color: var(--wa-y); }
+.wa-table td { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wa-table td:first-child { white-space: normal; min-width: 220px; }
+.wa-table summary { cursor: pointer; }
+.wa-why { display: block; font-size: 0.78rem; color: var(--muted); }
+.wa-row.s-r .wa-why { color: var(--wa-r); }
+.wa-row.s-y .wa-why { color: var(--wa-y); }
+.wa-sig { font-size: 1.05rem; }
+.wa-bad { color: var(--wa-r); font-weight: 700; }
+.wa-delta { margin-left: 4px; font-style: normal; font-size: 0.74rem; font-weight: 700; }
+.wa-delta.up { color: var(--wa-g); }
+.wa-delta.down { color: var(--wa-r); }
+.wa-detail { margin-top: 6px; font-size: 0.82rem; }
+.wa-detail p { margin: 2px 0; }
+.wa-slack .meta { font-size: 0.76rem; }
+@keyframes wa-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .wa-sigs li { animation: none; } }
+@media (max-width: 560px) { .wa-big { font-size: 2.4rem; } .wa-sigs { grid-template-columns: 1fr 1fr; width: 100%; } }

@@ -2,6 +2,7 @@ import Shell from "@/components/Shell";
 import ReviewCandidateActions from "@/components/ReviewCandidateActions";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { loopwareHref } from "@/lib/loopwareLink";
+import { parseReport, SIGNAL_ORDER } from "@/lib/agentWeeklyActivity";
 import {
   MAIL_SURFACES,
   byEmployee,
@@ -77,6 +78,8 @@ async function load() {
       .limit(300),
     sb.from("sync_meta").select("value,updated_at").eq("key", "loopware_rule_candidates").maybeSingle(),
   ]);
+  // AI社員の週次稼働（土曜 9:00 集計）。詳しくは /agent-team の「週次稼働」タブ
+  const act = await sb.from("sync_meta").select("value").eq("key", "agent_weekly_activity").maybeSingle();
   const rows = (mail.data || []) as DecisionLite[];
   const cur = rows.filter((r) => r.decided_at >= since);
   const prev = rows.filter((r) => r.decided_at < since);
@@ -100,6 +103,7 @@ async function load() {
     states: candidateStates((reviews.data || []) as DecisionLite[]),
     evidence,
     reviewsThisWeek: ((reviews.data || []) as DecisionLite[]).filter((r) => r.decided_at >= since),
+    activity: parseReport(act.data?.value),
   };
 }
 
@@ -132,6 +136,13 @@ export default async function ReviewPage() {
         押した判断も判断ログに残り、来週の見立てに使われます。
       </p>
       {d.error ? <p className="empty">判断ログの読み込みに失敗: {d.error}</p> : null}
+
+      <p className="sub" style={{ marginTop: 12 }}>
+        <a href="/agent-team#activity">AI社員の週次稼働 →</a>{" "}
+        {d.activity
+          ? `今週機能した社員 ${d.activity.worked_agents}/${d.activity.total_agents}（${SIGNAL_ORDER.map((k) => `${k}${d.activity?.summary[k] ?? 0}`).join(" ")}）・${md(d.activity.until)} 集計`
+          : "土曜 9:00 に最初の集計が入ります"}
+      </p>
 
       <h2 style={{ marginTop: 24 }}>1. 確認待ちのフィードバック（{pending.length} 件）</h2>
       <p className="sub">

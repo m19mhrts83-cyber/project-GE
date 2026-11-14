@@ -21,4 +21,7 @@ mkdir -p "$REPO_DIR/.jarvis_state/loopware"
   > "$REPO_DIR/.jarvis_state/loopware/weekly.md" 2>> "$REPO_DIR/.jarvis_state/loopware/weekly.err" || true
 # 見張りファイルも更新（315 鮮度監視が weekly.published_at を見る）
 "$PY" "$REPO_DIR/scripts/jarvis_loopware_status.py" >> "$REPO_DIR/.jarvis_state/loopware/weekly.err" 2>&1 || true
+# AI社員・Grok Bot の週次稼働（起動・実働・件数・失敗・Slack 報告・Grok の成果物メール）。AI なし・失敗しても 314 は止めない
+# 結果は metrics／sync_meta(agent_weekly_activity) → ダッシュ /agent-team「週次稼働」、314 の Slack に数行足す
+"$PY" "$REPO_DIR/scripts/jarvis_agent_weekly_activity.py" --push >/dev/null || echo "agent_weekly_activity failed" >&2
 exec "$PY" "$REPO_DIR/scripts/jarvis_weekly_review_314.py" --post
