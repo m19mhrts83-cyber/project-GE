@@ -1,0 +1,4 @@
+#!/bin/sh
+# 公開リポに入れてはいけない情報をコミット前に止める（scripts/public_repo_guard.py）。
+# 入れ方: sh scripts/install_git_hooks.sh
+exec python3 "$(git rev-parse --show-toplevel)/scripts/public_repo_guard.py" --staged

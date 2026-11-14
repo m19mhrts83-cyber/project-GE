@@ -211,3 +211,14 @@ supabase/.temp/
 # 611×317 配車の起動記録・作業 worktree
 .jarvis_state/dispatch_queue/
 .jarvis_state/dispatch_worktrees/
+
+# ---- 非公開リポ（project-GE-private）へ移したもの。config/private_paths.txt と同じ（2026-11-14）----
+215_kamiooya/C2_ルーティン作業/
+215_kamiooya/C1_cursor/1b_Cursorマニュアル/連絡先一覧.snapshot.yaml
+215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/採点自動化/**/forum_comments_*.csv
+215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/採点自動化/05_calibration_samples.csv
+215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/inbox/
+.jarvis_state/**
+!.jarvis_state/**/
+!.jarvis_state/**/*.example.*
+215_kamiooya/C1_cursor/browser_automation/振込自動入力_設計.md

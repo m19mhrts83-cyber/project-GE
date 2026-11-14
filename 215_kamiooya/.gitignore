@@ -11,7 +11,7 @@
 !.github/workflows/
 !.github/workflows/*.yml
 !C1_cursor/
-!C2_ルーティン作業/
+# C2_ルーティン作業/ は非公開リポ project-GE-private へ移した（2026-11-14。../config/private_paths.txt）
 !C3_プロンプト/
 !50_税金,確定申告/zaim_to_yayoi.py
 !50_税金,確定申告/確定申告マニュアル.md
@@ -59,3 +59,12 @@ C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情
 *.doc
 *.docx
 *.pptx
+
+# --- 非公開リポ（project-GE-private）へ移したもの。../config/private_paths.txt と同じ（2026-11-14）---
+# ここで ! で戻すと親の .gitignore より優先されるので、このファイルにも書く
+C2_ルーティン作業/
+C1_cursor/1b_Cursorマニュアル/連絡先一覧.snapshot.yaml
+C1_cursor/1c_神・大家さん倶楽部_AI推進/採点自動化/**/forum_comments_*.csv
+C1_cursor/1c_神・大家さん倶楽部_AI推進/採点自動化/05_calibration_samples.csv
+C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/inbox/
+C1_cursor/browser_automation/振込自動入力_設計.md

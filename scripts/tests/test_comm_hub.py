@@ -82,9 +82,11 @@ class PartyTests(unittest.TestCase):
         self.assertIsNone(hub.party_row({"name": "x"}, now=""))
 
     def test_repo_contact_yaml_loads(self):
-        partners = hub.load_contact_partners(
-            hub.REPO_PARTNER_BASE / "000_共通" / "連絡先一覧.yaml"
-        )
+        # 連絡先は非公開リポ project-GE-private にある（2026-11-14）。Mac と写しを重ねた環境だけで確かめる
+        path = hub.REPO_PARTNER_BASE / "000_共通" / "連絡先一覧.yaml"
+        if not path.exists():
+            self.skipTest("連絡先一覧.yaml は非公開リポ側（公開 checkout には無い）")
+        partners = hub.load_contact_partners(path)
         self.assertGreater(len(partners), 10)
         self.assertTrue(all(hub.party_row(p, now="") for p in partners if p.get("folder")))
 

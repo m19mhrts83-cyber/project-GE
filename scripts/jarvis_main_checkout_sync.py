@@ -91,12 +91,31 @@ def same_as_upstream(path: str) -> bool:
     return _blob(path) == _upstream_blob(path)
 
 
+def saved_in_private(path: str) -> bool:
+    """非公開リポへ移したファイル（config/private_paths.txt）で、非公開 clone に同じ中身があるか。
+
+    公開側で追跡をやめたファイルは ff で作業フォルダから消えるが、直後の
+    private_data_sync.py restore で戻る。手元の変更が非公開 clone に保存済みなら外してよい（2026-11-14）。
+    """
+    try:
+        import filecmp
+
+        import private_data_sync as pds  # noqa: PLC0415
+    except Exception:
+        return False
+    src = REPO / path
+    dst = pds.private_dir() / path
+    if not src.is_file() or not dst.is_file() or _upstream_blob(path):
+        return False
+    return filecmp.cmp(src, dst, shallow=False)
+
+
 def drop_identical(paths: list[str], *, dry: bool) -> tuple[list[str], list[str]]:
     """origin/main と同じ中身の手元変更を外す。(外した, 残った) を返す。"""
     dropped: list[str] = []
     left: list[str] = []
     for path in paths:
-        if not same_as_upstream(path):
+        if not same_as_upstream(path) and not saved_in_private(path):
             left.append(path)
             continue
         if dry:
