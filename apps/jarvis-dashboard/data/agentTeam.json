@@ -111,16 +111,17 @@
         "614",
         "615",
         "616",
-        "617"
+        "617",
+        "618"
       ],
       "grok_bot_ids": [
         "resource"
       ],
       "counts": {
-        "ai": 7,
+        "ai": 8,
         "grok": 1,
         "paired": 1,
-        "ai_only": 6,
+        "ai_only": 7,
         "grok_only": 0
       }
     },
