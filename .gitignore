@@ -222,3 +222,4 @@ supabase/.temp/
 !.jarvis_state/**/
 !.jarvis_state/**/*.example.*
 215_kamiooya/C1_cursor/browser_automation/振込自動入力_設計.md
+docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/input/2*.md
