@@ -103,3 +103,8 @@ status: done_local / pending_production_approval。詳細はphase3_report.md。
 ## 2026-11-14：本番反映の了承取得・作業中
 
 status: running / executor: codex。松野さんの「反映進めて良いです」でDB/非公開Storage/所有者登録/KURASHIFT/既存実行コードへの適用を了承。PR・CI・本番確認まで実施。金融機関ログイン・実画像取得・Slack送信は含めない。
+
+
+## 2026-11-14：本番反映完了
+
+status: done_deployment / executor: codex。了承範囲のDB/非公開Storage/所有者登録/KURASHIFT/Mac既存コードを適用。PR #413、CI成功、本番READY、本人ログインと空状態/旧run未確認表示、匿名拒否を確認。詳細deploy_report.md。金融取得・画像登録・Slack送信はこの反映作業に含めず未実施。新runの照合は次の定期/実依頼時。
