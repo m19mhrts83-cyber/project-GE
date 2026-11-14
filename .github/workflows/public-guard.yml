@@ -1,0 +1,32 @@
+# 公開リポに入れてはいけない情報（取引先・会員・口座・録音など）が入っていないか、変更分だけ見る（AI 不使用）。
+# 2026-11-14: リポは public のまま、機微なものは非公開リポ project-GE-private へ（config/private_paths.txt）。
+# public リポなので Actions の分数はかからない。main への直接 push も見て、入ったら赤にする（314 週次が拾う）。
+name: Public guard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check changed files
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then BASE="$HEAD~1"; fi
+          python3 scripts/public_repo_guard.py --base "$BASE" --head "$HEAD"
