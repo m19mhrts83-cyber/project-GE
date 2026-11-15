@@ -9,10 +9,17 @@ name: Jarvis Dashboard Gmail Triage
 # Graph refresh 回転は Secrets / private が本線（sync_meta は opt-in。回転後は --push-gha）。
 # 末尾で Ops Fail Watch（Vercel/GHA）も朝1回だけ実行する。
 # 課金削減 2026-09: GEMINI_API_KEY は渡さない（判定・下書き・和訳オフ）。
+#
+# 日中便（317・2026-11-15）: 9〜21時 JST に2時間おき。1) の general 取込だけを
+#   「まだ入っていない新着だけ・Gmail は既読にしない・ダイジェストは作らない」で回す。
+#   昼・夜の 116 カードに当日届いたメールを載せるため。起票は 116 のボタンのまま。
+#   パートナー MD・Chatwork・受付・Ops 監視は 05:00 本便だけ。
+#   止める: リポジトリ変数 JARVIS_GMAIL_DAYTIME_DISABLE=1
 
 on:
   schedule:
     - cron: "0 20 * * *" # 05:00 JST
+    - cron: "0 0-12/2 * * *" # 日中便 09,11,13,15,17,19,21 JST（general 新着だけ）
   workflow_dispatch:
     inputs:
       recovery_actor:
@@ -33,15 +40,24 @@ on:
         required: false
         type: boolean
         default: false
+      daytime:
+        description: "日中便として回す（general 新着だけ・既読にしない）"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
-  group: jarvis-dashboard-gmail-triage
+  # 日中便が遅れて走った 05:00 本便を取り消さないよう、本便と日中便で別の列にする
+  group: jarvis-dashboard-gmail-triage-${{ (github.event.schedule == '0 0-12/2 * * *' || github.event.inputs.daytime == 'true') && 'day' || 'main' }}
   cancel-in-progress: true
 
 jobs:
   triage:
+    if: ${{ !((github.event.schedule == '0 0-12/2 * * *') && vars.JARVIS_GMAIL_DAYTIME_DISABLE == '1') }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      DAYTIME: ${{ (github.event.schedule == '0 0-12/2 * * *' || github.event.inputs.daytime == 'true') && 'true' || 'false' }}
     permissions:
       contents: read
       actions: read
@@ -92,6 +108,9 @@ jobs:
         run: |
           set -euo pipefail
           ARGS=(--limit "$LIMIT")
+          if [[ "$DAYTIME" == "true" ]]; then
+            ARGS+=(--new-only --no-mark-read --no-digest --lookback-days 2)
+          fi
           if [[ "$DRY" == "true" ]]; then
             ARGS+=(--dry-run)
           else
@@ -100,7 +119,7 @@ jobs:
           python scripts/jarvis_gha_gmail_triage.py "${ARGS[@]}"
 
       - name: Partner Gmail → OneDrive MD (Graph)
-        if: ${{ github.event.inputs.skip_partner != 'true' }}
+        if: ${{ env.DAYTIME != 'true' && github.event.inputs.skip_partner != 'true' }}
         env:
           GMAIL_CREDENTIALS_PATH: ${{ github.workspace }}/.credentials/credentials.json
           GMAIL_ADMIN_TOKEN_PATH: ${{ github.workspace }}/.credentials/token_admin.json
@@ -132,7 +151,7 @@ jobs:
 
       - name: Slack/Web sent replies → OneDrive MD (Graph)
         # 2026-11-13: Slack から送った返信を Mac が動かない日でも 5.やり取り.md に残す
-        if: ${{ github.event.inputs.skip_partner != 'true' }}
+        if: ${{ env.DAYTIME != 'true' && github.event.inputs.skip_partner != 'true' }}
         continue-on-error: true
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
@@ -159,7 +178,7 @@ jobs:
           python scripts/jarvis_gha_triage_sent_yoritoori.py "${ARGS[@]}"
 
       - name: Partner Chatwork → OneDrive MD (Graph)
-        if: ${{ github.event.inputs.skip_partner != 'true' }}
+        if: ${{ env.DAYTIME != 'true' && github.event.inputs.skip_partner != 'true' }}
         env:
           CHATWORK_API_TOKEN: ${{ secrets.CHATWORK_API_TOKEN }}
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
@@ -192,7 +211,7 @@ jobs:
           python scripts/jarvis_gha_partner_chatwork_yoritoori.py "${ARGS[@]}"
 
       - name: Partner Gmail/Chatwork unreplied → triage_items
-        if: ${{ github.event.inputs.skip_partner != 'true' }}
+        if: ${{ env.DAYTIME != 'true' && github.event.inputs.skip_partner != 'true' }}
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
@@ -223,7 +242,7 @@ jobs:
 
       # ボット（Grok など）の受付の表 → 台帳へ本登録。失敗しても本線は止めない
       - name: Comm intake (bots) → comm_items
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ env.DAYTIME != 'true' && github.event.inputs.dry_run != 'true' }}
         continue-on-error: true
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
@@ -234,7 +253,7 @@ jobs:
       # Autofix は Fail(attention/warn) のときだけ Cloud Agent。抑制: repo Variable/Secret
       # JARVIS_OPS_FAIL_AUTOFIX_DISABLE=1（了承後）。正本: docs/AIエージェントチーム/34_定期実行とAI使用量_20261017.md
       - name: Ops fail watch (Vercel / GHA) + autofix
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ env.DAYTIME != 'true' && github.event.inputs.dry_run != 'true' }}
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
@@ -254,4 +273,5 @@ jobs:
           SLACK_WEBHOOK_AI_TEAM_HUB: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_HUB }}
           RECOVERY_ACTOR: ${{ github.event.inputs.recovery_actor || '' }}
           DRY: ${{ github.event.inputs.dry_run || 'false' }}
-        run: bash scripts/jarvis_job_finish.sh comm_write "${{ job.status }}"
+        # 日中便は別の目印（本便の heartbeat を上書きして本便の失敗を隠さない）
+        run: bash scripts/jarvis_job_finish.sh "${{ env.DAYTIME == 'true' && 'comm_write_day' || 'comm_write' }}" "${{ job.status }}"

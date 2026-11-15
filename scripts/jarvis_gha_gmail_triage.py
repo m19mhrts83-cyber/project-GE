@@ -203,6 +203,42 @@ def protected_status_by_id(sb, ids: list[str], protected: set[str], chunk: int =
     return out
 
 
+def existing_keys(sb, rows: list[dict[str, Any]], chunk: int = 80) -> tuple[set[str], set[str]]:
+    """もう triage_items にある id と gmail_message_id（日中便の「新着だけ」判定用）。
+
+    Mac の night triage は gha- の付かない id で同じメールを入れるので、message_id でも見る。
+    """
+    ids = sorted({str(r.get("id") or "") for r in rows if r.get("id")})
+    gids = sorted({str(r.get("gmail_message_id") or "") for r in rows if r.get("gmail_message_id")})
+    have_ids: set[str] = set()
+    have_gids: set[str] = set()
+    for i in range(0, len(ids), chunk):
+        r = sb.table("triage_items").select("id").in_("id", ids[i : i + chunk]).execute()
+        have_ids.update(str(x.get("id")) for x in (r.data or []))
+    for i in range(0, len(gids), chunk):
+        r = (
+            sb.table("triage_items")
+            .select("gmail_message_id")
+            .in_("gmail_message_id", gids[i : i + chunk])
+            .execute()
+        )
+        have_gids.update(str(x.get("gmail_message_id")) for x in (r.data or []))
+    return have_ids, have_gids
+
+
+def only_new_rows(rows: list[dict[str, Any]], have_ids: set[str], have_gids: set[str]) -> list[dict[str, Any]]:
+    """まだ入っていない行だけ。既存行を上書きすると payload（Slack 投稿済みの印など）が消えるため。"""
+    out = []
+    for r in rows:
+        if str(r.get("id") or "") in have_ids:
+            continue
+        gid = str(r.get("gmail_message_id") or "")
+        if gid and gid in have_gids:
+            continue
+        out.append(r)
+    return out
+
+
 def push_rows(rows: list[dict[str, Any]]) -> int:
     from supabase import create_client
 
@@ -250,6 +286,22 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="下書き・英語和訳に Gemini を使う（非推奨・課金）",
     )
+    # 317 日中便（2026-11-15）: 05:00 本便のあとに届いたメールを昼・夜の 116 カードへ載せる
+    ap.add_argument(
+        "--new-only",
+        action="store_true",
+        help="まだ triage_items に無い行だけ入れる（既存行・閉じた行には触らない）。日中便用",
+    )
+    ap.add_argument(
+        "--no-mark-read",
+        action="store_true",
+        help="取込時に Gmail を既読にしない（日中便。既読は 116 のカード投稿時）",
+    )
+    ap.add_argument(
+        "--no-digest",
+        action="store_true",
+        help="その他メールのダイジェスト再作成をしない（日中便。05:00 本便で作る）",
+    )
     args = ap.parse_args(argv)
     allow_gemini = bool(args.allow_gemini) and not (
         (os.environ.get("JARVIS_TRIAGE_NO_GEMINI") or "1").strip().lower()
@@ -277,12 +329,28 @@ def main(argv: list[str] | None = None) -> int:
             f"  - {r['received_at']} {r.get('from_email')} | {r.get('subject')}",
             file=sys.stderr,
         )
+    if args.new_only and rows:
+        from supabase import create_client
+
+        sb_new = create_client(
+            (os.environ.get("JARVIS_SUPABASE_URL") or "").strip(),
+            (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip(),
+        )
+        have_ids, have_gids = existing_keys(sb_new, rows)
+        before = len(rows)
+        rows = only_new_rows(rows, have_ids, have_gids)
+        print(f"# new-only: {before} → {len(rows)}（既存 {before - len(rows)} 件は触らない）", file=sys.stderr)
     if args.dry_run or not args.push:
-        print(json.dumps({"count": len(rows), "dry_run": True}, ensure_ascii=False))
+        print(json.dumps({"count": len(rows), "dry_run": True, "new_only": bool(args.new_only)}, ensure_ascii=False))
+        return 0
+    if args.new_only and not rows:
+        print(json.dumps({"upserted": 0, "source": "gha", "new_only": True}, ensure_ascii=False))
         return 0
     n = push_rows(rows)
-    # 取込時点で既読（Dashboard で閉じるまで未読のままにしない）
+    # 取込時点で既読（Dashboard で閉じるまで未読のままにしない）。日中便は付けない
     try:
+        if args.no_mark_read:
+            raise RuntimeError("--no-mark-read")
         from jarvis_night_triage_general import mark_gmail_read_for_items
 
         mr = mark_gmail_read_for_items(rows, dry_run=False)
@@ -313,8 +381,10 @@ def main(argv: list[str] | None = None) -> int:
             )
     except Exception as e:
         print(f"# cleanup_re_pending skipped: {e}", file=sys.stderr)
-    # ダイジェスト更新（LLM 既定オフ・課金削減）
+    # ダイジェスト更新（LLM 既定オフ・課金削減）。日中便は作らない
     try:
+        if args.no_digest:
+            raise RuntimeError("--no-digest")
         sys.path.insert(0, str(REPO / "scripts"))
         from jarvis_other_mail_digest import build_and_maybe_push
 
