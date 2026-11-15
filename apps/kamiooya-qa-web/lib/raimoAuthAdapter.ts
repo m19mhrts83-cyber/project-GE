@@ -7,6 +7,15 @@ import {answerHash,cleanMeta,RAIMO_ANSWER_MODEL,type AnswerMeta} from './answerM
 import type { GatewayDependencies } from './raimoAuthGateway.ts';
 export type RuntimeConfig = { origin: string; raimoBase: string; gatewaySecret: string; projectUrl: string; serviceKey: string; proxySecret: string };
 export const digest = async (s: string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))), b => b.toString(16).padStart(2, '0')).join('');
+// メールに書く有効期限。日本時間の「2026年11月15日 12:59」（24時間表記・分は切り捨て＝その時刻までは確実に使える）。
+// 保存する期限（backend へ送る expires_at）は ISO のまま。2026-11-15 松野さん「日付と何時何分まで、24時間表記で」。
+export const jstDeadline = (iso: string) => {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return iso;
+  const d = new Date(t + 9 * 3600000);
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  return d.getUTCFullYear() + '年' + (d.getUTCMonth() + 1) + '月' + d.getUTCDate() + '日 ' + p2(d.getUTCHours()) + ':' + p2(d.getUTCMinutes());
+};
 export class UpstreamError extends Error {
   code: string; status: number;
   constructor(code: string, status: number) { super(code); this.code=code; this.status=status; }
@@ -182,7 +191,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         if(u?.status==='approved'){
           const token=crypto.randomUUID()+crypto.randomUUID();const expires_at=new Date(Date.now()+1800000).toISOString();
           await backend('POST',path,{email,token:await digest(token),expires_at});
-          await backend('POST','/notify/password-reset',{email,expires_at,reset_url:c.origin+'/#reset-password?token='+encodeURIComponent(token)});
+          await backend('POST','/notify/password-reset',{email,expires_at:jstDeadline(expires_at),reset_url:c.origin+'/#reset-password?token='+encodeURIComponent(token)});
         }
         return {success:true};
       }
