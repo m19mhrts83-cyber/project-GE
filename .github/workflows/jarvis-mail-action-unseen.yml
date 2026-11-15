@@ -33,6 +33,8 @@ jobs:
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+          # 立ち上がり確認: 判断ログの件数を #report へ（11/22 まで）
+          SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
         run: |
           set -euo pipefail
           ARGS=(scripts/jarvis_mail_action_unseen.py)
