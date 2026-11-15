@@ -24,10 +24,17 @@ export function featureAllowed(flag: FeatureFlag | undefined, u: FeatureUser): b
 
 // 画面に渡すのは「その人に見えている機能」と、比べるための「会員にも出ているか」だけ。
 // 一覧（誰が確認者か）や段階名は、見えない人には返さない。
+// preview: 名指しの確認者（owner_ids / reviewer_ids に載っている人）だけ true。確認用の帯はこの人だけに出す（2026-11-15 松野さん
+// 「会員さんには確認用の帯は見せない。管理者も名指しでなければ会員と同じ見栄え」）。
 export function featuresFor(flags: FeatureFlag[], u: FeatureUser) {
   const features: Record<string, { members: boolean }> = {};
-  for (const f of flags) if (/^[a-z0-9_]{1,40}$/.test(f.feature) && featureAllowed(f, u)) features[f.feature] = { members: f.stage === 'all' };
-  return { features };
+  let preview = false;
+  for (const f of flags) {
+    if (!/^[a-z0-9_]{1,40}$/.test(f.feature)) continue;
+    if (featureAllowed(f, u)) features[f.feature] = { members: f.stage === 'all' };
+    if (named(f.owner_ids, u) || named(f.reviewer_ids, u)) preview = true;
+  }
+  return { features, preview };
 }
 
 export class FeatureDisabledError extends Error {
