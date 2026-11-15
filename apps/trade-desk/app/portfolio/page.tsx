@@ -345,6 +345,10 @@ export default async function PortfolioPage() {
         <a href="/settings">設定</a> から。
       </p>
 
+      <p>
+        <a className="btn" href="/portfolio/evidence">最新の資産証拠を見る →</a>
+      </p>
+
       <Suspense fallback={<p className="meta">保存状況を確認中…</p>}><Asset618Status userId={user?.id ?? null}/></Suspense>
 
       <div className="card" style={{ marginTop: 12 }}>

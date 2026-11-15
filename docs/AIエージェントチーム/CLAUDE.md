@@ -117,3 +117,8 @@ Cursor／Jarvis の正本ルール: `.cursor/rules/jarvis-multi-agent-share.mdc`
 ```
 
 Cursor ルール: `.cursor/rules/jarvis-agent-team-slack-report.mdc` · 読取: `jarvis-slack-hub-watch.mdc`
+
+
+## 作業フローの確認から実装指示（2026-11-15・本人依頼）
+
+作業フローの設計/確認/社員具体化を依頼された時は、[workflow-review/README.md](workflow-review/README.md) と同フォルダのひな形を使う。各工程の主体・実行者、保存/表示/報告、判断ログの保存と実行前取得、今回/次回の戻り矢印を明示し、同じ工程から実装TASKを作る。既存社員・既存資産を再利用し、FlowForge経由を必須にしない。Claude側の入口は `.claude/rules/matsuno-workflow-review.md`。単発の説明やコード修正へ一式を強制しない。
