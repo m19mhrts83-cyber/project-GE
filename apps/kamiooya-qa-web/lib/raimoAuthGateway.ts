@@ -7,6 +7,7 @@ import {findTroubledChats, summarizeSignals, SIGNAL_LABELS} from './conversation
 import {parseSourceClick, sourceClickRow, summarizeSourceClicks} from './sourceClicks.ts';
 import {matchPending} from './rosterMatch.ts';
 import {parseThemeDecision, shapeRound, decisionRow} from './rankingThemes.ts';
+import {shapeOpenchatRound} from './openchatRanking.ts';
 // Shared gateway: the production adapter supplies persistent sessions and live membership checks.
 type Member = { id: string; email: string; role: string; status: string; authVersion: string; name?: string; member_no?: string; prefecture?: string };
 type Session = { uid: string; authVersion: string; expires: number };
@@ -38,6 +39,8 @@ export type GatewayDependencies = {
   listRecentJobs?(): Promise<unknown[]>;
   // (4) 質問ランキング＋講座テーマ案（qa_theme_rounds / qa_theme_decisions）。
   themeRounds?(limit: number): Promise<unknown[]>;
+  // (4) の拡張: LINEオープンチャットの質問ランキング（qa_openchat_rankings）。11/16
+  openchatRankings?(limit: number): Promise<unknown[]>;
   themeDecisions?(roundIds: string[]): Promise<unknown[]>;
   saveThemeDecision?(row: Record<string, unknown>): Promise<void>;
   now?: () => number;
@@ -208,6 +211,16 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         const decisions=rounds.length?await d.themeDecisions(rounds.map(r=>r.id)) as any[]:[];
         return json({latest:rounds[0]?shapeRound(rounds[0],decisions):null,
           history:rounds.slice(1).map(r=>{const s=shapeRound(r,decisions);return {id:s.id,created_at:s.created_at,themes:s.themes.map((x:any)=>({id:x.id,title:x.title,decision:x.decision}))};})});
+      }
+      // (4) の拡張: LINEオープンチャットの質問ランキング（運営分析）。管理者で、かつスイッチ openchat_ranking で見える人だけ。11/16
+      if(path==='/admin/openchat-ranking/list' && req.method==='POST'){
+        let flags:FeatureFlag[]=[];
+        try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
+        requireFeature(Array.isArray(flags)?flags:[],'openchat_ranking',{id:user.id,email:user.email});
+        if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
+        if(!d.openchatRankings)return json({error:'feature_not_available'},404);
+        const rounds=(await d.openchatRankings(1) as any[]).filter(r=>r&&typeof r.id==='string');
+        return json({latest:rounds[0]?shapeOpenchatRound(rounds[0]):null});
       }
       if(path==='/admin/answer-feedback/list' && req.method==='POST'){
         let flags:FeatureFlag[]=[];

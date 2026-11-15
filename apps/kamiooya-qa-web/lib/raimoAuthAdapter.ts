@@ -160,6 +160,8 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     // (4) 質問ランキング＋講座テーマ案。最新の回と、その回の判断。11/11
     themeRounds:async(limit)=>rest('qa_theme_rounds?select=id,created_at,period_days,model,ranking,themes,stats&order=created_at.desc&limit='+Math.max(1,Math.min(10,limit))),
     themeDecisions:async(ids)=>{const ok=ids.filter(i=>/^r[0-9]{8}[a-z0-9_-]{0,20}$/.test(i));return ok.length?rest('qa_theme_decisions?select=round_id,theme_id,choice,revised_title,reason,decided_at&round_id=in.('+ok.join(',')+')'):[];},
+    // (4) の拡張: オープンチャットの質問ランキング。最新の回だけ（1回 百KB前後）。11/16
+    openchatRankings:async(limit)=>rest('qa_openchat_rankings?select=id,created_at,period_days,ranking,by_chat,stats&order=created_at.desc&limit='+Math.max(1,Math.min(5,limit))),
     saveThemeDecision:async row=>{await rest('qa_theme_decisions?on_conflict=round_id,theme_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
     listChangeLog:async()=>rest('qa_change_log?visible=is.true&select=released_on,title,body,trigger&order=released_on.desc,id.desc&limit=200'),
     saveFeedback:async row=>{await rest('qa_answer_feedback?on_conflict=user_id,chat_id,message_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},

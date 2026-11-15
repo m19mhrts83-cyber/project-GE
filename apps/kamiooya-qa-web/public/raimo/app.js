@@ -176,7 +176,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案', openchat_ranking: '(4)オープンチャットの質問ランキング' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -5059,6 +5059,7 @@ const App = {
         try {
           await App.apiClient('POST', '/admin/ranking-themes/decide', { round_id: latest.id, theme_id: theme.id, choice: choice, revised_title: title.value, reason: reason.value });
           void App.loadRankingThemes();
+    void App.loadOpenchatRanking();
         } catch (e) {
           msg.textContent = '保存できませんでした: ' + ((e && e.message) || String(e));
         }
@@ -5069,6 +5070,119 @@ const App = {
         return esc(t.title) + (t.decision ? '（' + esc(App.themeChoiceLabel[t.decision.choice] || '') + '）' : '（未判断）');
       }).join('、') + '</div>';
     }).join('') || '<div>まだありません。</div>';
+  },
+
+  // (4) の拡張: LINEオープンチャットの質問ランキング。見えない人には枠ごと出さない。2026-11-16
+  openchatTab: 'all',
+  openchatChat: '',
+  loadOpenchatRanking: async () => {
+    const box = document.getElementById('openchatRanking');
+    if (!box) return;
+    const show = App.isStaffAdmin() && App.featureOn('openchat_ranking');
+    box.classList.toggle('hidden', !show);
+    if (!show) return;
+    const status = document.getElementById('openchatRankingStatus');
+    const btn = document.getElementById('reloadOpenchatRankingBtn');
+    if (btn && !btn.dataset.bound) { btn.dataset.bound = '1'; btn.addEventListener('click', function () { void App.loadOpenchatRanking(); }); }
+    status.textContent = '読み込み中…';
+    try {
+      const r = await App.apiClient('POST', '/admin/openchat-ranking/list', {});
+      App.renderOpenchatRanking(r || {});
+    } catch (e) {
+      status.textContent = '取得できませんでした: ' + ((e && e.message) || String(e));
+    }
+  },
+  renderOpenchatRanking: (r) => {
+    const status = document.getElementById('openchatRankingStatus');
+    const body = document.getElementById('openchatRankingBody');
+    const esc = App.escapeHtml;
+    const fmt = (n) => Number(n || 0).toLocaleString('ja-JP');
+    const latest = r.latest;
+    if (!latest || !(latest.ranking || []).length) {
+      status.textContent = latest ? '' : 'まだ集計の回がありません（毎週月曜の朝に作られます）。';
+      body.innerHTML = '<div class="ab-empty"><i class="fa-solid fa-comments"></i><p>まだ表示できるランキングがありません。</p></div>';
+      return;
+    }
+    const st = latest.stats || {};
+    const days = latest.period_days || 120;
+    const rank = latest.ranking || [];
+    const chats = latest.by_chat || [];
+    status.textContent = String(latest.created_at || '').slice(0, 10) + ' の集計（直近 ' + days + ' 日）';
+    const top = rank[0];
+    const totalReplies = rank.reduce((a, x) => a + (x.replies || 0), 0);
+    const lead =
+      '<div class="ab-lead"><div class="ab-lead-icon"><i class="fa-solid fa-lightbulb"></i></div><div>' +
+      '<p class="ab-lead-title">この' + esc(String(days)) + '日間のまとめ</p>' +
+      '<p class="ab-lead-text"><b>' + fmt(st.chats) + '</b>のオープンチャットで、質問は <b>' + fmt(st.questions) + '件</b>（<b>' + fmt(st.people) + '人</b>）ありました。' +
+      'いちばん多かったのは「<b>' + esc(top.topic) + '</b>」で <b>' + fmt(top.count) + '件</b>、' + (top.chats || []).length + 'つのオープンチャットで聞かれています。' +
+      (chats[0] ? '質問がいちばん多いのは「' + esc(chats[0].chat) + '」（' + fmt(chats[0].questions) + '件）です。' : '') + '</p></div></div>';
+    const kpi = (icon, label, value, unit, sub, cls) =>
+      '<div class="ab-kpi ' + (cls || '') + '"><div class="ab-kpi-head"><span class="ab-kpi-icon"><i class="fa-solid ' + icon + '"></i></span>' + esc(label) + '</div>' +
+      '<div class="ab-kpi-value">' + fmt(value) + '<span class="ab-kpi-unit">' + esc(unit) + '</span></div><div class="ab-kpi-sub">' + sub + '</div></div>';
+    const kpis = '<div class="ab-kpis">' +
+      kpi('fa-circle-question', '質問の数', st.questions, '件', '直近' + esc(String(days)) + '日', 'ab-kpi-main') +
+      kpi('fa-user-group', '質問した人', st.people, '人', '同じ人は1人と数える', 'ab-kpi-c1') +
+      kpi('fa-layer-group', '話題の種類', rank.length, '個', '上位' + rank.length + 'の話題', 'ab-kpi-c2') +
+      kpi('fa-reply-all', '上位の話題への返信', totalReplies, '件', 'スレッドで答えた数', 'ab-kpi-good') + '</div>';
+    const tabs = '<div class="oc-tabs" role="tablist">' +
+      '<button type="button" role="tab" data-oc-tab="all" aria-selected="' + (App.openchatTab === 'all') + '"><i class="fa-solid fa-ranking-star"></i> 全体のランキング</button>' +
+      '<button type="button" role="tab" data-oc-tab="chat" aria-selected="' + (App.openchatTab === 'chat') + '"><i class="fa-solid fa-comments"></i> オープンチャット別</button></div>';
+    const max = Math.max(1, ...rank.map((x) => x.count || 0));
+    const allList = '<ol class="oc-list">' + rank.map((x, i) =>
+      '<li style="--d:' + Math.min(i * 60, 1200) + 'ms">' +
+      '<div class="oc-row"><span class="oc-no' + (i < 3 ? ' is-top' : '') + '">' + (i + 1) + '</span>' +
+      '<div class="oc-main"><div class="oc-topic">' + esc(x.topic) + '</div>' +
+      '<div class="oc-bar"><i style="width:' + ((x.count / max) * 100).toFixed(1) + '%"></i></div></div>' +
+      '<span class="oc-n">' + fmt(x.count) + '<small>件</small><em>' + fmt(x.people) + '人</em></span></div>' +
+      '<div class="oc-meta">' + (x.chats || []).map((c, k) => '<span class="oc-chip' + (k === 0 ? ' is-main' : '') + '">' + esc(c.chat) + '<b>' + fmt(c.n) + '</b></span>').join('') +
+      (x.recent ? '<span class="oc-badge oc-badge-new"><i class="fa-solid fa-clock"></i> 直近30日 ' + fmt(x.recent) + '件</span>' : '') +
+      (x.replies ? '<span class="oc-badge"><i class="fa-solid fa-reply"></i> 返信 ' + fmt(x.replies) + '件</span>' : '') + '</div>' +
+      ((x.examples || []).length ? '<details class="oc-ex"><summary>実際の質問を見る</summary><ul>' + x.examples.map((e) =>
+        '<li><span class="oc-ex-src">' + esc(e.chat) + (e.d ? '・' + esc(e.d.slice(5).replace('-', '/')) : '') + '</span>' + esc(e.text) + '</li>').join('') + '</ul></details>' : '') +
+      '</li>').join('') + '</ol>';
+    if (!chats.some((c) => c.chat === App.openchatChat)) App.openchatChat = chats[0] ? chats[0].chat : '';
+    const cmax = Math.max(1, ...chats.map((c) => c.questions || 0));
+    const picker = '<p class="oc-hint">オープンチャットを選ぶと、そこでよく聞かれていることが出ます（質問の多い順）。</p><div class="oc-picker">' + chats.map((c) =>
+      '<button type="button" data-oc-chat="' + esc(c.chat) + '" title="' + esc(c.chat) + '" aria-pressed="' + (c.chat === App.openchatChat) + '">' +
+      '<span>' + esc(c.chat) + '</span><b>' + fmt(c.questions) + '件</b><i style="width:' + ((c.questions / cmax) * 100).toFixed(1) + '%"></i></button>').join('') + '</div>';
+    const chatPanel = (name) => {
+      const c = chats.find((x) => x.chat === name);
+      if (!c) return '';
+      const m = Math.max(1, ...(c.top || []).map((t) => t.count || 0));
+      return '<div class="oc-panel"><h4 class="ab-h"><i class="fa-solid fa-comments"></i> ' + esc(c.chat) + '<span class="oc-panel-sub">質問 ' + fmt(c.questions) + '件・' + fmt(c.people) + '人</span></h4>' +
+        '<ol class="oc-list oc-list-chat">' + (c.top || []).map((t, i) =>
+          '<li style="--d:' + (i * 60) + 'ms"><div class="oc-row"><span class="oc-no' + (i < 3 ? ' is-top' : '') + '">' + (i + 1) + '</span>' +
+          '<div class="oc-main"><div class="oc-topic">' + esc(t.topic) + '</div><div class="oc-bar"><i style="width:' + ((t.count / m) * 100).toFixed(1) + '%"></i></div></div>' +
+          '<span class="oc-n">' + fmt(t.count) + '<small>件</small><em>' + fmt(t.people) + '人</em></span></div>' +
+          ((t.examples || []).length ? '<details class="oc-ex"><summary>実際の質問を見る</summary><ul>' + t.examples.map((e) => '<li>' + esc(e) + '</li>').join('') + '</ul></details>' : '') +
+          '</li>').join('') + '</ol></div>';
+    };
+    body.innerHTML = lead + kpis + tabs +
+      '<div class="oc-pane" data-oc-pane="all"' + (App.openchatTab === 'all' ? '' : ' hidden') + '><div class="ab-card">' + allList + '</div></div>' +
+      '<div class="oc-pane" data-oc-pane="chat"' + (App.openchatTab === 'chat' ? '' : ' hidden') + '><div class="ab-card">' + picker + '<div class="oc-chat-panel">' + chatPanel(App.openchatChat) + '</div></div></div>';
+    const animate = (el) => {
+      let reduce = false;
+      try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* ignore */ }
+      el.classList.remove('is-in');
+      if (reduce) { el.classList.add('is-in'); return; }
+      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('is-in')));
+    };
+    body.querySelectorAll('[data-oc-tab]').forEach((b) => b.addEventListener('click', () => {
+      App.openchatTab = b.getAttribute('data-oc-tab');
+      body.querySelectorAll('[data-oc-tab]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      body.querySelectorAll('[data-oc-pane]').forEach((p) => { p.hidden = p.getAttribute('data-oc-pane') !== App.openchatTab; });
+      animate(body);
+    }));
+    body.querySelectorAll('[data-oc-chat]').forEach((b) => b.addEventListener('click', () => {
+      App.openchatChat = b.getAttribute('data-oc-chat');
+      body.querySelectorAll('[data-oc-chat]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      try { b.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); } catch (e) { /* ignore */ }
+      const panel = body.querySelector('.oc-chat-panel');
+      panel.innerHTML = chatPanel(App.openchatChat);
+      animate(body);
+      if (window.matchMedia && window.matchMedia('(max-width: 640px)').matches) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
+    animate(body);
   },
 
   // Phase 13: 運営分析ダッシュボード（qa-analytics Edge）
