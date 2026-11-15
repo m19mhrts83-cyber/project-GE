@@ -23,7 +23,7 @@ test('壊れた行・知らない段階・行なしはオフ', () => {
 
 test('一覧には見えている機能と会員公開の有無だけを返し、名簿は返さない', () => {
   const out = featuresFor([flag('reviewers'), { feature: 'cost_saving', stage: 'all' }, { feature: 'auto_approval', stage: 'off' }], reviewer);
-  assert.deepEqual(out, { features: { answer_feedback: { members: false }, cost_saving: { members: true } } });
+  assert.deepEqual(out, { features: { answer_feedback: { members: false }, cost_saving: { members: true } }, preview: true });
   assert.equal(JSON.stringify(out).includes('owner@example.test'), false);
 });
 
@@ -44,10 +44,18 @@ test('/features はログインした本人で判定し、読めなければ全�
     forward: async () => { throw new Error('should not forward'); }, attachmentSession: async () => ({}),
     featureFlags: async () => { if (broken) throw new Error('db down'); return [flag('owner')]; } });
   const get = async t => (await handler(new Request('https://g.example/features', { method: 'GET', headers: { Origin: origin, Authorization: 'Bearer ' + t } }))).json();
-  assert.deepEqual(await get('a'.repeat(64)), { features: { answer_feedback: { members: false } } });
-  assert.deepEqual(await get('b'.repeat(64)), { features: {} });
+  assert.deepEqual(await get('a'.repeat(64)), { features: { answer_feedback: { members: false } }, preview: true });
+  assert.deepEqual(await get('b'.repeat(64)), { features: {}, preview: false });
   broken = true;
-  assert.deepEqual(await get('a'.repeat(64)), { features: {} });
+  assert.deepEqual(await get('a'.repeat(64)), { features: {}, preview: false });
   const anon = await handler(new Request('https://g.example/features', { method: 'GET', headers: { Origin: origin } }));
   assert.equal(anon.status, 401);
+});
+
+test('確認用の帯(preview)は名指しの人だけ。全員公開の機能しか無い会員・管理者には出さない', () => {
+  const flags = [{ feature: 'cost_saving', stage: 'all', owner_ids: ['o1'] }, { feature: 'design_theme', stage: 'all', owner_ids: ['o1'] }];
+  const member = featuresFor(flags, { id: 'm9', email: 'member@example.test' });
+  assert.equal(member.preview, false);
+  assert.deepEqual(Object.keys(member.features), ['cost_saving', 'design_theme']);
+  assert.equal(featuresFor(flags, { id: 'o1', email: '' }).preview, true); // 全部 all でも名指しの本人は帯が見える
 });

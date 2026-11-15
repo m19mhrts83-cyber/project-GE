@@ -180,17 +180,24 @@ const App = {
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
+    App.state.featurePreview = false;
     if (!App.authGatewayBase) return; // 旧バックエンドには /features が無い → 全部オフ
     try {
       const r = await App.apiClient('GET', '/features');
       if (r && r.features && typeof r.features === 'object') App.state.features = r.features;
+      App.state.featurePreview = !!(r && r.preview === true);
     } catch (e) {
       App.state.features = {};
     }
-    try {
-      App.state.featureViewNew = localStorage.getItem('qa_feature_view_new') !== '0';
-      App.state.viewAsMember = localStorage.getItem('qa_view_as_member') === '1';
-    } catch (e) { /* ignore */ }
+    // 確認用の帯の切り替え（新しい版で見る／会員として見る）は名指しの確認者だけ。ほかの人は常に会員と同じ見え方。
+    App.state.featureViewNew = true;
+    App.state.viewAsMember = false;
+    if (App.state.featurePreview) {
+      try {
+        App.state.featureViewNew = localStorage.getItem('qa_feature_view_new') !== '0';
+        App.state.viewAsMember = localStorage.getItem('qa_view_as_member') === '1';
+      } catch (e) { /* ignore */ }
+    }
   },
   // (5) ロゴに合わせた配色（案A）。見た目だけなので画面側の切り替えで足りる（色は index.html と style.css の html.theme-a）。
   // ログイン前の画面にも出せるよう、この端末で一度見えた人は覚えておく（見えない人がログインしたら消す）。
@@ -239,8 +246,10 @@ const App = {
     const bar = document.getElementById('featurePreviewBar');
     if (!bar) return;
     const names = Object.keys(App.state.features || {});
-    bar.classList.toggle('hidden', names.length === 0);
-    if (!names.length) return;
+    // 会員（名指しでない管理者を含む）には帯を出さない
+    const show = !!App.state.featurePreview && names.length > 0;
+    bar.classList.toggle('hidden', !show);
+    if (!show) return;
     const viewNew = document.getElementById('featureViewNewToggle');
     const asMember = document.getElementById('featureAsMemberToggle');
     viewNew.checked = !!App.state.featureViewNew;
