@@ -41,3 +41,6 @@ docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送
 .jarvis_state/vpoint_audit_result.json
 .jarvis_state/vpoint_cadence.json
 .jarvis_state/westudy_weekly_watch.json
+
+# Claude向け個別財務フロー・引継ぎ（共通ルールは公開、個別対象/状態は非公開）
+docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/claude_*

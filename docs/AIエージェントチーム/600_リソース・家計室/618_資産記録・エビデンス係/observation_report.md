@@ -27,7 +27,7 @@
 `.github/workflows/asset-618-observation.yml` を追加。専用GHAは画像取得や別の資産ジョブを起動しない。
 既存GitHub secrets（DB接続とREPORT webhook）は名前だけ存在確認済み。新規秘密登録は不要。
 `ASSET618_REPORT_APPROVED=true` と `ASSET618_REPORT_UNTIL=2026-12-12` の両方が必要。期限後や12/12を超える期限は送信不可。
-現在は両変数未設定、自動送信無効。送信前の宛先・本文確認ルールに従い、継続投稿の了承後にだけ有効化する。
+2026-11-15に本人が継続投稿を了承。両変数を設定し自動送信を有効化、初回run43662707341の送信と#reportの着信を確認。追加の#consult/#ops送信等へこの了承を拡張しない。
 手動dispatchも同じ送信ゲートを通る。処理結果は30日保持の非機密Actions artifactへ残す。Slack失敗はリトライせず失敗終了、Actionsでも確認可能。
 実行後の当日再dispatchは重複投稿の可能性があるため行わない。通常スケジュールは1日1回、concurrencyで並列送信を防ぐ。
 

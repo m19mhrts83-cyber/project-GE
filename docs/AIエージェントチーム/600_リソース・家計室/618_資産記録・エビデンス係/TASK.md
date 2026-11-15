@@ -115,3 +115,10 @@ status: done_deployment / executor: codex。了承範囲のDB/非公開Storage/�
 executor: codex / status: implemented_pending_send_approval。正常稼働も含む報告、保存済み対象・未保存理由・次の手当てを明示する。数値DBと画像を区別し、カードを未取得扱いしない。子どもSOVANIの対象漏れを修正。毎朝のGHA報告を準備し、送信前の本文・継続投稿の了承ルールに従い、実投稿は有効化前の確認まで行わない。
 
 観察スクリプト・GHAゲート・対象漏れ/カード除外と11テストを追加、618関連95件成功。本番SELECT確認・対象別一覧と手当てはobservation_report.md。金融取得・実画像登録・Slack投稿なし。残りは継続投稿の了承→変数有効化→実投稿確認、およびJarvisの初回取得/画像保存/当該run画面照合。
+
+
+## 2026-11-15：自動報告の了承・Claude向け共通ルール
+
+executor: codex / status: implementation_done_pending_deployment。本人が#report自動投稿（毎朝09:30 JST、12/12まで、正常時含む、都度確認なし）を了承。変数有効化・初回投稿確認、KURASHIFTから最新証拠への導線確認、Claude用ルールとフローを見ながら処理する引継ぎを作る。銀行IB/OTP/実画像取得は今回の対象外。
+
+初回GHA run43662707341成功、Slack着信確認。Claude Codeの本人Macルールを配置、既存ホームCLAUDEは保持。18ノード/戻り矢印2本/選択/メモJSON/390pxでの非クリップ/外部通信なしをブラウザ検証。引継ぎ `claude_*` は個別財務情報があるためprivate_paths/private_sync_paths/gitignoreへ登録。KURASHIFT上部リンクの本番確認とClaudeでの読込/受領は別工程。

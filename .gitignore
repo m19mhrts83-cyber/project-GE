@@ -231,3 +231,6 @@ docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送
 215_kamiooya/C1_cursor/finance/zaim_budget_sync/downloads/
 215_kamiooya/C1_cursor/finance/.prudential_otp_resume_meta.json
 *storage_state*.json
+
+# Claude向け個別財務フロー・引継ぎ（共通ルールは公開、個別対象/状態は非公開）
+docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/claude_*
