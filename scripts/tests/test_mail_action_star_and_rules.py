@@ -155,5 +155,26 @@ class RulesUnavailableTests(unittest.TestCase):
         self.assertTrue(ma.rules_unavailable_ops_due(None))
 
 
+class GreenReportTests(unittest.TestCase):
+    def test_due_until_inclusive(self):
+        with mock.patch.dict(os.environ, {"JARVIS_MAIL_ACTION_GREEN_UNTIL": "2026-11-22"}):
+            self.assertTrue(ma.green_report_due("2026-11-22"))
+            self.assertFalse(ma.green_report_due("2026-11-23"))
+
+    def test_text_green_and_yellow(self):
+        ok = ma.run_report_text(0, {"posted": 3, "stats": {"rules": 1}})
+        self.assertTrue(ok.startswith("🟢【報告】116"))
+        self.assertIn("カード 3件", ok)
+        ng = ma.run_report_text(0, {"posted": 0, "stats": {"rules_unavailable": True}})
+        self.assertTrue(ng.startswith("🟡"))
+        self.assertIn("未適用", ng)
+
+    def test_no_post_on_dry_run(self):
+        with mock.patch.object(ma, "RUN_SUMMARY", {"from_triage": True, "dry_run": True}), \
+                mock.patch("subprocess.run") as run:
+            ma.post_run_report(0)
+        run.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

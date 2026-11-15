@@ -49,6 +49,10 @@ RULES_UNAVAILABLE_OPS_HOURS = 6.0
 # 判断B（2026-11-15）: スター付き・Todoist済の確認で外れる分を見越して多めに並べる
 STAR_CHECK_EXTRA = 5
 TODOIST_DONE_LABEL = "Todoist済"
+# 変更直後の1週間だけ #report に毎回の結果を🟢で出す（2026-11-15 松野さん）。以後は #ops だけ
+GREEN_REPORT_UNTIL_DEFAULT = "2026-11-22"
+# main() の結果を #report の1通にまとめるための入れ物（--from-triage の時だけ使う）
+RUN_SUMMARY: dict[str, Any] = {}
 
 # アカウント → Gmail token（物件取込・triage catchup と同系）
 TOKEN_BY_ACCOUNT = {
@@ -1416,6 +1420,55 @@ def notify_rules_unavailable_ops(sb: Any | None, warnings: list[str], *, dry_run
     return True
 
 
+def green_report_due(today: str | None = None) -> bool:
+    until = (os.environ.get("JARVIS_MAIL_ACTION_GREEN_UNTIL") or GREEN_REPORT_UNTIL_DEFAULT).strip()
+    d = today or datetime.now(JST).strftime("%Y-%m-%d")
+    return bool(until) and d <= until
+
+
+def run_report_text(rc: int, s: dict[str, Any]) -> str:
+    st = s.get("stats") or {}
+    warn = rc != 0 or bool(st.get("rules_unavailable"))
+    head = "🟡" if warn else "🟢"
+    when = datetime.now(JST).strftime("%m/%d %H:%M")
+    lines = [f"{head}【報告】116 メール要対応 — {when}"]
+    if rc != 0:
+        lines.append(f"・投稿が途中で止まりました（rc={rc}）。詳しくは #ops／実行ログ")
+    if s.get("skipped_reason"):
+        lines.append(f"・カード 0件（{s['skipped_reason']}）")
+    else:
+        lines.append(f"・カード {int(s.get('posted') or 0)}件を #consult に出しました")
+    if st.get("star_excluded"):
+        lines.append(f"・スター付き・Todoist済で外した {st['star_excluded']}件（スター起票の担当）")
+    if st.get("star_check_unavailable"):
+        lines.append(f"・スター確認できず {st['star_check_unavailable']}件（外さずに出した）")
+    lines.append("・ルール帳: 未適用（読めず）" if st.get("rules_unavailable") else f"・ルール帳: 確定 {int(st.get('rules') or 0)}件を適用")
+    until = (os.environ.get("JARVIS_MAIL_ACTION_GREEN_UNTIL") or GREEN_REPORT_UNTIL_DEFAULT).strip()
+    lines.append(f"（変更直後の確認用。{until[5:].replace('-', '/')} まで毎回、以後は異常時の #ops だけ）")
+    return "\n".join(lines)
+
+
+def post_run_report(rc: int) -> None:
+    s = RUN_SUMMARY
+    if not s.get("from_triage") or s.get("dry_run") or s.get("disabled") or not green_report_due():
+        return
+    post = REPO / "scripts" / "jarvis_slack_webhook_post.py"
+    if not post.is_file():
+        return
+    import subprocess
+
+    try:
+        subprocess.run(
+            [sys.executable, str(post), "--channel", "report", "--text", run_report_text(rc, s),
+             "--username", "116 メール要対応"],
+            cwd=str(REPO),
+            check=False,
+            timeout=60,
+        )
+    except Exception as e:  # noqa: BLE001 — 報告の失敗で本線を止めない
+        print(f"# run report skip: {e}", file=sys.stderr)
+
+
 def load_pending_from_supabase(
     *, limit: int, dry_run: bool = False
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -1923,7 +1976,9 @@ def main() -> int:
         "yes",
     }:
         print("disabled via JARVIS_MAIL_ACTION_SLACK_DISABLE=1")
+        RUN_SUMMARY["disabled"] = True
         return 0
+    RUN_SUMMARY.update({"from_triage": bool(args.from_triage), "dry_run": bool(args.dry_run)})
 
     url_mode = bool(args.url_buttons)
     # 業者返信と同型: Bot / Signing が無いとアプリ内ボタンは無反応になる
@@ -1971,6 +2026,7 @@ def main() -> int:
         seen = {str(r.get("id")) for r in rows}
         rows = rows + [w for w in wait_rows if str(w.get("id")) not in seen]
         stats.update(wait_stats)
+        RUN_SUMMARY["stats"] = stats
     else:
         ap.print_help()
         return 2
@@ -1987,6 +2043,7 @@ def main() -> int:
     )
     if not rows:
         print("投稿対象なし（pending 要対応が無い／ミュート除外）")
+        RUN_SUMMARY["skipped_reason"] = "要対応の新着なし"
         return 0
 
     for i, row in enumerate(rows, 1):
@@ -2014,6 +2071,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             print("投稿対象なし（直近ダイジェストと同一セット）")
+            RUN_SUMMARY["skipped_reason"] = "直近と同じ顔ぶれのため出し直さず"
             return 0
         digest = build_digest_payload(rows)
         rc, digest_ch, digest_ts = post_slack(
@@ -2045,6 +2103,7 @@ def main() -> int:
         if rc != 0:
             return rc
         posted += 1
+        RUN_SUMMARY["posted"] = posted
         if sb and not args.dry_run and row.get("_reply_wait"):
             mark_reply_wait_posted(sb, tid, slack_channel=ch, slack_ts=ts)
         elif sb and not args.dry_run:
@@ -2088,4 +2147,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    _rc = main()
+    post_run_report(_rc)
+    raise SystemExit(_rc)

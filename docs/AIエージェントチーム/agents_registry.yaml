@@ -128,8 +128,8 @@ agents:
     trigger: 時間＋イベント＋人＋健全性
     tool_assigned: jarvis
     tool_fit: A+B
-    tool_notes: triage→#consult 返信／見送り／後回し(Todoist)。VRは516。mute学習あり。スター付きは隣の予定タスク（Claude・平日8:38・#report報告）が起票し116には出さない
-    schedule: '朝バンドル／昼12:30GHA／night後／手動（隣＝スター起票 平日8:38 Claude予定タスク）'
+    tool_notes: triage→#consult 返信／見送り／後回し(Todoist)。VRは516。mute学習あり。スター付き（人が選んだもの）は116の工程03＝Claude予定タスク（平日8:38・#report報告）が起票し、カードには出さない
+    schedule: '朝バンドル／昼12:30GHA／night後／手動／スター起票 平日8:38（Claude予定タスク・116工程03）'
     note: '設計中（2026-10-19）。正本 docs/Jarvis_メール要対応_Slack操作_20261019.md'
   '211':
     name: 返信案内下書き係
