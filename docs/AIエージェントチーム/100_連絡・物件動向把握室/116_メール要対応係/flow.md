@@ -77,19 +77,35 @@ flowchart TD
 | 05 | 人間 | 「メール要対応出して」 | 松野さん → Claude／Cursor が CLI（T4） | 音声・チャット → 07 | 既存 |
 | 06 | 人間 | 見落としを「要対応だった」に戻す | 松野さん｜判断デスク（ループウェア） | → payload `loopware_miss`。古くても次回の候補 | 既存 |
 | 07 | プログラム | 受付・停止・重複ガード | `jarvis_mail_action_slack_post.py`／`_kick-guard.yml`／sync_meta の digest 指紋 | 停止スイッチ `JARVIS_MAIL_ACTION_SLACK_DISABLE`、二重起動・同じ並びの digest を止める | 既存 |
-| 08 | プログラム | ルール帳・ミュート・送信者方針を取得 | `jarvis_learned_rules.py` → [learned_rules.md](./learned_rules.md)、sync_meta | 今回効かせる基準。**C**: 読めない回は続行し「ルール未適用」の印・#ops 1行・payload に印 | 既存＋C 実装待ち |
-| 09 | プログラム | 候補集め・除外 | 同上 → `triage_items` | pending 最大60＋見落とし戻し＋後回しの期日到来分 → ノイズ・定型・販促・業者返信（516）・自分発信・ミュート・hide を外す。**B**: スター付き・`Todoist済` を Gmail スレッドIDで外す（Gmail に繋がらない時は外さず出す） | 既存＋B 実装待ち |
+| 08 | プログラム | ルール帳・ミュート・送信者方針を取得 | `jarvis_learned_rules.py` → [learned_rules.md](./learned_rules.md)、sync_meta | 今回効かせる基準。**C**: 読めない回は続行し「ルール未適用」の印・#ops 1行・payload に印 | 既存＋C 実装済（PR #426・未デプロイ） |
+| 09 | プログラム | 候補集め・除外 | 同上 → `triage_items` | pending 最大60＋見落とし戻し＋後回しの期日到来分 → ノイズ・定型・販促・業者返信（516）・自分発信・ミュート・hide を外す。**B**: スター付き・`Todoist済` を Gmail スレッドIDで外す（Gmail に繋がらない時は外さず出す） | 既存＋B 実装済（PR #426・未デプロイ） |
 | 10 | プログラム | スコア順で上位5・要旨 | `score_row`＋ルールの boost/demote・重複除去 | 上位5件と抽出要旨（AIなし）・applied_rules 保持・6位以下は次点として記録 | 既存 |
 | 11 | プログラム | #consult 短索引＋スレのカード | Slack Bot（無い時は Webhook の短カード） | ボタン: 返信する／見送り／資料を集めて後回し／Chatworkで返信。投稿時刻を payload へ | 既存 |
 | 12 | プログラム | Gmail 既読 | Gmail API | 失敗は朝バンドルで取り直し | 既存 |
 | 13 | プログラム | 投稿・記録・既読を判定 | 同上 | 投稿／保存／既読を別々に判定。保存できたことと Slack に出たことを同じ成功にしない。まとめた判定は一部のみ | 一部 |
 | 14 | 人間 | カードで判断 | 松野さん｜Slack | 返信（本文確認＝送ってよいの了承）／見送り／後回し／触らない | 既存 |
-| 15 | プログラム | ボタンを処理 | Jarvis Dashboard（Vercel）`mailActionSlackAction.ts` | 返信＝Gmail 送信。見送り＝カード削除・索引更新・2回でミュート。後回し＝過去資料＋回答案＋Todoist（`gmail_thread=<id>` を説明欄に）。**B**: 作る前にスター起票済みを確認 | 既存＋B 実装待ち |
+| 15 | プログラム | ボタンを処理 | Jarvis Dashboard（Vercel）`mailActionSlackAction.ts` | 返信＝Gmail 送信。見送り＝カード削除・索引更新・2回でミュート。後回し＝過去資料＋回答案＋Todoist（`gmail_thread=<id>` を説明欄に）。**B**: 作る前にスター起票済みを確認 | 既存＋B 実装済（PR #426・未デプロイ） |
 | 16 | プログラム | 判断ログへ記録 | Supabase トリガー `triage_items_log_owner_decision` → `owner_decisions`／GHA 平日21:00 `jarvis-mail-action-unseen.yml` | 判断・applied_rules・run。触らないは「未判断」（見送り扱いにしない） | 既存 |
 | 17 | プログラム | 健全性・#ops | `jarvis_mail_action_mute.py --health --notify-ops` | 投稿失敗・pending 過多・ミュート過多 → #ops（6時間に1回まで） | 既存 |
 | 18 | AI | ブリーフィング代行の突き合わせ | Claude 予定タスク 毎日 12:00 → Slack | Gmail 直近24h と #consult 直近24h → #report に1通、116 未検出は #consult にも | 既存稼働 |
 | 19 | AI＋人間 | 週次でルール候補を決める | 314 業務品質監査係（土曜）→ 判断デスクで松野さん | 採用／今回だけ／見送りと本人の理由（AI が理由を補わない） | 既存（314） |
 | 20 | プログラム | 採用ルールをルール帳へ | learned_rules.md 確定ルール（1ルール1コミット・取消は revert） | 次回の 08 で読まれる。効果は applied_rules で週次に数える | 既存 |
+
+## ループは3本
+
+1. **今回の取り直し（見落とし）**: 18 が「116 未検出」→ 本人が要対応と認めたら 06 で戻す → 07 から次の回に1回だけ必ず出る。
+2. **今回の取り直し（後回し）**: 14「後回し」→ 15 が Todoist へ → 期日が来たら 09 が再掲（1日1回まで・Todoist 完了なら出さない）。
+3. **次回の基準**: 14 のボタン・触らなかったカード → 16 判断ログ → 19 週次で本人が採用／今回だけ／見送り＋理由 → 20 採用分だけルール帳 → 次の回の 08 で読み、10 の選び方が変わる。効果は applied_rules で週次に数える。
+
+足りない所: ボタンを押す時は理由を聞かない（理由は週次の採用時だけ）。03 スター起票には判断ログがない。
+
+## 報告先
+
+| 係 | ふだん | 異常時 |
+|---|---|---|
+| 116 | #consult のカードそのもの（生存報告はしない） | #ops |
+| 03 スター起票 | #report に1通（11/22 まで毎回） | 以後は🟡🔴だけ #report |
+| 18 ブリーフィング代行 | #report に1通（毎日 12:00） | 116 未検出は #consult にも |
 
 ## 決まったこと（2026-11-15 松野さん了承）
 

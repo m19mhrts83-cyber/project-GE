@@ -4,8 +4,8 @@
 |---|---|
 | task_id | mail-action-116-flow-v2-20261115 |
 | agent_id | 116 |
-| executor | 未定（611 配車係の使用量を見て振り分け。Claude/Codex どちらでも可） |
-| status | ready（フロー v2 は 2026-11-15 松野さん了承） |
+| executor | Claude Code（2026-11-15 松野さん「続きを進めて」） |
+| status | review（B・C を実装し PR #426。マージ＝本番反映は松野さん了承後。フロー図の本人確認は後追い） |
 | フロー正本 | [flow.md](./flow.md) v2（工程番号 01〜20） |
 
 ## 業務自動化・社員具体化の依頼
@@ -91,3 +91,12 @@
 ## 最初の返答と完了報告
 
 最初に、未確認4点の結果と、2〜4 のどれから作るかを短く返す。完了時は、変更内容・検証結果・未検証・次の一手を報告し、116 の CLAUDE.md 改善ログを更新する。設計・実装・本番稼働を混同しない。
+
+## 実施結果（2026-11-15・Claude）
+
+- 未確認4点: (1) スター起票の Gmail アカウントは未確認のまま。116 側は行の account ごとの箱でラベルを見るので、どの箱でも効く。(2) triage_items にラベルは無い → 投稿直前に Gmail `messages.get(format=minimal)` で確認。(3) `load_rulebook` は読めないとき空のルール＋警告だけを返し、0件と区別できなかった → `RuleBook.unavailable` を追加。(4) 昼 GHA の遅延実行は未確認（digest の同一セット防止で投稿は抑えられる見込み）。
+- 08（C）: `jarvis_learned_rules.py` に `unavailable`。`jarvis_mail_action_slack_post.py` で、読めない回は続行しダイジェストに「⚠ ルール未適用」、payload `rules_unavailable`、#ops に🟡1行（sync_meta `mail_action_rules_unavailable_ops` で6時間に1回）。
+- 09（B）: `filter_star_or_todoist_done`。STARRED か「Todoist済」なら外す。外れる分を見越して5件多めに並べる。Gmail に繋がらない時は外さない。停止は `JARVIS_MAIL_ACTION_STAR_CHECK=0`。
+- 15（B）: Dashboard `lib/starTodoistGuard.ts`（判定は `lib/starLabels.ts`）。「後回し」でスター付き・Todoist済なら作らず、スター起票のタスクを探して寄せる（status=todoist・payload `todoist_by_star`）。確かめられない時は従来どおり作る。
+- テスト: `scripts/tests/test_mail_action_star_and_rules.py`（13件）、既存 mail_action／learned_rules 全件 OK。Dashboard `tests/starLabels.test.mjs` 3件 OK、`tsc --noEmit` OK。`npm test` の失敗1件は外部へ繋ぐ既存テスト（flowforgeShareProxy live）で、変更前も同じ。
+- 未検証: 本番の Gmail・Todoist・Slack での実動作（マージ・デプロイ後に昼の回で確認）。
