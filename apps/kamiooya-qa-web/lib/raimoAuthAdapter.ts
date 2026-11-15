@@ -11,6 +11,14 @@ export class UpstreamError extends Error {
   code: string; status: number;
   constructor(code: string, status: number) { super(code); this.code=code; this.status=status; }
 }
+// メールに書く有効期限は日本時間の「2026年11月15日 12:59」形式（24時間表記、分は切り捨て＝表示より前に切れない）。2026-11-15 松野さん
+export function jstDeadlineLabel(iso: string): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  const d = new Date(t + 9 * 3600 * 1000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return d.getUTCFullYear() + '年' + (d.getUTCMonth() + 1) + '月' + d.getUTCDate() + '日 ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+}
 export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, stored: string) => Promise<boolean>, hash: (raw: string) => Promise<string>, transport: typeof fetch = fetch, jobsRuntime?:{schedule(task:Promise<void>):void;semantic(req:Request):Promise<Response>}) {
   if (!/^https:\/\//.test(c.raimoBase) || !c.raimoBase.startsWith(c.origin+'/miniAppApi/') ||
       !/^https:\/\/[a-z]+\.supabase\.co$/.test(c.projectUrl) || [c.gatewaySecret,c.proxySecret].some(v=>v.length<32) || !c.serviceKey) throw new Error('invalid_configuration');
@@ -182,7 +190,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         if(u?.status==='approved'){
           const token=crypto.randomUUID()+crypto.randomUUID();const expires_at=new Date(Date.now()+1800000).toISOString();
           await backend('POST',path,{email,token:await digest(token),expires_at});
-          await backend('POST','/notify/password-reset',{email,expires_at,reset_url:c.origin+'/#reset-password?token='+encodeURIComponent(token)});
+          await backend('POST','/notify/password-reset',{email,expires_at:jstDeadlineLabel(expires_at),reset_url:c.origin+'/#reset-password?token='+encodeURIComponent(token)});
         }
         return {success:true};
       }

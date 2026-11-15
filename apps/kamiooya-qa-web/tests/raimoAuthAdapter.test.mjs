@@ -63,7 +63,7 @@ test('registrations hash credentials, reset URLs are generated on server, thrott
  const registration=f.calls.find(c=>c.url.endsWith('/auth/register'));assert.equal(registration.body.password_hash,'hashed:new-password');assert.equal('role' in registration.body,false);
  await f.request('/auth/forgot-password/issue',{email:'user@example.test',token:'attacker-choice',expires_at:'2999-01-01'});
  const issue=f.calls.find(c=>c.url.endsWith('/auth/forgot-password/issue'));assert.match(issue.body.token,/^[0-9a-f]{64}$/);assert.notEqual(issue.body.token,'attacker-choice');
- const mail=f.calls.find(c=>c.url.endsWith('/notify/password-reset'));assert.ok(mail.body.reset_url.startsWith(origin+'/#reset-password?token='));assert.equal(mail.body.reset_url.includes('attacker-choice'),false);
+ const mail=f.calls.find(c=>c.url.endsWith('/notify/password-reset'));assert.ok(mail.body.reset_url.startsWith(origin+'/#reset-password?token='));assert.equal(mail.body.reset_url.includes('attacker-choice'),false);assert.match(mail.body.expires_at,/^\d{4}年\d{1,2}月\d{1,2}日 \d{2}:\d{2}$/);
  f.disableLimit();assert.equal((await f.request('/auth/login',{email:'new@example.test',password_hash:'new-password'})).status,429);
 });
 test('expired password reset and wrong tokens cannot change credentials',async()=>{
@@ -122,4 +122,11 @@ test('semantic configuration rejects redirect destinations and reused privileged
   const adapter=createProductionAdapter(f.config,async()=>true,async()=>'',async()=>Response.json(bad));
   await assert.rejects(()=>adapter.deps.semanticConfig());
  }
+});
+
+test('パスワード再設定メールの有効期限は日本時間の「年月日 時:分」', async () => {
+  const { jstDeadlineLabel } = await import('../lib/raimoAuthAdapter.ts');
+  assert.equal(jstDeadlineLabel('2026-11-15T03:59:40.475Z'), '2026年11月15日 12:59');
+  assert.equal(jstDeadlineLabel('2026-12-31T15:05:00Z'), '2027年1月1日 00:05');
+  assert.equal(jstDeadlineLabel('壊れた値'), '');
 });
