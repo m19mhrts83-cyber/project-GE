@@ -84,6 +84,9 @@ class RuleBook:
     path: str
     rules: list[Rule]
     warnings: list[str]
+    # ルール帳そのものを読めなかった（ファイルが無い・読込エラー）。ルール0件とは別。
+    # 読めない回を「基準なし」と同じに扱わないための印（116 判断C・2026-11-15）
+    unavailable: bool = False
 
     @property
     def confirmed(self) -> list[Rule]:
@@ -220,11 +223,11 @@ def load_rulebook(employee: str) -> RuleBook:
     """無ければ空。読めなくても本線は止めない"""
     p = rulebook_path(employee)
     if not p or not p.exists():
-        return RuleBook(path=str(p or ""), rules=[], warnings=[])
+        return RuleBook(path=str(p or ""), rules=[], warnings=[], unavailable=bool(p))
     try:
         return parse_rulebook(p.read_text(encoding="utf-8"), str(p))
     except Exception as e:  # noqa: BLE001 — soft-fail
-        return RuleBook(path=str(p), rules=[], warnings=[f"読めません: {e}"])
+        return RuleBook(path=str(p), rules=[], warnings=[f"読めません: {e}"], unavailable=True)
 
 
 @dataclass

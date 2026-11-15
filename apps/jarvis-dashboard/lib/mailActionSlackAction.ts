@@ -17,6 +17,7 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import { isSelfEmail, parseEmailAddr } from "@/lib/selfEmails";
 import { extractMaterialRequests } from "@/lib/materialRequest";
 import { closeTodoistTaskById, createTodoistTask } from "@/lib/todoistTasks";
+import { checkStarOrTodoistDone, findStarTodoistTask } from "@/lib/starTodoistGuard";
 import { editRatio } from "@/lib/maDecisionBlocks";
 
 /** done = LINE／Chatwork などアプリ側で返信済み（送信はしない） */
@@ -652,6 +653,44 @@ export async function applyMailActionSlack(
         message: `Todoist に登録済みです: ${String(payload.todoist_url)}`,
         status: "todoist",
         todoist_url: String(payload.todoist_url),
+      };
+    }
+    // 判断B（2026-11-15）: スター付き・Todoist済は予定タスク「スター付きメール→Todoist起票」の担当。
+    // 116 からは作らない。確かめられない時は従来どおり作る。
+    const star = await checkStarOrTodoistDone({
+      messageId: row.gmail_message_id,
+      account: row.account,
+    });
+    if (star.checked && (star.starred || star.todoistDone)) {
+      const existing = await findStarTodoistTask(row.gmail_thread_id);
+      payload.slack_ma_action = { action: "todoist", at: now, source };
+      payload.todoist_by_star = {
+        at: now,
+        starred: star.starred,
+        todoist_done: star.todoistDone,
+        thread: row.gmail_thread_id || null,
+      };
+      if (existing) {
+        payload.todoist_task_id = existing.id;
+        payload.todoist_url = existing.url;
+      }
+      const { error: starErr } = await sb
+        .from("triage_items")
+        .update({ status: "todoist", payload, updated_at: now })
+        .eq("id", id);
+      if (starErr) return { ok: false, message: starErr.message };
+      const digestSyncStar = await syncDigestFromPayload(payload);
+      revalidateMailActionPaths();
+      return {
+        ok: true,
+        message: existing
+          ? `スター起票で登録済みです: ${existing.url}`
+          : star.todoistDone
+            ? "スター起票で登録済みです（Todoist済）"
+            : "スター付きのメールです。平日 8:38 のスター起票で Todoist に入ります",
+        status: "todoist",
+        todoist_url: existing?.url,
+        ...digestSyncStar,
       };
     }
     const subject = String(row.subject || "").trim() || "(件名なし)";

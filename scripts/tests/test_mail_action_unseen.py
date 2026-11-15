@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+from unittest import mock
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -58,6 +59,39 @@ class NearMissTest(unittest.TestCase):
         finally:
             del os.environ["JARVIS_MAIL_ACTION_NEAR_MISS"]
         self.assertEqual(ma.near_miss_n(), 3)
+
+
+class DecisionLogReportTests(unittest.TestCase):
+    def test_summary_today_and_week(self):
+        import jarvis_mail_action_unseen as mu
+        from datetime import datetime as _dt
+        start = _dt.fromisoformat("2026-11-16T00:00:00+09:00")
+        rows = [
+            {"action": "sent", "decided_at": "2026-11-16T03:00:00+00:00"},
+            {"action": "unseen", "decided_at": "2026-11-16T12:00:00+00:00"},
+            {"action": "skipped", "decided_at": "2026-11-14T03:00:00+00:00"},
+        ]
+        s = mu.summarize_decisions(rows, day_start=start)
+        self.assertEqual(s["today_total"], 2)
+        self.assertEqual(s["week_total"], 3)
+
+    def test_text_green_yellow(self):
+        import jarvis_mail_action_unseen as mu
+        from datetime import datetime as _dt, timezone as _tz
+        now = _dt(2026, 11, 16, 12, 0, tzinfo=_tz.utc)
+        ok = mu.decision_log_report_text({"today": {"sent": 1}, "today_total": 1, "week_total": 4}, posted_today=3, logged_unseen=0, now=now)
+        self.assertTrue(ok.startswith("🟢【報告】116 判断ログ"))
+        self.assertIn("返信 1", ok)
+        ng = mu.decision_log_report_text({"today": {}, "today_total": 0, "week_total": 0}, posted_today=3, logged_unseen=0, now=now)
+        self.assertTrue(ng.startswith("🟡"))
+        quiet = mu.decision_log_report_text({"today": {}, "today_total": 0, "week_total": 0}, posted_today=0, logged_unseen=0, now=now)
+        self.assertTrue(quiet.startswith("🟢"))
+
+    def test_due_until(self):
+        import jarvis_mail_action_unseen as mu
+        with mock.patch.dict(os.environ, {"JARVIS_DECISION_LOG_REPORT_UNTIL": "2026-11-22"}):
+            self.assertTrue(mu.report_due("2026-11-22"))
+            self.assertFalse(mu.report_due("2026-11-23"))
 
 
 if __name__ == "__main__":

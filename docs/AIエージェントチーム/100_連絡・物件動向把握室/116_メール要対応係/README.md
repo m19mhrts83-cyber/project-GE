@@ -5,12 +5,12 @@
 
 | 項目 | 内容 |
 |---|---|
-| 役割 | 要返信メールを `#consult` で返信／見送り／Todoist |
+| 役割 | 要返信メールを `#consult` で返信／見送り／Todoist。スター付きメールの起票（工程03・Claude予定タスク）も担当 |
 | 合図 | 朝・昼GHA・night後・人依頼・健全性（T1〜T5） |
 | 権限の境界 | 投稿＝自動可／送信・見送り・起票＝人のボタン |
 | 報告 | Slack `#consult`（障害は `#ops`） |
 | 指示書 | [CLAUDE.md](./CLAUDE.md) |
-| 今回の依頼 | [TASK.md](./TASK.md) |
-| フロー | [flow.md](./flow.md) |
+| 今回の依頼 | [TASK.md](./TASK.md)（B・C 実装待ち） |
+| フロー | [flow.md](./flow.md)（v2・20工程・2026-11-15） |
 | 正本 | `docs/Jarvis_メール要対応_Slack操作_20261019.md` |
 | 境界 | VR＝516／パートナー報告＝111／下書き定型＝211 |

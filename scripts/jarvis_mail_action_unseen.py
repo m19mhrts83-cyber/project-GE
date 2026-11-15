@@ -7,6 +7,9 @@
 - 理由は聞かない。週次レビューで「未判断がN件、理由を1つだけ」聞く材料にする。
 
 平日夜（GHA jarvis-mail-action-unseen.yml）に走る。失敗しても何も止めない。
+
+立ち上がり確認（2026-11-15 松野さん）: 判断ログがたまっているかを #report に1通。
+JARVIS_DECISION_LOG_REPORT_UNTIL（既定 2026-11-22）まで毎回、以後は出さない。
 """
 from __future__ import annotations
 
@@ -22,6 +25,16 @@ from jarvis_owner_decision_log import log_owner_decision  # noqa: E402
 
 JST = timezone(timedelta(hours=9))
 MIN_HOURS_DEFAULT = 6.0
+REPORT_UNTIL_DEFAULT = "2026-11-22"
+ACTION_LABELS = {
+    "sent": "返信",
+    "skipped": "見送り",
+    "snoozed": "後回し",
+    "todoist": "Todoistへ",
+    "done": "対応済",
+    "hesitated": "迷い",
+    "unseen": "触らなかった",
+}
 
 
 def parse_ts(raw: Any) -> datetime | None:
@@ -93,6 +106,100 @@ def stamp_unseen(pl: dict[str, Any], *, now: datetime) -> dict[str, Any]:
     return out
 
 
+def report_until() -> str:
+    return (os.environ.get("JARVIS_DECISION_LOG_REPORT_UNTIL") or REPORT_UNTIL_DEFAULT).strip()
+
+
+def report_due(today: str) -> bool:
+    until = report_until()
+    return bool(until) and today <= until
+
+
+def summarize_decisions(rows: list[dict[str, Any]], *, day_start: datetime) -> dict[str, Any]:
+    """owner_decisions（triage）の行から、今日の内訳と7日の合計を作る（ネットワーク不要）。"""
+    today: dict[str, int] = {}
+    week = 0
+    for r in rows:
+        week += 1
+        at = parse_ts(r.get("decided_at"))
+        if at and at >= day_start:
+            a = str(r.get("action") or "?")
+            today[a] = today.get(a, 0) + 1
+    return {"today": today, "today_total": sum(today.values()), "week_total": week}
+
+
+def decision_log_report_text(summary: dict[str, Any], *, posted_today: int | None, logged_unseen: int, now: datetime) -> str:
+    total = int(summary.get("today_total") or 0)
+    warn = posted_today is None or (posted_today > 0 and total == 0)
+    head = "🟡" if warn else "🟢"
+    lines = [f"{head}【報告】116 判断ログ — {now.astimezone(JST).strftime('%m/%d %H:%M')}"]
+    if posted_today is None:
+        lines.append("・今日出したカードの数を読めませんでした")
+    else:
+        lines.append(f"・今日 #consult に出したカード {posted_today}件")
+    parts = [f"{ACTION_LABELS.get(a, a)} {n}" for a, n in sorted(summary.get("today", {}).items(), key=lambda x: -x[1])]
+    lines.append(f"・今日たまった判断 {total}件" + (f"（{'／'.join(parts)}）" if parts else ""))
+    lines.append(f"・うち今夜「触らなかった」として記録 {logged_unseen}件")
+    lines.append(f"・直近7日の合計 {int(summary.get('week_total') or 0)}件（土曜の 314 がルール候補の材料にします）")
+    if warn and posted_today:
+        lines.append("・カードを出したのに判断が0件です。記録が止まっていないか確認してください")
+    until = report_until()
+    lines.append(f"（立ち上がり確認。{until[5:].replace('-', '/')} まで毎回、以後は出しません）")
+    return "\n".join(lines)
+
+
+def post_decision_log_report(sb: Any, *, now: datetime, logged_unseen: int) -> None:
+    today = now.astimezone(JST).strftime("%Y-%m-%d")
+    if not report_due(today):
+        return
+    day_start = datetime.fromisoformat(f"{today}T00:00:00+09:00")
+    week_start = (day_start - timedelta(days=6)).isoformat()
+    try:
+        res = (
+            sb.table("owner_decisions")
+            .select("action,decided_at")
+            .eq("surface", "triage")
+            .gte("decided_at", week_start)
+            .limit(5000)
+            .execute()
+        )
+        summary = summarize_decisions(res.data or [], day_start=day_start)
+    except Exception as e:  # noqa: BLE001
+        print(f"# decision summary skip: {e}", file=sys.stderr)
+        summary = {"today": {}, "today_total": 0, "week_total": 0}
+    posted: int | None
+    try:
+        r2 = (
+            sb.table("triage_items")
+            .select("id,payload->>slack_ma_posted_at")
+            .not_.is_("payload->>slack_ma_posted_at", "null")
+            .gte("updated_at", day_start.isoformat())
+            .limit(2000)
+            .execute()
+        )
+        posted = 0
+        for r in r2.data or []:
+            at = parse_ts(r.get("slack_ma_posted_at"))
+            if at and at >= day_start:
+                posted += 1
+    except Exception as e:  # noqa: BLE001
+        print(f"# posted count skip: {e}", file=sys.stderr)
+        posted = None
+    text = decision_log_report_text(summary, posted_today=posted, logged_unseen=logged_unseen, now=now)
+    print(text)
+    post = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jarvis_slack_webhook_post.py")
+    import subprocess
+
+    try:
+        subprocess.run(
+            [sys.executable, post, "--channel", "report", "--text", text, "--username", "116 判断ログ"],
+            check=False,
+            timeout=60,
+        )
+    except Exception as e:  # noqa: BLE001 — 報告の失敗で記録を止めない
+        print(f"# decision report skip: {e}", file=sys.stderr)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true")
@@ -134,6 +241,8 @@ def main() -> int:
             except Exception as e:  # noqa: BLE001 — soft-fail
                 print(f"# stamp soft-fail {rec['target_id']}: {e}", file=sys.stderr)
     print(f"📎 mail action unseen — candidates={len(rows)} logged={logged} dry_run={args.dry_run}")
+    if not args.dry_run:
+        post_decision_log_report(sb, now=now, logged_unseen=logged)
     return 0
 
 

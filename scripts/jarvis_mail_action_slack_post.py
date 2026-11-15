@@ -43,6 +43,16 @@ MUTE_META_KEY = "mail_action_skip_mute"
 DEFAULT_CONSULT_CHANNEL = "C0C7R0UF3MM"
 DEFAULT_MUTE_THRESHOLD = 2
 DEFAULT_LIMIT = 5
+# 判断C（2026-11-15）: ルール帳を読めなかった回の #ops 通知（連投防止）
+RULES_UNAVAILABLE_META_KEY = "mail_action_rules_unavailable_ops"
+RULES_UNAVAILABLE_OPS_HOURS = 6.0
+# 判断B（2026-11-15）: スター付き・Todoist済の確認で外れる分を見越して多めに並べる
+STAR_CHECK_EXTRA = 5
+TODOIST_DONE_LABEL = "Todoist済"
+# 変更直後の1週間だけ #report に毎回の結果を🟢で出す（2026-11-15 松野さん）。以後は #ops だけ
+GREEN_REPORT_UNTIL_DEFAULT = "2026-11-22"
+# main() の結果を #report の1通にまとめるための入れ物（--from-triage の時だけ使う）
+RUN_SUMMARY: dict[str, Any] = {}
 
 # アカウント → Gmail token（物件取込・triage catchup と同系）
 TOKEN_BY_ACCOUNT = {
@@ -892,6 +902,18 @@ def build_digest_payload(ranked: list[dict[str, Any]]) -> dict[str, Any]:
             ],
         },
     ]
+    if any(r.get("_rules_unavailable") for r in ranked):
+        blocks.append(
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": "⚠ ルール未適用（ルール帳を読めなかったため、この回は確定ルールを効かせていません）",
+                    }
+                ],
+            }
+        )
     return {"text": text, "blocks": blocks, "username": "Jarvis メール要対応"}
 
 
@@ -1252,6 +1274,201 @@ def mark_gmail_read_after_slack(
     return {"ok": ok, "fail": fail, "skip": skip, "dry_run": int(dry_run)}
 
 
+def _star_check_enabled() -> bool:
+    return (os.environ.get("JARVIS_MAIL_ACTION_STAR_CHECK") or "1").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+    }
+
+
+def filter_star_or_todoist_done(
+    rows: list[dict[str, Any]],
+    *,
+    service_for: Any = None,
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """判断B: Gmail でスター付き／ラベル「Todoist済」のメールは 116 に出さない。
+
+    スター付き＝松野さんが選んだもの。予定タスク「スター付きメール→Todoist起票」が起票する。
+    Gmail に繋がらない・ID が無い行は外さずに出す（出ないことの方が害が大きい）。
+    service_for(token_name) は差し替え用（テスト）。既定は _gmail_service。
+    """
+    stats = {"star_excluded": 0, "star_check_unavailable": 0, "star_checked": 0}
+    if not rows or not _star_check_enabled():
+        return rows, stats
+    get_service = service_for or _gmail_service
+    services: dict[str, Any] = {}
+    done_label_ids: dict[str, str] = {}
+    broken: set[str] = set()
+    kept: list[dict[str, Any]] = []
+    for row in rows:
+        gid = str(row.get("gmail_message_id") or "").strip()
+        if not gid or row.get("_reply_wait"):
+            kept.append(row)
+            continue
+        account = (str(row.get("account") or "admin").strip().lower() or "admin")
+        token_name = TOKEN_BY_ACCOUNT.get(account, "token_livingsupport.json")
+        if token_name in broken:
+            stats["star_check_unavailable"] += 1
+            kept.append(row)
+            continue
+        try:
+            if token_name not in services:
+                svc = get_service(token_name)
+                labels = svc.users().labels().list(userId="me").execute().get("labels") or []
+                done_label_ids[token_name] = next(
+                    (str(lb.get("id")) for lb in labels if lb.get("name") == TODOIST_DONE_LABEL),
+                    "",
+                )
+                services[token_name] = svc
+            msg = (
+                services[token_name]
+                .users()
+                .messages()
+                .get(userId="me", id=gid, format="minimal")
+                .execute()
+            )
+        except Exception as e:  # noqa: BLE001 — soft-fail: 外さずに出す
+            if token_name not in services:
+                broken.add(token_name)
+            stats["star_check_unavailable"] += 1
+            print(f"# star check soft-fail id={row.get('id')}: {str(e)[:120]}", file=sys.stderr)
+            kept.append(row)
+            continue
+        stats["star_checked"] += 1
+        label_ids = set(msg.get("labelIds") or [])
+        done_id = done_label_ids.get(token_name) or ""
+        if "STARRED" in label_ids or (done_id and done_id in label_ids):
+            stats["star_excluded"] += 1
+            print(f"# star/Todoist済 exclude id={row.get('id')}")
+            continue
+        kept.append(row)
+    return kept, stats
+
+
+def rules_unavailable_ops_due(sb: Any | None) -> bool:
+    """判断C の #ops 1行を6時間に1回までにする（sync_meta 共有・読めなければ出す）。"""
+    if sb is None:
+        return True
+    try:
+        r = (
+            sb.table("sync_meta")
+            .select("value")
+            .eq("key", RULES_UNAVAILABLE_META_KEY)
+            .limit(1)
+            .execute()
+        )
+        raw = ((r.data or [{}])[0] or {}).get("value")
+        obj = json.loads(raw) if isinstance(raw, str) and raw.strip() else (raw or {})
+        at = str((obj or {}).get("at") or "")
+        if at:
+            ts = datetime.fromisoformat(at.replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            age_h = (datetime.now(timezone.utc) - ts).total_seconds() / 3600
+            if age_h < RULES_UNAVAILABLE_OPS_HOURS:
+                return False
+    except Exception as e:  # noqa: BLE001
+        print(f"# rules_unavailable meta load skip: {e}", file=sys.stderr)
+    return True
+
+
+def rules_unavailable_ops_text(warnings: list[str]) -> str:
+    lines = [
+        "🟡【ops】116 メール要対応 — ルール帳を読めないまま投稿しました",
+        "・この回は確定ルール（hide／boost 等）を効かせていません。ダイジェストにも印を付けています",
+    ]
+    if warnings:
+        lines.append(f"・理由: {warnings[0][:120]}")
+    lines.append(
+        "・確認: python3 scripts/jarvis_learned_rules.py "
+        "docs/AIエージェントチーム/100_連絡・物件動向把握室/116_メール要対応係/learned_rules.md"
+    )
+    return "\n".join(lines)
+
+
+def notify_rules_unavailable_ops(sb: Any | None, warnings: list[str], *, dry_run: bool) -> bool:
+    text = rules_unavailable_ops_text(warnings)
+    if dry_run:
+        print("# dry-run ops: " + text.replace("\n", " / "))
+        return True
+    if not rules_unavailable_ops_due(sb):
+        print("# rules_unavailable ops skip（6時間以内に通知済み）", file=sys.stderr)
+        return False
+    post = REPO / "scripts" / "jarvis_slack_webhook_post.py"
+    if not post.is_file():
+        return False
+    import subprocess
+
+    subprocess.run(
+        [sys.executable, str(post), "--channel", "ops", "--text", text, "--username", "116 メール要対応"],
+        cwd=str(REPO),
+        check=False,
+    )
+    if sb is not None:
+        try:
+            sb.table("sync_meta").upsert(
+                {
+                    "key": RULES_UNAVAILABLE_META_KEY,
+                    "value": json.dumps({"at": now_iso()}, ensure_ascii=False),
+                    "updated_at": now_iso(),
+                },
+                on_conflict="key",
+            ).execute()
+        except Exception as e:  # noqa: BLE001
+            print(f"# rules_unavailable meta save skip: {e}", file=sys.stderr)
+    return True
+
+
+def green_report_due(today: str | None = None) -> bool:
+    until = (os.environ.get("JARVIS_MAIL_ACTION_GREEN_UNTIL") or GREEN_REPORT_UNTIL_DEFAULT).strip()
+    d = today or datetime.now(JST).strftime("%Y-%m-%d")
+    return bool(until) and d <= until
+
+
+def run_report_text(rc: int, s: dict[str, Any]) -> str:
+    st = s.get("stats") or {}
+    warn = rc != 0 or bool(st.get("rules_unavailable"))
+    head = "🟡" if warn else "🟢"
+    when = datetime.now(JST).strftime("%m/%d %H:%M")
+    lines = [f"{head}【報告】116 メール要対応 — {when}"]
+    if rc != 0:
+        lines.append(f"・投稿が途中で止まりました（rc={rc}）。詳しくは #ops／実行ログ")
+    if s.get("skipped_reason"):
+        lines.append(f"・カード 0件（{s['skipped_reason']}）")
+    else:
+        lines.append(f"・カード {int(s.get('posted') or 0)}件を #consult に出しました")
+    if st.get("star_excluded"):
+        lines.append(f"・スター付き・Todoist済で外した {st['star_excluded']}件（スター起票の担当）")
+    if st.get("star_check_unavailable"):
+        lines.append(f"・スター確認できず {st['star_check_unavailable']}件（外さずに出した）")
+    lines.append("・ルール帳: 未適用（読めず）" if st.get("rules_unavailable") else f"・ルール帳: 確定 {int(st.get('rules') or 0)}件を適用")
+    until = (os.environ.get("JARVIS_MAIL_ACTION_GREEN_UNTIL") or GREEN_REPORT_UNTIL_DEFAULT).strip()
+    lines.append(f"（変更直後の確認用。{until[5:].replace('-', '/')} まで毎回、以後は異常時の #ops だけ）")
+    return "\n".join(lines)
+
+
+def post_run_report(rc: int) -> None:
+    s = RUN_SUMMARY
+    if not s.get("from_triage") or s.get("dry_run") or s.get("disabled") or not green_report_due():
+        return
+    post = REPO / "scripts" / "jarvis_slack_webhook_post.py"
+    if not post.is_file():
+        return
+    import subprocess
+
+    try:
+        subprocess.run(
+            [sys.executable, str(post), "--channel", "report", "--text", run_report_text(rc, s),
+             "--username", "116 メール要対応"],
+            cwd=str(REPO),
+            check=False,
+            timeout=60,
+        )
+    except Exception as e:  # noqa: BLE001 — 報告の失敗で本線を止めない
+        print(f"# run report skip: {e}", file=sys.stderr)
+
+
 def load_pending_from_supabase(
     *, limit: int, dry_run: bool = False
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -1299,6 +1516,8 @@ def load_pending_from_supabase(
     book = load_rulebook("116")
     for w in book.warnings:
         print(f"# learned_rules 116: {w}", file=sys.stderr)
+    if book.unavailable:
+        print("# learned_rules 116: ルール帳を読めません → 続行（ルール未適用の印）", file=sys.stderr)
     rule_hidden = 0
     pool_rows: list[dict[str, Any]] = []
     muted_n = 0
@@ -1390,7 +1609,13 @@ def load_pending_from_supabase(
 
     keys = [content_dedupe_key(r) for r in pool_rows]
     content_dupes = max(0, len(keys) - len(set(keys)))
-    ranked_all = rank_candidates(pool_rows, limit=limit + near_miss_n())
+    ranked_all = rank_candidates(
+        pool_rows, limit=limit + near_miss_n() + (STAR_CHECK_EXTRA if _star_check_enabled() else 0)
+    )
+    ranked_all, star_stats = filter_star_or_todoist_done(ranked_all)
+    ranked_all = ranked_all[: limit + near_miss_n()]
+    if book.unavailable:
+        ranked_all = [{**r, "_rules_unavailable": True} for r in ranked_all]
     ranked = ranked_all[:limit]
     near = ranked_all[limit:]
     stats = {
@@ -1401,6 +1626,9 @@ def load_pending_from_supabase(
         "policy_closed": policy_closed,
         "rule_hidden": rule_hidden,
         "rules": len(book.confirmed) + len(book.exceptions),
+        "rules_unavailable": bool(book.unavailable),
+        "rules_warnings": list(book.warnings)[:3],
+        **star_stats,
         "vendor_skip": skipped_vendor,
         "skim_skip": skipped_skim,
         "self_skip": skipped_self,
@@ -1605,8 +1833,14 @@ def _stamp_posted_payload(
     digest_ts: str | None,
     sibling_of: str | None = None,
     applied_rules: list[str] | None = None,
+    rules_unavailable: bool = False,
 ) -> dict[str, Any]:
     out = dict(pl)
+    # 判断C: ルール帳を読めなかった回の印（判断ログのトリガーが payload を写す）
+    if rules_unavailable:
+        out["rules_unavailable"] = True
+    else:
+        out.pop("rules_unavailable", None)
     if is_loopware_miss_due(pl):
         out["slack_ma_miss_posted_at"] = now_iso()
     out["slack_ma_posted_at"] = now_iso()
@@ -1647,6 +1881,7 @@ def mark_posted(
     digest_ts: str | None = None,
     gmail_message_id: str | None = None,
     applied_rules: list[str] | None = None,
+    rules_unavailable: bool = False,
 ) -> None:
     """投稿済み印。同一 gmail_message_id の姉妹行（gha-* 二重など）も一緒に印付け。"""
     try:
@@ -1671,6 +1906,7 @@ def mark_posted(
             digest_channel=digest_channel,
             digest_ts=digest_ts,
             applied_rules=applied_rules,
+            rules_unavailable=rules_unavailable,
         )
         sb.table("triage_items").update(
             {"payload": pl, "updated_at": now_iso()}
@@ -1704,6 +1940,7 @@ def mark_posted(
                 digest_ts=digest_ts,
                 sibling_of=tid,
                 applied_rules=applied_rules,
+                rules_unavailable=rules_unavailable,
             )
             sb.table("triage_items").update(
                 {"payload": stamped, "updated_at": now_iso()}
@@ -1739,7 +1976,9 @@ def main() -> int:
         "yes",
     }:
         print("disabled via JARVIS_MAIL_ACTION_SLACK_DISABLE=1")
+        RUN_SUMMARY["disabled"] = True
         return 0
+    RUN_SUMMARY.update({"from_triage": bool(args.from_triage), "dry_run": bool(args.dry_run)})
 
     url_mode = bool(args.url_buttons)
     # 業者返信と同型: Bot / Signing が無いとアプリ内ボタンは無反応になる
@@ -1787,6 +2026,7 @@ def main() -> int:
         seen = {str(r.get("id")) for r in rows}
         rows = rows + [w for w in wait_rows if str(w.get("id")) not in seen]
         stats.update(wait_stats)
+        RUN_SUMMARY["stats"] = stats
     else:
         ap.print_help()
         return 2
@@ -1803,6 +2043,7 @@ def main() -> int:
     )
     if not rows:
         print("投稿対象なし（pending 要対応が無い／ミュート除外）")
+        RUN_SUMMARY["skipped_reason"] = "要対応の新着なし"
         return 0
 
     for i, row in enumerate(rows, 1):
@@ -1830,6 +2071,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             print("投稿対象なし（直近ダイジェストと同一セット）")
+            RUN_SUMMARY["skipped_reason"] = "直近と同じ顔ぶれのため出し直さず"
             return 0
         digest = build_digest_payload(rows)
         rc, digest_ch, digest_ts = post_slack(
@@ -1861,6 +2103,7 @@ def main() -> int:
         if rc != 0:
             return rc
         posted += 1
+        RUN_SUMMARY["posted"] = posted
         if sb and not args.dry_run and row.get("_reply_wait"):
             mark_reply_wait_posted(sb, tid, slack_channel=ch, slack_ts=ts)
         elif sb and not args.dry_run:
@@ -1875,7 +2118,13 @@ def main() -> int:
                 digest_ts=digest_ts,
                 gmail_message_id=str(row.get("gmail_message_id") or "") or None,
                 applied_rules=list(row.get("_applied_rules") or []) or None,
+                rules_unavailable=bool(row.get("_rules_unavailable")),
             )
+
+    if stats.get("rules_unavailable") and posted:
+        notify_rules_unavailable_ops(
+            sb, list(stats.get("rules_warnings") or []), dry_run=args.dry_run
+        )
 
     near_marked = 0
     if sb is not None and not args.dry_run and stats.get("near_miss"):
@@ -1898,4 +2147,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    _rc = main()
+    post_run_report(_rc)
+    raise SystemExit(_rc)
