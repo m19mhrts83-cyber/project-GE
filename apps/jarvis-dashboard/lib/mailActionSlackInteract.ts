@@ -3,6 +3,7 @@
  */
 import {
   applyMailActionSlack,
+  dashboardBase,
   fetchMailActionTriage,
   isMailActionTriageId,
   guessMailReplyTo,
@@ -36,6 +37,7 @@ import {
 } from "@/lib/maDecisionBlocks";
 import { decideSenderMute, tagSkipReason, weekDecisionCount } from "@/lib/maDecisionLog";
 import { isMuteAskPending } from "@/lib/mailActionSkipMute";
+import { bodyTextBlocks, buildFullTextView } from "@/lib/maFullTextView";
 
 export const MA_ACTION_IDS = {
   reply: "mail_action_reply",
@@ -44,6 +46,8 @@ export const MA_ACTION_IDS = {
   done: "mail_action_done",
   prep: "mail_action_prep",
   chatdraft: "mail_action_chatdraft",
+  /** 2026-11-14: 本文の全文をモーダルで見る（Slack にトグル部品が無いのでドリルダウン） */
+  full: "mail_action_full",
 } as const;
 
 export const MA_MODAL_CALLBACK = "mail_action_reply_modal";
@@ -66,7 +70,7 @@ export function maTimingFromMeta(meta: MaModalMeta) {
 }
 
 /** カードのボタン。prep =「過去資料で回答案（後回し）」: 資料探し＋下書き＋Todoist */
-export type MaButtonAction = MailActionSlackAction | "prep" | "chatdraft";
+export type MaButtonAction = MailActionSlackAction | "prep" | "chatdraft" | "full";
 
 /** value: ma:reply|skip|todoist|done|prep:{triage_id} */
 export function parseMaButtonValue(
@@ -74,10 +78,10 @@ export function parseMaButtonValue(
 ): { action: MaButtonAction; id: string } | null {
   const m = String(value || "")
     .trim()
-    .match(/^ma:(reply|skip|todoist|done|prep|chatdraft):([a-zA-Z0-9_.:-]{6,80})$/i);
+    .match(/^ma:(reply|skip|todoist|done|prep|chatdraft|full):([a-zA-Z0-9_.:-]{6,80})$/i);
   if (!m) return null;
   const extra = m[1].toLowerCase();
-  if (extra === "prep" || extra === "chatdraft") {
+  if (extra === "prep" || extra === "chatdraft" || extra === "full") {
     return isMailActionTriageId(m[2]) ? { action: extra, id: m[2] } : null;
   }
   const action = parseMaAction(m[1]);
@@ -208,7 +212,6 @@ function metaVersion(metaRaw: string): number {
 
 function buildReplyView(input: ReplyViewInput) {
   const { meta, state, version } = input;
-  const inbound = (input.inbound || "").slice(0, 1500);
   const accountOptions = MAIL_SEND_ACCOUNTS.map((a) => ({
     text: { type: "plain_text" as const, text: a.label },
     value: a.key,
@@ -218,12 +221,11 @@ function buildReplyView(input: ReplyViewInput) {
   const blocks: Array<Record<string, unknown>> = [
     {
       type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*相手:* ${input.who.slice(0, 80)}
-\`\`\`${inbound || "(本文なし)"}\`\`\``,
-      },
+      text: { type: "mrkdwn", text: `*相手:* ${input.who.slice(0, 80)}　*届いた本文（全文）*` },
     },
+    // 2026-11-14: 見ずに返さない — 受信本文は切らずに全部載せる（2800字ずつのブロック）
+    ...bodyTextBlocks(input.inbound || ""),
+    { type: "divider" },
     {
       type: "input",
       block_id: "mail_reply_from_block",
@@ -376,40 +378,155 @@ async function slackApi(
     : { ok: false, error: j.error || `${method} failed` };
 }
 
-async function openReplyModal(opts: {
-  token: string;
-  triggerId: string;
-  triageId: string;
-  who: string;
-  draft: string;
-  inbound: string;
-  to: string;
-  account: string;
-  channelId?: string;
-  messageTs?: string;
-  /** 本文が空なので、開いた後に下書きを作る */
-  composing?: boolean;
-  openedAt?: number;
-  /** 「過去資料で回答案」で先に探しておいた添付候補 */
-  candidates?: MaterialCandidate[];
-}): Promise<{ ok: boolean; error?: string; viewId?: string }> {
+type MaTriageRow = NonNullable<Awaited<ReturnType<typeof fetchMailActionTriage>>>;
+
+/**
+ * 返信モーダルの初期画面と、本文が空のときの下書き作成（開いた後に views.update）。
+ * カードの「返信する」（views.open）と全文モーダルの「返信する」（response_action=update）で共用。
+ */
+function prepareReplyModal(
+  row: MaTriageRow,
+  where: { channelId?: string; messageTs?: string },
+): { view: ReturnType<typeof buildReplyView>; compose?: (bot: string, viewId: string) => Promise<void> } {
+  const triageId = row.id;
+  const who = String(row.partner || row.from_email || "相手");
+  const inbound = String(row.original_body || "");
+  const to = guessMailReplyTo(row);
+  const account = normalizeMailAccount(row.account) || "estate";
+  const composing = !String(row.draft_text || "").trim() && Boolean(inbound.trim());
+  const candidates = storedCandidates(row.payload);
+  const materials = extractMaterialRequests(inbound);
+  const meta: MaModalMeta = { id: triageId, channel: where.channelId, message_ts: where.messageTs, o: Date.now() };
   const view = buildReplyView({
-    meta: { id: opts.triageId, channel: opts.channelId, message_ts: opts.messageTs, o: opts.openedAt || Date.now() },
-    who: opts.who,
-    inbound: opts.inbound,
-    state: { ...EMPTY_STATE, body: opts.draft, to: opts.to, account: opts.account },
+    meta,
+    who,
+    inbound,
+    state: { ...EMPTY_STATE, body: String(row.draft_text || ""), to, account },
     version: 1,
-    materials: extractMaterialRequests(opts.inbound),
-    candidates: opts.candidates,
-    showFileQuery: Boolean(opts.candidates?.length),
-    busy: opts.composing,
-    notice: opts.composing
+    materials,
+    candidates,
+    showFileQuery: Boolean(candidates.length),
+    busy: composing,
+    notice: composing
       ? "⏳ これまでのやり取りを踏まえて下書きを作成中…（1分ほど）"
-      : opts.candidates?.length
+      : candidates.length
         ? "📎 過去資料の候補です。添付するものにチェックして「送信」"
         : undefined,
   });
-  return slackApi(opts.token, "views.open", { trigger_id: opts.triggerId, view });
+  if (!composing) return { view };
+  return {
+    view,
+    compose: async (bot: string, viewId: string) => {
+      const history = await retrieveYoritooriForAsk({
+        lane: row.lane,
+        title: row.subject,
+        summary: row.summary,
+        payload: { ...(row.payload || {}), partner: row.partner, folder: row.folder },
+      }).catch(() => null);
+      const result = await composeDraft({
+        who,
+        subject: String(row.subject || ""),
+        inbound,
+        history: history?.ok ? history.promptBlock : "",
+        materials,
+      });
+      let body = "";
+      let notice: string;
+      if (result.ok) {
+        body = result.text;
+        await saveMailActionDraft(triageId, body, "slack_compose").catch(() => {});
+        notice = history?.ok && history.chars
+          ? "✍️ これまでのやり取りを踏まえた下書きです。確認・修正してから「送信」"
+          : "✍️ 届いたメールから作った下書きです（やり取り履歴なし）。確認・修正してから「送信」";
+      } else {
+        notice = `❌ 下書きを作れませんでした（${result.error}）。本文を入力して送信できます`;
+      }
+      // 作成中に入力していたら上書きしない: 版を上げずに本文だけ差し込むと Slack が入力を保つので、版を上げる
+      await slackApi(bot, "views.update", {
+        view_id: viewId,
+        view: buildReplyView({
+          meta,
+          who,
+          inbound,
+          state: { ...EMPTY_STATE, body, to, account },
+          version: 2,
+          materials,
+          notice,
+        }),
+      });
+    },
+  };
+}
+
+function channelLabelOf(row: MaTriageRow): { label: string; chat: boolean } {
+  const ch = String(row.channel || "");
+  if (ch.startsWith("Chatwork")) return { label: "Chatwork", chat: true };
+  if (ch.startsWith("LINE")) return { label: "LINE", chat: true };
+  if (String(row.kind || "") === "chat") return { label: ch || "チャット", chat: true };
+  return { label: "メール", chat: false };
+}
+
+/** カードの「📄 全文を見る」: 届いた本文を全部モーダルに出す。メールは「返信する」で返信画面へ進める */
+async function openFullTextModal(opts: {
+  triageId: string;
+  triggerId?: string;
+  channelId?: string;
+  messageTs?: string;
+  messageBlocks?: unknown;
+}): Promise<{ kind: "modal_opened" | "ephemeral" | "error"; text: string }> {
+  const detail = `${dashboardBase()}/mail/${opts.triageId}`;
+  const bot = (process.env.SLACK_BOT_TOKEN || "").trim();
+  if (!bot || !opts.triggerId) {
+    return { kind: "ephemeral", text: `全文は Dashboard で見られます: ${detail}` };
+  }
+  const row = await fetchMailActionTriage(opts.triageId);
+  if (!row) return { kind: "error", text: "対象の要対応が見つかりません" };
+  const { label, chat } = channelLabelOf(row);
+  const app = chat
+    ? findAppReplyButton(opts.messageBlocks) || (label === "LINE" ? { url: LINE_CHATS_URL, text: "LINEで返信" } : null)
+    : null;
+  const received = String(row.received_at || "");
+  const view = buildFullTextView({
+    meta: { id: row.id, channel: opts.channelId, message_ts: opts.messageTs },
+    who: String(row.partner || row.from_email || "相手"),
+    subject: String(row.subject || ""),
+    from: String(row.from_email || ""),
+    received: received ? received.replace("T", " ").slice(0, 16) : "",
+    channelLabel: label,
+    body: String(row.original_body || row.summary || ""),
+    canReply: !chat && String(row.status || "") !== "sent",
+    app,
+    detailUrl: detail,
+  });
+  const opened = await slackApi(bot, "views.open", { trigger_id: opts.triggerId, view });
+  return opened.ok
+    ? { kind: "modal_opened", text: "全文を開きました" }
+    : { kind: "ephemeral", text: `全文を開けませんでした（${opened.error}）。Dashboard: ${detail}` };
+}
+
+/**
+ * 全文モーダルの「返信する」（view_submission）: 同じ窓を返信モーダルに差し替える。
+ * 本文が空なら差し替え後に下書きを作る（view.id は update 後も同じ）。
+ */
+export async function handleMaFullSubmit(payload: Record<string, unknown>): Promise<{
+  view?: ReturnType<typeof buildReplyView>;
+  error?: string;
+  run?: () => Promise<void>;
+}> {
+  const view = (payload.view || {}) as Record<string, unknown>;
+  const meta = parseMaModalMeta(String(view.private_metadata || ""));
+  if (!meta) return { error: "対象 ID が不正です" };
+  const row = await fetchMailActionTriage(meta.id);
+  if (!row) return { error: "対象のメール要対応が見つかりません" };
+  if (String(row.status || "") === "sent") return { error: "すでに送信済みです" };
+  const prepared = prepareReplyModal(row, { channelId: meta.channel, messageTs: meta.message_ts });
+  const viewId = String(view.id || "");
+  const bot = (process.env.SLACK_BOT_TOKEN || "").trim();
+  const compose = prepared.compose;
+  return {
+    view: prepared.view,
+    run: compose && viewId && bot ? () => compose(bot, viewId) : undefined,
+  };
 }
 
 /** view.state から入力値を拾う（本文・指示ブロックは版付き block_id） */
@@ -828,6 +945,10 @@ export async function handleMaBlockAction(opts: {
     return startChatDraft({ triageId, channelId, messageTs, messageBlocks: opts.messageBlocks });
   }
 
+  if (action === "full") {
+    return openFullTextModal({ triageId, triggerId, channelId, messageTs, messageBlocks: opts.messageBlocks });
+  }
+
   if (action === "reply") {
     const row = await fetchMailActionTriage(triageId);
     if (!row) {
@@ -835,76 +956,18 @@ export async function handleMaBlockAction(opts: {
     }
     const bot = (process.env.SLACK_BOT_TOKEN || "").trim();
     if (bot && triggerId) {
-      const who = String(row.partner || row.from_email || "相手");
-      const inbound = String(row.original_body || "");
-      const to = guessMailReplyTo(row);
-      const account = normalizeMailAccount(row.account) || "estate";
-      const composing = !String(row.draft_text || "").trim() && Boolean(inbound.trim());
-      const openedAt = Date.now();
-      const opened = await openReplyModal({
-        openedAt,
-        token: bot,
-        triggerId,
-        triageId,
-        who,
-        draft: String(row.draft_text || ""),
-        inbound,
-        to,
-        account,
-        channelId,
-        messageTs,
-        composing,
-        candidates: storedCandidates(row.payload),
-      });
+      const prepared = prepareReplyModal(row, { channelId, messageTs });
+      const opened = await slackApi(bot, "views.open", { trigger_id: triggerId, view: prepared.view });
       if (opened.ok) {
         const viewId = opened.viewId;
-        if (!composing || !viewId) {
+        if (!prepared.compose || !viewId) {
           return { kind: "modal_opened", text: "返信モーダルを開きました" };
         }
-        const meta = { id: triageId, channel: channelId, message_ts: messageTs, o: openedAt };
-        const materials = extractMaterialRequests(inbound);
+        const compose = prepared.compose;
         return {
           kind: "modal_opened",
           text: "返信モーダルを開きました（下書き作成中）",
-          run: async () => {
-            const history = await retrieveYoritooriForAsk({
-              lane: row.lane,
-              title: row.subject,
-              summary: row.summary,
-              payload: { ...(row.payload || {}), partner: row.partner, folder: row.folder },
-            }).catch(() => null);
-            const result = await composeDraft({
-              who,
-              subject: String(row.subject || ""),
-              inbound,
-              history: history?.ok ? history.promptBlock : "",
-              materials,
-            });
-            let body = "";
-            let notice: string;
-            if (result.ok) {
-              body = result.text;
-              await saveMailActionDraft(triageId, body, "slack_compose").catch(() => {});
-              notice = history?.ok && history.chars
-                ? "✍️ これまでのやり取りを踏まえた下書きです。確認・修正してから「送信」"
-                : "✍️ 届いたメールから作った下書きです（やり取り履歴なし）。確認・修正してから「送信」";
-            } else {
-              notice = `❌ 下書きを作れませんでした（${result.error}）。本文を入力して送信できます`;
-            }
-            // 作成中に入力していたら上書きしない: 版を上げずに本文だけ差し込むと Slack が入力を保つので、版を上げる
-            await slackApi(bot, "views.update", {
-              view_id: viewId,
-              view: buildReplyView({
-                meta,
-                who,
-                inbound,
-                state: { ...EMPTY_STATE, body, to, account },
-                version: 2,
-                materials,
-                notice,
-              }),
-            });
-          },
+          run: () => compose(bot, viewId),
         };
       }
       return {
@@ -1006,6 +1069,12 @@ export function maChatDraftBlocks(input: {
       text: { type: "plain_text", text: "返信済みにする", emoji: true },
       action_id: MA_ACTION_IDS.done,
       value: `ma:done:${input.id}`,
+    },
+    {
+      type: "button",
+      text: { type: "plain_text", text: "📄 全文を見る", emoji: true },
+      action_id: MA_ACTION_IDS.full,
+      value: `ma:full:${input.id}`,
     },
     {
       type: "button",
@@ -1165,6 +1234,12 @@ export function maPrepResultBlocks(input: {
         style: "primary",
         action_id: MA_ACTION_IDS.reply,
         value: `ma:reply:${input.id}`,
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "📄 全文を見る", emoji: true },
+        action_id: MA_ACTION_IDS.full,
+        value: `ma:full:${input.id}`,
       },
       {
         type: "button",

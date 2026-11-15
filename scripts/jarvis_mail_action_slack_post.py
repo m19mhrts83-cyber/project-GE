@@ -8,7 +8,7 @@
     - バッチ1回あたりスコア上位 N 件（既定5）
     - 本線ダイジェストは短索引のみ（partner＋件名）。要旨・ボタンはスレのカードへ
     - Bot 投稿時はカードを digest の thread_ts 配下へ（Webhook 時は本線に短カード）
-    - 要約は抽出（Plan A・LLMなし）。本文全文は Dashboard。下書き全文はカードに載せない
+    - 要約は抽出（Plan A・LLMなし）。本文全文はカードの「📄 全文を見る」（モーダル）。下書き全文はカードに載せない
     - Slack に出した件は Gmail 既読（物件取込と同型。失敗時は morning catchup）
     - 各カードに digest_ts/channel を保存。見送り等で残 pending 更新／残0でダイジェスト削除
     - スレ投稿オフ: JARVIS_MAIL_ACTION_THREAD_CARDS=0
@@ -131,7 +131,10 @@ MA_ACTION_IDS = {
     "done": "mail_action_done",
     "prep": "mail_action_prep",
     "chatdraft": "mail_action_chatdraft",
+    # 2026-11-14: 届いた本文の全文をモーダルで見る（Slack に開閉トグルが無いのでボタンでドリルダウン）
+    "full": "mail_action_full",
 }
+FULL_LABEL = "📄 全文を見る"
 CHAT_DRAFT_LABEL = "✍️ 返信案を作る"
 # メール: 後回しボタン（過去資料を探して回答案を作り、Todoist にも入れる。新しい資料は作らない）
 PREP_LABEL = "📎 資料を集めて後回し"
@@ -441,7 +444,14 @@ def _button_elements(
             "text": {"type": "plain_text", "text": DONE_LABEL, "emoji": True},
             "url": ma_url(tid, "done"),
         }])
-    return app_btn + draft_btn + [
+    full_btn = [{
+        "type": "button",
+        "text": {"type": "plain_text", "text": FULL_LABEL, "emoji": True},
+        "action_id": MA_ACTION_IDS["full"],
+        "value": f"ma:full:{tid}",
+    }]
+    # 読んでから決める: 全文ボタンは先頭（チャットはアプリを開くボタンの次）
+    return app_btn + full_btn + draft_btn + [
         {
             "type": "button",
             "text": {"type": "plain_text", "text": first_label, "emoji": True},
@@ -881,7 +891,7 @@ def build_digest_payload(ranked: list[dict[str, Any]]) -> dict[str, Any]:
                 "text": (
                     f"*{when}* · スコア順\n"
                     "👉 *スレッドを開く* → 各カードで返信／見送り／Todoist\n"
-                    "本文全文はカード内「詳細を見る」（Dashboard）"
+                    "本文全文はスレのカードの「📄 全文を見る」"
                 ),
             },
         },
@@ -974,7 +984,7 @@ def build_compact_payload(
                     f"*From:* `{from_short}` · score=`{score}`\n"
                     f"*要旨:* {summary}\n"
                     f"{material_line}"
-                    f"<{detail}|本文の詳細（Dashboard）> · "
+                    + (f"<{detail}|本文の詳細（Dashboard）> · " if url_mode else f"全文は「{FULL_LABEL}」 · ")
                     + (f"<{loopware_url(tid)}|ループウェアで見る> · " if _loopware_links_on() else "")
                     + f"{draft_note}"
                 ),
