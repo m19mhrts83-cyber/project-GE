@@ -777,6 +777,7 @@ def mark_vendor(
     vacancy_listing_ok: str | None = None,
     kodate_mgmt_ok: str | None = None,
     property_lane: str | None = None,
+    at: str | None = None,
     dry_run: bool,
 ) -> dict[str, Any]:
     if status not in STATUSES:
@@ -787,6 +788,11 @@ def mark_vendor(
     if not v:
         return {"ok": False, "error": f"vendor not found: {vid}"}
     today = today_jst()
+    if at:
+        # 送信証跡の日付で記録する（実行日とずれる後追い反映用）
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", at):
+            return {"ok": False, "error": f"invalid --at (YYYY-MM-DD): {at}"}
+        today = at
     v["status"] = status
     if note:
         v["notes"] = note if not v.get("notes") else f"{v['notes']} | {note}"
@@ -942,6 +948,7 @@ def main() -> int:
     ap.add_argument("--mark", metavar="ID")
     ap.add_argument("--status", default="contacted")
     ap.add_argument("--note", default="")
+    ap.add_argument("--at", default="", help="--mark の日付（YYYY-MM-DD・既定は今日 JST）")
     ap.add_argument("--result", default="")
     ap.add_argument("--vacancy-listing-ok", default="")
     ap.add_argument("--kodate-mgmt-ok", default="")
@@ -1039,6 +1046,7 @@ def main() -> int:
             vacancy_listing_ok=args.vacancy_listing_ok or None,
             kodate_mgmt_ok=args.kodate_mgmt_ok or None,
             property_lane=args.property_lane or None,
+            at=args.at or None,
             dry_run=args.dry_run,
         )
         print(json.dumps(out, ensure_ascii=False, indent=2))
@@ -1074,4 +1082,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # 台帳が変わったら GHA 見守り用 Secret へ追従（dry-run・GHA 内では何もしない）
+    from jarvis_vendor_list_secret_sync import run_with_secret_sync
+
+    raise SystemExit(run_with_secret_sync(main, LIST_PATH, "KURASHIFT_MGMT_VENDOR_LIST_B64"))

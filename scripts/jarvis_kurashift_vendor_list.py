@@ -1475,4 +1475,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # 台帳が変わったら GHA 見守り用 Secret へ追従（dry-run・GHA 内では何もしない）
+    from jarvis_vendor_list_secret_sync import run_with_secret_sync
+
+    raise SystemExit(run_with_secret_sync(main, LIST_PATH, "KURASHIFT_RE_VENDOR_LIST_B64"))
