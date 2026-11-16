@@ -797,3 +797,75 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 @media (prefers-reduced-motion: reduce) {
   .ab-stack, .ab-rank li, .ab-rank-bar i, .ab-arc, .ab-share i, .ab-pair-bars { transition: none !important; }
 }
+
+/* (4) の拡張: LINEオープンチャットの質問ランキング（2026-11-16）。運営分析の新デザイン（ab-*）に合わせる。文字は rem なので「文字の大きさ」に合わせて大きくなる */
+.oc-rank { background: #f8fafc; border: 1px solid #dbe4f1; border-radius: 18px; padding: 1.1rem; color: #1e293b; }
+.oc-rank > * + * { margin-top: .9rem; }
+.oc-rank #openchatRankingBody > * + * { margin-top: .9rem; }
+.oc-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; }
+.oc-title { font-weight: 700; color: #11366A; font-size: 1.2rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.oc-title i { color: #06C755; font-size: 1.4rem; }
+.oc-title small { font-size: .85rem; color: #64748b; font-weight: 400; }
+.oc-reload { border: 1px solid #c9d6ea; background: #fff; color: #11366A; border-radius: 9999px; padding: .4rem 1rem; font-size: .95rem; font-weight: 700; }
+.oc-status { color: #475569; font-size: .95rem; margin-top: .3rem !important; }
+.oc-note { color: #64748b; font-size: .85rem; line-height: 1.7; }
+.oc-tabs { display: flex; gap: .5rem; flex-wrap: wrap; }
+.oc-tabs button { flex: 1 1 12rem; border: 2px solid #c9d6ea; background: #fff; color: #11366A; border-radius: 14px; padding: .7rem 1rem; font-size: 1.05rem; font-weight: 700; }
+.oc-tabs button[aria-selected="true"] { background: #11366A; border-color: #11366A; color: #fff; box-shadow: 0 4px 12px rgba(17, 54, 106, .2); }
+.oc-tabs button i { margin-right: .3rem; }
+.oc-tabs button[aria-selected="true"] i { color: #FEAD48; }
+.oc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+.oc-list > li { padding: .75rem .3rem; border-bottom: 1px solid #eef2f7; opacity: 0; transform: translateY(6px); transition: opacity .5s ease, transform .5s ease; transition-delay: var(--d, 0ms); }
+.oc-list > li:last-child { border-bottom: 0; }
+.is-in .oc-list > li { opacity: 1; transform: none; }
+.oc-row { display: flex; align-items: center; gap: .75rem; }
+.oc-no { flex: none; width: 2.1rem; height: 2.1rem; border-radius: 50%; display: grid; place-items: center; background: #eef3fa; color: #11366A; font-weight: 700; font-size: 1rem; }
+.oc-no.is-top { background: #FE910B; color: #fff; }
+.oc-main { flex: 1; min-width: 0; }
+.oc-topic { font-size: 1.08rem; font-weight: 700; color: #1e293b; line-height: 1.45; }
+.oc-bar { margin-top: .35rem; height: .65rem; border-radius: 9999px; background: #eef3fa; overflow: hidden; }
+.oc-bar i { display: block; height: 100%; border-radius: 9999px; background: linear-gradient(90deg, #1E4F8F, #11366A); transform-origin: left; transform: scaleX(0); transition: transform .9s cubic-bezier(.2, .8, .2, 1); transition-delay: var(--d, 0ms); }
+.oc-list > li:nth-child(-n+3) .oc-bar i { background: linear-gradient(90deg, #FEAD48, #FE910B); }
+.is-in .oc-bar i { transform: scaleX(1); }
+.oc-n { flex: none; text-align: right; font-weight: 700; color: #11366A; font-size: 1.35rem; font-variant-numeric: tabular-nums; min-width: 3.6rem; line-height: 1.1; }
+.oc-n small { font-size: .8rem; margin-left: .1rem; color: #64748b; }
+.oc-n em { display: block; font-style: normal; font-size: .85rem; color: #64748b; }
+.oc-meta { margin: .45rem 0 0 2.85rem; display: flex; flex-wrap: wrap; gap: .35rem; }
+.oc-chip { display: inline-flex; align-items: center; gap: .35rem; background: #eef3fa; color: #11366A; border-radius: 9999px; padding: .2rem .7rem; font-size: .88rem; }
+.oc-chip b { background: #fff; border-radius: 9999px; padding: 0 .45rem; font-size: .8rem; }
+.oc-chip.is-main { background: #11366A; color: #fff; }
+.oc-chip.is-main b { color: #11366A; }
+.oc-badge { display: inline-flex; align-items: center; gap: .3rem; border-radius: 9999px; padding: .2rem .7rem; font-size: .85rem; background: #ecf7e8; color: #2f6b1f; font-weight: 700; }
+.oc-badge-new { background: #fff4e5; color: #9a4d00; }
+.oc-ex { margin: .45rem 0 0 2.85rem; font-size: .95rem; }
+.oc-ex summary { cursor: pointer; color: #1E4F8F; font-weight: 700; padding: .2rem 0; }
+.oc-ex ul { margin: .3rem 0 0; padding: 0; list-style: none; display: grid; gap: .4rem; }
+.oc-ex li { background: #f8fafc; border-left: 4px solid #c9d6ea; border-radius: 8px; padding: .5rem .7rem; line-height: 1.7; color: #334155; }
+.oc-ex-src { display: block; font-size: .8rem; color: #64748b; font-weight: 700; }
+.oc-hint { color: #475569; font-size: .95rem; margin-bottom: .6rem; }
+@media (max-width: 640px) { .oc-hint::after { content: '（横にずらすと他のオープンチャットも選べます）'; } }
+.oc-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: .5rem; }
+.oc-picker button { position: relative; overflow: hidden; text-align: left; border: 2px solid #dbe4f1; background: #fff; border-radius: 12px; padding: .6rem .8rem .8rem; display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; font-size: 1rem; color: #1e293b; }
+.oc-picker button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oc-picker button b { flex: none; color: #11366A; }
+.oc-picker button i { position: absolute; left: 0; bottom: 0; height: 4px; background: #c9d6ea; }
+.oc-picker button[aria-pressed="true"] { border-color: #FE910B; background: #fff8ef; box-shadow: 0 4px 12px rgba(254, 145, 11, .18); }
+.oc-picker button[aria-pressed="true"] i { background: #FE910B; }
+.oc-panel { margin-top: 1rem; border-top: 2px dashed #dbe4f1; padding-top: 1rem; }
+.oc-panel-sub { margin-left: auto; font-size: .9rem; color: #64748b; font-weight: 400; }
+.oc-list-chat .oc-ex { margin-left: 2.85rem; }
+@media (max-width: 640px) {
+  .oc-rank { padding: .8rem; border-radius: 14px; }
+  .oc-rank .ab-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .oc-meta, .oc-ex, .oc-list-chat .oc-ex { margin-left: 0; }
+  .oc-picker { display: flex; overflow-x: auto; gap: .45rem; padding-bottom: .4rem; scroll-snap-type: x proximity; }
+  .oc-picker button { flex: 0 0 auto; max-width: 15rem; scroll-snap-align: start; }
+  .oc-rank .ab-lead-icon { display: none; }
+  .oc-rank .ab-lead { padding: .8rem .9rem; }
+  .oc-rank .ab-kpi { padding: .8rem .8rem .9rem; }
+  .oc-rank .ab-kpi-value { font-size: 2rem; }
+  .oc-rank .ab-kpi-icon { display: none; }
+  .oc-title { font-size: 1.1rem; }
+  .oc-n { font-size: 1.15rem; min-width: 3rem; }
+}
+@media (prefers-reduced-motion: reduce) { .oc-list > li, .oc-bar i { transition: none !important; } }
