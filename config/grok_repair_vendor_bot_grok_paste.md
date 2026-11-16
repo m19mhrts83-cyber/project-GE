@@ -29,6 +29,7 @@
 
 - admin Drive `【with Grok bot】/30_shared_working/神大家オプチャ_修繕業者・相談知見リスト.md`
 - 情報源: 815神大家オプチャ（特に **31修繕相談G**）の先輩大家・サポート知見
+- 生ログの置き場所: Supabase **kamiooya-qa** の `public.line_openchat_logs`（jarvis-dashboard の `kurashift_openchat_logs` は 2026-09-10 廃止）
 - 例: 散水テスト／コーキング、OSBボード壁、ビリビリガード（簡易アース）、ジモティーでのエアコン引取、リビングステージ等の実勢単価
 
 管理会社の高額見積（30〜50万級）を鵜呑みにせず、上記知見で **代替案・適正相場** を所見に1〜3行書く。

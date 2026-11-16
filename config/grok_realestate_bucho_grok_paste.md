@@ -875,6 +875,14 @@ S1 は **新耐震／旧耐震を最初に確認**（確認日 1981-06-01 以降
 5. 修繕依頼時は **alive_ok（期限内）を優先**（台帳正本は KURASHIFT。Grok は UI 直読しない）
 6. **S2 / S9 と混ぜない**
 
+### 神大家修繕オプチャ週次ウォッチ（毎週月曜11:00ごろ）
+
+- **読む先（正本）**: Supabase **kamiooya-qa**（ref `mwubzgefkkjjbingrmqu`）の `public.line_openchat_logs`
+- jarvis-dashboard（ref `idkdqneutpvkhxhpjtgc`）の `kurashift_openchat_logs` は **2026-09-10 に廃止**（二重管理をやめ kamiooya-qa に一本化）。jarvis-dashboard を見に行かない
+- 抽出の目安: `chat_title = '31修繕相談G【神大家】'` かつ `posted_at` が直近7日。列は `posted_at, sender_name, content, is_repair_related, repair_category`
+- 鮮度確認: 同表の `max(created_at)`（取込時刻）が2日以上前なら「同期停止の疑い」として #ops に1行。新着0件でも取込が新しければ「今週はヒットなし」
+- 読めない（権限・表なし）ときは「ヒットなし」と書かず「実行できず」として #ai-hub に置き場所つきで報告。S4 には渡さない
+
 ## §管理会社開拓（社員 S9 · 週数回〜本日分に軽く）
 
 正本: `config/grok_mgmt_vendor_bot_grok_paste.md`  
