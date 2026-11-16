@@ -394,6 +394,49 @@ class CloseResolvedTests(unittest.TestCase):
         self.assertTrue(hub.reconcile_ok({"a": 2, "b": 2, "a_unlinked": 0, "stale": 0, "reverse": 0}))
 
 
+class TwinLinkTests(unittest.TestCase):
+    """GHA の id（gha-p-…）を指すリンクを、同じメールの Mac 行（ハッシュだけの id）に読み替える。"""
+
+    def _sb(self):
+        sb = _FakeSB()
+        sb.db["comm_items"] = [
+            {"id": "i1", "work_status": "needs_reply", "party_id": "p", "subject": "送信済み"},
+            {"id": "i2", "work_status": "needs_reply", "party_id": "p", "subject": "Todoist 起票済み"},
+            {"id": "i3", "work_status": "needs_reply", "party_id": "p", "subject": "まだ"},
+            {"id": "i4", "work_status": "needs_reply", "party_id": "p", "subject": "双子も無い"},
+        ]
+        sb.db["triage_items"] = [
+            {"id": "aaa111", "status": "sent", "lane": "partner", "comm_item_id": None},
+            {"id": "bbb222", "status": "todoist", "lane": "partner", "comm_item_id": None},
+            {"id": "ccc333", "status": "pending", "lane": "partner", "comm_item_id": None},
+        ]
+        sb.db["comm_links"] = [
+            {"item_id": "i1", "target_type": "triage_item", "target_id": "gha-p-aaa111"},
+            {"item_id": "i2", "target_type": "triage_item", "target_id": "gha-p-bbb222"},
+            {"item_id": "i3", "target_type": "triage_item", "target_id": "gha-cw-ccc333"},
+            {"item_id": "i4", "target_type": "triage_item", "target_id": "gha-p-zzz999"},
+        ]
+        return sb
+
+    def test_twin_ids(self):
+        self.assertEqual(hub.triage_twin_ids("gha-p-abc"), ["abc", "gha-abc", "gha-cw-abc"])
+        self.assertEqual(hub.triage_twin_ids("abc"), ["gha-abc", "gha-p-abc", "gha-cw-abc"])
+
+    def test_close_resolved_follows_twin(self):
+        sb = self._sb()
+        hub.close_resolved(sb, apply=True)
+        ws = {r["id"]: r["work_status"] for r in sb.db["comm_items"]}
+        self.assertEqual(ws["i1"], "done")
+        self.assertEqual(ws["i2"], "done")
+        self.assertEqual(ws["i3"], "needs_reply")  # 双子が pending なら残す
+        self.assertEqual(ws["i4"], "needs_reply")  # 双子も無ければ触らない
+
+    def test_reconcile_counts_twin_pending_as_b(self):
+        c = hub.reconcile_counts(self._sb())
+        self.assertEqual(c["b"], 1)  # i3 → ccc333（partner の pending）
+        self.assertEqual(c["stale"], 2)  # i1・i2 は閉じ残しとして見える
+
+
 class DedupeSyncTests(unittest.TestCase):
     def test_existing_variant_with_other_external_id_not_reinserted(self):
         now = datetime.now(JST)

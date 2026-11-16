@@ -600,10 +600,41 @@ def _triage_links_by_item(sb, item_ids: list[str]) -> tuple[dict[str, set[str]],
             targets[str(t["comm_item_id"])].add(str(t["id"]))
     tids = sorted({t for v in targets.values() for t in v})
     info: dict[str, dict[str, Any]] = {}
-    for i in range(0, len(tids), 100):
-        for t in sb.table("triage_items").select("id,status,lane").in_("id", tids[i : i + 100]).execute().data or []:
-            info[str(t["id"])] = {"status": str(t.get("status") or ""), "lane": t.get("lane")}
+
+    def fetch(id_list: list[str]) -> None:
+        for i in range(0, len(id_list), 100):
+            for t in (
+                sb.table("triage_items").select("id,status,lane").in_("id", id_list[i : i + 100]).execute().data
+                or []
+            ):
+                info[str(t["id"])] = {"status": str(t.get("status") or ""), "lane": t.get("lane")}
+
+    fetch(tids)
+    # 見つからないリンク先は「双子」（同じメールの Mac 行 / GHA 行）に読み替える。
+    # GHA の行（gha-p-…）は、Mac の行（同じハッシュ）が先にあると DB のトリガーで入らないが、
+    # 台帳のリンクは GHA の id を指したまま残る（20261109_triage_items_twins）。
+    missing = [t for t in tids if t not in info]
+    if missing:
+        fetch(sorted({v for t in missing for v in triage_twin_ids(t)} - set(info)))
+        for iid, ts in targets.items():
+            fixed: set[str] = set()
+            for t in ts:
+                if t in info:
+                    fixed.add(t)
+                    continue
+                twins = [v for v in triage_twin_ids(t) if v in info]
+                fixed.update(twins or [t])  # 双子も無ければ元のまま（missing 扱いで閉じない）
+            targets[iid] = fixed
     return targets, info
+
+
+TRIAGE_TWIN_RE = re.compile(r"^gha-(?:cw-|p-)?")
+
+
+def triage_twin_ids(tid: str) -> list[str]:
+    """同じメールの別 id（双子）の候補。DB の public.triage_twin_key と同じ外し方。自分は含めない。"""
+    key = TRIAGE_TWIN_RE.sub("", tid)
+    return [v for v in (key, f"gha-{key}", f"gha-p-{key}", f"gha-cw-{key}") if v != tid]
 
 
 def _triage_status_by_item(sb, item_ids: list[str]) -> dict[str, list[str]]:
