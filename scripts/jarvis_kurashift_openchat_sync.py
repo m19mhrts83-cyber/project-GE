@@ -131,6 +131,12 @@ def parse_heading_datetime(date_str: str) -> tuple[str | None, str | None]:
     return None, None
 
 
+# 見出しの方向欄（投稿者名ではない）
+DIRECTION_TOKENS = ("受信", "送信")
+# 投稿者名として扱う最大長（旧見出しの要約を名前と取り違えないため）
+SENDER_LABEL_MAX = 40
+
+
 def parse_heading(line: str) -> dict[str, str] | None:
     if not line.startswith("### "):
         return None
@@ -154,13 +160,32 @@ def parse_heading(line: str) -> dict[str, str] | None:
     summary = ""
     idx = 3
     if stream_type in ("thread", "thread_reply") and idx < len(parts):
-        thread_title = parts[idx]
+        # スレッド題は「…」で囲まれる。題なしのスレッドでは次が方向（受信/送信）
+        if parts[idx] not in DIRECTION_TOKENS:
+            thread_title = parts[idx]
+            idx += 1
+
+    # 旧パーサーの解釈（id を変えないために残す）: 題の次の欄を sender とみなしていた
+    legacy_idx = 4 if stream_type in ("thread", "thread_reply") and len(parts) > 3 else 3
+    legacy_sender = parts[legacy_idx] if legacy_idx < len(parts) else ""
+    legacy_summary = "｜".join(parts[legacy_idx + 1:]) if legacy_idx + 1 < len(parts) else ""
+
+    # 見出しは「…｜受信/送信｜投稿者名｜要約」。方向は投稿者ではないので飛ばす
+    if idx < len(parts) and parts[idx] in DIRECTION_TOKENS:
         idx += 1
-    if idx < len(parts):
-        sender = parts[idx]
-        idx += 1
-    if idx < len(parts):
-        summary = "｜".join(parts[idx:])
+        rest = parts[idx:]
+        # 投稿者名が無い旧見出し（受信｜要約）は 1 欄だけ
+        if len(rest) >= 2 and len(rest[0]) <= SENDER_LABEL_MAX:
+            sender = rest[0]
+            summary = "｜".join(rest[1:])
+        else:
+            summary = "｜".join(rest)
+    else:
+        if idx < len(parts):
+            sender = parts[idx]
+            idx += 1
+        if idx < len(parts):
+            summary = "｜".join(parts[idx:])
 
     return {
         "date_str": date_str,
@@ -169,6 +194,8 @@ def parse_heading(line: str) -> dict[str, str] | None:
         "thread_title": thread_title,
         "sender": sender,
         "summary": summary,
+        "legacy_sender": legacy_sender,
+        "legacy_summary": legacy_summary,
     }
 
 
@@ -186,12 +213,14 @@ def parse_messages_from_md(md_path: Path, route_id: str, chat_title: str) -> lis
         nonlocal current_meta, body_lines
         if not current_meta:
             return
-        content = "\n".join(body_lines).strip()
-        if not content and current_meta.get("summary"):
-            content = current_meta["summary"]
+        body = "\n".join(body_lines).strip()
+        content = body or (current_meta.get("summary") or "")
+        # id は旧パーサーと同じ材料で作る（投稿者名の修正で別行として二重登録しない）
+        id_content = body or (current_meta.get("legacy_summary") or "")
+        id_sender = current_meta.get("legacy_sender", current_meta["sender"])
 
         if content and "[非テキスト contentType=1]" not in content:
-            raw_id_src = f"{route_id}_{current_meta['date_str']}_{current_meta['sender']}_{content[:100]}"
+            raw_id_src = f"{route_id}_{current_meta['date_str']}_{id_sender}_{id_content[:100]}"
             msg_id = hashlib.sha256(raw_id_src.encode("utf-8")).hexdigest()[:24]
 
             chat = current_meta["chat_name"]
@@ -439,6 +468,45 @@ def upsert_batches(sb: Client, table: str, rows: list[dict[str, Any]], cols: lis
     return upserted
 
 
+# 投稿者名・スレッド題の補正だけで行う列（公開状態や本文には触れない）
+NAME_FIX_FIELDS = ("sender_name", "thread_title")
+
+
+def plan_name_fixes(
+    parsed: list[dict[str, Any]],
+    existing_by_id: dict[str, dict[str, Any]],
+) -> dict[tuple[str, Any], list[str]]:
+    """既存行のうち投稿者名・スレッド題が見出しと違う行を、(列, 新しい値) ごとに束ねる。"""
+    groups: dict[tuple[str, Any], list[str]] = defaultdict(list)
+    seen: set[str] = set()
+    for e in parsed:
+        rid = str(e.get("id") or "")
+        if not rid or rid in seen or rid not in existing_by_id:
+            continue
+        seen.add(rid)
+        prev = existing_by_id[rid]
+        for col in NAME_FIX_FIELDS:
+            new_val = _norm_val(e.get(col))
+            if new_val != _norm_val(prev.get(col)):
+                groups[(col, new_val)].append(rid)
+    return groups
+
+
+def apply_name_fixes(
+    sb: Client,
+    groups: dict[tuple[str, Any], list[str]],
+    table: str = "line_openchat_logs",
+) -> int:
+    """sender_name / thread_title だけを id 指定で更新（ingest_status・本文は変えない）。"""
+    n = 0
+    batch = 200
+    for (col, val), ids in groups.items():
+        for i in range(0, len(ids), batch):
+            chunk = ids[i : i + batch]
+            sb.table(table).update({col: val}).in_("id", chunk).execute()
+            n += len(chunk)
+    return n
+
 def export_catalog(entries: list[dict[str, Any]], output_path: Path) -> None:
     """タイトル別の全件カタログ（Grok共有・データソース確認用）"""
     by_title: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -592,6 +660,11 @@ def main() -> int:
         action="store_true",
         help="DB照合して新規/変更/変更なし件数だけ表示（書込なし）",
     )
+    parser.add_argument(
+        "--fix-sender-names",
+        action="store_true",
+        help="既存行の投稿者名・スレッド題だけを見出しから補正（--apply で書込、無ければ件数のみ）",
+    )
     args = parser.parse_args()
     do_apply = bool(args.apply or args.also_qa)
 
@@ -625,6 +698,23 @@ def main() -> int:
 
     repair_n = sum(1 for e in all_entries if e.get("is_repair_related"))
     print(f"📊 合計: {len(all_entries)} 件 (修繕関連: {repair_n})")
+
+    if args.fix_sender_names:
+        sb = qa_sb()
+        existing = fetch_existing_fingerprints(sb)
+        groups = plan_name_fixes(all_entries, existing)
+        rows = {i for ids in groups.values() for i in ids}
+        received = sum(1 for rid in rows if existing[rid].get("sender_name") in DIRECTION_TOKENS)
+        print(
+            f"🧾 投稿者名・スレッド題の補正: 対象 {len(rows)} 行"
+            f"（うち投稿者が受信/送信 {received} 行） 更新の組 {len(groups)}"
+        )
+        if do_apply:
+            n = apply_name_fixes(sb, groups)
+            print(f"✅ sender_name / thread_title を更新: のべ {n} 件（公開状態は変更なし）")
+        else:
+            print("ℹ️ 件数のみ（DB未書込）。書き込むには --apply を付ける")
+        return 0
 
     if do_apply or args.dry_run_diff:
         sb = qa_sb()
