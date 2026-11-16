@@ -52,6 +52,12 @@ class PendingTest(unittest.TestCase):
         self.assertFalse(poll.is_pending({"kind": "skip_bot", "ack_ts": "1.2"}))
         self.assertFalse(poll.is_pending({"kind": "unknown", "ack_ts": "1.2", "done_at": "x"}))
 
+    def test_hub_picks_only_banto(self) -> None:
+        self.assertEqual(poll.channel_reply_rule("hub", "【Banto（Muse）より】715 が未投稿です"), "mark")
+        self.assertEqual(poll.channel_reply_rule("hub", "Jarvis です。直しました"), "skip")
+        self.assertEqual(poll.channel_reply_rule("report", "ここ直して"), "ack")
+        self.assertEqual(poll.channel_reply_rule("report", "【Banto（Muse）より】指摘"), "ack")
+
     def test_prune_keeps_pending(self) -> None:
         processed = {f"report:{i}": {"kind": "skip_bot", "at": f"2026-10-25T{i:05d}"} for i in range(600)}
         processed["consult:old"] = {"kind": "unknown", "ack_ts": "1", "at": "2000-01-01"}

@@ -52,8 +52,12 @@ EXAMPLE = REPO / ".jarvis_state" / "slack_report_fb.example.json"
 JST = timezone(timedelta(hours=9))
 
 # 対象（人向け報告・相談）
-TARGET_CHANNELS = ("report", "consult")
+TARGET_CHANNELS = ("report", "consult", "hub")
 DEFAULT_PARENT_LIMIT = 15
+# #ai-hub は AI 同士のやり取りが多いので、番頭さんの指摘だけを拾い「受けた」返信はしない（2026-11-17 松野依頼）
+BANTO_PREFIX = "【Banto（Muse）より】"
+QUIET_CHANNELS = ("hub",)  # config の hub = #ai-hub
+QUIET_PARENT_LIMIT = 30
 DEFAULT_LOOKBACK_HOURS = 72
 
 
@@ -199,6 +203,13 @@ def add_reaction(
 
 def processed_key(channel_key: str, reply_ts: str) -> str:
     return f"{channel_key}:{reply_ts}"
+
+
+def channel_reply_rule(channel: str, text: str) -> str:
+    """ack=受けた返信＋👀 / mark=返信せず未対応に積む / skip=対象外。"""
+    if channel in QUIET_CHANNELS:
+        return "mark" if text.lstrip().startswith(BANTO_PREFIX) else "skip"
+    return "ack"
 
 
 def is_pending(entry: dict[str, Any]) -> bool:
@@ -352,8 +363,8 @@ def main() -> int:
     )
     ap.add_argument(
         "--channels",
-        default="report,consult",
-        help="カンマ区切り（既定 report,consult）",
+        default="report,consult,hub",
+        help="カンマ区切り（既定 report,consult,hub。hub=#ai-hub は番頭さんの返信だけ）",
     )
     ap.add_argument(
         "--pending",
@@ -410,7 +421,7 @@ def main() -> int:
     marked = 0
 
     for name in want:
-        if name not in TARGET_CHANNELS and name not in ("report", "consult"):
+        if name not in TARGET_CHANNELS:
             # 明示指定は許可するが既定外は警告
             print(f"# warn: #{name} は FB 対象外の可能性（続行）", file=sys.stderr)
         meta = chans.get(name) or {}
@@ -419,7 +430,8 @@ def main() -> int:
             print(f"# skip #{name}: channel id なし", file=sys.stderr)
             continue
         try:
-            parents = history(cid, token=token, limit=args.limit, oldest=oldest)
+            limit = max(args.limit, QUIET_PARENT_LIMIT) if name in QUIET_CHANNELS else args.limit
+            parents = history(cid, token=token, limit=limit, oldest=oldest)
         except (urllib.error.URLError, TimeoutError, RuntimeError, json.JSONDecodeError) as e:
             print(f"# #{name} history 失敗: {e}", file=sys.stderr)
             continue
@@ -430,6 +442,8 @@ def main() -> int:
             if not pts:
                 continue
             if parent.get("thread_ts") and str(parent.get("thread_ts")) != pts:
+                continue
+            if name in QUIET_CHANNELS and not parent.get("reply_count"):
                 continue
             try:
                 reps = replies(cid, pts, token=token)
@@ -462,6 +476,16 @@ def main() -> int:
                     marked += 1
                     continue
                 text = str(rep.get("text") or "")
+                rule = channel_reply_rule(name, text)
+                if rule == "skip":
+                    processed[key] = {
+                        "at": now_iso(),
+                        "kind": "skip_not_banto",
+                        "channel": name,
+                        "thread_ts": pts,
+                    }
+                    marked += 1
+                    continue
                 kind = classify_fb_reply(text)
                 item = {
                     "channel": name,
@@ -477,7 +501,7 @@ def main() -> int:
                     f"kind={kind_label_ja(kind)} — {text.replace(chr(10), ' ')[:100]}"
                 )
 
-                if args.mark_only:
+                if args.mark_only or rule == "mark":
                     processed[key] = {
                         "at": now_iso(),
                         "kind": kind,
