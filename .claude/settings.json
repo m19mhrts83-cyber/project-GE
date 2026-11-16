@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(~/selenium_env/venv/bin/python scripts/jarvis_kurashift_mgmt_vendor_list.py --mark:*)",
+      "Bash(~/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --mark:*)",
+      "Bash(~/selenium_env/venv/bin/python scripts/jarvis_kurashift_repair_vendor_list.py --mark:*)",
+      "Bash(/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_kurashift_mgmt_vendor_list.py --mark:*)",
+      "Bash(/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_kurashift_vendor_list.py --mark:*)",
+      "Bash(/Users/matsunomasaharu2/selenium_env/venv/bin/python scripts/jarvis_kurashift_repair_vendor_list.py --mark:*)"
+    ]
+  }
+}
