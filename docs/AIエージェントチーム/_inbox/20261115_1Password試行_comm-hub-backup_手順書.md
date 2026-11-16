@@ -80,3 +80,12 @@ launchd の無人実行が、`.env.jarvis_private` の代わりに 1Password（S
 2. ログ・Slack に値が出ない：今のところ OK
 3. ratelimit が想定内：OK（1回あたり read 1）
 4. 画面ロック中・再起動後も動く：未
+
+### 結果（11/16 313 Miss Lemon 判定）
+
+1. 承認待ちで止まらず2回 exit 0：**OK**（`backup_20261115_134005.log`・`backup_20261115_211005.log` とも `via=1password`・`end exit=0`）
+2. ログ・Slack に値が出ない：**OK**（2回分のログと launchd.out を鍵の形で照合し、該当なし。launchd.err の最終更新は試行前の 11/14 21:10）
+3. ratelimit が想定内：**OK**（11/16 10:3x 時点 token read 0/1000・account 0/1000。1時間窓のため実行時以外は0）
+4. 画面ロック中・再起動後も動く：**未**（pmset ログでは 13:30 に画面ON、21:10 前後に画面OFFの記録なし → ロック中の実行は未確認）
+
+判定: 1〜3 は合格。plist は戻さない。4 は次に画面ロック中・再起動後の回を1回見てから本移行を決める。
