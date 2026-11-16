@@ -111,6 +111,9 @@ def qa_sb() -> Client:
     return create_client(url, key)
 
 
+DIRECTION_TOKENS = ("受信", "送信")
+
+
 def parse_heading_datetime(date_str: str) -> tuple[str | None, str | None]:
     """見出し先頭の日時 → (post_date ISO date, posted_at ISO timestamptz JST)。
 
@@ -149,18 +152,33 @@ def parse_heading(line: str) -> dict[str, str] | None:
     elif "【スレッド】" in stream_tag:
         stream_type = "thread"
 
-    thread_title = ""
-    sender = ""
-    summary = ""
+    # 旧来の読み方（id 生成に使う。変えると既存行と id がずれて二重登録になるため固定）
+    legacy_thread_title = ""
+    legacy_sender = ""
     idx = 3
     if stream_type in ("thread", "thread_reply") and idx < len(parts):
-        thread_title = parts[idx]
+        legacy_thread_title = parts[idx]
         idx += 1
     if idx < len(parts):
-        sender = parts[idx]
+        legacy_sender = parts[idx]
         idx += 1
-    if idx < len(parts):
-        summary = "｜".join(parts[idx:])
+
+    # 見出しの正しい並び（chrline_open_chat_to_md._build_open_chat_heading）:
+    #   日時｜種別｜オプチャ名｜[「スレッド名」（【スレッド】のみ）]｜受信/送信｜投稿者｜要約
+    # 旧来の読み方では「受信」を投稿者、【スレッド返信】では「受信」をスレッド名として拾っていた。
+    dir_idx = -1
+    for i in range(3, min(len(parts), 5)):
+        if parts[i] in DIRECTION_TOKENS:
+            dir_idx = i
+            break
+    if dir_idx >= 0:
+        thread_title = parts[3] if dir_idx == 4 and stream_type == "thread" else ""
+        sender = parts[dir_idx + 1] if dir_idx + 1 < len(parts) else ""
+        summary = "｜".join(parts[dir_idx + 2:])
+    else:
+        thread_title = legacy_thread_title
+        sender = legacy_sender
+        summary = "｜".join(parts[idx:]) if idx < len(parts) else ""
 
     return {
         "date_str": date_str,
@@ -168,6 +186,7 @@ def parse_heading(line: str) -> dict[str, str] | None:
         "chat_name": chat_name,
         "thread_title": thread_title,
         "sender": sender,
+        "id_sender": legacy_sender,
         "summary": summary,
     }
 
@@ -191,7 +210,7 @@ def parse_messages_from_md(md_path: Path, route_id: str, chat_title: str) -> lis
             content = current_meta["summary"]
 
         if content and "[非テキスト contentType=1]" not in content:
-            raw_id_src = f"{route_id}_{current_meta['date_str']}_{current_meta['sender']}_{content[:100]}"
+            raw_id_src = f"{route_id}_{current_meta['date_str']}_{current_meta.get('id_sender', current_meta['sender'])}_{content[:100]}"
             msg_id = hashlib.sha256(raw_id_src.encode("utf-8")).hexdigest()[:24]
 
             chat = current_meta["chat_name"]
@@ -221,6 +240,7 @@ def parse_messages_from_md(md_path: Path, route_id: str, chat_title: str) -> lis
                 "post_date": p_date,
                 "posted_at": posted_at,
                 "sender_name": current_meta["sender"] or None,
+                "_id_sender": current_meta.get("id_sender"),
                 "content": content,
                 "is_repair_related": is_repair,
                 "repair_category": matched_cat,
@@ -565,6 +585,48 @@ def export_for_grok(entries: list[dict[str, Any]], output_path: Path) -> None:
     print(f"   primary={len(primary)} secondary={len(secondary)}")
 
 
+def fix_sender_names(sb: Client, entries: list[dict[str, Any]], *, apply: bool) -> int:
+    """既存行の投稿者・スレッド名だけを直す（本文・公開状態・embedding は触らない）。
+
+    旧来の読み方で sender_name に「受信/送信」、【スレッド返信】の thread_title に
+    「受信/送信」が入った行を、見出しから読み直した値で上書きする。
+    """
+    groups: dict[tuple[str | None, str | None], list[str]] = defaultdict(list)
+    seen: set[str] = set()
+    for e in entries:
+        rid = str(e.get("id") or "")
+        if not rid or rid in seen:
+            continue
+        seen.add(rid)
+        sender = e.get("sender_name")
+        title = e.get("thread_title")
+        if sender in DIRECTION_TOKENS:
+            continue
+        legacy_bad = e.get("_id_sender") in DIRECTION_TOKENS or e.get("stream_type") == "thread_reply"
+        if not legacy_bad:
+            continue
+        groups[(sender or None, title or None)].append(rid)
+    total = sum(len(v) for v in groups.values())
+    print(f"🛠 投稿者の直し対象: {total} 件（{len(groups)} グループ）")
+    if not apply:
+        return total
+    done = 0
+    for (sender, title), ids in groups.items():
+        for i in range(0, len(ids), 200):
+            chunk = ids[i:i + 200]
+            q = (
+                sb.table("line_openchat_logs")
+                .update({"sender_name": sender, "thread_title": title})
+                .in_("id", chunk)
+            )
+            # 旧来の誤りが残っている行だけ（手で直した行などは触らない）
+            q = q.or_("sender_name.in.(受信,送信),thread_title.in.(受信,送信)")
+            q.execute()
+            done += len(chunk)
+    print(f"✅ 投稿者を直しました（対象 {done} 件）")
+    return done
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="LINE OpenChat → kamiooya-qa (一本化) & Grok")
     parser.add_argument("--route", help="特定 route_id / title_substring")
@@ -591,6 +653,11 @@ def main() -> int:
         "--dry-run-diff",
         action="store_true",
         help="DB照合して新規/変更/変更なし件数だけ表示（書込なし）",
+    )
+    parser.add_argument(
+        "--fix-sender-names",
+        action="store_true",
+        help="既存行の投稿者欄（「受信」になっていた分）だけ見出しから直す。--apply で書込",
     )
     args = parser.parse_args()
     do_apply = bool(args.apply or args.also_qa)
@@ -625,6 +692,10 @@ def main() -> int:
 
     repair_n = sum(1 for e in all_entries if e.get("is_repair_related"))
     print(f"📊 合計: {len(all_entries)} 件 (修繕関連: {repair_n})")
+
+    if args.fix_sender_names:
+        fix_sender_names(qa_sb(), all_entries, apply=do_apply)
+        return 0
 
     if do_apply or args.dry_run_diff:
         sb = qa_sb()
