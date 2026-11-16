@@ -54,6 +54,7 @@ class PendingTest(unittest.TestCase):
 
     def test_hub_picks_only_banto(self) -> None:
         self.assertEqual(poll.channel_reply_rule("hub", "【Banto（Muse）より】715 が未投稿です"), "mark")
+        self.assertEqual(poll.channel_reply_rule("hub", "【ホーク（Grok）より】715 起票しました"), "mark")
         self.assertEqual(poll.channel_reply_rule("hub", "Jarvis です。直しました"), "skip")
         self.assertEqual(poll.channel_reply_rule("report", "ここ直して"), "ack")
         self.assertEqual(poll.channel_reply_rule("report", "【Banto（Muse）より】指摘"), "ack")

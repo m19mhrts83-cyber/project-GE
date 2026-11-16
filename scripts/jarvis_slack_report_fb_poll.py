@@ -54,8 +54,10 @@ JST = timezone(timedelta(hours=9))
 # 対象（人向け報告・相談）
 TARGET_CHANNELS = ("report", "consult", "hub")
 DEFAULT_PARENT_LIMIT = 15
-# #ai-hub は AI 同士のやり取りが多いので、番頭さんの指摘だけを拾い「受けた」返信はしない（2026-11-17 松野依頼）
+# #ai-hub は AI 同士のやり取りが多いので、番頭さん・ホークの返信だけを拾い「受けた」返信はしない（2026-11-17 松野依頼）
 BANTO_PREFIX = "【Banto（Muse）より】"
+HAWK_PREFIX = "【ホーク（Grok）より】"
+QUIET_PICK_PREFIXES = (BANTO_PREFIX, HAWK_PREFIX)
 QUIET_CHANNELS = ("hub",)  # config の hub = #ai-hub
 QUIET_PARENT_LIMIT = 30
 DEFAULT_LOOKBACK_HOURS = 72
@@ -208,7 +210,7 @@ def processed_key(channel_key: str, reply_ts: str) -> str:
 def channel_reply_rule(channel: str, text: str) -> str:
     """ack=受けた返信＋👀 / mark=返信せず未対応に積む / skip=対象外。"""
     if channel in QUIET_CHANNELS:
-        return "mark" if text.lstrip().startswith(BANTO_PREFIX) else "skip"
+        return "mark" if text.lstrip().startswith(QUIET_PICK_PREFIXES) else "skip"
     return "ack"
 
 
@@ -364,7 +366,7 @@ def main() -> int:
     ap.add_argument(
         "--channels",
         default="report,consult,hub",
-        help="カンマ区切り（既定 report,consult,hub。hub=#ai-hub は番頭さんの返信だけ）",
+        help="カンマ区切り（既定 report,consult,hub。hub=#ai-hub は番頭さん・ホークの返信だけ）",
     )
     ap.add_argument(
         "--pending",
