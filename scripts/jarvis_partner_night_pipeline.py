@@ -271,6 +271,9 @@ def main() -> int:
             if code != 0:
                 fails.append(f"line exit={code}")
                 rc = code or rc
+            elif "# CHRLINE sync 失敗:" in blob:
+                # 直近補完で取り込みは続くので exit は 0 のまま。ただし報告では失敗として見せる。
+                fails.append("line sync失敗（直近補完のみ）")
     elif not args.apply:
         print("# dry: LINE / 公式エクスポートは未実行（--apply で実行）")
 

@@ -44,6 +44,11 @@ _FRAME_JA = {"day": "昼", "night": "夜", "manual": "副合図"}
 # 機械語失敗 →（人間語, 次の一手）
 _FAIL_HUMAN: list[tuple[re.Pattern[str], str, str]] = [
     (
+        re.compile(r"^line sync失敗"),
+        "LINEの差分同期（sync）が失敗。直近補完だけで取り込みを継続",
+        "夜枠ログの「CHRLINE sync 失敗」を確認 → 続くなら #ops",
+    ),
+    (
         re.compile(r"^line exit=(\d+)$", re.I),
         "LINE取込が異常終了（CHRLINE／認証まわり・exit={g1}）",
         "Mac版LINE終了を確認 → run_patch.sh 再実行 or #ops",
