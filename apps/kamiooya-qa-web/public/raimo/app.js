@@ -176,7 +176,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案', openchat_ranking: '(4)オープンチャットの質問ランキング', openchat_threads: 'オプチャのスレッド番号' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案', openchat_ranking: '(4)オープンチャットの質問ランキング', openchat_threads: 'オプチャのスレッド番号', mobile_layout: 'スマホ縦の表示' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -204,6 +204,8 @@ const App = {
   applyTheme: () => {
     const on = App.featureOn('design_theme');
     if (document.documentElement) document.documentElement.classList.toggle('theme-a', on);
+    // スマホ縦の表示（メニュー縦並び・オプチャのカード表示）。スイッチ mobile_layout の人だけ（2026-11-18）
+    if (document.documentElement) document.documentElement.classList.toggle('ff-mobile-layout', App.featureOn('mobile_layout'));
     // アプリ名「神大家AIナビ」（2026-11-11 目黒さん「一旦これで」）。配色と同じスイッチの人だけ。
     document.title = on ? '神大家AIナビ' : '神・大家さん倶楽部Q&Aチャットボット';
     App.applyAppIcon(on);
