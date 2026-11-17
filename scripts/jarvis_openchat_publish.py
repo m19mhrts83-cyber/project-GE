@@ -115,6 +115,18 @@ def _update_status_minimal(sb: Any, ids: list[str], status: str, now: str) -> in
     return n
 
 
+def refresh_thread_numbers(sb) -> None:
+    """スレッド番号（qa_openchat_threads）を更新。新しいスレッドに続き番号を振る。
+
+    関数が未作成（migration 前）や失敗でも取込自体は成功扱いにする。
+    """
+    try:
+        res = sb.rpc("qa_refresh_openchat_threads", {}).execute()
+        print(f"🔢 スレッド番号: 新しく {res.data if res.data is not None else 0} 本に番号を付与")
+    except Exception as exc:  # noqa: BLE001
+        print(f"⚠️ スレッド番号の更新をスキップ: {exc}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Publish LINE openchat logs to ready/excluded")
     parser.add_argument("--dry-run", action="store_true", help="件数だけ表示（既定）")
@@ -169,6 +181,7 @@ def main() -> int:
     print(
         f"✅ 更新行数: {upserted}（ready={len(ready_ids)} excluded={len(excluded_ids)}）"
     )
+    refresh_thread_numbers(sb)
     return 0
 
 

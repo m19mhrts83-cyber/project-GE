@@ -176,7 +176,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案', openchat_ranking: '(4)オープンチャットの質問ランキング' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案', openchat_ranking: '(4)オープンチャットの質問ランキング', openchat_threads: 'オプチャのスレッド番号' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -331,6 +331,10 @@ const App = {
     App.elements.openchatBackBar = document.getElementById('openchatBackBar');
     App.elements.openchatBackBtn = document.getElementById('openchatBackBtn');
     App.elements.openchatBackLabel = document.getElementById('openchatBackLabel');
+    App.elements.openchatThreadBar = document.getElementById('openchatThreadBar');
+    App.elements.openchatThreadBarTitle = document.getElementById('openchatThreadBarTitle');
+    App.elements.openchatThreadBarSub = document.getElementById('openchatThreadBarSub');
+    App.elements.openchatThreadBackBtn = document.getElementById('openchatThreadBackBtn');
     App.elements.reloadOpenchatBtn = document.getElementById('reloadOpenchatBtn');
     App.elements.lessonsBackLabel = document.getElementById('lessonsBackLabel');
     App.elements.knowledgeTableBody = document.getElementById('knowledgeTableBody');
@@ -603,6 +607,23 @@ const App = {
     }
     if (App.elements.openchatTitleFilter) {
       App.elements.openchatTitleFilter.addEventListener('change', function () {
+        App.loadOpenchatLogs().catch(function (err) {
+          App.showToast((err && err.message) || 'LINEオプチャの取得に失敗しました', 'error');
+        });
+      });
+    }
+    // スレッド番号を押したら、そのスレッドだけを古い順に読む（2026-11-17）
+    if (App.elements.openchatTableBody) {
+      App.elements.openchatTableBody.addEventListener('click', function (ev) {
+        const btn = ev.target && ev.target.closest ? ev.target.closest('.openchat-thread-btn') : null;
+        if (!btn) return;
+        ev.preventDefault();
+        App.openOpenchatThread(btn.getAttribute('data-chat-title') || '', Number(btn.getAttribute('data-thread-no') || 0));
+      });
+    }
+    if (App.elements.openchatThreadBackBtn) {
+      App.elements.openchatThreadBackBtn.addEventListener('click', function () {
+        App.state.openchatThread = null;
         App.loadOpenchatLogs().catch(function (err) {
           App.showToast((err && err.message) || 'LINEオプチャの取得に失敗しました', 'error');
         });
@@ -1765,9 +1786,11 @@ const App = {
         (App.looksLikeOpenchatId(q) ? String(q).trim() : '') ||
         ''
     ).trim();
+    const threadReq = options.thread && options.thread.chatTitle && options.thread.threadNo ? options.thread : null;
     const body = {
       list_openchat: true,
-      only_attachments: !openchatId && !!(App.elements.openchatAttachmentsOnly && App.elements.openchatAttachmentsOnly.checked),
+      with_threads: App.featureOn('openchat_threads') || undefined,
+      only_attachments: !openchatId && !threadReq && !!(App.elements.openchatAttachmentsOnly && App.elements.openchatAttachmentsOnly.checked),
       query: openchatId ? openchatId : String(q || '').trim(),
       chat_title: openchatId ? undefined : String(title || '').trim() || undefined,
       openchat_limit: 40,
@@ -1776,6 +1799,11 @@ const App = {
     };
     if (openchatId) {
       body.openchat_id = openchatId;
+    } else if (threadReq) {
+      body.query = '';
+      body.chat_title = threadReq.chatTitle;
+      body.thread_no = threadReq.threadNo;
+      body.openchat_limit = undefined;
     }
     const response = await fetch(cfg.url, {
       method: 'POST',
@@ -1804,8 +1832,52 @@ const App = {
     App.state.openchatLogs = App.normalizeRelatedList(data.relatedOpenchat || []);
     if (Array.isArray(data.openchatRooms)) App.state.openchatRooms = data.openchatRooms;
     App.state.openchatHighlightId = openchatId || '';
+    App.state.openchatThread = threadReq ? Object.assign({ chatTitle: threadReq.chatTitle, threadNo: threadReq.threadNo }, (data.meta && data.meta.thread) || {}) : null;
+    App.renderOpenchatThreadBar();
     App.renderOpenchatTitleFilterOptions();
     App.renderOpenchatTable({ exactOpenchatId: openchatId || undefined });
+  },
+
+  openOpenchatThread: (chatTitle, threadNo) => {
+    if (!chatTitle || !threadNo) return;
+    App.loadOpenchatLogs({ thread: { chatTitle: chatTitle, threadNo: threadNo } }).catch(function (err) {
+      App.showToast((err && err.message) || 'スレッドの取得に失敗しました', 'error');
+    });
+  },
+
+  renderOpenchatThreadBar: () => {
+    const bar = App.elements.openchatThreadBar;
+    if (!bar) return;
+    const t = App.state.openchatThread;
+    if (!t || !App.featureOn('openchat_threads')) { bar.classList.add('hidden'); return; }
+    const count = (App.state.openchatLogs || []).length;
+    if (App.elements.openchatThreadBarTitle) {
+      App.elements.openchatThreadBarTitle.textContent = (t.chatTitle || t.chat_title || '') + ' ／ スレッド' + (t.threadNo || t.thread_no);
+    }
+    if (App.elements.openchatThreadBarSub) {
+      const head = String(t.first_snippet || '').trim();
+      App.elements.openchatThreadBarSub.textContent = (head ? '最初の書き込み：' + head.slice(0, 80) + (head.length > 80 ? '…' : '') + '　' : '') + count + '件（古い順）';
+    }
+    bar.classList.remove('hidden');
+  },
+
+  /** 「スレッド12」表記。番号がなければ従来どおり「スレッド」 */
+  openchatStreamLabel: (row) => {
+    const st = String((row && (row.stream_type || row.streamType)) || '');
+    if (st === 'thread') {
+      const no = Number(row.thread_no || row.threadNo || 0);
+      return no && App.featureOn('openchat_threads') ? 'スレッド' + no : 'スレッド';
+    }
+    if (st === 'thread_reply') return 'スレッド返信';
+    return 'メイン';
+  },
+
+  /** スレッド名が「t013e392…」のような識別子だけなら表示しない */
+  openchatReadableThreadTitle: (title) => {
+    const t = String(title || '').trim();
+    if (!t) return '';
+    if (App.featureOn('openchat_threads') && /^「?t[0-9a-f]{6,10}…?」?$/i.test(t)) return '';
+    return t;
   },
 
   renderOpenchatTitleFilterOptions: () => {
@@ -1849,7 +1921,10 @@ const App = {
       (App.elements.openchatTitleFilter && App.elements.openchatTitleFilter.value) || ''
     ).trim();
     let rows = App.state.openchatLogs || [];
-    if (exactId) {
+    const threadMode = !!App.state.openchatThread;
+    if (threadMode) {
+      // スレッドごとに読むときは、サーバーが返した古い順のまま全部出す
+    } else if (exactId) {
       const hit = rows.filter(function (r) {
         return String(r.id || '').trim() === exactId;
       });
@@ -1884,7 +1959,7 @@ const App = {
       }
     }
     if (App.elements.openchatListMeta) {
-      App.elements.openchatListMeta.textContent = exactId
+      App.elements.openchatListMeta.textContent = threadMode ? '' : exactId
         ? rows.length
           ? '該当メッセージ 1 件（id: ' + exactId + '）'
           : '該当メッセージなし（id: ' + exactId + '）'
@@ -1915,7 +1990,10 @@ const App = {
           App.escapeHtml(String(r.chat_title || r.chatTitle || '')) +
           '</td>' +
           '<td class="p-2 whitespace-nowrap text-xs">' +
-          App.escapeHtml(streamLabel(String(r.stream_type || r.streamType || ''))) +
+          (App.featureOn('openchat_threads') && Number(r.thread_no || 0) && !threadMode
+            ? '<button type="button" class="openchat-thread-btn" data-chat-title="' + App.escapeHtml(String(r.chat_title || r.chatTitle || '')) + '" data-thread-no="' + App.escapeHtml(String(r.thread_no)) + '" title="このスレッドを古い順に読む">' + App.escapeHtml(App.openchatStreamLabel(r)) + '</button>' +
+              (r.thread_heading ? '<div class="openchat-thread-head">' + App.escapeHtml(String(r.thread_heading).slice(0, 24)) + (String(r.thread_heading).length > 24 ? '…' : '') + '</div>' : '')
+            : App.escapeHtml(App.featureOn('openchat_threads') ? App.openchatStreamLabel(r) : streamLabel(String(r.stream_type || r.streamType || '')))) +
           '</td>' +
           '<td class="p-2 whitespace-nowrap text-xs">' +
           App.escapeHtml(App.formatOpenchatDateTime(when)) +
@@ -2404,13 +2482,7 @@ const App = {
       if (strict && openchatIdSet) {
         if (!oid || !openchatIdSet[oid]) return;
       }
-      const stream = String(o.stream_type || o.streamType || '').trim();
-      const streamLabel =
-        stream === 'thread'
-          ? 'スレッド'
-          : stream === 'thread_reply'
-            ? 'スレッド返信'
-            : 'メイン';
+      const streamLabel = App.openchatStreamLabel(o);
       citations.push({
         kind: 'openchat',
         citationLabel: o.citation_label || '',
@@ -2418,7 +2490,8 @@ const App = {
         openchatId: oid,
         chatTitle: String(o.chat_title || o.chatTitle || o.chat_name || o.chatName || '').trim(),
         streamLabel: streamLabel,
-        threadTitle: String(o.thread_title || o.threadTitle || '').trim(),
+        threadTitle: App.openchatReadableThreadTitle(o.thread_title || o.threadTitle || ''),
+        threadNo: Number(o.thread_no || o.threadNo || 0) || 0,
         authorName: o.sender_name || o.senderName || '',
         postedAt: o.posted_at || o.postedAt || o.post_date || o.postDate || '',
         snippet: String(o.content || '').replace(/\s+/g, ' ').slice(0, 220)

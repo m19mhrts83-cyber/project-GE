@@ -450,6 +450,16 @@
                 </select>
                 <button id="reloadOpenchatBtn" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
               </div>
+              <!-- スレッドごとに読む（スイッチ openchat_threads、2026-11-17） -->
+              <div id="openchatThreadBar" class="hidden openchat-thread-bar mb-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <p class="openchat-thread-bar-title" id="openchatThreadBarTitle"></p>
+                    <p class="openchat-thread-bar-sub" id="openchatThreadBarSub"></p>
+                  </div>
+                  <button type="button" id="openchatThreadBackBtn" class="openchat-thread-back"><i class="fa-solid fa-arrow-left mr-1"></i>一覧に戻る</button>
+                </div>
+              </div>
               <p id="openchatListMeta" class="text-xs text-slate-500 mb-2"></p>
               <div class="overflow-auto bg-white rounded border" style="max-height: calc(100dvh - 260px); min-height: 180px;">
                 <table class="min-w-full text-sm">
