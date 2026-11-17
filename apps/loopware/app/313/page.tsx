@@ -23,6 +23,13 @@ export default async function Page313({
           <h1>片付ける</h1>
         </div>
       </div>
+      <Link className="glass nav-card" href="/313/bulk" style={{ marginBottom: 12 }}>
+        <span className="txt">
+          <strong>まとめて片付ける</strong>
+          <span className="meta">スター付きメール由来のタスクを、完了・削除・日を変える・残すでまとめて判断</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
       <Suspense fallback={<p className="meta">読み込み中…</p>}>
         <CleanupClient
           initialTaskId={taskId}
