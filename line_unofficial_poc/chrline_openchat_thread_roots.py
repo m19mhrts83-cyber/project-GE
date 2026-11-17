@@ -29,6 +29,32 @@ ROOT = Path(__file__).resolve().parent
 OUT_FILENAME = "openchat_thread_roots.json"
 ROOT_TEXT_MAX = 2000
 SAVE_EVERY = 25
+# 期限内でも一時的に 404（削除済み）が返ることがあるため、1回だけ取り直す（2026-11-18 松野さん了承）
+DELETED_RETRY_AFTER_HOURS = 20
+DELETED_RETRY_WITHIN_DAYS = 30
+DELETED_RETRY_MAX = 1
+
+
+def _parse_iso(s: Any) -> datetime | None:
+    try:
+        d = datetime.fromisoformat(str(s))
+    except (TypeError, ValueError):
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def deleted_retry_due(rec: dict[str, Any], now: datetime | None = None) -> bool:
+    """削除済み（404）を取り直す時期か。判定から20時間以上・最初の取得から30日以内・取り直しは1回まで。"""
+    if rec.get("status") != "deleted" or int(rec.get("retries") or 0) >= DELETED_RETRY_MAX:
+        return False
+    now = now or datetime.now(timezone.utc)
+    last = _parse_iso(rec.get("fetched_at"))
+    first = _parse_iso(rec.get("first_fetched_at") or rec.get("fetched_at"))
+    if not last or not first:
+        return False
+    hours = (now - last).total_seconds() / 3600
+    days = (now - first).total_seconds() / 86400
+    return hours >= DELETED_RETRY_AFTER_HOURS and days <= DELETED_RETRY_WITHIN_DAYS
 
 
 def _plain(x: Any, depth: int = 0) -> Any:
@@ -141,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
                 only.update(str(x) for x in v)
 
     todo: list[tuple[dict[str, Any], str]] = []
+    retry: list[tuple[dict[str, Any], str]] = []
     for r in load_routes(args.routes_yaml):
         chat_mid = str(r.get("square_chat_mid") or "").strip()
         if not chat_mid:
@@ -151,14 +178,23 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             prev = threads.get(tmid) or {}
             st = prev.get("status")
+            if st == "deleted" and deleted_retry_due(prev):
+                retry.append((r, tmid))
+                continue
             if st in {"ok", "no_root", "deleted"}:
                 continue
             if st in {"error", "denied"} and not args.retry_errors:
                 continue
             todo.append((r, tmid))
+    # 新しいスレッドを先に、削除済みの取り直しは後に
+    n_retry = len(retry)
+    todo = todo + retry
     if args.limit > 0:
         todo = todo[: args.limit]
-    print(f"# 元投稿の取得: 対象 {len(todo)} 件（取得済み {len(threads)} 件）→ {out_path}", file=sys.stderr)
+    print(
+        f"# 元投稿の取得: 対象 {len(todo)} 件（うち削除済みの取り直し {n_retry} 件・取得済み {len(threads)} 件）→ {out_path}",
+        file=sys.stderr,
+    )
     if not todo:
         return 0
 
@@ -168,13 +204,17 @@ def main(argv: list[str] | None = None) -> int:
     started = time.monotonic()
     for i, (r, tmid) in enumerate(todo, 1):
         chrline_throttle()
+        prev = threads.get(tmid) or {}
         rec: dict[str, Any] = {
+            "first_fetched_at": prev.get("first_fetched_at") or prev.get("fetched_at"),
+            "retries": int(prev.get("retries") or 0) + (1 if prev.get("status") == "deleted" else 0),
             "route_id": r.get("id"),
             "chat_title": r.get("org_label"),
             "square_chat_mid": r.get("square_chat_mid"),
             "thread_title": (r.get("thread_titles") or {}).get(tmid),
             "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
+        rec["first_fetched_at"] = rec["first_fetched_at"] or rec["fetched_at"]
         try:
             rec.update(parse_thread_response(cl.getSquareThread(tmid, True)))
             consecutive_err = 0
