@@ -560,6 +560,13 @@ const App = {
         void App.runAllSearch();
       });
     }
+    // 左上のアプリ名を押したらトップ（Q&Aチャット）へ（2026-11-17 目黒さん要望）
+    const brandHomeBtn = document.getElementById('brandHomeBtn');
+    if (brandHomeBtn) {
+      brandHomeBtn.addEventListener('click', function () {
+        App.switchScreen('chat', { fromNav: true });
+      });
+    }
     document.querySelectorAll('.screen-tab').forEach(function (btn) {
       btn.addEventListener('click', function () {
         App.switchScreen(btn.getAttribute('data-screen'), { fromNav: true });

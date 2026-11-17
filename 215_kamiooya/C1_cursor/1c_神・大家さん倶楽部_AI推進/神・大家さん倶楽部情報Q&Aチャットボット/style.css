@@ -206,7 +206,24 @@ body {
   position: sticky;
   top: 0;
   align-self: stretch;
+  /* 画面が低いと管理者メニューやチャット履歴が下に隠れるため、サイドバー全体をスクロールできるようにする（2026-11-17） */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+
+/* 左上のアプリ名（押すとQ&Aチャットへ）。見た目は見出しのまま */
+.brand-home-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.brand-home-btn:hover { opacity: 0.85; }
+.brand-home-btn:focus-visible { outline: 2px solid #FE910B; outline-offset: 2px; border-radius: 4px; }
 
 @media (min-width: 768px) {
   #sidebar {
