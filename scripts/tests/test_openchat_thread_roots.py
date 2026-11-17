@@ -73,5 +73,22 @@ class BuildPayloadTest(unittest.TestCase):
         self.assertEqual([p["thread_mid"] for p in payload], ["t1111111111111111", "t2222222222222222"])
 
 
+class DeletedRetryTest(unittest.TestCase):
+    def _at(self, s):
+        from datetime import datetime, timezone
+        return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+
+    def test_retry_once_after_20h_within_30d(self):
+        rec = {"status": "deleted", "fetched_at": "2026-11-18T00:00:00+00:00"}
+        self.assertFalse(roots.deleted_retry_due(rec, self._at("2026-11-18T10:00:00")))
+        self.assertTrue(roots.deleted_retry_due(rec, self._at("2026-11-18T21:00:00")))
+        self.assertFalse(roots.deleted_retry_due({**rec, "retries": 1}, self._at("2026-11-18T21:00:00")))
+
+    def test_no_retry_after_30_days_or_other_status(self):
+        rec = {"status": "deleted", "fetched_at": "2026-11-18T00:00:00+00:00", "first_fetched_at": "2026-10-01T00:00:00+00:00"}
+        self.assertFalse(roots.deleted_retry_due(rec, self._at("2026-11-19T00:00:00")))
+        self.assertFalse(roots.deleted_retry_due({"status": "ok", "fetched_at": "2026-11-01T00:00:00+00:00"}, self._at("2026-11-19T00:00:00")))
+
+
 if __name__ == "__main__":
     unittest.main()
