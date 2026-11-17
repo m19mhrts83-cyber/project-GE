@@ -896,3 +896,9 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 .openchat-thread-bar-sub { margin-top: .2rem; font-size: .85rem; color: #64748b; word-break: break-word; }
 .openchat-thread-back { flex: 0 0 auto; padding: .4rem .8rem; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; color: #334155; font-size: .9rem; cursor: pointer; }
 .openchat-thread-back:hover { background: #f1f5f9; }
+
+/* スレッドの元の投稿（2026-11-18） */
+.openchat-thread-root-row { background: #fff8ef; }
+.openchat-thread-root-row td { border-bottom: 2px solid #fcd9a8; }
+.openchat-thread-root-badge { display: inline-block; padding: .2rem .6rem; border-radius: 999px; background: #FE910B; color: #fff; font-weight: 700; font-size: .85rem; white-space: nowrap; }
+.openchat-thread-root-note { font-size: .75rem; color: #b45309; margin-bottom: .2rem; white-space: nowrap; }

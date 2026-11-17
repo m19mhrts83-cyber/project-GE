@@ -156,6 +156,8 @@ type OpenchatRow = {
   similarity: number;
   thread_no?: number | null;
   thread_heading?: string | null;
+  /** スレッドを始めたメイン投稿（元の投稿）なら true */
+  is_thread_root?: boolean;
 };
 
 type OpenchatThreadInfo = {
@@ -165,9 +167,35 @@ type OpenchatThreadInfo = {
   first_snippet: string | null;
   first_sender: string | null;
   post_count: number;
+  root_text: string | null;
+  root_posted_at: string | null;
+  root_sender: string | null;
+  root_log_id: string | null;
+  root_status: string | null;
+  heading: string | null;
 };
 
-const OPENCHAT_THREAD_SELECT = "chat_title,thread_key,thread_no,first_snippet,first_sender,post_count";
+const OPENCHAT_THREAD_SELECT =
+  "chat_title,thread_key,thread_no,first_snippet,first_sender,post_count,root_text,root_posted_at,root_sender,root_log_id,root_status";
+
+const THREAD_MID_KEY_RE = /^「?t[0-9a-f]{6,}…?」?$/i;
+
+/** スレッドの見出し: スレッド名 → 元の投稿の書き出し → スレッド内の最初の書き込み */
+export function threadHeading(
+  info: { thread_key?: string | null; root_text?: string | null; first_snippet?: string | null }
+): string | null {
+  const key = asString(info.thread_key).trim();
+  if (key && !THREAD_MID_KEY_RE.test(key)) {
+    const name = key.replace(/^「/, "").replace(/」$/, "").trim();
+    if (name) return name;
+  }
+  const root = asString(info.root_text)
+    .replace(/^(\s*@\S+)+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (root) return root.slice(0, 120);
+  return asString(info.first_snippet).trim() || null;
+}
 
 function mapThreadInfo(row: Record<string, unknown>): OpenchatThreadInfo {
   return {
@@ -177,6 +205,12 @@ function mapThreadInfo(row: Record<string, unknown>): OpenchatThreadInfo {
     first_snippet: asString(row.first_snippet) || null,
     first_sender: asString(row.first_sender) || null,
     post_count: Number(row.post_count || 0),
+    root_text: asString(row.root_text) || null,
+    root_posted_at: asString(row.root_posted_at) || null,
+    root_sender: asString(row.root_sender) || null,
+    root_log_id: asString(row.root_log_id) || null,
+    root_status: asString(row.root_status) || null,
+    heading: threadHeading(row as { thread_key?: string; root_text?: string; first_snippet?: string }),
   };
 }
 
@@ -188,38 +222,63 @@ export async function attachThreadNumbers(
   rows: OpenchatRow[]
 ): Promise<OpenchatRow[]> {
   const targets = rows.filter((r) => r.stream_type === "thread" && r.chat_title && r.thread_title);
-  if (!targets.length) return rows;
-  const titles = Array.from(new Set(targets.map((r) => r.chat_title as string)));
-  const keys = Array.from(new Set(targets.map((r) => r.thread_title as string)));
+  const mains = rows.filter((r) => r.stream_type === "main" && r.id);
+  if (!targets.length && !mains.length) return rows;
+  const byKey = new Map<string, OpenchatThreadInfo>();
+  const byRoot = new Map<string, OpenchatThreadInfo>();
   try {
-    const { data, error } = await sb
-      .from("qa_openchat_threads")
-      .select(OPENCHAT_THREAD_SELECT)
-      .in("chat_title", titles)
-      .in("thread_key", keys);
-    if (error) {
-      console.warn("qa_openchat_threads read failed", error.message);
-      return rows;
+    if (targets.length) {
+      const titles = Array.from(new Set(targets.map((r) => r.chat_title as string)));
+      const keys = Array.from(new Set(targets.map((r) => r.thread_title as string)));
+      const { data, error } = await sb
+        .from("qa_openchat_threads")
+        .select(OPENCHAT_THREAD_SELECT)
+        .in("chat_title", titles)
+        .in("thread_key", keys);
+      if (error) console.warn("qa_openchat_threads read failed", error.message);
+      for (const row of (data || []) as Record<string, unknown>[]) {
+        const info = mapThreadInfo(row);
+        byKey.set(`${info.chat_title}\u0000${info.thread_key}`, info);
+      }
     }
-    const byKey = new Map<string, OpenchatThreadInfo>();
-    for (const row of (data || []) as Record<string, unknown>[]) {
-      const info = mapThreadInfo(row);
-      byKey.set(`${info.chat_title}\u0000${info.thread_key}`, info);
+    if (mains.length) {
+      // メイン投稿のうち、スレッドの元の投稿になっているもの
+      const { data, error } = await sb
+        .from("qa_openchat_threads")
+        .select(OPENCHAT_THREAD_SELECT)
+        .in("root_log_id", Array.from(new Set(mains.map((r) => r.id))));
+      if (error) console.warn("qa_openchat_threads root read failed", error.message);
+      for (const row of (data || []) as Record<string, unknown>[]) {
+        const info = mapThreadInfo(row);
+        if (info.root_log_id) byRoot.set(info.root_log_id, info);
+      }
     }
-    return rows.map((r) => {
-      if (r.stream_type !== "thread") return r;
-      const info = byKey.get(`${r.chat_title}\u0000${r.thread_title}`);
-      return info ? { ...r, thread_no: info.thread_no, thread_heading: info.first_snippet } : r;
-    });
   } catch (error) {
     console.warn("qa_openchat_threads read failed", error instanceof Error ? error.message : String(error));
     return rows;
   }
+  return rows.map((r) => {
+    if (r.stream_type === "thread") {
+      const info = byKey.get(`${r.chat_title}\u0000${r.thread_title}`);
+      return info ? { ...r, thread_no: info.thread_no, thread_heading: info.heading } : r;
+    }
+    if (r.stream_type === "main") {
+      const info = byRoot.get(r.id);
+      return info ? { ...r, thread_no: info.thread_no, thread_heading: info.heading, is_thread_root: true } : r;
+    }
+    return r;
+  });
 }
 
 /** 回答の根拠・一覧で使う「スレッド12」表記（番号がなければスレッド名そのまま） */
-export function openchatThreadLabel(row: Pick<OpenchatRow, "thread_no" | "thread_title">): string {
-  if (row.thread_no) return `スレッド${row.thread_no}`;
+export function openchatThreadLabel(
+  row: Pick<OpenchatRow, "thread_no" | "thread_title"> & { thread_heading?: string | null; is_thread_root?: boolean }
+): string {
+  if (row.thread_no) {
+    const head = asString(row.thread_heading).replace(/\s+/g, " ").trim();
+    const label = `スレッド${row.thread_no}${head ? `「${head.slice(0, 30)}${head.length > 30 ? "…" : ""}」` : ""}`;
+    return row.is_thread_root ? `${label}の元の投稿` : label;
+  }
   return asString(row.thread_title);
 }
 
@@ -570,6 +629,42 @@ async function planQuery(query: string, history: ChatTurn[], usage: GeminiUsage,
   }
 }
 
+/** スレッドの元の投稿を1行で返す。DB のメイン投稿と結べていればその行、なければ LINE から取った本文。 */
+async function fetchThreadRootRow(
+  // deno-lint-ignore no-explicit-any
+  sb: any,
+  thread: OpenchatThreadInfo
+): Promise<OpenchatRow | null> {
+  const extra = { thread_no: thread.thread_no, thread_heading: thread.heading, is_thread_root: true };
+  if (thread.root_log_id) {
+    const { data, error } = await sb
+      .from("line_openchat_logs")
+      .select(OPENCHAT_LIST_SELECT)
+      .eq("id", thread.root_log_id)
+      .limit(1);
+    if (error) console.warn("openchat thread root read failed", error.message);
+    const row = ((data || []) as Record<string, unknown>[])[0];
+    if (row) return { ...mapOpenchatRow({ ...row, similarity: 0 }), ...extra };
+  }
+  if (thread.root_text) {
+    return {
+      id: "",
+      route_id: null,
+      chat_title: thread.chat_title,
+      chat_name: null,
+      stream_type: "main",
+      thread_title: null,
+      posted_at: thread.root_posted_at,
+      post_date: thread.root_posted_at ? thread.root_posted_at.slice(0, 10) : null,
+      sender_name: thread.root_sender,
+      content: buildSnippet(thread.root_text),
+      similarity: 0,
+      ...extra,
+    };
+  }
+  return null;
+}
+
 function mapOpenchatRow(row: Record<string, unknown>): OpenchatRow {
   return {
     id: asString(row.id),
@@ -792,8 +887,10 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
           threadRows = ((rData || []) as Record<string, unknown>[]).map((row) => ({
             ...mapOpenchatRow({ ...row, similarity: 0 }),
             thread_no: thread.thread_no,
-            thread_heading: thread.first_snippet,
+            thread_heading: thread.heading,
           }));
+          const root = await fetchThreadRootRow(sb, thread);
+          if (root) threadRows = [root, ...threadRows];
         }
         await logSearchEvent(sb, {
           ...baseEvent,
