@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {handleSemanticSearch,normalizeHistory,contextualSearchQuery,buildAnswerPrompt,buildPlanPrompt,parsePlan,clarificationAnswer,CLARIFY_MARK} from './handler.ts';
+import {handleSemanticSearch,openchatThreadLabel,normalizeHistory,contextualSearchQuery,buildAnswerPrompt,buildPlanPrompt,parsePlan,clarificationAnswer,CLARIFY_MARK} from './handler.ts';
 
 Deno.test('LINE filename browse and exact attachment source reads use ready rows without AI calls',async()=>{
  const keys=['GEMINI_API_KEY','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SEMANTIC_SEARCH_SHARED_SECRET','SEMANTIC_SEARCH_DISABLED'];
@@ -148,4 +148,41 @@ Deno.test('clarify: rewrite fills omitted topics, asks back at most once in a ro
  assert.equal(parsePlan('not json','q',true),null);
  assert.equal(parsePlan('{"action":"search"}','元の質問',true)?.searchQuery,'元の質問');
  const text=clarificationAnswer(a!);assert.ok(text.startsWith(CLARIFY_MARK+'どの事例ですか？'));assert.ok(text.includes('1. 法人の融資'));
+});
+
+Deno.test('openchat thread numbers: list attaches numbers, thread mode reads one thread oldest first',async()=>{
+ const keys=['GEMINI_API_KEY','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SEMANTIC_SEARCH_SHARED_SECRET','SEMANTIC_SEARCH_DISABLED'];
+ const saved=keys.map(k=>Deno.env.get(k)),originalFetch=globalThis.fetch;
+ ['fixture','https://fixture.supabase.co','fixture-service','fixture-semantic','0'].forEach((v,i)=>Deno.env.set(keys[i],v));
+ const logs:URL[]=[],threads:URL[]=[];
+ const row={id:'oc_1',chat_title:'30空室相談G',stream_type:'thread',thread_title:'t013e392',content:'返信です',posted_at:'2026-11-01T00:00:00Z'};
+ globalThis.fetch=async(input)=>{
+  const url=new URL(input instanceof Request?input.url:String(input));
+  if(url.pathname.endsWith('/qa_openchat_threads')){threads.push(url);
+   return Response.json([{chat_title:'30空室相談G',thread_key:'t013e392',thread_no:12,first_snippet:'東北の学生向けアパートの相談',first_sender:'A',post_count:3}]);}
+  if(url.pathname.endsWith('/line_openchat_logs')){logs.push(url);return Response.json([row]);}
+  if(url.pathname.endsWith('/app_qa_search_events'))return Response.json([],{status:201});
+  throw new Error('unexpected network/AI request');
+ };
+ try{
+  const call=(body:unknown)=>handleSemanticSearch(new Request('https://fixture.supabase.co/functions/v1/semantic-search',{
+   method:'POST',headers:{'x-semantic-shared-secret':'fixture-semantic'},body:JSON.stringify(body)}));
+  // スイッチ未指定なら番号を引かない（従来どおり）
+  let r=await call({list_openchat:true});
+  let j=await r.json();assert.equal(r.status,200);assert.equal(threads.length,0);assert.equal(j.relatedOpenchat[0].thread_no??null,null);
+  // with_threads で番号と見出しを付ける
+  r=await call({list_openchat:true,with_threads:true});j=await r.json();
+  assert.equal(j.relatedOpenchat[0].thread_no,12);assert.equal(j.relatedOpenchat[0].thread_heading,'東北の学生向けアパートの相談');
+  // 番号を押したとき: そのスレッドだけ古い順
+  r=await call({list_openchat:true,with_threads:true,chat_title:'30空室相談G',thread_no:12});j=await r.json();
+  assert.equal(j.meta.mode,'thread');assert.equal(j.meta.thread.thread_no,12);assert.equal(j.relatedOpenchat.length,1);
+  const last=logs[logs.length-1];
+  assert.equal(last.searchParams.get('thread_title'),'eq.t013e392');assert.equal(last.searchParams.get('stream_type'),'eq.thread');
+  assert.equal(last.searchParams.get('ingest_status'),'eq.ready');assert.ok(last.searchParams.get('order')?.startsWith('posted_at.asc'));
+ }finally{globalThis.fetch=originalFetch;keys.forEach((k,i)=>saved[i]===undefined?Deno.env.delete(k):Deno.env.set(k,saved[i]!));}
+});
+
+Deno.test('openchat thread label uses number, then readable title',()=>{
+ assert.equal(openchatThreadLabel({thread_no:5,thread_title:'t013e392'}),'スレッド5');
+ assert.equal(openchatThreadLabel({thread_no:null,thread_title:'物件名の相談'}),'物件名の相談');
 });

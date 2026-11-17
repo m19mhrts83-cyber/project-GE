@@ -48,6 +48,10 @@ type SemanticSearchRequest = {
   /** 「DBで見る」用: line_openchat_logs.id を正確に取得（query の KW 検索ではヒットしない） */
   openchat_id?: string;
   chat_title?: string;
+  /** スレッド番号を付ける（スイッチ openchat_threads の人だけ画面が付ける、2026-11-17） */
+  with_threads?: boolean;
+  /** 一覧でスレッドごとに読む: chat_title（完全一致）＋この番号のスレッドの書き込みを古い順に返す */
+  thread_no?: number;
   secret?: string;
   session_id?: string;
   user_id?: string;
@@ -150,7 +154,74 @@ type OpenchatRow = {
   sender_name: string | null;
   content: string;
   similarity: number;
+  thread_no?: number | null;
+  thread_heading?: string | null;
 };
+
+type OpenchatThreadInfo = {
+  chat_title: string;
+  thread_key: string;
+  thread_no: number;
+  first_snippet: string | null;
+  first_sender: string | null;
+  post_count: number;
+};
+
+const OPENCHAT_THREAD_SELECT = "chat_title,thread_key,thread_no,first_snippet,first_sender,post_count";
+
+function mapThreadInfo(row: Record<string, unknown>): OpenchatThreadInfo {
+  return {
+    chat_title: asString(row.chat_title),
+    thread_key: asString(row.thread_key),
+    thread_no: Number(row.thread_no || 0),
+    first_snippet: asString(row.first_snippet) || null,
+    first_sender: asString(row.first_sender) || null,
+    post_count: Number(row.post_count || 0),
+  };
+}
+
+/** スレッドの書き込みに「オプチャごとの通し番号」と見出し（最初の書き込みの書き出し）を付ける。
+ *  表示の補助なので、読めなかったときは番号なしのまま返す（一覧・回答そのものは止めない）。 */
+export async function attachThreadNumbers(
+  // deno-lint-ignore no-explicit-any
+  sb: any,
+  rows: OpenchatRow[]
+): Promise<OpenchatRow[]> {
+  const targets = rows.filter((r) => r.stream_type === "thread" && r.chat_title && r.thread_title);
+  if (!targets.length) return rows;
+  const titles = Array.from(new Set(targets.map((r) => r.chat_title as string)));
+  const keys = Array.from(new Set(targets.map((r) => r.thread_title as string)));
+  try {
+    const { data, error } = await sb
+      .from("qa_openchat_threads")
+      .select(OPENCHAT_THREAD_SELECT)
+      .in("chat_title", titles)
+      .in("thread_key", keys);
+    if (error) {
+      console.warn("qa_openchat_threads read failed", error.message);
+      return rows;
+    }
+    const byKey = new Map<string, OpenchatThreadInfo>();
+    for (const row of (data || []) as Record<string, unknown>[]) {
+      const info = mapThreadInfo(row);
+      byKey.set(`${info.chat_title}\u0000${info.thread_key}`, info);
+    }
+    return rows.map((r) => {
+      if (r.stream_type !== "thread") return r;
+      const info = byKey.get(`${r.chat_title}\u0000${r.thread_title}`);
+      return info ? { ...r, thread_no: info.thread_no, thread_heading: info.first_snippet } : r;
+    });
+  } catch (error) {
+    console.warn("qa_openchat_threads read failed", error instanceof Error ? error.message : String(error));
+    return rows;
+  }
+}
+
+/** 回答の根拠・一覧で使う「スレッド12」表記（番号がなければスレッド名そのまま） */
+export function openchatThreadLabel(row: Pick<OpenchatRow, "thread_no" | "thread_title">): string {
+  if (row.thread_no) return `スレッド${row.thread_no}`;
+  return asString(row.thread_title);
+}
 
 function corsHeaders(): HeadersInit {
   return {
@@ -345,7 +416,7 @@ function buildAnswerContext(
     if (!body) return;
     const when = asString(row.posted_at) || asString(row.post_date);
     parts.push(
-      `[LINEオプチャ${index + 1}] id=${asString(row.id)} chat=${asString(row.chat_title) || asString(row.chat_name)} stream=${asString(row.stream_type)} thread=${asString(row.thread_title)} sender=${asString(row.sender_name)} posted=${when} similarity=${Number(row.similarity || 0).toFixed(3)}\n${body}`
+      `[LINEオプチャ${index + 1}] id=${asString(row.id)} chat=${asString(row.chat_title) || asString(row.chat_name)} stream=${asString(row.stream_type)} thread=${openchatThreadLabel(row)} sender=${asString(row.sender_name)} posted=${when} similarity=${Number(row.similarity || 0).toFixed(3)}\n${body}`
     );
   });
   return parts.join("\n\n");
@@ -671,9 +742,10 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
           .eq("id", openchatId)
           .limit(1);
         if (error) throw new Error(`openchat by id failed: ${error.message}`);
-        const relatedOpenchat = ((data || []) as Record<string, unknown>[]).map((row) =>
+        let relatedOpenchat = ((data || []) as Record<string, unknown>[]).map((row) =>
           mapOpenchatRow({ ...row, similarity: 0 })
         );
+        if (body?.with_threads === true) relatedOpenchat = await attachThreadNumbers(sb, relatedOpenchat);
         await logSearchEvent(sb, {
           ...baseEvent,
           query_text: openchatId.slice(0, 2000),
@@ -690,6 +762,51 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
             mode: "by_id",
             openchatId,
           },
+        });
+      }
+
+      // スレッドごとに読む（番号を押したとき）: そのスレッドの書き込みを古い順に
+      const threadNo = Number(body?.thread_no || 0);
+      const threadChat = asString(body?.chat_title).trim();
+      if (Number.isInteger(threadNo) && threadNo > 0 && threadChat) {
+        const { data: tData, error: tError } = await sb
+          .from("qa_openchat_threads")
+          .select(OPENCHAT_THREAD_SELECT)
+          .eq("chat_title", threadChat)
+          .eq("thread_no", threadNo)
+          .limit(1);
+        if (tError) throw new Error(`openchat thread lookup failed: ${tError.message}`);
+        const thread = ((tData || []) as Record<string, unknown>[]).map(mapThreadInfo)[0] || null;
+        let threadRows: OpenchatRow[] = [];
+        if (thread) {
+          const { data: rData, error: rError } = await sb
+            .from("line_openchat_logs")
+            .select(OPENCHAT_LIST_SELECT)
+            .eq("ingest_status", "ready")
+            .eq("stream_type", "thread")
+            .eq("chat_title", thread.chat_title)
+            .eq("thread_title", thread.thread_key)
+            .order("posted_at", { ascending: true, nullsFirst: false })
+            .limit(500);
+          if (rError) throw new Error(`openchat thread rows failed: ${rError.message}`);
+          threadRows = ((rData || []) as Record<string, unknown>[]).map((row) => ({
+            ...mapOpenchatRow({ ...row, similarity: 0 }),
+            thread_no: thread.thread_no,
+            thread_heading: thread.first_snippet,
+          }));
+        }
+        await logSearchEvent(sb, {
+          ...baseEvent,
+          query_text: `thread:${threadChat}#${threadNo}`.slice(0, 2000),
+          comment_hit_count: 0,
+          chunk_hit_count: 0,
+          result_status: "ok",
+          used_sources: JSON.stringify({ openchat_ids: threadRows.map((r) => r.id) }),
+        });
+        return json({
+          relatedOpenchat: threadRows,
+          hitCount: threadRows.length,
+          meta: { openchatHitCount: threadRows.length, mode: "thread", thread },
         });
       }
 
@@ -713,9 +830,10 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       }
       const { data, error } = await q;
       if (error) throw new Error(`openchat list failed: ${error.message}`);
-      const relatedOpenchat = ((data || []) as Record<string, unknown>[]).map((row) =>
+      let relatedOpenchat = ((data || []) as Record<string, unknown>[]).map((row) =>
         mapOpenchatRow({ ...row, similarity: 0 })
       );
+      if (body?.with_threads === true) relatedOpenchat = await attachThreadNumbers(sb, relatedOpenchat);
       await logSearchEvent(sb, {
         ...baseEvent,
         comment_hit_count: 0,
@@ -816,7 +934,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
 
       return {chunkRowsRaw,relatedSources};
     })();
-    const [commentsRpc, chunkData, openchatRows] = await Promise.all([
+    const [commentsRpc, chunkData, openchatRowsRaw] = await Promise.all([
       sb.rpc("match_comments_semantic", {
         query_embedding: embedding, match_threshold: matchThreshold, match_count: commentLimit,
       }),
@@ -824,6 +942,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       fetchOpenchatHits(sb, keywordResult, embedding, matchThreshold, openchatLimit),
     ]);
     if(commentsRpc.error)throw new Error(`match_comments_semantic failed: ${commentsRpc.error.message}`);
+    const openchatRows = body?.with_threads === true ? await attachThreadNumbers(sb, openchatRowsRaw) : openchatRowsRaw;
     const commentRows: CommentRow[] = (commentsRpc.data || []).map((row: Record<string, unknown>) => ({
       source_type: asString(row.source_type) || null,
       comment_id: asString(row.comment_id) || null,

@@ -886,3 +886,13 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   .oc-n { font-size: 1.15rem; min-width: 3rem; }
 }
 @media (prefers-reduced-motion: reduce) { .oc-list > li, .oc-bar i { transition: none !important; } }
+
+/* オプチャのスレッド番号（openchat_threads、2026-11-17） */
+.openchat-thread-btn { display: inline-flex; align-items: center; gap: .25rem; padding: .2rem .6rem; border-radius: 999px; border: 1px solid #FE910B; background: #fff8ef; color: #b45309; font-weight: 700; font-size: .85rem; white-space: nowrap; cursor: pointer; }
+.openchat-thread-btn:hover, .openchat-thread-btn:focus-visible { background: #FE910B; color: #fff; outline: none; }
+.openchat-thread-head { margin-top: .25rem; font-size: .78rem; color: #64748b; line-height: 1.35; max-width: 12rem; }
+.openchat-thread-bar { border: 1px solid #fcd9a8; background: #fff8ef; border-radius: 12px; padding: .75rem 1rem; }
+.openchat-thread-bar-title { font-weight: 700; color: #1e293b; font-size: 1rem; }
+.openchat-thread-bar-sub { margin-top: .2rem; font-size: .85rem; color: #64748b; word-break: break-word; }
+.openchat-thread-back { flex: 0 0 auto; padding: .4rem .8rem; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; color: #334155; font-size: .9rem; cursor: pointer; }
+.openchat-thread-back:hover { background: #f1f5f9; }
