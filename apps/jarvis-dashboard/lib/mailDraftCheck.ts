@@ -4,6 +4,20 @@
  * - 見直し: フリーワード指示で書き直す
  */
 import { geminiReply } from "@/lib/geminiReply";
+import { geminiPaidGenerate } from "@/lib/geminiPaid";
+
+/**
+ * flat = Mac の定額 AI（既定）。gemini = 従量課金の Gemini（判断デスクで松野さんが1回ごとに了承したときだけ）
+ */
+export type DraftEngine = "flat" | "gemini";
+
+async function generate(prompt: string, engine: DraftEngine = "flat"): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  if (engine === "gemini") {
+    const r = await geminiPaidGenerate(prompt);
+    return r.ok ? { ok: true, text: r.text } : r;
+  }
+  return geminiReply(prompt, { timeoutMs: TIMEOUT_MS, maxAttempts: 3 });
+}
 
 export type DraftCheckResult =
   | { ok: true; text: string; changes: string[] }
@@ -63,25 +77,26 @@ export function parseDraftCheckJson(raw: string, fallback: string): {
   }
 }
 
-async function run(prompt: string, draft: string): Promise<DraftCheckResult> {
-  const r = await geminiReply(prompt, { timeoutMs: TIMEOUT_MS, maxAttempts: 3 });
+async function run(prompt: string, draft: string, engine: DraftEngine = "flat"): Promise<DraftCheckResult> {
+  const r = await generate(prompt, engine);
   if (!r.ok) return { ok: false, error: r.error };
   const parsed = parseDraftCheckJson(r.text, draft);
   return { ok: true, ...parsed };
 }
 
-export async function proofreadDraft(draft: string): Promise<DraftCheckResult> {
+export async function proofreadDraft(draft: string, engine: DraftEngine = "flat"): Promise<DraftCheckResult> {
   if (!draft.trim()) return { ok: false, error: "本文が空です" };
-  return run(proofreadPrompt(draft), draft);
+  return run(proofreadPrompt(draft), draft, engine);
 }
 
 export async function reviseDraft(
   draft: string,
   instruction: string,
+  engine: DraftEngine = "flat",
 ): Promise<DraftCheckResult> {
   if (!draft.trim()) return { ok: false, error: "本文が空です" };
   if (!instruction.trim()) return { ok: false, error: "見直し指示を入力してください" };
-  return run(revisePrompt(draft, instruction), draft);
+  return run(revisePrompt(draft, instruction), draft, engine);
 }
 
 /** 返信下書きを作る（「返信する」で本文が空のとき・1通1回） */
@@ -164,9 +179,10 @@ export async function composeDraft(opts: {
   materials?: string[];
   instruction?: string;
   chat?: string;
+  engine?: DraftEngine;
 }): Promise<DraftCheckResult> {
   if (!opts.inbound.trim()) return { ok: false, error: "元のメール本文がありません" };
-  const r = await geminiReply(composePrompt(opts), { timeoutMs: TIMEOUT_MS, maxAttempts: 3 });
+  const r = await generate(composePrompt(opts), opts.engine || "flat");
   if (!r.ok) return { ok: false, error: r.error };
   const text = stripFence(r.text);
   if (!text) return { ok: false, error: "下書きが空でした" };
