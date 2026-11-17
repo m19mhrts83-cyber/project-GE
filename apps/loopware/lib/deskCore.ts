@@ -19,6 +19,7 @@ export type TriageRow = {
   received_at?: string | null;
   priority?: string | null;
   gmail_thread_id?: string | null;
+  account?: string | null;
   payload?: Record<string, unknown> | null;
 };
 
@@ -34,7 +35,15 @@ export type DeskCard = {
   kind: string;
   summary: string;
   bodyLines: string[];
+  /** メール全文（取り込み時に 8000 字まで。続き・添付は Jarvis の詳細） */
+  bodyFull: string;
+  /** 全文が取り込みの上限で切れていそうか */
+  bodyClipped: boolean;
   draftLines: string[];
+  /** 下書きの全文（判断デスクの返信欄の初期値） */
+  draftText: string;
+  /** 受け取ったメールボックス（estate／admin／m19m）。返信の送信元の既定 */
+  account: string;
   receivedAt: string | null;
   priority: string;
   threadId: string;
@@ -50,7 +59,7 @@ export type DeskCard = {
   stayReason: string | null;
 };
 
-/** デスクのボタン。返信は Jarvis の返信画面で送る（ここでは送らない） */
+/** デスクのボタン。返信（reply）はデスクの返信欄で下書き→送信し、記録は送信時に Jarvis 側で残る */
 export const DESK_CHOICES = ["skip", "todo", "done", "hesitate"] as const;
 export type DeskChoice = (typeof DESK_CHOICES)[number];
 
@@ -109,6 +118,18 @@ function bodyHead(text: string | null | undefined): string[] {
   return out;
 }
 
+/** 取り込み側（Slack の全文モーダルと同じ）の本文上限 */
+export const BODY_CAP = 8000;
+
+/** 全文（改行をそろえ、空行の連続だけ詰める。引用・署名も落とさない） */
+export function fullBody(text: string | null | undefined): string {
+  return String(text || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, BODY_CAP);
+}
+
 function threadOf(x: unknown): ThreadMsg[] {
   if (!Array.isArray(x)) return [];
   const out: ThreadMsg[] = [];
@@ -136,7 +157,11 @@ export function toCard(r: TriageRow): DeskCard {
     kind: String(r.kind || "mail"),
     summary: String(digest.summary || r.summary || "").slice(0, 400),
     bodyLines: bodyHead(r.original_body),
+    bodyFull: fullBody(r.original_body),
+    bodyClipped: String(r.original_body || "").length >= BODY_CAP - 10,
     draftLines: lines(r.draft_text, 40),
+    draftText: String(r.draft_text || "").slice(0, 8000),
+    account: String(r.account || ""),
     receivedAt: r.received_at || null,
     priority: String(r.priority || ""),
     threadId: String(r.gmail_thread_id || ""),

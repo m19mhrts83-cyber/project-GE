@@ -6,13 +6,14 @@ import Icon from "./Icon";
 import LogJar, { type Bead } from "./LogJar";
 import { logged } from "@/lib/logPulse";
 import VoicePanel from "./VoicePanel";
+import ReplyComposer from "./ReplyComposer";
 import { MAIL_REASON_TAGS, STAY_REASON_TAGS, type WeekTally } from "@/lib/decisionContract";
 import { SENDER_POLICIES, type SenderPolicy } from "@/lib/senderPolicyCore";
 import { agoLabel, stateLine, type DeskCard, type DeskChoice } from "@/lib/deskCore";
 
 /**
  * 判断デスク（/desk?surface=triage）。メールを1件ずつ大きく出して判断する。
- * - 1 返信する（Jarvis の返信画面へ）／2 見送る／3 ToDo／4 迷う／0 回答不要
+ * - 1 返信する（このデスクの返信欄で 声→下書き→直す→送信。2026-11-17〜）／2 見送る／3 ToDo／4 迷う／0 回答不要
  * - 理由はすべて任意。押さなくても 5 秒で次へ
  * - 迷った・見ていないは NG に混ぜない（粒の色が違う）
  * - 表示から判断までの時間を測って一緒に残す
@@ -21,7 +22,7 @@ import { agoLabel, stateLine, type DeskCard, type DeskChoice } from "@/lib/deskC
 type Phase =
   | { k: "card" }
   | { k: "reason"; key: string; choice: DeskChoice; itemId: string }
-  | { k: "opened" };
+  | { k: "reply" };
 
 const QUEUE_KEY = "loopware_desk_queue_v1";
 const AUTO_MS = 5000;
@@ -276,12 +277,23 @@ export default function DeskClient() {
     return () => window.clearInterval(iv);
   }, [phase, next]);
 
+  // 返信はこのデスクの返信欄で（Jarvis の画面へは飛ばさない）
   const openReply = useCallback(() => {
     if (!card) return;
     touch();
-    window.open(`${dash}/mail/${encodeURIComponent(card.id)}`, "_blank", "noopener");
-    setPhase({ k: "opened" });
-  }, [card, dash, touch]);
+    setPhase({ k: "reply" });
+  }, [card, touch]);
+
+  const onSent = useCallback(
+    (message: string) => {
+      setBeads((b) => [...b, "take"]);
+      const n = (tallyWeek?.total || 0) + beads.length + 1;
+      flash(`✓ ${message}・判断ログに記録（今週 ${n} 件）`);
+      logged({ beads: ["take"], compact: true });
+      next();
+    },
+    [tallyWeek, beads.length, next],
+  );
 
   // キーボード: 1〜4・0。理由の画面では 1〜6 でタグ、Enter で飛ばす
   useEffect(() => {
@@ -297,8 +309,8 @@ export default function DeskClient() {
         if (e.key === "Enter" || e.key === "Escape") next();
         return;
       }
-      if (phase.k === "opened") {
-        if (e.key === "Enter") next();
+      if (phase.k === "reply") {
+        // 返信欄では数字キーで判断しない（書いている最中の誤操作を防ぐ）
         return;
       }
       if (e.key === "1") openReply();
@@ -390,16 +402,24 @@ export default function DeskClient() {
             </details>
           ) : null}
 
-          {card.bodyLines.length ? (
-            <details className="desk-body">
-              <summary>本文の先頭</summary>
-              {card.bodyLines.map((l, i) => (
-                <p key={i}>{l || " "}</p>
-              ))}
+          {card.bodyFull ? (
+            <details className="desk-body" open>
+              <summary>メール全文</summary>
+              <div className="desk-body-full">
+                {card.bodyFull.split("\n").map((l, i) => (
+                  <p key={i} className={/^\s*>/.test(l) ? "quoted" : undefined}>{l || " "}</p>
+                ))}
+              </div>
+              {card.bodyClipped ? (
+                <p className="meta">
+                  取り込みの上限（8000字）で切れています。続きと添付は{" "}
+                  <a href={`${dash}/mail/${encodeURIComponent(card.id)}`} target="_blank" rel="noopener noreferrer">Jarvis の詳細</a>
+                </p>
+              ) : null}
             </details>
           ) : null}
 
-          {card.draftLines.length ? (
+          {phase.k === "reply" ? null : card.draftLines.length ? (
             <div className="desk-draft" aria-label="下書き">
               <div className="eyebrow">下書き</div>
               <ol>
@@ -438,14 +458,8 @@ export default function DeskClient() {
             </div>
           ) : null}
 
-          {phase.k === "opened" ? (
-            <div className="desk-reason">
-              <p>Jarvis の返信画面を開きました。送ったら記録は自動で残ります。</p>
-              <div className="btn-row">
-                <button className="primary" onClick={next}>次へ</button>
-                <button onClick={() => setPhase({ k: "card" })}>このカードに戻る</button>
-              </div>
-            </div>
+          {phase.k === "reply" ? (
+            <ReplyComposer card={card} dash={dash} onSent={onSent} onBack={() => setPhase({ k: "card" })} />
           ) : null}
         </article>
       ) : null}

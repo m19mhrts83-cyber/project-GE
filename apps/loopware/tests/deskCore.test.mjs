@@ -135,3 +135,17 @@ test('いまの状態の一行', () => {
   assert.equal(d.stateLine({ postedToSlack: false, hesitatedAt: 'x', history: [] }), '迷って残っています');
   assert.equal(d.stateLine({ postedToSlack: false, hesitatedAt: null, history: [] }), 'まだ判断していません');
 });
+
+test('メール全文: 引用も残し、空行の連続だけ詰める。上限で切れたら印（2026-11-17）', () => {
+  const c = d.toCard({
+    id: 'gha-full01', account: 'livingsupport', draft_text: 'A様\r\n\r\n了解です',
+    original_body: '松野様\r\n\r\n\r\n\r\n本文\n> 引用',
+  });
+  assert.equal(c.bodyFull, '松野様\n\n本文\n> 引用');
+  assert.equal(c.bodyClipped, false);
+  assert.equal(c.draftText, 'A様\r\n\r\n了解です');
+  assert.equal(c.account, 'livingsupport');
+  const long = d.toCard({ id: 'gha-full02', original_body: 'あ'.repeat(8000) });
+  assert.equal(long.bodyFull.length, 8000);
+  assert.equal(long.bodyClipped, true);
+});
