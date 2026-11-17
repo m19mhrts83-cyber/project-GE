@@ -1855,8 +1855,10 @@ const App = {
       App.elements.openchatThreadBarTitle.textContent = (t.chatTitle || t.chat_title || '') + ' ／ スレッド' + (t.threadNo || t.thread_no);
     }
     if (App.elements.openchatThreadBarSub) {
-      const head = String(t.first_snippet || '').trim();
-      App.elements.openchatThreadBarSub.textContent = (head ? '最初の書き込み：' + head.slice(0, 80) + (head.length > 80 ? '…' : '') + '　' : '') + count + '件（古い順）';
+      const head = String(t.heading || t.first_snippet || '').trim();
+      const hasRoot = (App.state.openchatLogs || []).some(function (r) { return r && r.is_thread_root; });
+      const label = hasRoot ? '元の投稿：' : '最初の書き込み：';
+      App.elements.openchatThreadBarSub.textContent = (head ? label + head.slice(0, 80) + (head.length > 80 ? '…' : '') + '　' : '') + (hasRoot ? '元の投稿＋返信 ' + Math.max(0, count - 1) + '件' : count + '件') + '（古い順）';
     }
     bar.classList.remove('hidden');
   },
@@ -1869,6 +1871,10 @@ const App = {
       return no && App.featureOn('openchat_threads') ? 'スレッド' + no : 'スレッド';
     }
     if (st === 'thread_reply') return 'スレッド返信';
+    if (row && row.is_thread_root && App.featureOn('openchat_threads')) {
+      const rno = Number(row.thread_no || row.threadNo || 0);
+      return rno ? 'スレッド' + rno : '元の投稿';
+    }
     return 'メイン';
   },
 
@@ -1978,8 +1984,9 @@ const App = {
           .trim()
           .slice(0, 180);
         const rowId = String(r.id || '').trim();
+        const isRoot = !!(r.is_thread_root && App.featureOn('openchat_threads'));
         const highlight =
-          exactId && rowId === exactId ? ' bg-amber-50 ring-1 ring-amber-200' : '';
+          exactId && rowId === exactId ? ' bg-amber-50 ring-1 ring-amber-200' : isRoot && threadMode ? ' openchat-thread-root-row' : '';
         return (
           '<tr class="border-t align-top' +
           highlight +
@@ -1990,8 +1997,10 @@ const App = {
           App.escapeHtml(String(r.chat_title || r.chatTitle || '')) +
           '</td>' +
           '<td class="p-2 whitespace-nowrap text-xs">' +
-          (App.featureOn('openchat_threads') && Number(r.thread_no || 0) && !threadMode
-            ? '<button type="button" class="openchat-thread-btn" data-chat-title="' + App.escapeHtml(String(r.chat_title || r.chatTitle || '')) + '" data-thread-no="' + App.escapeHtml(String(r.thread_no)) + '" title="このスレッドを古い順に読む">' + App.escapeHtml(App.openchatStreamLabel(r)) + '</button>' +
+          (isRoot && threadMode
+            ? '<span class="openchat-thread-root-badge">元の投稿</span>'
+            : App.featureOn('openchat_threads') && Number(r.thread_no || 0) && !threadMode
+            ? (isRoot ? '<div class="openchat-thread-root-note">元の投稿 →</div>' : '') + '<button type="button" class="openchat-thread-btn" data-chat-title="' + App.escapeHtml(String(r.chat_title || r.chatTitle || '')) + '" data-thread-no="' + App.escapeHtml(String(r.thread_no)) + '" title="このスレッドを古い順に読む">' + App.escapeHtml(App.openchatStreamLabel(r)) + '</button>' +
               (r.thread_heading ? '<div class="openchat-thread-head">' + App.escapeHtml(String(r.thread_heading).slice(0, 24)) + (String(r.thread_heading).length > 24 ? '…' : '') + '</div>' : '')
             : App.escapeHtml(App.featureOn('openchat_threads') ? App.openchatStreamLabel(r) : streamLabel(String(r.stream_type || r.streamType || '')))) +
           '</td>' +

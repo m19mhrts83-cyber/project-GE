@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {handleSemanticSearch,openchatThreadLabel,normalizeHistory,contextualSearchQuery,buildAnswerPrompt,buildPlanPrompt,parsePlan,clarificationAnswer,CLARIFY_MARK} from './handler.ts';
+import {handleSemanticSearch,openchatThreadLabel,threadHeading,normalizeHistory,contextualSearchQuery,buildAnswerPrompt,buildPlanPrompt,parsePlan,clarificationAnswer,CLARIFY_MARK} from './handler.ts';
 
 Deno.test('LINE filename browse and exact attachment source reads use ready rows without AI calls',async()=>{
  const keys=['GEMINI_API_KEY','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SEMANTIC_SEARCH_SHARED_SECRET','SEMANTIC_SEARCH_DISABLED'];
@@ -185,4 +185,51 @@ Deno.test('openchat thread numbers: list attaches numbers, thread mode reads one
 Deno.test('openchat thread label uses number, then readable title',()=>{
  assert.equal(openchatThreadLabel({thread_no:5,thread_title:'t013e392'}),'スレッド5');
  assert.equal(openchatThreadLabel({thread_no:null,thread_title:'物件名の相談'}),'物件名の相談');
+});
+
+Deno.test('openchat thread roots: thread view starts with the root post, root main rows get the thread number',async()=>{
+ const keys=['GEMINI_API_KEY','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SEMANTIC_SEARCH_SHARED_SECRET','SEMANTIC_SEARCH_DISABLED'];
+ const saved=keys.map(k=>Deno.env.get(k)),originalFetch=globalThis.fetch;
+ ['fixture','https://fixture.supabase.co','fixture-service','fixture-semantic','0'].forEach((v,i)=>Deno.env.set(keys[i],v));
+ const info={chat_title:'20戸建G',thread_key:'「t1949673…」',thread_no:7,first_snippet:'近隣の月極駐車場を借りて',first_sender:'A',post_count:2,
+  root_text:'物件名変えてリニューアル募集したら、２日で申し込み入りました',root_posted_at:'2026-11-17T07:53:07Z',root_sender:'柴田',root_log_id:'oc_root',root_status:'matched'};
+ const rootRow={id:'oc_root',chat_title:'20戸建G',stream_type:'main',thread_title:null,content:info.root_text,posted_at:'2026-11-17T07:53:00Z',sender_name:'柴田'};
+ const reply={id:'oc_r1',chat_title:'20戸建G',stream_type:'thread',thread_title:'「t1949673…」',content:'おめでとうございます',posted_at:'2026-11-17T09:00:00Z'};
+ let rootLinked=true;
+ globalThis.fetch=async(input)=>{
+  const url=new URL(input instanceof Request?input.url:String(input));
+  if(url.pathname.endsWith('/qa_openchat_threads')){
+   if(url.searchParams.get('root_log_id'))return Response.json(url.searchParams.get('root_log_id')!.includes('oc_root')?[info]:[]);
+   return Response.json([rootLinked?info:{...info,root_log_id:null}]);}
+  if(url.pathname.endsWith('/line_openchat_logs')){
+   if(url.searchParams.get('id')==='eq.oc_root')return Response.json([rootRow]);
+   if(url.searchParams.get('stream_type')==='eq.thread')return Response.json([reply]);
+   return Response.json([rootRow,reply]);}
+  if(url.pathname.endsWith('/app_qa_search_events'))return Response.json([],{status:201});
+  throw new Error('unexpected network/AI request');
+ };
+ try{
+  const call=(body:unknown)=>handleSemanticSearch(new Request('https://fixture.supabase.co/functions/v1/semantic-search',{
+   method:'POST',headers:{'x-semantic-shared-secret':'fixture-semantic'},body:JSON.stringify(body)}));
+  // 一覧: 元の投稿（メイン）にも番号が付き、見出しは元の投稿の書き出し
+  let j=await (await call({list_openchat:true,with_threads:true})).json();
+  const main=j.relatedOpenchat.find((r:{id:string})=>r.id==='oc_root');const th=j.relatedOpenchat.find((r:{id:string})=>r.id==='oc_r1');
+  assert.equal(main.thread_no,7);assert.equal(main.is_thread_root,true);
+  assert.equal(th.thread_no,7);assert.equal(th.thread_heading,info.root_text);
+  // スレッドを開く: 先頭が元の投稿、続いてスレッドの書き込み
+  j=await (await call({list_openchat:true,with_threads:true,chat_title:'20戸建G',thread_no:7})).json();
+  assert.deepEqual(j.relatedOpenchat.map((r:{id:string})=>r.id),['oc_root','oc_r1']);assert.equal(j.relatedOpenchat[0].is_thread_root,true);
+  // DB のメイン投稿と結べていないときは LINE から取った本文で先頭に出す
+  rootLinked=false;
+  j=await (await call({list_openchat:true,with_threads:true,chat_title:'20戸建G',thread_no:7})).json();
+  assert.equal(j.relatedOpenchat.length,2);assert.equal(j.relatedOpenchat[0].id,'');assert.equal(j.relatedOpenchat[0].content,info.root_text);
+  assert.equal(j.relatedOpenchat[0].is_thread_root,true);
+ }finally{globalThis.fetch=originalFetch;keys.forEach((k,i)=>saved[i]===undefined?Deno.env.delete(k):Deno.env.set(k,saved[i]!));}
+});
+
+Deno.test('openchat thread heading: thread name, then root post, then first reply',()=>{
+ assert.equal(threadHeading({thread_key:'「物件名の相談」',root_text:'元の投稿',first_snippet:'返信'}),'物件名の相談');
+ assert.equal(threadHeading({thread_key:'「t1949673…」',root_text:'@講師きむら  物件名を\n変えました',first_snippet:'返信'}),'物件名を 変えました');
+ assert.equal(threadHeading({thread_key:'「t1949673…」',root_text:null,first_snippet:'返信'}),'返信');
+ assert.equal(openchatThreadLabel({thread_no:7,thread_title:null,thread_heading:'物件名変えて募集',is_thread_root:true}),'スレッド7「物件名変えて募集」の元の投稿');
 });

@@ -127,6 +127,16 @@ def refresh_thread_numbers(sb) -> None:
         print(f"⚠️ スレッド番号の更新をスキップ: {exc}")
 
 
+def apply_thread_roots_safe(sb) -> None:
+    """スレッドの元投稿（LINE から取得済みの JSON）を番号表に反映。失敗しても取込は成功扱い。"""
+    try:
+        from jarvis_openchat_thread_roots_apply import apply_thread_roots
+
+        apply_thread_roots(sb)
+    except Exception as exc:  # noqa: BLE001
+        print(f"⚠️ スレッド元投稿の反映をスキップ: {exc}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Publish LINE openchat logs to ready/excluded")
     parser.add_argument("--dry-run", action="store_true", help="件数だけ表示（既定）")
@@ -182,6 +192,7 @@ def main() -> int:
         f"✅ 更新行数: {upserted}（ready={len(ready_ids)} excluded={len(excluded_ids)}）"
     )
     refresh_thread_numbers(sb)
+    apply_thread_roots_safe(sb)
     return 0
 
 

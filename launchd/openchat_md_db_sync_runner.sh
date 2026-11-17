@@ -72,6 +72,14 @@ fi
     echo "# active threads sync rc=${th_rc}"
   fi
 
+  # スレッドの元投稿（スレッドを始めたメイン投稿）を、まだ取っていないスレッドだけ取得（読み取りのみ）。
+  # DB への反映は下の jarvis_openchat_publish.py --apply の最後で行う。失敗しても本文の取込は止めない。
+  if [[ "${JARVIS_OPENCHAT_THREAD_ROOTS:-1}" != "0" ]]; then
+    roots_rc=0
+    ( cd "$POC" && ./run_patch.sh chrline_openchat_thread_roots.py --limit 300 ) || roots_rc=$?
+    echo "# thread roots fetch rc=${roots_rc}"
+  fi
+
   # OneDrive MD → kamiooya-qa.line_openchat_logs（staging）。
   # Google Drive の Grok共有は二次出力なので、日次本線から分離する。
   db_rc=0
