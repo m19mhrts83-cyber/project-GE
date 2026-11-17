@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { hardStop, STOP_GRACE_MS } from "./useSpeech";
 
 /**
  * 声のひとこと。話した言葉がその場で文字で流れ、映している物・選んでいる行が変わったら
@@ -19,6 +20,7 @@ type Rec = {
   interimResults: boolean;
   start: () => void;
   stop: () => void;
+  abort?: () => void;
   onresult: ((e: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
   onend: (() => void) | null;
   onerror: ((e: { error?: string }) => void) | null;
@@ -63,6 +65,11 @@ export default function VoicePanel({ target, onSaved }: { target: VoiceTarget | 
   useEffect(() => {
     const w = window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec };
     setSupported(Boolean(w.SpeechRecognition || w.webkitSpeechRecognition));
+    // 画面を離れた・カードの操作で消えたときも、マイクを掴んだままにしない
+    return () => {
+      hardStop(rec.current);
+      rec.current = null;
+    };
   }, []);
 
   const sec = () => Math.round((Date.now() - t0.current) / 100) / 10;
@@ -82,11 +89,14 @@ export default function VoicePanel({ target, onSaved }: { target: VoiceTarget | 
     const w = window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec };
     const C = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!C || !target) return;
+    hardStop(rec.current); // 前の認識が残っていたら止める（二重に動くと片方しか止まらない）
     const r = new C();
     r.lang = "ja-JP";
     r.continuous = true;
     r.interimResults = true;
     r.onresult = (e) => {
+      // 止めた後は言い終わりの確定文だけ受け取り、字幕は出さない
+      const stopped = rec.current !== r;
       let inter = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const res = e.results[i];
@@ -101,10 +111,15 @@ export default function VoicePanel({ target, onSaved }: { target: VoiceTarget | 
           inter += text;
         }
       }
-      setInterim(inter);
+      if (!stopped) setInterim(inter);
     };
-    r.onerror = (e) => setMsg(e.error === "not-allowed" ? "マイクの使用が許可されていません" : "音声認識が止まりました");
+    r.onerror = (e) => {
+      if (rec.current !== r || e.error === "aborted" || e.error === "no-speech") return;
+      setMsg(e.error === "not-allowed" ? "マイクの使用が許可されていません" : "音声認識が止まりました");
+    };
     r.onend = () => {
+      if (rec.current !== r) return;
+      rec.current = null;
       setOn(false);
       setInterim("");
     };
@@ -112,13 +127,21 @@ export default function VoicePanel({ target, onSaved }: { target: VoiceTarget | 
     setSegs([{ cardId: target.id, target: target.subject, line: target.line, t_start: 0, text: "" }]);
     setMsg("");
     rec.current = r;
-    r.start();
-    setOn(true);
+    try {
+      r.start();
+      setOn(true);
+    } catch {
+      rec.current = null;
+      setMsg("音声認識を開始できませんでした");
+    }
   }, [target]);
 
   const stop = useCallback(() => {
-    rec.current?.stop();
+    const r = rec.current;
+    rec.current = null;
+    hardStop(r, STOP_GRACE_MS);
     setOn(false);
+    setInterim("");
     setSegs((s) => (s.length && s[s.length - 1].t_end === undefined ? [...s.slice(0, -1), { ...s[s.length - 1], t_end: sec() }] : s));
   }, []);
 

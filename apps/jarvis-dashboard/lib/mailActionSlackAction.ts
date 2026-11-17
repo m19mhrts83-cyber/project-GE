@@ -95,6 +95,23 @@ export function maSigOk(
   }
 }
 
+/**
+ * 判断デスク（loopware）からのサーバ間依頼の署名（下書き作成など、Slack ボタンに無い操作）。
+ * 形は maActionSig と同じ `ma:{id}:{op}`。秘密も同じ（MAIL_ACTION_TOKEN）。
+ */
+export function maOpSigOk(id: string, op: string, sig: string | null | undefined): boolean {
+  const secret = actionSecret();
+  if (!secret) return false;
+  const expected = createHmac("sha256", secret).update(`ma:${id}:${op}`, "utf8").digest("hex").slice(0, 10);
+  const got = (sig || "").trim().toLowerCase();
+  if (!got || got.length !== expected.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(got), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
 export function parseMaAction(
   raw: string | null | undefined,
 ): MailActionSlackAction | null {

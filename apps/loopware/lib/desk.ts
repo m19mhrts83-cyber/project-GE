@@ -28,7 +28,7 @@ import {
 export type LeftCard = DeskCard & { next: NextStep };
 
 const COLS =
-  "id,status,subject,partner,from_email,lane,kind,summary,draft_text,original_body,received_at,priority,gmail_thread_id,payload";
+  "id,status,subject,partner,from_email,lane,kind,summary,draft_text,original_body,received_at,priority,gmail_thread_id,account,payload";
 
 export function dashboardBase(): string {
   return (process.env.JARVIS_DASHBOARD_URL || "https://jarvis-dashboard-amber.vercel.app").replace(/\/$/, "");
@@ -250,4 +250,166 @@ export async function markHesitated(sb: SupabaseClient, id: string, timing?: Tim
   const pl = { ...((data?.payload as Record<string, unknown>) || {}) };
   pl.loopware_hesitated_at = timing?.decided_at || new Date().toISOString();
   await sb.from("triage_items").update({ payload: pl }).eq("id", id);
+}
+
+// ---------------------------------------------------------------- 判断デスクで返信まで（2026-11-17）
+// 下書き作成・点検・送信は Jarvis ダッシュボードのサーバに頼む（Gmail の鍵・OneDrive のやり取り md・
+// Mac の定額 AI の受付・Slack カードの片付けがそちらにあるため）。画面は判断デスクのまま。
+// 頼むときは Slack と同じ署名（MAIL_ACTION_TOKEN）をサーバ間だけで付ける。ブラウザには出さない。
+
+export type PastReply = { id: string; subject: string; at: string; to: string; body: string };
+
+type SentRow = {
+  id: string;
+  subject?: string | null;
+  draft_text?: string | null;
+  from_email?: string | null;
+  updated_at?: string | null;
+  payload?: Record<string, unknown> | null;
+};
+
+function addrOf(raw: string | null | undefined): string {
+  const s = String(raw || "").trim();
+  const m = s.match(/<([^>]+)>/);
+  return (m ? m[1] : s).trim().toLowerCase();
+}
+
+/**
+ * この相手に過去に実際に送った返信（Gmail で送ったものだけ。回答不要の記録は入れない）。
+ * 同じアドレス（受信元・送った宛先）と、パートナー名が同じものを新しい順に。
+ */
+export async function loadPastReplies(sb: SupabaseClient, id: string, max = 5): Promise<PastReply[]> {
+  const { data: me } = await sb.from("triage_items").select("id,from_email,partner,lane").eq("id", id).maybeSingle();
+  if (!me) return [];
+  const addr = addrOf(me.from_email as string);
+  const partner = String(me.partner || "").trim();
+  const cols = "id,subject,draft_text,from_email,updated_at,payload";
+  const rows: SentRow[] = [];
+  const seen = new Set<string>([id]);
+  const take = (d: unknown) => {
+    for (const r of (d as SentRow[]) || []) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      rows.push(r);
+    }
+  };
+  const base = () =>
+    sb.from("triage_items").select(cols).eq("status", "sent").not("payload->>gmail_sent_id", "is", null);
+  const jobs: PromiseLike<{ data: unknown }>[] = [];
+  if (addr && addr.includes("@")) {
+    jobs.push(base().ilike("from_email", `%${addr}%`).order("updated_at", { ascending: false }).limit(10));
+    jobs.push(base().ilike("payload->>sent_to", addr).order("updated_at", { ascending: false }).limit(10));
+  }
+  if (partner && String(me.lane || "") === "partner") {
+    jobs.push(base().eq("partner", partner).order("updated_at", { ascending: false }).limit(10));
+  }
+  const res = await Promise.allSettled(jobs);
+  for (const r of res) if (r.status === "fulfilled") take(r.value.data);
+  return rows
+    .map((r) => {
+      const pl = (r.payload || {}) as Record<string, unknown>;
+      return {
+        id: r.id,
+        subject: String(r.subject || "").slice(0, 160),
+        at: String(pl.sent_at || r.updated_at || ""),
+        to: String(pl.sent_to || addrOf(r.from_email)),
+        body: String(r.draft_text || "").trim().slice(0, 3000),
+      };
+    })
+    .filter((r) => r.body)
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, max);
+}
+
+export type DraftOp = "compose" | "proofread" | "revise" | "context";
+
+export type DraftResult = {
+  ok: boolean;
+  /** Mac の定額 AI がまだ作っている（少し待ってもう一度） */
+  pending?: boolean;
+  text?: string;
+  changes?: string[];
+  message?: string;
+  /** やり取り md の末尾（context のとき） */
+  log?: { folder?: string; notice: string; tail: string } | null;
+};
+
+async function postJson(url: string, body: unknown, timeoutMs: number): Promise<{ status: number; json: Record<string, unknown> }> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: ctl.signal,
+    });
+    let json: Record<string, unknown> = {};
+    try {
+      json = (await r.json()) as Record<string, unknown>;
+    } catch {
+      json = { ok: false, message: `Jarvis が JSON を返しませんでした（${r.status}）。ダッシュボードが古い版の可能性があります` };
+    }
+    return { status: r.status, json };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** 下書き作成・誤字脱字・指示で見直し・やり取り md の読み出し（Jarvis 側 /api/g/lwdraft/{id}） */
+export async function draftViaDashboard(
+  id: string,
+  op: DraftOp,
+  args: { draft?: string; instruction?: string },
+): Promise<DraftResult> {
+  const s = maSig(id, "lwdraft");
+  if (!s) return { ok: false, message: "MAIL_ACTION_TOKEN が loopware に設定されていません" };
+  try {
+    const { json } = await postJson(
+      `${dashboardBase()}/api/g/lwdraft/${encodeURIComponent(id)}`,
+      { s, op, draft: args.draft || "", instruction: args.instruction || "" },
+      op === "context" ? 20_000 : 80_000,
+    );
+    return json as DraftResult;
+  } catch (e) {
+    const aborted = e instanceof Error && e.name === "AbortError";
+    return aborted
+      ? { ok: false, pending: true, message: "Mac の定額AIで作成中です。少し待ってからもう一度押してください" }
+      : { ok: false, message: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 送信（Slack の返信と同じ処理: Gmail 送信・Slack カード片付け・Todoist を閉じる・判断ログ） */
+export async function sendViaDashboard(
+  id: string,
+  args: { body: string; to?: string; account?: string; openedAt?: number; assist?: { proofread?: number; revise?: number } },
+): Promise<{ ok: boolean; message: string }> {
+  const s = maSig(id, "reply");
+  if (!s) return { ok: false, message: "MAIL_ACTION_TOKEN が loopware に設定されていません" };
+  const form = new URLSearchParams({ s, intent: "send", via: "loopware", body: args.body });
+  if (args.to) form.set("to", args.to);
+  if (args.account) form.set("account", args.account);
+  if (args.openedAt) form.set("opened_at", String(args.openedAt));
+  if (args.assist?.proofread) form.set("proofread", String(args.assist.proofread));
+  if (args.assist?.revise) form.set("revise", String(args.assist.revise));
+  try {
+    const r = await fetch(`${dashboardBase()}/api/g/ma/reply/${encodeURIComponent(id)}`, {
+      method: "POST",
+      body: form,
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      cache: "no-store",
+    });
+    const ct = r.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      const j = (await r.json()) as { ok?: boolean; message?: string };
+      return { ok: Boolean(j.ok), message: String(j.message || "") };
+    }
+    // 古いダッシュボード（HTML を返す）
+    const html = await r.text();
+    const ok = r.ok && /送信完了/.test(html) && !/失敗|認証エラー/.test(html.slice(0, 800));
+    return { ok, message: ok ? "送信しました" : "送れませんでした（Jarvis の画面で確かめてください）" };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) };
+  }
 }

@@ -160,8 +160,22 @@ export async function POST(
   if (action === "reply") {
     const body = String(form.get("body") || "");
     const intent = String(form.get("intent") || "send");
+    // 判断デスク（loopware）の返信欄からの送信: 宛先・送信元・測った時間も受け取り JSON で返す
+    const replyFromLoopware = String(form.get("via") || "") === "loopware";
     if (intent !== "send") {
+      if (replyFromLoopware) return NextResponse.json({ ok: false, message: "intent required" }, { status: 400 });
       return htmlPage("キャンセル", "送信しませんでした", true);
+    }
+    if (replyFromLoopware) {
+      const num = (k: string) => Number(form.get(k) || 0) || undefined;
+      const result = await applyMailActionSlack(id, "reply", {
+        body,
+        source: "loopware_desk",
+        to: String(form.get("to") || "").trim() || undefined,
+        account: String(form.get("account") || "").trim() || undefined,
+        timing: { openedAt: num("opened_at"), proofread: num("proofread"), revise: num("revise") },
+      });
+      return NextResponse.json(result, { status: result.ok ? 200 : 409 });
     }
     const result = await applyMailActionSlack(id, "reply", {
       body,
