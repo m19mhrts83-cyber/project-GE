@@ -65,6 +65,8 @@ export async function isValidLinkToken(key: string, token: string | null | undef
 export function isLegacyOpenPath(path: string, search: URLSearchParams | null = null): boolean {
   // /api/misses?surface=triage はメールの中身を返すので鍵が要る
   if (path === "/api/misses" && search?.get("surface")) return false;
+  // 片付けのまとめ判断はメール由来の件名・相手が出るので鍵が要る
+  if (path.startsWith("/313/bulk") || path.startsWith("/api/cleanup")) return false;
   return (
     path === "/" ||
     path.startsWith("/312") ||

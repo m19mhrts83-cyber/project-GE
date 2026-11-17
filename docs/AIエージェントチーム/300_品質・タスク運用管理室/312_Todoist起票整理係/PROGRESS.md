@@ -27,3 +27,13 @@
 - 平日 = エージェント以外のタスク（松野さん自身の仕事）。土日祝 = エージェントでまだ自動化できていないところの自動化を進める日。
 - 土日祝にはエージェント自動化タスクを2件置く。11/14(土) 58_承認案の実装、11/15(日) Gmail到着イベントの自動タスク化の設計。
 - 週次ピック（scripts/jarvis_todoist_weekly_pick.py）は、土日の日付に置いた「[自律化]／自動化／エージェント作成」のタスクを候補にも日付消しにも入れない（`AGENT_RE`）。祝日は日付判定せず、土日同様に Todoist 側へ置く運用。
+
+## Todoist片付けのまとめ判断（松野さん 2026-11-17）
+スター付きメール由来のタスクが大量に入ったため、メールの判断デスクと同じ形でまとめて判断できるようにした（313 の出口側。Nody /313/bulk）。
+1. GHA 30分ごと（`todoist-cleanup-bulk.yml`）が Todoist から「スター起票」ラベルの未完了を集め、おすすめ（完了／削除／残す）と理由を sync_meta.todoist_cleanup_snapshot に置く（プログラム）。
+2. 松野さんが Nody /313/bulk で、1件ずつまたはチェックしてまとめて 完了／残す／削除／日を変える を選び「確定」（人間。選ばなかった物は何もしない）。
+3. 判断を owner_decisions（surface=todoist_313, payload.bulk=true, 残す=defer）に記録。
+4. 次の GHA 実行が Todoist に反映（完了=close／削除=delete／日=due_date）し、done 行（target_type=cleanup_apply）を足し、#consult に件数を報告。失敗は次回再試行。
+- 「残す」は14日間候補から外す。日を変えたものはその日が来るまで外れる。
+- 判断ログのおすすめ一致（payload.followed_suggest）で、おすすめ精度を週次レビューで見られる。
+- 止める: リポジトリ変数 JARVIS_TODOIST_CLEANUP_DISABLE=1。loopware は merge で自動デプロイされない（デプロイは松野さんに伝えてから）。
