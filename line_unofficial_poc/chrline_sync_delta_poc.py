@@ -380,18 +380,55 @@ def _op_revision(cl, op) -> int | None:
         return None
 
 
+# 夜パイプライン（jarvis_partner_night_pipeline.py）はこの接頭辞を見て失敗として報告する。
+SYNC_FAIL_MARK = "# CHRLINE sync 失敗:"
+# サーバが同期のやり直し（fullSync / partialFullSync）を求めたときに追従する上限。
+# CHRLINE の sync() は無制限に自分を呼び直すため、2026-10-27 以降 RecursionError で止まっていた。
+SYNC_MAX_RESYNC = 3
+
+
+class _ResyncLimit(Exception):
+    pass
+
+
 def _run_sync(cl, local_revision: int, count: int, sync_reason: int | None) -> list:
+    orig_sync = cl.sync
+    calls = [0]
+
+    def guarded(*a, **k):
+        calls[0] += 1
+        if calls[0] > SYNC_MAX_RESYNC + 1:
+            raise _ResyncLimit(k.get("revision", a[0] if a else None))
+        return orig_sync(*a, **k)
+
+    # CHRLINE の sync() は内部で self.sync(...) を呼び直すので、インスタンス属性で差し替えて回数を数える
+    cl.sync = guarded
     try:
-        return cl.sync(local_revision, count, sync_reason)
+        return guarded(local_revision, count, sync_reason)
+    except _ResyncLimit as e:
+        print(
+            f"{SYNC_FAIL_MARK} サーバが同期のやり直しを{SYNC_MAX_RESYNC}回続けて要求（revision={e}）。"
+            " 直近補完のみで続行",
+            file=sys.stderr,
+        )
+        return []
+    except RecursionError as e:
+        print(f"{SYNC_FAIL_MARK} RecursionError: {e}", file=sys.stderr)
+        return []
     except RuntimeError as e:
-        print(f"# sync RuntimeError: {e}", file=sys.stderr)
+        print(f"{SYNC_FAIL_MARK} RuntimeError: {e}", file=sys.stderr)
         return []
     except EOFError as e:
-        print(f"# sync 応答エラー: {e}", file=sys.stderr)
+        print(f"{SYNC_FAIL_MARK} 応答エラー: {e}", file=sys.stderr)
         return []
     except Exception as e:
-        print(f"# sync 例外: {type(e).__name__}: {e}", file=sys.stderr)
+        print(f"{SYNC_FAIL_MARK} 例外 {type(e).__name__}: {e}", file=sys.stderr)
         return []
+    finally:
+        try:
+            del cl.sync
+        except AttributeError:
+            pass
 
 
 def main() -> int:

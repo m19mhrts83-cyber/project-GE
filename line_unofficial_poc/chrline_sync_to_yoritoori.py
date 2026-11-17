@@ -563,13 +563,24 @@ def _messages_from_response(cl, res) -> list:
     return []
 
 
-def _latest_heading_date_ts_ms(path: Path) -> int | None:
-    """やり取り見出しの最新日付（00:00）をミリ秒で返す。"""
+def _latest_heading_date_ts_ms(path: Path, tags: tuple[str, ...] = ()) -> int | None:
+    """やり取り見出しの最新日付（00:00）をミリ秒で返す。
+
+    tags を渡すと、そのタグ文字列を含む見出しだけを対象にする
+    （1:1 は他経路の見出しで日付が進んでも取りこぼさないようにする）。
+    """
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return None
-    dates = re.findall(r"^### ([12]\d{3}/\d{2}/\d{2})", text, flags=re.MULTILINE)
+    if tags:
+        dates = [
+            m.group(1)
+            for m in re.finditer(r"^### ([12]\d{3}/\d{2}/\d{2})(.*)$", text, flags=re.MULTILINE)
+            if any(t and t in m.group(2) for t in tags)
+        ]
+    else:
+        dates = re.findall(r"^### ([12]\d{3}/\d{2}/\d{2})", text, flags=re.MULTILINE)
     if not dates:
         return None
     latest = max(dates)
@@ -604,8 +615,19 @@ def _append_direct_backfill_from_recent(
     if count <= 0:
         return 0
     my_mid = (getattr(cl, "mid", None) or "").strip()
-    since_day = _latest_heading_date_ts_ms(route.yoritoori_md)
-    since_ts = (since_day + 24 * 60 * 60 * 1000) if since_day else None
+    needle = (target.needle or "").strip()
+    since_day = None
+    if needle.startswith("u") and _looks_like_line_chat_mid(needle):
+        # 1:1 は公式Bot・グループ経路と見出しを共有しないので、自分のタグの見出しだけで起点を決める。
+        # 重複は dedup key で落とす。
+        since_day = _latest_heading_date_ts_ms(
+            route.yoritoori_md, tags=(target.recv_tag, target.send_tag)
+        )
+        since_ts = since_day if since_day else None
+    else:
+        # グループは公式Bot・公式エクスポートと同じ発言を拾うので、md 全体の最新見出し日の翌日から。
+        since_day = _latest_heading_date_ts_ms(route.yoritoori_md)
+        since_ts = (since_day + 24 * 60 * 60 * 1000) if since_day else None
     try:
         res = cl.getRecentMessagesV2(target.needle, max(1, min(count, 300)))
     except Exception as e:
