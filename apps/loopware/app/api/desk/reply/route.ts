@@ -12,7 +12,8 @@ export const maxDuration = 90;
 /**
  * 判断デスクの返信欄（2026-11-17）。
  * GET  ?item=<id>  → この相手に過去に送った返信と、やり取り md の末尾（AI は使わない）
- * POST { itemId, op: compose|proofread|revise|send, draft?, instruction?, to?, account?, openedAt?, assist? }
+ * POST { itemId, op: compose|proofread|revise|send|status, draft?, instruction?, engine?, to?, account?, openedAt?, assist? }
+ *   engine=gemini は従量課金。画面で松野さんが「Gemini で作る」を押したその1回だけ送られてくる
  */
 export async function GET(req: Request) {
   const id = new URL(req.url).searchParams.get("item") || "";
@@ -39,6 +40,7 @@ type Body = {
   assist?: { proofread?: number; revise?: number };
   subject?: string;
   input?: "voice" | "text";
+  engine?: string;
   /** 指示1回ごとの鍵（作成中の再試行でもコメントは1行だけ） */
   idemKey?: string;
 };
@@ -68,6 +70,11 @@ export async function POST(req: Request) {
     return NextResponse.json(r, { status: r.ok ? 200 : 409 });
   }
 
+  if (op === "status") {
+    const r = await draftViaDashboard(id, "status", {});
+    return NextResponse.json(r);
+  }
+
   if (op !== "compose" && op !== "proofread" && op !== "revise") {
     return NextResponse.json({ ok: false, message: "op が不正です" }, { status: 400 });
   }
@@ -88,6 +95,21 @@ export async function POST(req: Request) {
     }).catch(() => undefined);
   }
 
-  const r = await draftViaDashboard(id, op as DraftOp, { draft: String(b.draft || ""), instruction });
+  const engine = b.engine === "gemini" ? "gemini" : "flat";
+  // 従量課金を使った判断も残す（週次で「Mac が止まっていた回数・Gemini を使った回数」を見るため）
+  if (engine === "gemini") {
+    await writeDecision(serviceClient(), {
+      surface: "triage",
+      action: "comment",
+      source: "loopware",
+      targetType: "triage_item",
+      targetId: id,
+      subject: String(b.subject || "").slice(0, 200),
+      note: `従量課金の Gemini で${op === "compose" ? "下書き作成" : op === "proofread" ? "誤字脱字チェック" : "見直し"}を了承`,
+      idemKey: `${String(b.idemKey || `lw-reply-${op}-${id}`).slice(0, 100)}-paid`,
+      payload: { step: "paid_ai_ok", engine: "gemini", op },
+    }).catch(() => undefined);
+  }
+  const r = await draftViaDashboard(id, op as DraftOp, { draft: String(b.draft || ""), instruction, engine });
   return NextResponse.json(r, { status: r.ok || r.pending ? 200 : 409 });
 }

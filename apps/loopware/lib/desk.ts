@@ -321,7 +321,9 @@ export async function loadPastReplies(sb: SupabaseClient, id: string, max = 5): 
     .slice(0, max);
 }
 
-export type DraftOp = "compose" | "proofread" | "revise" | "context";
+export type DraftOp = "compose" | "proofread" | "revise" | "context" | "status";
+/** flat = Mac の定額 AI（既定）／gemini = 従量課金（松野さんが画面で1回ごとに了承したときだけ） */
+export type DraftEngine = "flat" | "gemini";
 
 export type DraftResult = {
   ok: boolean;
@@ -332,6 +334,11 @@ export type DraftResult = {
   message?: string;
   /** やり取り md の末尾（context のとき） */
   log?: { folder?: string; notice: string; tail: string } | null;
+  /** status のとき: Mac の定額 AI の係の最後の生存報告から何秒か */
+  macAgeSec?: number | null;
+  macAlive?: boolean;
+  gemini?: boolean;
+  engine?: DraftEngine;
 };
 
 async function postJson(url: string, body: unknown, timeoutMs: number): Promise<{ status: number; json: Record<string, unknown> }> {
@@ -361,15 +368,15 @@ async function postJson(url: string, body: unknown, timeoutMs: number): Promise<
 export async function draftViaDashboard(
   id: string,
   op: DraftOp,
-  args: { draft?: string; instruction?: string },
+  args: { draft?: string; instruction?: string; engine?: DraftEngine },
 ): Promise<DraftResult> {
   const s = maSig(id, "lwdraft");
   if (!s) return { ok: false, message: "MAIL_ACTION_TOKEN が loopware に設定されていません" };
   try {
     const { json } = await postJson(
       `${dashboardBase()}/api/g/lwdraft/${encodeURIComponent(id)}`,
-      { s, op, draft: args.draft || "", instruction: args.instruction || "" },
-      op === "context" ? 20_000 : 80_000,
+      { s, op, draft: args.draft || "", instruction: args.instruction || "", engine: args.engine || "flat" },
+      op === "context" || op === "status" ? 20_000 : 80_000,
     );
     return json as DraftResult;
   } catch (e) {

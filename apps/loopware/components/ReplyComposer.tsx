@@ -8,7 +8,8 @@ import type { DeskCard } from "@/lib/deskCore";
  * 判断デスクの返信欄（2026-11-17）。Jarvis の画面へ飛ばずに、ここで
  *   過去に送った返信を見る → 声（または文字）で指示 → 下書き → 誤字脱字・指示で直す → 送信
  * まで済ませる。下書き作成・送信の中身は Jarvis 側（Slack の返信モーダルと同じ処理）。
- * AI は Mac の定額枠だけ（従量課金なし）。送信は「送信する」→「この宛先で送る」の二段。
+ * AI は Mac の定額枠が既定。Mac がスリープ等で応答しないときだけ「従量課金の Gemini で作りますか？」と
+ * 聞き、押されたその1回だけ Gemini を使う（自動では切り替えない）。送信は「送信する」→「この宛先で送る」の二段。
  */
 
 type Past = { id: string; subject: string; at: string; to: string; body: string };
@@ -47,7 +48,19 @@ function ymd(iso: string): string {
   return `${d.getUTCFullYear()}/${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 }
 
-type Res = { ok?: boolean; pending?: boolean; text?: string; changes?: string[]; message?: string };
+type Res = {
+  ok?: boolean;
+  pending?: boolean;
+  text?: string;
+  changes?: string[];
+  message?: string;
+  engine?: string;
+  macAlive?: boolean;
+  macAgeSec?: number | null;
+  gemini?: boolean;
+};
+type Op = "compose" | "proofread" | "revise";
+const OP_LABEL: Record<Op, string> = { compose: "下書き作成", proofread: "誤字脱字チェック", revise: "見直し" };
 
 async function call(body: unknown): Promise<Res> {
   try {
@@ -84,6 +97,8 @@ export default function ReplyComposer({
   const [note, setNote] = useState("");
   const [changes, setChanges] = useState<string[]>([]);
   const [confirm, setConfirm] = useState(false);
+  /** Mac が応答しないとき「従量課金の Gemini で作るか」を聞く */
+  const [askPaid, setAskPaid] = useState<{ op: Op; why: string } | null>(null);
   const openedAt = useRef(Date.now());
   const assist = useRef({ proofread: 0, revise: 0 });
 
@@ -107,18 +122,20 @@ export default function ReplyComposer({
     };
   }, [card.id]);
 
-  /** 下書き系。Mac の定額 AI が作成中なら、少し待って同じ依頼をもう一度（同じ依頼は使い回される） */
+  /**
+   * 下書き系。既定は Mac の定額 AI。Mac の係が止まっている（スリープ等）ときや、1分待っても返らないときは
+   * 「従量課金の Gemini で作りますか？」と聞く。Gemini は押されたその1回だけ（engine=gemini）。
+   */
   const run = useCallback(
-    async (op: "compose" | "proofread" | "revise") => {
+    async (op: Op, engine: "flat" | "gemini" = "flat", skipCheck = false) => {
       if (busy) return;
       if (speech.listening) speech.stop();
       if (op === "revise" && !instr.trim()) {
         setNote("直し方をひとこと話すか書いてください（例: もう少し短く、日程は来週で）");
         return;
       }
-      setBusy(op);
+      setAskPaid(null);
       setChanges([]);
-      setNote(op === "compose" ? "下書きを作っています（Mac の定額AI・1分ほど）…" : op === "proofread" ? "誤字脱字を見ています…" : "指示どおり直しています…");
       const key = `lw-reply-${op}-${uid()}`;
       const body = {
         itemId: card.id,
@@ -128,16 +145,39 @@ export default function ReplyComposer({
         subject: card.subject,
         input: viaVoice ? "voice" : "text",
         idemKey: key,
+        engine,
       };
-      let r: Res = {};
-      for (let i = 0; i < 4; i++) {
-        r = await call(body);
-        if (!r.pending) break;
-        setNote(`Mac の定額AIで作成中です…（${i + 1}回目の確認）`);
-        await new Promise((ok) => setTimeout(ok, 5000));
+      setBusy(op);
+      if (engine === "flat" && !skipCheck) {
+        // Mac の係が止まっていれば、待たずに聞く（AI は使わない確認）
+        setNote("Mac の定額AIの様子を見ています…");
+        const st = await call({ itemId: card.id, op: "status" });
+        if (st.ok && st.macAlive === false && st.gemini) {
+          setBusy("");
+          setNote("");
+          const ago = typeof st.macAgeSec === "number" ? `${Math.round(st.macAgeSec / 60)}分` : "しばらく";
+          setAskPaid({ op, why: `Mac の定額AIが${ago}応答していません（スリープ中かもしれません）` });
+          return;
+        }
       }
+      setNote(
+        engine === "gemini"
+          ? `従量課金の Gemini で${OP_LABEL[op]}しています…`
+          : op === "compose"
+            ? "下書きを作っています（Mac の定額AI・1分ほど）…"
+            : op === "proofread"
+              ? "誤字脱字を見ています…"
+              : "指示どおり直しています…",
+      );
+      const r = await call(body);
       setBusy("");
+      if (r.pending) {
+        setNote("");
+        setAskPaid({ op, why: "Mac の定額AIが1分たっても返してきません（混んでいるか、止まっています）" });
+        return;
+      }
       if (r.ok && r.text) {
+        const paid = r.engine === "gemini" ? "（Gemini・従量課金）" : "";
         setDraft(r.text);
         setChanges(r.changes || []);
         if (op !== "compose") assist.current[op] += 1;
@@ -147,12 +187,12 @@ export default function ReplyComposer({
         }
         setNote(
           op === "compose"
-            ? `✍️ ${r.message || "下書きを作りました"}。読んで直してから送信してください`
+            ? `✍️ ${r.message || "下書きを作りました"}${paid}。読んで直してから送信してください`
             : op === "proofread"
               ? r.changes?.length
-                ? "✅ 誤字脱字を直しました（下に直した所）"
-                : "✅ 誤字脱字は見つかりませんでした"
-              : "✅ 指示どおり直しました",
+                ? `✅ 誤字脱字を直しました${paid}（下に直した所）`
+                : `✅ 誤字脱字は見つかりませんでした${paid}`
+              : `✅ 指示どおり直しました${paid}`,
         );
       } else {
         setNote(`❌ ${r.message || "作れませんでした"}（本文はそのままです）`);
@@ -299,6 +339,26 @@ export default function ReplyComposer({
       </details>
 
       {note ? <p className="meta reply-note" role="status">{note}</p> : null}
+
+      {askPaid ? (
+        <div className="reply-confirm" role="alertdialog" aria-label="従量課金の確認">
+          <p>
+            {askPaid.why}。<b>従量課金の Gemini</b> で{OP_LABEL[askPaid.op]}しますか？
+            <span className="meta">（この1回だけ。1回あたり1円前後の見込み）</span>
+          </p>
+          <div className="btn-row">
+            <button className="primary" onClick={() => void run(askPaid.op, "gemini")} disabled={Boolean(busy)}>
+              Gemini で{OP_LABEL[askPaid.op]}（従量課金）
+            </button>
+            <button onClick={() => void run(askPaid.op, "flat", true)} disabled={Boolean(busy)}>
+              Mac をもう少し待つ
+            </button>
+            <button className="ghost" onClick={() => setAskPaid(null)}>
+              やめる
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {confirm ? (
         <div className="reply-confirm">
