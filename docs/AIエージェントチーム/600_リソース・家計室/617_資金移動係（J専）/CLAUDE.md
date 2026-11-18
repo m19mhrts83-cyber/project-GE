@@ -1,18 +1,18 @@
 # 617 資金移動係（J専）
 
 ID: **617**。リソース・家計室。  
-表示名の **（J専）** ＝ **Jarvis 実行専属**（他ツールは送金しない）。
+表示名の **（J専）** は旧名の印。**2026-11-19 松野さんの判断で実行者は Jarvis・Codex**（Orca 環境で Jarvis だけに絞る意味が薄いため）。Claude Code／FRIDAY／GenCode／Grok は送金しない。
 
 ## 位置づけ（他社員と違う）
 
 本係は **定型作業の型（プレイブック）** を置くための社員枠である。  
-**起動は人が頼む形が本線**。実行を頼む相手は **Jarvis のみ**。FRIDAY／GenCode／Claude Code／Codex／Grok 等に送金・OTP・IB／AW 操作を振らない。
+**起動は人が頼む形が本線**。実行を頼む相手は **Jarvis または Codex**。FRIDAY／GenCode／Claude Code／Grok 等に送金・OTP・IB／AW 操作を振らない。
 
 | 層 | 正本 | 誰が動く |
 |---|---|---|
 | 不足の検知・促し | **616** | どのツールでも可（ルール＋616 CLAUDE） |
-| **本係の発動・寄せ実行** | **`/adjust_cash`**（skill `adjust-cash`）＋本フォルダ | **Jarvis のみ**。コマンド＝本係起動 |
-| 定型手順・境界 | 本フォルダ `CLAUDE.md`／`flow.md` | 発動時に Jarvis が読む。他ツールは実行しない |
+| **本係の発動・寄せ実行** | **`/adjust_cash`**（skill `adjust-cash`）＋本フォルダ | **Jarvis または Codex**（Jarvis は `/adjust_cash`、Codex は同じ skill 手順を読んで実行）。コマンド＝本係起動 |
+| 定型手順・境界 | 本フォルダ `CLAUDE.md`／`flow.md` | 発動時に Jarvis／Codex が読む。他ツールは実行しない |
 
 **頼み方（正）**: Cursor で **`/adjust_cash`** → Jarvis が本係を起動（先頭に `【617 資金移動係（J専）】起動`）。  
 他社員のように「社員フォルダを開いて定期ジョブで回す」対象ではない。
@@ -60,8 +60,8 @@ ID: **617**。リソース・家計室。
 
 | 方法 | 使う？ | 内容 |
 |---|---|---|
-| CLI | ○（**Jarvisのみ**） | `run_phase1_*`／transfer 系（了承後）。読取は watch／Zaim／給与カレンダー |
-| ブラウザ／画面操作 | ○（**Jarvisのみ**） | IB／AW 入力・遷移。実行クリックは人 |
+| CLI | ○（**Jarvis・Codex**） | `run_phase1_*`／transfer 系（了承後）。読取は watch／Zaim／給与カレンダー |
+| ブラウザ／画面操作 | ○（**Jarvis・Codex**） | IB／AW 入力・遷移。実行クリックは人 |
 | 外部API | △ | Slack 完了報告（任意）。Webhook キー名のみ |
 | スキル／スラッシュ | ○ | **`/adjust_cash`** が実行入口（Jarvis） |
 | 他ツールからの実行 | × | 禁止 |

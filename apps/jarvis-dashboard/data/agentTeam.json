@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-12T23:16:06+09:00",
+  "updated": "2026-11-19T01:26:55+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -1320,7 +1320,7 @@
       "tool_fit": "A+B",
       "tool_notes": "triage→#consult 返信／見送り／後回し(Todoist)。VRは516。mute学習あり。スター付き（人が選んだもの）は116の工程03＝Claude予定タスク（平日8:38・#report報告）が起票し、カードには出さない",
       "note": "設計中（2026-10-19）。正本 docs/Jarvis_メール要対応_Slack操作_20261019.md",
-      "summary": "要返信メールを `#consult` で返信／見送り／Todoist",
+      "summary": "要返信メールを `#consult` で返信／見送り／Todoist。スター付きメールの起票（工程03・Claude予定タスク）も担当",
       "flow_summary": "pending triage → ルール帳を当てて**スコア上位5**を `#consult`（本線＝短索引／カード＝スレ）→ 人がボタンで返信・見送り・後回し → 判断ログ → 週次でルール帳へ。スター付き（人が選んだもの）は工程03の予定タスクが起票し、カードには出さない。",
       "builder_tag": "",
       "mixup_kind": "",
@@ -1415,7 +1415,8 @@
         "primary_report": "consult",
         "report_channels": [
           "consult",
-          "ops"
+          "ops",
+          "report"
         ],
         "reports": [
           {
@@ -1434,8 +1435,24 @@
           },
           {
             "kind": "完了・生存",
-            "destination": "通常不要（カード自体が入口）",
-            "channels": []
+            "destination": "2026-11-22 までは毎回 `#report` に🟢1通（変更直後の確認用・松野さん 11/15）。以後は不要（カード自体が入口）",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "スター起票（工程03）",
+            "destination": "`#report` に1通（11/22 まで毎回、以後🟡🔴のみ）",
+            "channels": [
+              "report"
+            ]
+          },
+          {
+            "kind": "判断ログ（工程16）",
+            "destination": "平日21:00 の unseen 記録のあと `#report` に1通（今日出したカード数・今日たまった判断の内訳・7日合計。カードを出したのに0件なら🟡）。11/22 まで、立ち上がり確認・松野さん 11/15",
+            "channels": [
+              "report"
+            ]
           },
           {
             "kind": "ch",
@@ -6087,7 +6104,7 @@
       "flowforge_share_url": "",
       "flowforge_edit_url": "",
       "permissions": {
-        "can_do": "カード引落バッファ不足の検知・Slack促し（ルール＋CLAUDE.md・スキル不要。送金・銀行ログインはしない。寄せ実行は Jarvis＋人了承）",
+        "can_do": "カード引落バッファ不足の検知・Slack促し（ルール＋CLAUDE.md・スキル不要。送金・銀行ログインはしない。寄せ実行は Jarvis／Codex＋人了承）",
         "methods": [
           {
             "name": "CLI",
@@ -6289,7 +6306,7 @@
       "schedule": "人依頼／616手渡しのみ（自動送金なし）",
       "tool_assigned": "jarvis",
       "tool_fit": "C",
-      "tool_notes": "定型の型（プレイブック）のみ。実行はJarvis専属（/adjust_cash）。FRIDAY等は送金しない。616は促し",
+      "tool_notes": "定型の型（プレイブック）のみ。実行はJarvis・Codex（/adjust_cash。2026-11-19〜）。FRIDAY・Claude等は送金しない。616は促し",
       "note": "2026-10-21 新設。他社員と位置づけが異なる（実行依頼はJarvisのみ）。正本 CLAUDE.md／jarvis-agent-617-fund-transfer.mdc。",
       "summary": "2026-10-21 新設。他社員と位置づけが異なる（実行依頼はJarvisのみ）。正本 CLAUDE.md／jarvis-agent-617-fund-transfer.mdc。",
       "flow_summary": "**人が頼む**（または 616 手渡し）→ Jarvis が最新残高→ギャップ表→了承→レール実行（OTPは人）。**他ツールは送金しない**。定期自動は置かない。",
@@ -6301,16 +6318,16 @@
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/NYLpUySk0tY27PvI",
       "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_duOrNmGET7-E_c7AAQE9fLfO",
       "permissions": {
-        "can_do": "資金移動係（J専）— 定型手順の保持。実行は Jarvis のみ（/adjust_cash・人が頼む）。他ツールは送金・銀行ログインしない",
+        "can_do": "資金移動係（J専）— 定型手順の保持。実行は Jarvis・Codex（/adjust_cash・人が頼む。2026-11-19〜）。他ツールは送金・銀行ログインしない",
         "methods": [
           {
             "name": "CLI",
-            "level": "○（**Jarvisのみ**）",
+            "level": "○（**Jarvis・Codex**）",
             "detail": "`run_phase1_*`／transfer 系（了承後）。読取は watch／Zaim／給与カレンダー"
           },
           {
             "name": "ブラウザ／画面操作",
-            "level": "○（**Jarvisのみ**）",
+            "level": "○（**Jarvis・Codex**）",
             "detail": "IB／AW 入力・遷移。実行クリックは人"
           },
           {
@@ -6518,44 +6535,18 @@
       "flowforge_id": "flow_fQRxeChymx2NZAzi70ppxMtb",
       "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_fQRxeChymx2NZAzi70ppxMtb",
       "flowforge_share_url": "",
-      "flowforge_edit_url": "",
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_fQRxeChymx2NZAzi70ppxMtb",
       "permissions": {
-        "can_do": "数値記録・読戻し、確認済み最新証拠の非公開保存、KURASHIFT照合。銀行IB・OTPはJarvis担当、Slack実送信は本人了承後。",
-        "methods": [
-          {
-            "name": "チャット・検索",
-            "level": "○",
-            "detail": "一覧の要約、`#consult`／`#report` の文面"
-          },
-          {
-            "name": "外部連携（API/MCP）",
-            "level": "○",
-            "detail": "Supabase 読み取り（財務の対象一覧・`sync_meta`）"
-          },
-          {
-            "name": "CLI",
-            "level": "○",
-            "detail": "`scripts/jarvis_purchase_asset_evidence.py --out <月フォルダ> --only all`"
-          },
-          {
-            "name": "ブラウザ／Playwright",
-            "level": "○",
-            "detail": "Mac 専有。各社マイページの照会画面のみ"
-          },
-          {
-            "name": "画面操作（OTP）",
-            "level": "△",
-            "detail": "**ログイン用** OTP だけ（メール・Messages の既存経路）。値はチャットに出さない。振込用コードには触れない"
-          }
-        ],
-        "methods_filled": true,
+        "can_do": "資産数値の記録・読戻し、確認済み画像の非公開保存、KURASHIFT表示照合、Slack下書き（実送信は本人了承後）",
+        "methods": [],
+        "methods_filled": false,
         "env_keys": [
           "SLACK_WEBHOOK_OPS"
         ],
         "site_logins": [],
         "site_logins_summary": "なし",
         "has_site_logins": false,
-        "human_gate": "停滞時のまとめ承認／追加候補の承認／月次一覧のレビュー／先方への送付。",
+        "human_gate": "対外送信・金融操作・削除。銀行IBとOTPを自動処理し得る取得器はJarvis・Codex担当（2026-11-19〜）。",
         "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
         "source": "claude+permissions_yaml"
       },
@@ -6563,15 +6554,16 @@
         "trigger_kinds": [
           {
             "id": "human",
-            "on": true,
-            "detail": "「最新の資産エビデンス取って」「資産証明のスクショ更新して」→ 即時実行",
-            "raw": "**人が頼む**: 「最新の資産エビデンス取って」「資産証明のスクショ更新して」→ 即時実行"
+            "on": false,
+            "detail": "",
+            "raw": ""
           },
           {
             "id": "schedule",
             "on": true,
-            "detail": "毎週日曜 **09:10** JST（launchd `com.matsunoma.jarvis.portfolio-weekly`）＋ Mac 起動時（RunAtLoad）＋ 朝オープンの取りこぼし。成功済みの週はスキップ。手動は KURASHIFT ホームのボタン／`--force` / 毎月 **第1日曜 10:30 JST**（launchd、松野さんの了承後に登録。週次 09:10 の後にずらし、同じロック `~/Library/Logs/jarvis_portfolio/weekly.lock.d` を共有して OTP 競合を避ける）",
-            "raw": "**時間（週次・運用中）**: 毎週日曜 **09:10** JST（launchd `com.matsunoma.jarvis.portfolio-weekly`）＋ Mac 起動時（RunAtLoad）＋ 朝オープンの取りこぼし。成功済みの週はスキップ。手動は KURASHIFT ホームのボタン／`--force`"
+            "detail": "数値=既存09:10起動・週単位収集／最新画像=音声・チャット依頼／未取得分=依頼された対象だけ取り直し",
+            "raw": "",
+            "from_registry": true
           },
           {
             "id": "event",
@@ -6582,54 +6574,30 @@
           {
             "id": "watch",
             "on": false,
-            "detail": "撮れなかった分が残ったら `#consult` に承認依頼1件 → 松野さんが承認 → 止まった分をバッチで再実行 / 財務の一覧に金融機関が増えたら次回の撮影時に追加候補として報告",
-            "raw": "**停滞時（副）**: 撮れなかった分が残ったら `#consult` に承認依頼1件 → 松野さんが承認 → 止まった分をバッチで再実行"
+            "detail": "",
+            "raw": ""
           }
         ],
         "trigger_kinds_on": [
-          "human",
           "schedule"
         ],
-        "trigger_kinds_label": "人依頼 · 時間",
+        "trigger_kinds_label": "時間",
         "triggers_filled": true,
-        "when": "週次=日曜09:10 launchd portfolio-weekly（運用中）／月次撮影=第1日曜10:30（launchd未登録）＋人依頼／停滞時はまとめ承認1回→バッチ再実行",
+        "when": "数値=既存09:10起動・週単位収集／最新画像=音声・チャット依頼／未取得分=依頼された対象だけ取り直し",
         "registry_trigger": "時間",
-        "registry_schedule": "週次=日曜09:10 launchd portfolio-weekly（運用中）／月次撮影=第1日曜10:30（launchd未登録）＋人依頼／停滞時はまとめ承認1回→バッチ再実行",
+        "registry_schedule": "数値=既存09:10起動・週単位収集／最新画像=音声・チャット依頼／未取得分=依頼された対象だけ取り直し",
         "primary_report": "report",
         "report_channels": [
-          "report",
-          "consult",
-          "ops"
+          "report"
         ],
-        "reports": [
-          {
-            "kind": "完了報告",
-            "destination": "Slack `#report`（件数・ok/skip・保存先パスのみ。金額・口座番号は書かない）",
-            "channels": [
-              "report"
-            ]
-          },
-          {
-            "kind": "週次の数値",
-            "destination": "KURASHIFT／財務（Supabase）。失敗した取得元は ダッシュの「次にやること」に出る",
-            "channels": []
-          },
-          {
-            "kind": "要判断（停滞のまとめ承認・追加候補）",
-            "destination": "Slack `#consult`",
-            "channels": [
-              "consult"
-            ]
-          },
-          {
-            "kind": "失敗・障害",
-            "destination": "Slack `#ops`",
-            "channels": [
-              "ops"
-            ]
-          }
-        ],
+        "reports": [],
         "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_fQRxeChymx2NZAzi70ppxMtb",
+            "kind": "flowforge"
+          },
           {
             "title": "CLAUDE.md",
             "path": "docs/AIエージェントチーム/600_リソース・家計室/618_資産記録・エビデンス係/CLAUDE.md",
@@ -6661,9 +6629,8 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
-        "source": "claude+registry+ops_yaml",
-        "summary": ""
+        "procedure_count": 6,
+        "source": "claude+registry+ops_yaml"
       }
     },
     {
@@ -12091,6 +12058,18 @@
         "role_split": "2026-10-21 新設。他社員と位置づけが異なる（実行依頼はJarvisのみ）。正本 CLAUDE.md／jarvis-agent-617-fund-transfer.mdc。"
       },
       {
+        "side": "ai_only",
+        "agent_id": "618",
+        "agent_name": "資産記録・エビデンス係",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "数値は財務DB履歴、画像は同じSupabaseの非公開Storageに正常な最新参照のみ。KURASHIFTで読戻し/表示照合/証拠閲覧。Slackは出口専用。Phase 1–3本番反映・画面確認済み。初回画像取得と新run照合は次の実行時。"
+      },
+      {
         "side": "paired",
         "agent_id": "711",
         "agent_name": "家族Journal週次材料係",
@@ -12605,18 +12584,6 @@
         ],
         "grok_department": "総務計画",
         "role_split": "山下向けコーチング"
-      },
-      {
-        "side": "ai_only",
-        "agent_id": "618",
-        "agent_name": "資産記録・エビデンス係",
-        "builder_tag": "",
-        "mixup_kind": "ai_only",
-        "grok_counterpart": "",
-        "grok_ids": [],
-        "grok_labels": [],
-        "grok_department": "",
-        "role_split": "2026-11-14 新設（松野さん依頼・Claudeチャット準備）。同日、資産週次(portfolio-weekly・数値)を統合し改名。月次=画面証拠。対象は財務の一覧と突合。保存先 OneDrive 240_融資/資産エビデンス_月次。"
       }
     ],
     "mapping_counts": {

@@ -494,7 +494,7 @@ agents:
     trigger: 人依頼
     tool_assigned: jarvis
     tool_fit: C
-    tool_notes: 定型の型（プレイブック）のみ。実行はJarvis専属（/adjust_cash）。FRIDAY等は送金しない。616は促し
+    tool_notes: 定型の型（プレイブック）のみ。実行はJarvis・Codex（/adjust_cash。2026-11-19〜）。FRIDAY・Claude等は送金しない。616は促し
     schedule: 人依頼／616手渡しのみ（自動送金なし）
     note: 2026-10-21 新設。他社員と位置づけが異なる（実行依頼はJarvisのみ）。正本 CLAUDE.md／jarvis-agent-617-fund-transfer.mdc。
   '618':

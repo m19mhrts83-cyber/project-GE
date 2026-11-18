@@ -1,5 +1,5 @@
 ---
-description: 616寄せリマインド係。不足検知・Slack促しはルール＋CLAUDE.md本線（スキル不要）。送金はJarvisのみ。
+description: 616寄せリマインド係。不足検知・Slack促しはルール＋CLAUDE.md本線（スキル不要）。送金はJarvis・Codex。
 alwaysApply: true
 ---
 
@@ -13,7 +13,7 @@ Cursor スキル／スラッシュ（`/adjust_cash`）に振り分けない。
 | 層 | 正 | 誰でも可？ |
 |---|---|---|
 | **616** | 不足検知 → Slack／チャット促し | **はい**（Jarvis／FRIDAY／GenCode／Claude Code／Codex 等） |
-| **送金・OTP** | 人了承のうえ **Jarvis** が寄せ実行 | 616 ではやらない |
+| **送金・OTP** | 人了承のうえ **Jarvis／Codex** が寄せ実行 | 616 ではやらない |
 
 正本指示: `docs/AIエージェントチーム/600_リソース・家計室/616_寄せリマインド係/CLAUDE.md`  
 Cursor ルール: 本ファイル  

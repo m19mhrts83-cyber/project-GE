@@ -10,5 +10,5 @@
 - フロー: ./flow.md · FF `flow_duOrNmGET7-E_c7AAQE9fLfO` · 閲覧 `share/NYLpUySk0tY27PvI`
 - 設計案: ./設計案_20261021.md
 
-**送金・OTP・IB／AW 操作は Jarvis のみ。**  
+**送金・OTP・IB／AW 操作は Jarvis・Codex（2026-11-19〜）。**  
 表示名の **（J専）** は Jarvis 実行専属の印。他ツールは定型の型として読むだけにし、実行しない。

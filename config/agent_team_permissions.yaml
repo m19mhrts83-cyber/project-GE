@@ -28,7 +28,7 @@ defaults:
 agents:
   "618":
     can_do: "資産数値の記録・読戻し、確認済み画像の非公開保存、KURASHIFT表示照合、Slack下書き（実送信は本人了承後）"
-    human_gate: "対外送信・金融操作・削除。銀行IBとOTPを自動処理し得る取得器はJarvis担当。"
+    human_gate: "対外送信・金融操作・削除。銀行IBとOTPを自動処理し得る取得器はJarvis・Codex担当（2026-11-19〜）。"
   "111":
     can_do: "パートナー連絡の差分取込・要約・#report 材料（送信は人）"
     site_logins:
@@ -135,10 +135,10 @@ agents:
     can_do: "USD/JPY 取得・グラフ・短報（売買指図なし）"
     site_logins: []
   "616":
-    can_do: "カード引落バッファ不足の検知・Slack促し（ルール＋CLAUDE.md・スキル不要。送金・銀行ログインはしない。寄せ実行は Jarvis＋人了承）"
+    can_do: "カード引落バッファ不足の検知・Slack促し（ルール＋CLAUDE.md・スキル不要。送金・銀行ログインはしない。寄せ実行は Jarvis／Codex＋人了承）"
     site_logins: []
   "617":
-    can_do: "資金移動係（J専）— 定型手順の保持。実行は Jarvis のみ（/adjust_cash・人が頼む）。他ツールは送金・銀行ログインしない"
+    can_do: "資金移動係（J専）— 定型手順の保持。実行は Jarvis・Codex（/adjust_cash・人が頼む。2026-11-19〜）。他ツールは送金・銀行ログインしない"
     site_logins: []
   "711":
     can_do: "家族 Journal 週次材料の抽出（評価の正は Grok）"

@@ -3,7 +3,7 @@
 ## 方針（確定 2026-10-21）
 
 **617 は寄せ（資金移動）の定型プレイブック枠。**  
-実行を頼むのは **Jarvis のみ**。FRIDAY／GenCode／Claude Code／Codex／Grok に送金・OTP・IB／AW を振らない。
+実行を頼むのは **Jarvis または Codex**（2026-11-19〜）。FRIDAY／GenCode／Claude Code／Grok に送金・OTP・IB／AW を振らない。
 
 | 層 | 正 | 誰でも可？ |
 |---|---|---|
@@ -28,7 +28,7 @@
 2. skill `adjust-cash` に従う（**最新残高ゲート §0c** → ギャップ表 → 了承 → 入力）
 3. keep（Preferred 残債 10,860 等）を usable から控除（`jarvis-fund-transfer-keep.mdc`）
 4. 了承前の `--go`／`--execute` 禁止。OTP／実行ボタンは人
-5. 他ツールからの「617 を回して送金」依頼が来たら **拒否し Jarvis へ `/adjust_cash` を渡す**旨を返す
+5. Jarvis・Codex 以外からの「617 を回して送金」依頼が来たら **拒否し Jarvis へ `/adjust_cash`（または Codex）を渡す**旨を返す
 ## やらないこと
 
 - 617 を GHA／launchd の自動送金ジョブにする

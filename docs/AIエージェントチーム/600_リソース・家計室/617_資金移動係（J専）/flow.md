@@ -40,11 +40,11 @@ flowchart TD
 |---|---|---|---|---|
 | 1 | **人が頼む**（対象・due・寄せ先） | 会話 | **人**＋Jarvis | `/adjust_cash` |
 | 1b | （副）616 手渡し | Slack | AI→Jarvis | `#consult` |
-| 2 | 最新残高 | アプリ／IB／Zaim更新 | **Jarvisのみ** | skill §0c |
+| 2 | 最新残高 | アプリ／IB／Zaim更新 | **Jarvis・Codex** | skill §0c |
 | 3 | need・keep・済除外 | 読取 | Jarvis | watch／YAML／Zaim |
 | 4 | ギャップ表・レール | 計算 | Jarvis | money-ops／rails |
 | 5 | プラン了承 | チャット | **人** | — |
-| 6 | 入力・遷移 | ブラウザ／CLI | **Jarvisのみ** | `run_phase1_*` 等 |
+| 6 | 入力・遷移 | ブラウザ／CLI | **Jarvis・Codex** | `run_phase1_*` 等 |
 | 7 | OTP／実行 | 銀行UI | **人のみ** | IB／AW |
 | 8 | 完了・監査 | state／Slack | Jarvis | transfer_audit |
 
