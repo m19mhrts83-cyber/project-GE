@@ -27,6 +27,8 @@
 
 同じ品質・安全性なら、AI使用量と追加費用が少ない順で進める。原則は、取得済み記録・専用スクリプト → 公式API／コネクタ／MCP／CLI → DOM等を直接読める内蔵ブラウザ／Chrome → スクリーンショット中心のComputer Use → 重いモデル・従量課金。Web作業は内蔵ブラウザを第一候補にするが、構造化経路の方が軽く確実ならそちらを優先する。重い経路へ上げた場合は理由を一言報告する。正本: `docs/AIエージェントチーム/49_共通ルール_AI使用量と入力_20261024.md`。
 
+Orca 上では、着手時に `~/.local/bin/ai-usage` で Claude／Codex／Cursor／Antigravity の残りを見て、余裕のあるエージェントへ `orca orchestration worker-start` で振る（衝突しそうなら子ワークツリー）。軽い作業はアングラ（Antigravity）、実装・レビューはチャッピー（Codex）も使う。誰に振ったかと理由を一言報告する。正本: 同ファイルの R13（2026-11-19）。
+
 ## ツール間の引き継ぎ（2026-10-26）
 
 JARVIS/Claude Code由来の案件をCodexが続行したら、各ターンの最終報告前に `/Users/matsunomasaharu2/git-repos/agent-handoff/` の元担当宛てメモを更新する（Claude Code→`to_MissLemon/`、Cursor→`to_Jarvis/`）。起点はユーザー指定・元会話で確認する。受取側は再開時に現在の案件のpendingを読み、実変更を確認して続行する。詳細の正本: `docs/AIエージェントチーム/51_ローカル受け渡し_20261026.md`。別worktreeでも上記絶対パスを使う。
