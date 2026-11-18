@@ -177,7 +177,8 @@ const App = {
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
   featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案', openchat_ranking: '(4)オープンチャットの質問ランキング', openchat_threads: 'オプチャのスレッド番号', mobile_layout: 'スマホ縦の表示', openchat_23: '23番オプチャ（成果達成者限定）' },
-  featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
+  // 会員全員に公開済み（members）の機能は「新しい版で見る」を外しても会員と同じく出す（2026-11-18）
+  featureOn: (name) => { const f = App.state.features && App.state.features[name]; return !!(f && (f.members || App.state.featureViewNew)); },
   loadFeatures: async () => {
     App.state.features = {};
     App.state.featurePreview = false;
@@ -247,8 +248,9 @@ const App = {
   renderFeaturePreviewBar: () => {
     const bar = document.getElementById('featurePreviewBar');
     if (!bar) return;
-    const names = Object.keys(App.state.features || {});
-    // 会員（名指しでない管理者を含む）には帯を出さない
+    // 会員全員に公開済みのものは帯に並べない。未公開（松野さんだけ・確認する人だけ）の機能だけ載せる（2026-11-18 松野さん「上がごちゃごちゃしてきたので公開済みは消して」）
+    const names = Object.keys(App.state.features || {}).filter(function (n) { return !App.state.features[n].members; });
+    // 会員（名指しでない管理者を含む）には帯を出さない。未公開の機能が無くなったら帯ごと出さない
     const show = !!App.state.featurePreview && names.length > 0;
     bar.classList.toggle('hidden', !show);
     if (!show) return;
@@ -256,8 +258,8 @@ const App = {
     const asMember = document.getElementById('featureAsMemberToggle');
     viewNew.checked = !!App.state.featureViewNew;
     asMember.checked = !!App.state.viewAsMember;
-    document.getElementById('featurePreviewList').textContent = names.map(function (n) {
-      return (App.featureLabels[n] || n) + (App.state.features[n].members ? '（会員にも公開中）' : '（会員には未公開）');
+    document.getElementById('featurePreviewList').textContent = '会員に未公開：' + names.map(function (n) {
+      return App.featureLabels[n] || n;
     }).join(' / ');
     if (!bar.dataset.bound) {
       bar.dataset.bound = '1';
