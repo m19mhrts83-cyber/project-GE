@@ -58,7 +58,8 @@ out: dict = {"generated_at": NOW.isoformat()}
 # 1) チャットボット質問ログ
 ev = get("app_qa_search_events", {
     "select": "created_at,query_text,comment_hit_count,chunk_hit_count,result_status,user_id",
-    "created_at": f"gte.{D120}", "order": "created_at.asc"})
+    "created_at": f"gte.{D120}", "order": "created_at.asc",
+    "search_mode": "in.(normal,semantic)"})  # オプチャ一覧の閲覧は質問ではない（2026-11-18）
 qc = collections.Counter()
 zc = collections.Counter()
 weekly = collections.Counter()
