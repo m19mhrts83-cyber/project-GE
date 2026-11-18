@@ -29,6 +29,8 @@
 
 Orca 上では、着手時に `~/.local/bin/ai-usage` で Claude／Codex／Cursor／Antigravity の残りを見て、余裕のあるエージェントへ `orca orchestration worker-start` で振る（衝突しそうなら子ワークツリー）。軽い作業はアングラ（Antigravity）、実装・レビューはチャッピー（Codex）も使う。誰に振ったかと理由を一言報告する。正本: 同ファイルの R13（2026-11-19）。
 
+ルールとスキルは全エージェントが読める場所に置く（R14）。スキルの正本は `.agents/skills/`（Claude 用リンクは `sh scripts/link_shared_skills.sh`）。`.cursor/rules` は Cursor しか読まないので、Cursor 以外は `docs/AIエージェントチーム/60_ルール共通化_棚卸し_20261119.md` で区分「全員」の行のうち作業テーマに合う `.mdc` を直接読む。
+
 ## ツール間の引き継ぎ（2026-10-26）
 
 JARVIS/Claude Code由来の案件をCodexが続行したら、各ターンの最終報告前に `/Users/matsunomasaharu2/git-repos/agent-handoff/` の元担当宛てメモを更新する（Claude Code→`to_MissLemon/`、Cursor→`to_Jarvis/`）。起点はユーザー指定・元会話で確認する。受取側は再開時に現在の案件のpendingを読み、実変更を確認して続行する。詳細の正本: `docs/AIエージェントチーム/51_ローカル受け渡し_20261026.md`。別worktreeでも上記絶対パスを使う。

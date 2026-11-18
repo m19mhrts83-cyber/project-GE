@@ -130,7 +130,7 @@ UI: https://jarvis-trade-desk.vercel.app/money-ops
 
 - money-ops にプランがあれば `--money-ops-id` を付ける
 - 各レールは **先に `--preview`**、了承後に `--go`（必要なら `--execute`）
-- OTP がアプリ／合言葉のレールは **Terminal.app** を案内（Codex 統合ターミナルは Enter が潰れることがある）
+- OTP がアプリ／合言葉のレールは **Terminal.app** を案内（エディタ内蔵のターミナル〈Cursor・Codex など〉は Enter が潰れることがある）
 - 完了判断はスクリプト終了ではなく **完了画面・残高・着金**
 - 終わったら Chrome 片付け: `scripts/jarvis_automation_chrome_cleanup.py`
 - 寄せ完了後: money-ops「寄せ完了」／必要なら `jarvis_card_debit_watch.py --dismiss-due`
