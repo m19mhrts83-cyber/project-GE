@@ -176,7 +176,7 @@ const App = {
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
-  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案', openchat_ranking: '(4)オープンチャットの質問ランキング', openchat_threads: 'オプチャのスレッド番号', mobile_layout: 'スマホ縦の表示' },
+  featureLabels: { cost_saving: '(1)使用量の削減', answer_feedback: '(2)回答の評価', auto_approval: '(3)自動承認', design_theme: '(5)デザイン', change_log: '改善履歴', conversation_signals: 'うまくいかなかった会話', chat_context: '前の質問の引き継ぎ', keyword_all: 'キーワード検索（全データ）', ranking_themes: '(4)質問ランキング・講座テーマ案', openchat_ranking: '(4)オープンチャットの質問ランキング', openchat_threads: 'オプチャのスレッド番号', mobile_layout: 'スマホ縦の表示', openchat_23: '23番オプチャ（成果達成者限定）' },
   featureOn: (name) => !!(App.state.features && App.state.features[name] && App.state.featureViewNew),
   loadFeatures: async () => {
     App.state.features = {};
@@ -1797,7 +1797,9 @@ const App = {
       chat_title: openchatId ? undefined : String(title || '').trim() || undefined,
       openchat_limit: 40,
       session_id: App.state.currentSessionId || undefined,
-      user_id: (App.state.currentUser && App.state.currentUser.id) || undefined
+      user_id: (App.state.currentUser && App.state.currentUser.id) || undefined,
+      // 限定オプチャ（23番）を見てよい人かは、サーバーがこのログイン証明で確かめる（2026-11-18）
+      viewer_token: App.state.attachmentToken || undefined
     };
     if (openchatId) {
       body.openchat_id = openchatId;
@@ -1899,6 +1901,8 @@ const App = {
             return String(row.chat_title || row.chatTitle || '').trim();
           })
           .filter(Boolean)
+          // 23番は成果達成者限定。見てよい人以外は絞り込み欄にも出さない（中身はサーバーが出さない）
+          .filter(function (t) { return t.indexOf('23再生AP/MS') !== 0 || App.featureOn('openchat_23'); })
       )
     ).sort(function (a, b) {
       return a.localeCompare(b, 'ja');
@@ -4688,7 +4692,8 @@ const App = {
         query: first,
         openchat_limit: 40,
         session_id: App.state.currentSessionId || undefined,
-        user_id: (App.state.currentUser && App.state.currentUser.id) || undefined
+        user_id: (App.state.currentUser && App.state.currentUser.id) || undefined,
+        viewer_token: App.state.attachmentToken || undefined
       })
     });
     const text = await response.text();
@@ -5957,7 +5962,8 @@ const App = {
         openchat_limit: 20,
         match_threshold: 0.22,
         session_id: App.state.currentSessionId || undefined,
-        user_id: (App.state.currentUser && App.state.currentUser.id) || undefined
+        user_id: (App.state.currentUser && App.state.currentUser.id) || undefined,
+        viewer_token: App.state.attachmentToken || undefined
       })
     };
     if (fetchOptions && fetchOptions.signal) options.signal = fetchOptions.signal;

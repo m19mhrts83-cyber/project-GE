@@ -1,5 +1,7 @@
 import {labelAnswerSources,attachReferenceLabels,mentionedSourceLabels} from '../../../lib/searchReferences.ts';
 import {createQueryEmbeddingCache,embeddingKey} from '../../../lib/queryEmbeddingCache.ts';
+import {RESTRICTED_OPENCHATS,filterOpenchatRows,hiddenOpenchats,isRestrictedOpenchat,needsViewer,sameSecret,viewerFromToken,type RestrictedOpenchat} from '../../../lib/openchatAccess.ts';
+import type {FeatureFlag} from '../../../lib/featureFlags.ts';
 // Supabase Edge Function: semantic search + answer summary.
 // Auth: X-Semantic-Shared-Secret (or body.secret). Deploy with --no-verify-jwt.
 //
@@ -55,6 +57,8 @@ type SemanticSearchRequest = {
   secret?: string;
   session_id?: string;
   user_id?: string;
+  /** 添付用のログイン証明。限定オプチャを見てよい人かの本人確認に使う（ブラウザから。2026-11-18） */
+  viewer_token?: string;
   /** 同じチャットの直前のやり取り（古い順）。スイッチ chat_context の人だけ、サーバーが付ける（2026-11-11）。 */
   history?: unknown;
   /** 調べる前にAIが質問を言い直す／意図が読めなければ聞き返す（スイッチ chat_context の人だけ、2026-11-11）。 */
@@ -318,6 +322,54 @@ function asNullableNumber(value: unknown): number | null {
 
 function buildSnippet(value: unknown, limit = SNIPPET_LIMIT): string {
   return asString(value).replace(/\s+/g, " ").trim().slice(0, limit);
+}
+
+// ---- 見られる人を限るオプチャ（lib/openchatAccess.ts、2026-11-18） ----
+const RAIMO_BACKEND = "https://ma-54t2keqdelz3.raimo-app.buzz/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0";
+const viewerEmailCache = new Map<string, { email: string; at: number }>();
+
+/** 会員IDからメールを引く（スイッチの名指しはメール）。引けなければ空＝名指しに当たらない。 */
+async function viewerEmail(uid: string): Promise<string> {
+  const hit = viewerEmailCache.get(uid);
+  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.email;
+  const secret = (Deno.env.get("RAIMO_AUTH_GATEWAY_SECRET") || "").trim();
+  if (secret.length < 32) return "";
+  try {
+    const r = await fetch(RAIMO_BACKEND + "/internal/auth-user/user_id", {
+      method: "POST", headers: { "Content-Type": "application/json" }, redirect: "error",
+      body: JSON.stringify({ user_id: uid, __gateway_secret: secret }), signal: AbortSignal.timeout(10000),
+    });
+    const u = (await r.json().catch(() => null))?.user;
+    const email = r.ok && u && String(u.id) === uid && u.status === "approved" ? String(u.email || "").trim() : "";
+    viewerEmailCache.set(uid, { email, at: Date.now() });
+    return email;
+  } catch {
+    return "";
+  }
+}
+
+/** この人に見せない限定オプチャ。本人は、サーバー内の呼び出し（AI回答）か、ブラウザの添付用ログイン証明で確かめる。
+ *  body.user_id だけ（自己申告）では見せない。どこかで失敗したら見せない側に倒す。 */
+async function openchatHiddenFor(
+  // deno-lint-ignore no-explicit-any
+  sb: any,
+  req: Request,
+  body: SemanticSearchRequest | null
+): Promise<RestrictedOpenchat[]> {
+  let flags: FeatureFlag[] | null = null;
+  try {
+    const { data, error } = await sb.from("qa_feature_flags").select("feature,stage,owner_ids,reviewer_ids")
+      .in("feature", RESTRICTED_OPENCHATS.map((r) => r.feature));
+    if (!error) flags = (data || []) as FeatureFlag[];
+  } catch { flags = null; }
+  if (!needsViewer(flags)) return hiddenOpenchats(flags, null);
+  let uid: string | null = null;
+  const gateway = (Deno.env.get("RAIMO_AUTH_GATEWAY_SECRET") || "").trim();
+  const proof = (req.headers.get("x-gateway-proof") || "").trim();
+  if (gateway.length >= 32 && proof && await sameSecret(proof, gateway)) uid = asString(body?.user_id) || null;
+  else uid = await viewerFromToken(asString(body?.viewer_token), (Deno.env.get("COMMUNITY_ATTACHMENTS_SESSION_SECRET") || "").trim(), Date.now());
+  if (!uid) return hiddenOpenchats(flags, null);
+  return hiddenOpenchats(flags, { id: uid, email: await viewerEmail(uid) });
 }
 
 function isAuthorized(req: Request, body: SemanticSearchRequest | null): boolean {
@@ -816,6 +868,8 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
 
   const geminiUsage = newGeminiUsage();
   let embeddingProviderCalls=0;
+  // 限定オプチャの判定は先に始めておき、オプチャを返す直前で待つ（失敗しても見せない側に倒れるだけで止めない）
+  const hiddenP = openchatHiddenFor(sb, req, body);
   try {
     const openchatLimit = Math.max(
       1,
@@ -837,9 +891,9 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
           .eq("id", openchatId)
           .limit(1);
         if (error) throw new Error(`openchat by id failed: ${error.message}`);
-        let relatedOpenchat = ((data || []) as Record<string, unknown>[]).map((row) =>
+        let relatedOpenchat = filterOpenchatRows(((data || []) as Record<string, unknown>[]).map((row) =>
           mapOpenchatRow({ ...row, similarity: 0 })
-        );
+        ), await hiddenP);
         if (body?.with_threads === true) relatedOpenchat = await attachThreadNumbers(sb, relatedOpenchat);
         await logSearchEvent(sb, {
           ...baseEvent,
@@ -871,7 +925,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
           .eq("thread_no", threadNo)
           .limit(1);
         if (tError) throw new Error(`openchat thread lookup failed: ${tError.message}`);
-        const thread = ((tData || []) as Record<string, unknown>[]).map(mapThreadInfo)[0] || null;
+        const thread = filterOpenchatRows(((tData || []) as Record<string, unknown>[]).map(mapThreadInfo), await hiddenP)[0] || null;
         let threadRows: OpenchatRow[] = [];
         if (thread) {
           const { data: rData, error: rError } = await sb
@@ -927,9 +981,9 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       }
       const { data, error } = await q;
       if (error) throw new Error(`openchat list failed: ${error.message}`);
-      let relatedOpenchat = ((data || []) as Record<string, unknown>[]).map((row) =>
+      let relatedOpenchat = filterOpenchatRows(((data || []) as Record<string, unknown>[]).map((row) =>
         mapOpenchatRow({ ...row, similarity: 0 })
-      );
+      ), await hiddenP);
       if (body?.with_threads === true) relatedOpenchat = await attachThreadNumbers(sb, relatedOpenchat);
       await logSearchEvent(sb, {
         ...baseEvent,
@@ -1039,7 +1093,8 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       fetchOpenchatHits(sb, keywordResult, embedding, matchThreshold, openchatLimit),
     ]);
     if(commentsRpc.error)throw new Error(`match_comments_semantic failed: ${commentsRpc.error.message}`);
-    const openchatRows = body?.with_threads === true ? await attachThreadNumbers(sb, openchatRowsRaw) : openchatRowsRaw;
+    const openchatVisible = filterOpenchatRows(openchatRowsRaw, await hiddenP);
+    const openchatRows = body?.with_threads === true ? await attachThreadNumbers(sb, openchatVisible) : openchatVisible;
     const commentRows: CommentRow[] = (commentsRpc.data || []).map((row: Record<string, unknown>) => ({
       source_type: asString(row.source_type) || null,
       comment_id: asString(row.comment_id) || null,
@@ -1140,6 +1195,8 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       referenceSelection:hasMentioned?"mentioned":"provided-context",
       // (2) 評価と結び付けるため、実際に答えたモデルを返す（要約を呼ばなかったときは空）。11/11
       answerModel: geminiUsage.calls>0?geminiUsage.model:"",
+      // 限定オプチャを使った答えは、見てよい人だけのもの。同じ質問の使い回しに保存させない（2026-11-18）。
+      restrictedUsed: openchatRows.some(isRestrictedOpenchat),
       hitCount: commentRows.length + relatedChunks.length + openchatRows.length,
       meta: {
         embeddingProviderCalls,
