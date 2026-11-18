@@ -11,6 +11,8 @@ function load(gemini) {
   const exports = {};
   vm.runInNewContext(code, { exports, require: name => {
     if (name === '@/lib/geminiReply') return { geminiReply: gemini };
+    // 従量課金の Gemini（#455）は engine=gemini のときだけ。ここでは呼ばれない前提
+    if (name === '@/lib/geminiPaid') return { geminiPaidGenerate: async () => { throw new Error('paid gemini must not be called'); } };
     throw new Error(`Unexpected dependency ${name}`);
   }});
   return exports;
