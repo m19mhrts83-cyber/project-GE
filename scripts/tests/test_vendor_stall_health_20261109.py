@@ -71,7 +71,8 @@ class HealthTests(unittest.TestCase):
         self.assertEqual(lv, "red")
 
     def test_only_red_alerts(self):
-        yellow = q(contacted_7d=2)
+        # should_ops_alert は実際の今日で判定するため、最終送信日を今日にして日付に左右されないようにする
+        yellow = q(contacted_7d=2, last_contacted=date.today().isoformat())
         self.assertFalse(runner.should_ops_alert(q=yellow, lst={}, bridge_ok=True, lane="s2")[0])
         red = q(needs_refill=True)
         self.assertTrue(runner.should_ops_alert(q=red, lst={}, bridge_ok=True, lane="s2")[0])
