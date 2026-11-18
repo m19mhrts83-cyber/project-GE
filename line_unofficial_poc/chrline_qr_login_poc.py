@@ -64,6 +64,7 @@ def main() -> int:
     from CHRLINE import CHRLINE
 
     from chrline_client_utils import (
+        chrline_enc_type_from_env,
         cleanup_chrline_qr_images,
         persist_auth_token,
         save_root_from_env,
@@ -73,7 +74,7 @@ def main() -> int:
     cleanup_chrline_qr_images(p)
 
     # requestSQR2 経路では token が短命化するケースがあるため、secure フローを使う。
-    cl = CHRLINE(device="DESKTOPWIN", useThrift=True, savePath=str(p), noLogin=True)
+    cl = CHRLINE(device="DESKTOPWIN", useThrift=True, savePath=str(p), noLogin=True, encType=chrline_enc_type_from_env())
     saw_native_img = False
     seen_urls: list[str] = []
     try:
@@ -105,7 +106,7 @@ def main() -> int:
     if tok.strip():
         persist_auth_token(p, tok)
         # 取得 token がそのまま利用可能かを直後に検証する。
-        CHRLINE(tok, device="DESKTOPWIN", useThrift=True, savePath=str(p))
+        CHRLINE(tok, device="DESKTOPWIN", useThrift=True, savePath=str(p), encType=chrline_enc_type_from_env())
     print("ログイン完了（セッションは LINE_UNOFFICIAL_AUTH_DIR に保存された想定です）。")
     if not tok.strip():
         print(
