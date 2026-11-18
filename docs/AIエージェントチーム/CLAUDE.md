@@ -24,6 +24,18 @@ Claude Code / Cursor（Jarvis）/ Codex / GenCode / Grok Bot など、**どの�
 | [`48_読まなくてよいMD一覧`](48_読まなくてよいMD一覧_20261024.md) | 名指し時だけ開く MD（AI 使用量の節約） |
 | 家ルール例 | [`config/claude_code_home_CLAUDE.example.md`](../../config/claude_code_home_CLAUDE.example.md) → `~/.claude/CLAUDE.md` |
 
+## 開発プロジェクトの経緯とメモリ（非公開・2026-11-19）
+
+Claudeプロジェクト「AIエージェント開発」と同じ前提で、Orca作業スペース「AIエージェントチーム開発/運用」などから動くための入口。
+このプロジェクトでは、フォルダ単位ではなく**チーム全体の実装**を扱う：運用中の社員のトラブル対応、社員フォルダはあるが運用に入っていない社員（registry の `候補`／`設計中`）の具体化。
+
+- 経緯・決定・進行中の案件は非公開メモリにある。作業前に読む
+  - 場所: `docs/AIエージェントチーム/memory/`（入口 `MEMORY.md`）
+  - `.gitignore` 対象。Mac の `~/git-repos` と非公開リポ `project-GE-private` にだけある（Drive にも写さない）
+  - 記録が食い違うときは日付の新しい方を優先し、実ファイル（registry・社員 `CLAUDE.md`・scripts）で確かめる
+- 新しく分かった決定・方針は同じ `memory/` に1件1ファイルで足し、`MEMORY.md` に1行の案内を書く
+- メモリの中身（取引先名・金額・個人情報）を公開側の MD・PR 本文・Slack に書き写さない
+
 ## 作業開始前（必須・短い）
 
 1. 当該社員の **`TASK.md`** に依頼・完了条件・executor を書く（`status=running`）
