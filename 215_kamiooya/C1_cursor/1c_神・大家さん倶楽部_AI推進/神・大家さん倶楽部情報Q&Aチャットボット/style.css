@@ -615,6 +615,8 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 
 /* 文の区切りでだけ折り返す（11/11 松野さん「切り位置が気に入らない」） */
 .brand-hero-lead .nobr { white-space: nowrap; }
+/* トップの見出し（2026-11-18 松野さんの文面）: PCでは1行目を途中で折らない。スマホは自然に折り返す */
+@media (min-width: 641px) { .theme-a .brand-hero-title { font-size: 1.75rem; } .brand-hero-title .nobr { white-space: nowrap; } }
 @media (max-width: 640px) { .theme-a .brand-hero-lead { font-size: min(0.95rem, 3.6vw); } }
 
 /* 運営分析の新しい見た目（2026-11-11 松野さん「味気ない。見やすく把握しやすく、動きもつけて」）。design_theme の人だけ。
