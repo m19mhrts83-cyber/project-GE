@@ -12,6 +12,7 @@ chrline_qr_login_poc 成功後に persist_auth_token を呼ぶ。
   LINE_CHRLINE_DEVICE … CHRLINE クライアント device（既定 DESKTOPWIN）。Phase0: CHROMEOS / ANDROIDSECONDARY 等。
 
   LINE_CHRLINE_APP_VERSION … CHRLINE クライアント版文字列（既定 9.0.0.3360）。
+  LINE_CHRLINE_ENC_TYPE … 0=LEGY 直送（既定・2026-11-18〜）／1=旧 /enc 経由（LINE が閉鎖）。
 
   LINE_CHRLINE_SQUARE_PROBE_MID / LINE_CHRLINE_SQUARE_PROBE_THREAD_MID … Square probe 用 mid。
     LINE 側がセッションを切ったときの QR 認証そのものは非公式 API の制約で省略できない。
@@ -69,10 +70,18 @@ def chrline_constructor_kwargs() -> dict[str, Any]:
     """Square スレッド API（getSquareThreadMid 等）に必要な CHRLINE クライアント引数。"""
     version = chrline_app_version_from_env()
     device = chrline_device_from_env()
-    kw: dict[str, Any] = {"device": device, "useThrift": True}
+    kw: dict[str, Any] = {"device": device, "useThrift": True, "encType": chrline_enc_type_from_env()}
     if version:
         kw["version"] = version
     return kw
+
+
+def chrline_enc_type_from_env() -> int:
+    """CHRLINE の送信方式。0 = LEGY ホスト（LINE_HOST_DOMAIN）へ直接 TLS、1 = 暗号化ゲートウェイ /enc 経由。
+    2026-11-18 10:31 ごろ LINE が /enc を閉じ、/enc 経由はすべて空ボディ 404 になった
+    （noop・refresh・QR の createSession とも）。既定を 0 にする。戻すときは LINE_CHRLINE_ENC_TYPE=1。"""
+    raw = (os.environ.get("LINE_CHRLINE_ENC_TYPE") or "0").strip()
+    return 1 if raw == "1" else 0
 
 
 def client_cache_key(save_root: Path) -> str:
