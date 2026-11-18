@@ -289,6 +289,11 @@ def refresh_with_rotation(cl, save_root: Path, refresh_token: str) -> str:
     _adopt_access_token(cl, access)
     persist_auth_token(save_root, access)
     save_refresh_token(save_root, access, new_rt)
+    duration = _value(cl, ratr, "durationUntilRefreshInSec", 2)
+    issued = _value(cl, ratr, "tokenIssueTimeEpochSec", 4)
+    write_refresh_schedule(save_root, duration_sec=duration, issued_epoch=issued)
+    if hasattr(cl, "_lp_refresh_required_at"):
+        cl._lp_refresh_required_at = 0.0
     return access
 
 
@@ -309,12 +314,176 @@ def refresh_access_token_locked(cl, save_root: Path) -> bool:
 
 
 def install_rotation_safe_refresh(cl, save_root: Path):
-    """CHRLINE 内部の自動更新（x-line-access-refresh-required）もこちらを通す。"""
+    """CHRLINE 内部の自動更新（code 119）もこちらを通す。
+    あわせて x-line-access-refresh-required ヘッダー（CHRLINE は記録するだけ）を拾う（2026-11-18 案A）。"""
     try:
         cl.tryRefreshToken = lambda: refresh_access_token_locked(cl, save_root)
     except Exception:
         pass
+    install_refresh_required_hook(cl)
     return cl
+
+
+# ---------------------------------------------------------------- 先回り延長（2026-11-18 案A＋B）
+# 11/18 は予告なしに accessToken・refreshToken とも 404 になった（11/10 の QR から延長 0 回）。
+# A: LINE が「延長して」と合図（x-line-access-refresh-required）したら延長する。
+# B: QR 直後に 1 回延長し、応答の目安時間（durationUntilRefreshInSec）の一定割合ごとに先回りで延長する。
+# 延長はすべて refresh_access_token_locked（ロック付き 1 か所）を通す。トークン値は書かない。
+REFRESH_SCHEDULE_FILE = ".token_refresh_schedule.json"
+REFRESH_REQUIRED_HEADER = "x-line-access-refresh-required"
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, "") or default)
+    except ValueError:
+        return default
+
+
+def _proactive_ratio() -> float:
+    r = _env_float("LINE_PROACTIVE_REFRESH_RATIO", 0.5)
+    return r if 0.05 <= r <= 0.95 else 0.5
+
+
+def _proactive_default_sec() -> float:
+    """目安時間が分からないとき（QR 直後の延長前など）の間隔。"""
+    return max(3600.0, _env_float("LINE_PROACTIVE_REFRESH_DEFAULT_HOURS", 24.0) * 3600)
+
+
+def _proactive_min_gap_sec() -> float:
+    """延長どうしの最短間隔（失敗時の再試行間隔も兼ねる）。LINE を叩きすぎない。"""
+    return max(300.0, _env_float("LINE_PROACTIVE_REFRESH_MIN_GAP_MINUTES", 60.0) * 60)
+
+
+def read_refresh_schedule(save_root: Path) -> dict:
+    import json
+
+    p = save_root / REFRESH_SCHEDULE_FILE
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _write_schedule_dict(save_root: Path, d: dict) -> None:
+    import json
+
+    p = save_root / REFRESH_SCHEDULE_FILE
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(p)
+
+
+def write_refresh_schedule(
+    save_root: Path, *, duration_sec=None, issued_epoch=None, now: float | None = None
+) -> dict:
+    """延長に成功した時刻と次の先回り時刻を保存（値は時刻と秒数だけ）。"""
+    now = time.time() if now is None else now
+    try:
+        dur = float(duration_sec) if duration_sec is not None else 0.0
+    except (TypeError, ValueError):
+        dur = 0.0
+    try:
+        base = float(issued_epoch) if issued_epoch else now
+    except (TypeError, ValueError):
+        base = now
+    if base > now + 600 or base < now - 30 * 86400:
+        base = now  # 時計ずれ・単位違いの保険
+    interval = dur * _proactive_ratio() if dur > 0 else _proactive_default_sec()
+    due = max(base + interval, now + _proactive_min_gap_sec())
+    d = {
+        "refreshed_at": now,
+        "issued_at": base,
+        "duration_sec": dur or None,
+        "next_due_at": due,
+        "last_error": "",
+        "last_error_at": 0,
+    }
+    try:
+        _write_schedule_dict(save_root, d)
+    except Exception:
+        pass
+    return d
+
+
+def _note_refresh_failure(save_root: Path, exc: Exception, now: float) -> None:
+    d = read_refresh_schedule(save_root)
+    d.update(
+        {
+            "last_error": f"{type(exc).__name__}: {str(exc)[:80]}",
+            "last_error_at": now,
+            "next_due_at": now + _proactive_min_gap_sec(),
+        }
+    )
+    try:
+        _write_schedule_dict(save_root, d)
+    except Exception:
+        pass
+
+
+def install_refresh_required_hook(cl) -> None:
+    """CHRLINE は x-line-access-refresh-required を「unhandled header」と記録して捨てる。
+    その記録を拾って印（時刻）を付ける。延長そのものは要求の外（maybe_proactive_refresh）で行う。"""
+    if getattr(cl, "_lp_refresh_hook", False):
+        return
+    orig = getattr(cl, "log", None)
+    if not callable(orig):
+        return
+    cl._lp_refresh_required_at = 0.0
+
+    def _log(text, *a, **kw):
+        try:
+            if REFRESH_REQUIRED_HEADER in str(text) and not cl._lp_refresh_required_at:
+                cl._lp_refresh_required_at = time.time()
+                print("# LINE が延長の合図（refresh-required）を返しました", file=sys.stderr)
+        except Exception:
+            pass
+        return orig(text, *a, **kw)
+
+    try:
+        cl.log = _log
+        cl._lp_refresh_hook = True
+    except Exception:
+        pass
+
+
+def proactive_refresh_reason(cl, save_root: Path, now: float | None = None) -> str:
+    """延長すべき理由（'refresh_required' / 'due' / 'no_schedule'）。不要なら空文字。"""
+    now = time.time() if now is None else now
+    d = read_refresh_schedule(save_root)
+    last_try = max(float(d.get("refreshed_at") or 0), float(d.get("last_error_at") or 0))
+    if getattr(cl, "_lp_refresh_required_at", 0):
+        if now - last_try >= _proactive_min_gap_sec() or not last_try:
+            return "refresh_required"
+    if not d:
+        # 予定が無い（#303 以前の保存・QR 直後の延長失敗）。refreshToken の保存時刻から数える
+        latest = save_root / ".refreshToken" / "latest"
+        try:
+            saved = latest.stat().st_mtime
+        except OSError:
+            return ""
+        return "no_schedule" if now - saved >= _proactive_default_sec() else ""
+    if now >= float(d.get("next_due_at") or 0):
+        return "due"
+    return ""
+
+
+def maybe_proactive_refresh(cl, save_root: Path, now: float | None = None) -> str:
+    """必要なら先回りで延長する。戻り値: '' 何もしない / 'ok:<理由>' / 'fail:<理由>'。
+    失敗しても例外は出さない（今のトークンはまだ使えることが多い）。次の起動で無効なら #301 の再ログイン待ちに乗る。"""
+    now = time.time() if now is None else now
+    reason = proactive_refresh_reason(cl, save_root, now)
+    if not reason:
+        return ""
+    try:
+        refresh_access_token_locked(cl, save_root)
+    except Exception as exc:
+        _note_refresh_failure(save_root, exc, now)
+        print(f"# 先回り延長 失敗（{reason}）: {type(exc).__name__}: {str(exc)[:80]}", file=sys.stderr)
+        return f"fail:{reason}"
+    print(f"# 先回り延長 成功（{reason}）", file=sys.stderr)
+    return f"ok:{reason}"
 
 
 def _try_refresh_access_token(cl, save_root: Path) -> bool:
@@ -1115,6 +1284,14 @@ def build_logged_in_client(save_root: Path, *, allow_qr_login: bool = False):
             save_refresh_token(save_root, cl.authToken, read_refresh_token_for(save_root, cl.authToken) or "")
         except Exception:
             pass
+        if not _env_truthy("LINE_SKIP_REFRESH_AFTER_QR"):
+            try:  # 案B: QR 直後に 1 回延長し、新しい refreshToken と目安時間を確保する
+                refresh_access_token_locked(cl, save_root)
+                _persist_client_session(save_root, cl)
+                print("# QR 直後の延長 成功（refreshToken・次回の先回り時刻を保存）", file=sys.stderr)
+            except Exception as exc:
+                _note_refresh_failure(save_root, exc, time.time())
+                print(f"# QR 直後の延長 失敗（ログインはそのまま）: {type(exc).__name__}: {str(exc)[:80]}", file=sys.stderr)
         _qr_logins_this_process += 1
         _process_client_cache[cache_key] = cl
         _relogin_marker("clear")

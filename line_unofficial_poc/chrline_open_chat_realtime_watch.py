@@ -32,6 +32,7 @@ from openchat_attachments import capture as capture_attachment
 
 from chrline_client_utils import (
     build_logged_in_client,
+    maybe_proactive_refresh,
     open_chat_session_lock,
     save_root_from_env,
 )
@@ -50,6 +51,8 @@ WRITE_SPOOL_FILENAME = ".chrline_open_chat_write_spool.jsonl"
 DEDUP_FLUSH_EVERY = 25
 DEDUP_FLUSH_SECONDS = 60.0
 HEARTBEAT_SECONDS = 30.0
+# 先回り延長（2026-11-18）。止めるときは LINE_PROACTIVE_REFRESH=0
+PROACTIVE_REFRESH_ENABLED = os.environ.get("LINE_PROACTIVE_REFRESH", "1").strip().lower() not in ("0", "false", "no", "off")
 MAC_LINE_CHECK_SECONDS = 5.0
 # PUSH が静かに止まったまま残らないよう、無イベントが続いたら自己再起動する
 # （launchd KeepAlive が再接続して張り直す。0 で無効）
@@ -851,6 +854,15 @@ def main() -> int:
                         ),
                     )
                     last_heartbeat = now
+                    # 先回り延長（案A＋B）。成功したら新しいトークンで PUSH をつなぎ直す（KeepAlive が再起動）
+                    if PROACTIVE_REFRESH_ENABLED:
+                        res = maybe_proactive_refresh(cl, save_root)
+                        if res:
+                            _status(last_proactive_refresh=res, last_proactive_refresh_at=datetime.now().astimezone().isoformat(timespec="seconds"))
+                        if res.startswith("ok:"):
+                            print("# 先回り延長のあと再接続のため再起動", file=sys.stderr)
+                            os.kill(os.getpid(), signal.SIGTERM)
+                            return
 
                 # PUSH が静かに止まったまま残らないよう自己再起動（KeepAlive が再接続）
                 mono = time.monotonic()
