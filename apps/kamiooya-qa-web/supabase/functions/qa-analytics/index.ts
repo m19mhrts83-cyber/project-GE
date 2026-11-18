@@ -117,6 +117,7 @@ Deno.serve(async (req) => {
     .select(
       "id,created_at,search_mode,query_text,session_id,user_id,comment_hit_count,chunk_hit_count,answer_comment_count,answer_chunk_count,result_status,error_message"
     )
+    .in("search_mode", ["normal", "semantic"]) // オプチャ一覧の閲覧（openchat_list）は質問ではないので数えない（2026-11-18）
     .gte("created_at", since)
     .lt("created_at", until || "9999-12-31T00:00:00Z")
     .order("created_at", { ascending: false })
