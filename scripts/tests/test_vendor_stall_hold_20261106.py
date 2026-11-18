@@ -65,7 +65,9 @@ class OfferHoldTests(unittest.TestCase):
         lst: dict = {"offers": {"f": {"count": 47}}}
         text = runner.build_held_consult("s9", [{"id": "f", "name": "福島土地", "channel": "email"}], lst)
         self.assertIn("福島土地", text)
-        self.assertIn("次: 人判断のみ", text)
+        self.assertIn("次: Grok が理由を書く", text)
+        self.assertIn("了承なしで送る", text)
+        self.assertNotIn("人判断のみ", text)
         self.assertIn("担当メモ", text)
         self.assertIn("橋渡し", text)
 
