@@ -1065,7 +1065,9 @@ def write_send_resume(
         f"【{lane.upper()} 送信再開 · 本日分】\n"
         "発信: 516／jarvis_vendor_outreach_stall_runner（stale_marks）。\n"
         f"{how}\n"
-        "非定型は松野確認。定型は都度許可不要。\n"
+        "定型フォーム・定型メールは松野さんの了承なしで送る（2026-11-17 松野さん）。\n"
+        "止めるのは懸念がある時だけ（同じ社へ2回目以降・誤字脱字・窓口が違う等）。\n"
+        "止めた社は「社名・何が気になるか・どうすれば送れるか」を1行ずつ部長日報に書く。\n"
         "完了後: 部長日報に --mark 行を集約。\n\n"
         + json.dumps(payload, ensure_ascii=False, indent=2)
     )
@@ -1254,24 +1256,31 @@ def pending_vendors(lane: str, ids: set[str]) -> list[dict[str, Any]]:
 
 
 def build_held_consult(lane: str, vendors: list[dict[str, Any]], lst: dict[str, Any]) -> str:
-    """保留になった社を #consult に 1 回だけ出す（末尾「次の担当」3行）。"""
+    """保留になった社を #consult に 1 回だけ出す（末尾「次の担当」3行）。
+
+    2026-11-17 松野さん: 業者開拓は定型なので了承なしで送る。止めるのは懸念がある時だけで、
+    その時は具体的に聞く。「止まってます」だけでは返事ができないので、社ごとに
+    Grok が止めた理由を書いてもらう前提の文にし、ボスへの一律の了承依頼はしない。
+    """
     label = LANE_CFG[lane]["label"]
     offers = lane_offers(lst)
     lines = [
         f"【consult】516 業者開拓フォロー｜{label}",
-        "送信再開を出しても送られない社があります。Grok 側で保留中（ボスの了承待ち・送れない窓口など）とみて、再依頼を止めて次の社に進めました。",
+        "送信再開を2回渡しても送られていない社があります。再依頼を止めて次の社に進めました。",
     ]
     for v in vendors[:5]:
         vid = str(v.get("id") or "")
         n = int((offers.get(vid) or {}).get("count") or 0)
         lines.append(f"・{v.get('name') or vid}（{v.get('channel') or '—'}・渡した回数 {n}）")
     lines += [
-        "送ってよければ Grok に「送ってよい」と伝える／外すなら台帳で skip に。"
+        "定型は了承なしで送る方針です（11/17 ボス）。",
+        "Grok はこのスレに社ごとの止めた理由を1行で（2回目の送信・誤字・窓口違い等）。",
+        "理由が無ければ次の送信再開でそのまま送ります。",
         f"{OFFER_HOLD_DAYS}日後に1回だけ自動で再依頼します。",
         f"<{LANE_CFG[lane]['url']}|UIを開く>",
-        "次: 人判断のみ",
-        "担当メモ: 516 は再依頼を止めた。送る／外すの判断はボス",
-        "橋渡し: 了承後は Grok が定型で送信し --mark",
+        "次: Grok が理由を書く／無ければ送信",
+        "担当メモ: 516 は再依頼を止めた。ボスは理由が出た社だけ判断",
+        "橋渡し: 理由の行が出たらボスへ。送ったら Grok が --mark",
     ]
     return "\n".join(lines)
 
