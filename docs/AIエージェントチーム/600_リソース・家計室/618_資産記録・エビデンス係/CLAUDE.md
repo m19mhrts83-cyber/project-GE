@@ -45,7 +45,7 @@ Slackの投稿・返信・リアクションは起動条件にしない。報告
 
 数値: `scripts/jarvis_portfolio_weekly.py` / `launchd/portfolio_weekly_runner.sh`。撮影: `scripts/jarvis_purchase_asset_evidence.py`。銀行等: `scripts/jarvis_liquidity_weekly.py`。
 
-対象は財務の口座・契約一覧と突合。SOURCE_LABELには処理名もあり、そのまま撮影対象にしない。振込・取引・解約・設定変更・振込認証・外部送付は行わない。Codexは銀行IB・OTPを実行せず、Jarvis専属境界を守る。秘密の値をMD・ログ・Slackへ書かない。Todoist完了はオーナー了承後。
+対象は財務の口座・契約一覧と突合。SOURCE_LABELには処理名もあり、そのまま撮影対象にしない。振込・取引・解約・設定変更・振込認証・外部送付は行わない。本係では銀行IB・OTPを実行しない（送金・OTPは617の範囲。2026-11-19〜 Jarvis・Codex が人了承のうえ実行）。秘密の値をMD・ログ・Slackへ書かない。Todoist完了はオーナー了承後。
 
 ## 7. 変更記録
 

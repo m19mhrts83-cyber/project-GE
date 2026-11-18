@@ -29,7 +29,7 @@ flowchart TD
   C -->|なし| Z
   C -->|あり| D["Slack #consult 616"]
   D --> E[次: Jarvis 寄せ・人了承]
-  E --> F[送金は Jarvis のみ]
+  E --> F[送金は Jarvis・Codex]
   A -->|failed| O["Slack #ops"]
 ```
 
