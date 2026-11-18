@@ -45,6 +45,8 @@ LOG = "📎 agent_team drive sync"
 DOC_EXT = {".md", ".html", ".csv", ".txt", ".pdf", ".png", ".jpg", ".jpeg", ".svg", ".mmd", ".yaml", ".yml"}
 AGENT_SUBDIRS = ("docs", "output", "tests", "config")
 HUB_ROOT_KEEP = {"00_このフォルダ.md", "00_チーム索引.md", "CLAUDE.md", "AGENTS.md"}
+# Drive 直下の CLAUDE／AGENTS は Drive 用の入口（正本は git と案内する）を写す
+DRIVE_ENTRY_SRC = {"CLAUDE.md": "_drive/CLAUDE.md", "AGENTS.md": "_drive/AGENTS.md"}
 SECRET_NAME_RE = re.compile(r"(^\.env|env\.|secret|token|credential|password)", re.I)
 MAX_BYTES = 20 * 1024 * 1024
 
@@ -160,6 +162,9 @@ def main() -> int:
             if src.name in HUB_ROOT_KEEP
             else DRIVE_HUB / "90_ハブ文書" / src.name
         )
+        override = HUB / DRIVE_ENTRY_SRC.get(src.name, "")
+        if src.name in DRIVE_ENTRY_SRC and override.is_file():
+            src = override
         copy_if_changed(src, dst, dry=args.dry_run, stats=stats)
 
     for src_rel, dst_rel in RULE_FILES.items():

@@ -52,7 +52,7 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_agent_run_lock.p
 cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_agent_team_status_sync.py
 ```
 
-Drive `★AIエージェントチーム` へも写す（`--no-drive` でオフ可）。社員フォルダの文書・`output/`（成果物）と `91_ルール/`（家ルール・Cursor ルール・config）は `jarvis_agent_team_drive_sync.py` が写す（status_sync の最後＋毎日 6:10 launchd。片方向・Drive で直しても git に戻らない）。詳細: [`22_`](22_運用状態の識別_20261011.md)
+Drive `★AIエージェントチーム` へも写す（`--no-drive` でオフ可）。社員フォルダの文書・`output/`（成果物）と `91_ルール/`（家ルール・Cursor ルール・config）は `jarvis_agent_team_drive_sync.py` が写す（status_sync の最後＋毎日 6:10 launchd。片方向・Drive で直しても git に戻らない）。Drive 直下の `CLAUDE.md`／`AGENTS.md` だけは、このファイルの写しではなく Drive 用の入口 [`_drive/`](_drive/CLAUDE.md)（「正本・プログラムは `~/git-repos`」と案内し、このファイルを取り込む）を写す。詳細: [`22_`](22_運用状態の識別_20261011.md)
 
 ## 新規社員を切ったあと（チェック）
 
