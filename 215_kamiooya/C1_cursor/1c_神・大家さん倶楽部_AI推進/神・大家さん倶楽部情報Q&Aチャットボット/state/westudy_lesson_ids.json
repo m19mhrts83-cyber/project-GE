@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-17T05:01:53.916291+00:00",
+  "updated_at": "2026-11-18T04:06:24.697322+00:00",
   "lessons": {
     "lesson_desc_kamiooya-otoiawase": "e6d52b3fc7c4f46f",
     "lesson_desc_link": "062d064f62968839",
@@ -280,6 +280,9 @@
     "lesson_desc_lesson-20260222_groupconsulting": "b8678ccbd5f3ab4d",
     "lesson_desc_lesson-20260125_groupconsulting": "170dd31892fe0632",
     "lesson_desc_lesson-20251228_groupconsulting": "a20387dff2338e75",
-    "lesson_desc_lesson-20251123_groupconsulting": "a698b82ad43f4379"
+    "lesson_desc_lesson-20251123_groupconsulting": "a698b82ad43f4379",
+    "lesson_desc_honatugi-ebina": "c8a6c5b8fc06280a",
+    "lesson_desc_uki-uto": "c8a6c5b8fc06280a",
+    "lesson_desc_matsuyama": "c8a6c5b8fc06280a"
   }
 }
