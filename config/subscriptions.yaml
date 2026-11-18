@@ -113,6 +113,20 @@ services:
     cancel_candidate: false
     note: "解約済・期間残"
 
+  - id: onepassword
+    name: 1Password（Individual）
+    category: ai
+    status: active
+    billing: yearly
+    amount_yen: 6389
+    next_bill: "2026-11-28（14日間体験の終了日＝初回の年額請求）"
+    watch: true
+    watch_reason: "初年度は割引（月$2.99相当）。2年目から通常の月$3.99相当（税込で年約$53）に上がる見込み。更新前に継続判断"
+    cancel_candidate: false
+    billing_url: "https://my.1password.com/"
+    usage_note: "パスワード・.env の一元管理。エージェント連携（Environments MCP・Service Account・1Password for Agents）"
+    note: "2026-11-14 申込（年払い・約40ドル＝松野さん申告の仮値）。11/14 の請求書は体験 $0.00（11/14〜11/28、請求書ID in_1UbdIhHBax7L5HDfXrLMZttK）。確定額は 11/28 の請求メールで更新する。月額換算 約532円（仮）。円は 2026-11-12 終値 USDJPY 159.725 で換算。経緯: Todoist 1Password 移行判断タスク"
+
   - id: muumuu
     name: ムームードメイン
     category: ai

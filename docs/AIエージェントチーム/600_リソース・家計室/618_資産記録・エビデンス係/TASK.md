@@ -119,6 +119,8 @@ executor: codex / status: implemented_pending_send_approval。正常稼働も含
 
 ## 2026-11-15：自動報告の了承・Claude向け共通ルール
 
-executor: codex / status: implementation_done_pending_deployment。本人が#report自動投稿（毎朝09:30 JST、12/12まで、正常時含む、都度確認なし）を了承。変数有効化・初回投稿確認、KURASHIFTから最新証拠への導線確認、Claude用ルールとフローを見ながら処理する引継ぎを作る。銀行IB/OTP/実画像取得は今回の対象外。
+executor: codex / status: done_implementation_and_deployment。本人が#report自動投稿（毎朝09:30 JST、12/12まで、正常時含む、都度確認なし）を了承。変数有効化・初回投稿確認、KURASHIFTから最新証拠への導線確認、Claude用ルールとフローを見ながら処理する引継ぎを作る。銀行IB/OTP/実画像取得は今回の対象外。
 
 初回GHA run43662707341成功、Slack着信確認。Claude Codeの本人Macルールを配置、既存ホームCLAUDEは保持。18ノード/戻り矢印2本/選択/メモJSON/390pxでの非クリップ/外部通信なしをブラウザ検証。引継ぎ `claude_*` は個別財務情報があるためprivate_paths/private_sync_paths/gitignoreへ登録。KURASHIFT上部リンクの本番確認とClaudeでの読込/受領は別工程。
+
+2026-11-15完了: PR #424をCI後merge、本番deploy43663656687成功。本人KURASHIFTで上部リンク表示→最新証拠画面への遷移確認。詳細の最終反映記録は非公開claude_handoff.md。Claude側の受領/チャット設定/実描画は未確認。
