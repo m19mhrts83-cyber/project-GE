@@ -494,11 +494,12 @@ const App = {
         }
       });
     }
-    document.getElementById('reloadCommentsBtn').addEventListener('click', App.loadComments);
+    // 「再取得」: 読み込み中なら重ねて始めず、押せたことと進み具合を出す（2026-11-19 松野さん「再取得が起動しない」）
+    document.getElementById('reloadCommentsBtn').addEventListener('click', function () { App.reloadReference('comments'); });
     const reloadLessonsBtn = document.getElementById('reloadLessonsBtn');
-    if (reloadLessonsBtn) reloadLessonsBtn.addEventListener('click', App.loadComments);
+    if (reloadLessonsBtn) reloadLessonsBtn.addEventListener('click', function () { App.reloadReference('comments'); });
     const reloadKnowledgeBtn = document.getElementById('reloadKnowledgeBtn');
-    if (reloadKnowledgeBtn) reloadKnowledgeBtn.addEventListener('click', App.loadKnowledge);
+    if (reloadKnowledgeBtn) reloadKnowledgeBtn.addEventListener('click', function () { App.reloadReference('knowledge'); });
     document.getElementById('reloadPendingUsersBtn').addEventListener('click', App.loadPendingUsers);
     const reloadApprovedUsersBtn = document.getElementById('reloadApprovedUsersBtn');
     if (reloadApprovedUsersBtn) reloadApprovedUsersBtn.addEventListener('click', App.loadApprovedUsers);
@@ -541,7 +542,8 @@ const App = {
       });
     }
     document.getElementById('sidebarToggleBtn').addEventListener('click', App.toggleSidebarMobile);
-    document.getElementById('commentSearchInput').addEventListener('input', App.renderCommentTable);
+    // 根拠の投稿だけを出している時に言葉を入れたら、全件の読み込みを始める
+    document.getElementById('commentSearchInput').addEventListener('input', function () { if (App.state.commentSingleView) { App.state.commentSingleView = ''; void App.ensureReferenceData('comments'); } App.renderCommentTable(); });
     if (App.elements.lessonSearchInput) {
       App.elements.lessonSearchInput.addEventListener('input', App.renderLessonTable);
     }
@@ -1546,7 +1548,8 @@ const App = {
       }
     });
     App.state.currentScreen = screenName || 'chat';
-    if(['comments','lessons','knowledge'].includes(screenName))void App.ensureReferenceData(screenName);
+    // 根拠の「本文を見る」から来た時は、全件を読まずにその投稿だけ取る（opts.skipReference）
+    if(['comments','lessons','knowledge'].includes(screenName)&&!opts.skipReference)void App.ensureReferenceData(screenName);
     App.elements.sidebar.classList.remove('mobile-open');
     if (App.syncSidebarBackdrop) App.syncSidebarBackdrop();
     // サイドバー手動遷移・戻る完了時は citation 用戻るバーを隠す
@@ -2086,9 +2089,52 @@ const App = {
     if(ready[key])return;
     if(loads[key])return loads[key];
     const generation=App.state.attachmentGeneration;
-    if(key==='comments'&&App.elements.commentListMeta)App.elements.commentListMeta.textContent='コメント一覧を取得中…';
-    const task=(key==='comments'?App.loadComments():App.loadKnowledge()).then(()=>{if(App.state.attachmentGeneration===generation)ready[key]=true;}).catch(error=>{if(App.state.attachmentGeneration===generation)App.showToast(error.message||'参照一覧の取得に失敗しました。メニューを開き直して再試行してください。','error');}).finally(()=>{delete loads[key];if(key==='comments'&&App.state.attachmentGeneration===generation&&App.elements.commentTableBody)App.renderCommentTable();});
+    if(key==='comments'){App.state.commentsLoadedCount=0;App.renderCommentLoadProgress();}
+    App.syncReloadButtons(true,key);
+    const task=(key==='comments'?App.loadComments():App.loadKnowledge()).then(()=>{if(App.state.attachmentGeneration===generation)ready[key]=true;}).catch(error=>{if(App.state.attachmentGeneration===generation)App.showToast(error.message||'参照一覧の取得に失敗しました。メニューを開き直して再試行してください。','error');}).finally(()=>{delete loads[key];App.syncReloadButtons(false,key);if(key==='comments'&&App.state.attachmentGeneration===generation){if(ready[key])App.state.commentSingleView='';if(App.elements.commentTableBody)App.renderCommentTable();if(App.elements.lessonTableBody)App.renderLessonTable();}});
     loads[key]=task;return task;
+  },
+  // 「再取得」ボタン（コメント・講座ページ説明文・動画文字起こし）
+  reloadReference: (key) => {
+    const loads=App.state.referenceLoads||(App.state.referenceLoads={});
+    if(loads[key]){App.showToast('いま読み込んでいます。終わるまでそのままお待ちください。','info');return;}
+    const ready=App.state.referenceReady||(App.state.referenceReady={});
+    ready[key]=false;if(key==='comments')App.state.commentSingleView='';
+    App.showToast(key==='comments'?'一覧を読み込み直しています（1〜2分かかることがあります）':'一覧を読み込み直しています','info');
+    void App.ensureReferenceData(key==='comments'?'comments':'knowledge');
+  },
+  // 読み込み中は「再取得」を押せない見た目にし、文言を「読み込み中…」に
+  syncReloadButtons: (loading, key) => {
+    const ids=key==='comments'?['reloadCommentsBtn','reloadLessonsBtn']:['reloadKnowledgeBtn'];
+    ids.forEach(function(id){const b=document.getElementById(id);if(!b)return;b.disabled=!!loading;b.classList.toggle('opacity-60',!!loading);b.textContent=loading?'読み込み中…':'再取得';});
+  },
+  // コメント一覧の進み具合（件数）を一覧の上に出す
+  renderCommentLoadProgress: () => {
+    let est=26000;try{const v=Number(localStorage.getItem('qa_comments_total'));if(v>0)est=v;}catch(e){/* ignore */}
+    const n=Number(App.state.commentsLoadedCount||0);
+    const text='コメント一覧を読み込んでいます… '+n.toLocaleString('ja-JP')+' / 約'+est.toLocaleString('ja-JP')+'件（全件で1〜2分かかります）';
+    [App.elements.commentListMeta,document.getElementById('lessonListMeta')].forEach(function(el){if(el&&!(App.state.commentSingleView&&el===App.elements.commentListMeta))el.textContent=text;});
+  },
+  // 根拠の「本文を見る」: その投稿だけを取りに行く（全26,000件を読むと1〜2分かかるため。2026-11-19）
+  openCommentQuick: async (commentId, screen) => {
+    const ready=(App.state.referenceReady||{}).comments;
+    const render=()=>{if(screen==='lessons')App.renderLessonTable({exactCommentId:commentId});else App.renderCommentTable({exactCommentId:commentId});};
+    const have=(App.state.comments||[]).some(r=>String(App.commentField(r,'comment_id')||'')===commentId);
+    if(ready||have||!App.authGatewayBase||!commentId){render();if(!ready&&!have)void App.ensureReferenceData(screen);return;}
+    App.state.commentSingleView=commentId;
+    if(App.elements.commentListMeta&&screen!=='lessons')App.elements.commentListMeta.textContent='この投稿を読み込んでいます…';
+    try{
+      const res=await App.apiClient('POST','/comments-by-id',{ids:[commentId]});
+      const rows=(res&&Array.isArray(res.comments)?res.comments:[]).map(App.enrichCommentCategory);
+      if(!rows.length)throw new Error('not_found');
+      const known=new Set((App.state.comments||[]).map(r=>String(App.commentField(r,'comment_id')||'')));
+      App.state.comments=(App.state.comments||[]).concat(rows.filter(r=>!known.has(String(App.commentField(r,'comment_id')||''))));
+      render();
+    }catch(error){
+      // 1件だけ取れない時（古い版のサーバー等）は、今までどおり全件を読む
+      App.state.commentSingleView='';
+      render();void App.ensureReferenceData(screen);
+    }
   },
 
   loadComments: async () => {
@@ -2107,6 +2153,7 @@ const App = {
         for(const row of part){const id=Number(row.id);if(!Number.isSafeInteger(id)||id<=previous)throw new Error('コメント一覧の順序を確認できませんでした');previous=id;}
         rows.push(...part);
         App.state.commentsLoadedCount=rows.length;
+        App.renderCommentLoadProgress();
         if(part.length<500)break;
         after=previous;
         if(page===99)throw new Error('コメント一覧の上限を超えました');
@@ -2641,12 +2688,10 @@ const App = {
       citation.sourceType === 'WeStudy学習動画' ||
       commentId.indexOf('lesson_desc_') === 0;
     if (isLesson) {
-      App.switchScreen('lessons');
+      App.switchScreen('lessons', { skipReference: true });
       App.showDbReturnBar('lessons');
-      if (App.elements.lessonSearchInput) {
-        App.elements.lessonSearchInput.value = commentId;
-        App.renderLessonTable({ exactCommentId: commentId });
-      }
+      if (App.elements.lessonSearchInput) App.elements.lessonSearchInput.value = commentId;
+      void App.openCommentQuick(commentId, 'lessons');
       return;
     }
     if (citation.kind === 'openchat') {
@@ -2664,13 +2709,13 @@ const App = {
       });
       return;
     }
-    App.switchScreen('comments');
+    App.switchScreen('comments', { skipReference: true });
     App.showDbReturnBar('comments');
     if (App.elements.commentSearchInput) {
       if (App.elements.commentAttachmentsOnly) App.elements.commentAttachmentsOnly.checked = false;
       App.elements.commentSearchInput.value = commentId;
-      App.renderCommentTable({ exactCommentId: commentId });
     }
+    void App.openCommentQuick(commentId, 'comments');
   },
 
   /**
@@ -4356,9 +4401,12 @@ const App = {
         ' 件（月日不明 ' +
         missingDateCount +
         ' 件・年も不明 ' + unknownYearCount + ' 件）' +
-        (commentsLoading ? '・コメント一覧を取得中（件数は暫定）' : '') +
+        (commentsLoading ? '・コメント一覧を取得中 ' + Number(App.state.commentsLoadedCount || 0).toLocaleString('ja-JP') + '件まで（件数は暫定）' : '') +
         (attachmentsOnly && App.state.attachmentLoading ? '・添付情報を確認中（件数は暫定）' :
           attachmentsOnly && App.state.attachmentStatus ? '・添付情報が未確認のため一部のみ表示。上部から再取得してください。' : '');
+      if (App.state.commentSingleView && !commentsLoading && !((App.state.referenceReady || {}).comments)) {
+        App.elements.commentListMeta.textContent = '根拠の投稿だけを表示しています。ほかの投稿も探すときは「再取得」を押してください（全件の読み込みに1〜2分かかります）。';
+      }
       if (filtered.length > pageSize) {
         const controls = document.createElement('span');
         controls.className = 'inline-flex gap-3 ml-3';
@@ -4376,7 +4424,7 @@ const App = {
 
     if (filtered.length === 0) {
       body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">' +
-        (commentsLoading ? 'コメント一覧を取得中…' : attachmentsOnly && (App.state.attachmentLoading || App.state.attachmentStatus) ? '添付情報の確認が完了していません。' : '該当データがありません') + '</td></tr>';
+        (commentsLoading ? 'コメント一覧を取得中…（' + Number(App.state.commentsLoadedCount || 0).toLocaleString('ja-JP') + '件まで）' : attachmentsOnly && (App.state.attachmentLoading || App.state.attachmentStatus) ? '添付情報の確認が完了していません。' : '該当データがありません') + '</td></tr>';
       return;
     }
 
@@ -4906,6 +4954,15 @@ const App = {
     App.state.allSearchResult = null;
     App.state.allSearchPendingTerms = terms;
     App.startAllSearchProgress(seq);
+    // 探している様子が画面の外にならないよう、「検索のしかた」をたたんで、探しているカードを画面の上に出す
+    try {
+      const help = document.getElementById('allSearchHelp'); if (help) help.open = false;
+      if (input.blur) input.blur();
+      const card = document.getElementById('allSearchWorkingCard');
+      const meta0 = App.elements.allSearchMeta;
+      const target = card || meta0;
+      if (target && target.scrollIntoView) window.setTimeout(function () { target.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60);
+    } catch (e) { /* 表示だけなので失敗しても続ける */ }
     const ocTask = App.allSearchOpenchat(query).then(function (r) { return r; }, function (e) { return { error: (e && e.message) || String(e) }; })
       .then(function (r) { if (current()) App.state.allSearchOcDone = true; return r; });
     const local = await Promise.all([App.ensureReferenceData('comments'), App.ensureReferenceData('knowledge')])
@@ -4972,7 +5029,7 @@ const App = {
       box.innerHTML = '<div id="allSearchWorkingCard" class="search-motion-wrap" role="status" aria-live="polite"><div class="search-motion">' +
         '<div class="search-motion-bar"><span></span><span></span><span></span><b>全データからキーワードを探しています</b></div>' +
         '<div class="search-motion-body">' +
-          '<div class="search-motion-scan" aria-hidden="true"><div class="search-motion-lines"><i></i><i></i><i></i><i></i></div><div class="search-motion-glass"><i class="fa-solid fa-magnifying-glass"></i></div></div>' +
+          '<div class="search-motion-scan" aria-hidden="true"><div class="search-motion-lines"><i></i><i></i><i></i><i></i></div><span class="search-motion-spark sm-spark-1">✦</span><span class="search-motion-spark sm-spark-2">✦</span><span class="search-motion-spark sm-spark-3">✦</span><div class="search-motion-glass"><i class="fa-solid fa-magnifying-glass"></i></div></div>' +
           '<ol class="search-motion-steps">' + st.steps.map(function (x, i) { return '<li data-step="' + i + '"><i class="' + x.icon + '" aria-hidden="true"></i><span data-label></span><small data-detail class="ml-auto text-xs whitespace-nowrap"></small></li>'; }).join('') + '</ol>' +
           '<div class="search-motion-progress" aria-hidden="true"><div data-progress></div></div>' +
           '<div class="search-motion-meta"><span data-remain></span><span data-elapsed></span></div>' +
