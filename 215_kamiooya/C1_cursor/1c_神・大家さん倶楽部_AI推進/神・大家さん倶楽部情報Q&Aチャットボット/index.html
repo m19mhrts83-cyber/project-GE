@@ -303,7 +303,13 @@
           <section id="chatScreen" class="screen-view flex-1 min-h-0 flex flex-col overflow-hidden">
             <div id="chatMessages" class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-50"></div>
 
-            <div class="shrink-0 border-t bg-white p-4">
+            <!-- 2026-11-19 松野さん「文章を読みたいときに入力欄が邪魔」: スマホは入力欄を1行にし、よくある質問・検索モードは「＋」の中へ。
+                 読み返している間（上へスクロール）と質問を送った後は入力欄をしまい、右下の「質問する」で開く -->
+            <button type="button" id="composerFab" class="composer-fab hidden" aria-controls="chatComposer" aria-expanded="false">
+              <i class="fa-solid fa-pen" aria-hidden="true"></i><span>質問する</span>
+            </button>
+            <div id="chatComposer" class="shrink-0 border-t bg-white p-4">
+              <div id="composerTools" class="composer-tools">
               <div>
                 <!-- よくある質問はたためる（2026-11-19 目黒さん「スマホで見づらい」）。スマホは最初たたんだ状態 -->
                 <button type="button" id="suggestedToggle" class="suggested-toggle" aria-expanded="true" aria-controls="suggestedQuestions">
@@ -323,7 +329,11 @@
                   意味検索モード: OFF
                 </button>
               </div>
+              </div>
               <form id="messageForm" class="flex gap-2">
+                <button type="button" id="composerToolsBtn" class="composer-tools-btn" aria-controls="composerTools" aria-expanded="false" aria-label="よくある質問・検索モードを開く">
+                  <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                </button>
                 <input id="messageInput" class="flex-1 min-w-0 border rounded-md px-3 py-2" placeholder="質問を入力してください" required />
                 <button id="sendMessageBtn" type="submit" class="shrink-0 px-4 py-2 rounded-md bg-blue-600 text-white">
                   送信

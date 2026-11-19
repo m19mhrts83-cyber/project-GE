@@ -980,3 +980,24 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   .chat-bubble.chat-assistant { max-width: 100%; }
   #chatMessages { padding-left: .6rem; padding-right: .6rem; }
 }
+
+/* スマホの入力欄（2026-11-19 松野さん「文章を読むときに入力欄が邪魔」）: チャットアプリのように
+   入力欄は1行＋「＋」、読み返し中・送信後はしまって右下の「質問する」ボタンだけにする。PCは従来どおり */
+#chatScreen { position: relative; }
+.composer-tools-btn { display: none; }
+.composer-fab { position: absolute; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 20; display: inline-flex; align-items: center; gap: .45rem; padding: .7rem 1.1rem; border-radius: 999px; background: #1e3a8a; color: #fff; font-weight: 700; font-size: 1rem; box-shadow: 0 6px 18px rgba(17, 54, 106, .28); border: 0; cursor: pointer; }
+.theme-a .composer-fab { background: linear-gradient(120deg, #FE910B, #FEAD48); }
+.composer-fab.hidden { display: none; }
+@media (max-width: 767px) {
+  #chatComposer { padding: .5rem .6rem calc(.5rem + env(safe-area-inset-bottom, 0px)); }
+  #chatComposer.composer-collapsed { display: none; }
+  .composer-tools { display: none; }
+  .composer-tools.composer-tools-open { display: block; max-height: 45vh; overflow-y: auto; padding-bottom: .4rem; margin-bottom: .4rem; border-bottom: 1px solid #e2e8f0; }
+  .composer-tools .mb-3 { margin-bottom: .5rem; }
+  .composer-tools-btn { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; min-height: 44px; border-radius: 999px; border: 1px solid #cbd5e1; background: #f8fafc; color: #334155; font-size: 1.05rem; }
+  .composer-tools-btn[aria-expanded="true"] { background: #1e3a8a; border-color: #1e3a8a; color: #fff; }
+  .composer-tools-btn[aria-expanded="true"] i { transform: rotate(45deg); }
+  .composer-tools-btn i { transition: transform .2s; }
+  #chatScreen.composer-is-collapsed #chatMessages { padding-bottom: 4.5rem; }
+}
+@media (prefers-reduced-motion: reduce) { .composer-tools-btn i { transition: none; } }
