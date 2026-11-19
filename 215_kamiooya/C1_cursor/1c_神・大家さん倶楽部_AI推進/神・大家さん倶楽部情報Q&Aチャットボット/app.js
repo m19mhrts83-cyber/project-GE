@@ -3602,6 +3602,12 @@ const App = {
 
   renderChatMessages: () => {
     const area = App.elements.chatMessages;
+    // 読み込み後の描き直し（参考情報・添付の一覧が届いた時）で一番下へ飛ばない（2026-11-19 スマホで評価ボタンが押せない）。
+    // 新しいメッセージが増えた時か、もともと一番下付近を見ていた時だけ一番下へ。
+    const prevCount = Number(area.dataset.msgCount || -1), prevTop = area.scrollTop;
+    const nearBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 80;
+    const keepPos = prevCount === App.state.chatMessages.length && !nearBottom;
+    area.dataset.msgCount = String(App.state.chatMessages.length);
     area.innerHTML = '';
     if (App.state.chatMessages.length === 0) {
       area.innerHTML = '<p class="text-sm text-slate-500">メッセージはまだありません。質問を送信してください。</p>';
@@ -3668,7 +3674,7 @@ const App = {
     });
     area.querySelectorAll('.answer-feedback').forEach(App.bindFeedbackBox);
     area.querySelectorAll('.citations-panel').forEach(App.bindSourceClicks);
-    area.scrollTop = area.scrollHeight;
+    area.scrollTop = keepPos ? prevTop : area.scrollHeight;
     area.querySelectorAll('.citation-attachments').forEach(function (container) {
       App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：', '', App.attachmentMetaFromElement(container));
     });
@@ -3733,7 +3739,7 @@ const App = {
     // 評価は押した時点で送る。理由とその他は「送る」で追加で送る（同じ回答には最後の1件だけが残る）。
     const send = async function (rating, reasons, comment) {
       const chatId = App.state.currentSessionId;
-      if (!chatId) return;
+      if (!chatId) { status.textContent = '送れませんでした。左のメニューからこのチャットを開き直してください。'; return false; }
       const prev = (App.state.feedbackByMessage || {})[msgId] || {};
       App.state.feedbackByMessage = Object.assign({}, App.state.feedbackByMessage, { [msgId]: { rating: rating, reasons: reasons, comment: comment, sent: false } });
       status.textContent = '送信中…';
@@ -3752,13 +3758,16 @@ const App = {
       b.addEventListener('click', async function () {
         const rating = b.getAttribute('data-rating'), prev = (App.state.feedbackByMessage || {})[msgId] || {};
         if (prev.rating === rating) return; // 同じ評価の押し直しでは選んだ理由を消さない
-        // 評価を変えたら前の理由は引き継がない
-        if (!(await send(rating, [], ''))) return;
-        box.querySelectorAll('.answer-feedback-btn').forEach(function (x) {
-          const on = x.getAttribute('data-rating') === rating;
-          x.setAttribute('aria-pressed', on ? 'true' : 'false');
-          x.className = App.feedbackBtnClass(on);
-        });
+        // 評価を変えたら前の理由は引き継がない。押した瞬間に色を変え、送れなければ元に戻す（2026-11-19）
+        const mark = function (r) {
+          box.querySelectorAll('.answer-feedback-btn').forEach(function (x) {
+            const on = x.getAttribute('data-rating') === r;
+            x.setAttribute('aria-pressed', on ? 'true' : 'false');
+            x.className = App.feedbackBtnClass(on);
+          });
+        };
+        mark(rating);
+        if (!(await send(rating, [], ''))) { mark(prev.rating || ''); return; }
         box.querySelector('.answer-feedback-reasons').innerHTML = App.renderFeedbackReasons(rating, null);
         input.value = '';
         detail.classList.toggle('hidden', !App.feedbackAsk(rating));
