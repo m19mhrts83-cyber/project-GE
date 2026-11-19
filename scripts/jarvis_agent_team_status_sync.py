@@ -1499,7 +1499,12 @@ def main() -> int:
         for src in sorted(HUB.glob("*.md")):
             name = Path(src.name)
             if src.name in drive_root_keep:
-                sync_drive(name, False)
+                # CLAUDE／AGENTS は Drive 用の入口（_drive/）があればそちらを写す
+                drive_entry = Path("_drive") / src.name
+                if src.name in ("CLAUDE.md", "AGENTS.md") and (HUB / drive_entry).is_file():
+                    sync_drive(drive_entry, False, dst_rel=name)
+                else:
+                    sync_drive(name, False)
             else:
                 sync_drive(name, False, dst_rel=docs_subdir / src.name)
                 # 旧配置（Drive直下）の残骸を消す
