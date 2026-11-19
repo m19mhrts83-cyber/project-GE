@@ -3687,6 +3687,7 @@ const App = {
         (m.role === 'assistant' && msgId && App.featureOn('answer_feedback') ? App.renderFeedbackBox(msgId) : '');
 
       wrap.appendChild(bubble);
+      wrap.setAttribute('data-role', m.role === 'user' ? 'user' : 'assistant');
       area.appendChild(wrap);
     });
 
@@ -3715,7 +3716,19 @@ const App = {
     });
     area.querySelectorAll('.answer-feedback').forEach(App.bindFeedbackBox);
     area.querySelectorAll('.citations-panel').forEach(App.bindSourceClicks);
-    area.scrollTop = keepPos ? prevTop : area.scrollHeight;
+    // 新しい回答が届いた時・チャットを開いた時は、回答の書き出し（直前の質問の少し上）を画面の上に合わせる
+    // （2026-11-19 松野さん「長い回答だと毎回一番下から上に戻るのが手間」）。質問を送った直後は一番下
+    if (keepPos) area.scrollTop = prevTop;
+    else {
+      const wraps = area.querySelectorAll('[data-role]');
+      const last = wraps[wraps.length - 1];
+      if (last && last.getAttribute('data-role') === 'assistant') {
+        const q = last.previousElementSibling && last.previousElementSibling.getAttribute('data-role') === 'user' ? last.previousElementSibling : null;
+        const qShort = q && q.offsetHeight < area.clientHeight * 0.25;
+        const target = (qShort ? q : last);
+        area.scrollTop = Math.max(0, target.offsetTop - area.offsetTop - 8);
+      } else area.scrollTop = area.scrollHeight;
+    }
     area.querySelectorAll('.citation-attachments').forEach(function (container) {
       App.appendAttachmentLinks(container, container.getAttribute('data-comment-id'), '関連添付：', '', App.attachmentMetaFromElement(container));
     });
