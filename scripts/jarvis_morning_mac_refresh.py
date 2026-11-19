@@ -17,6 +17,7 @@ gmail 取込後に partner レーンの未返信キャッチアップ（night_tr
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import subprocess
@@ -30,6 +31,11 @@ JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 STATE = REPO / ".jarvis_state" / "night_triage"
 LAST_REFRESH_PATH = STATE / "last_mac_morning_refresh_date"
+# 実行中ロック（2026-11-19）: launchd が120秒ごとに朝オープンを起動し、本日済の印は
+# バンドル完走後にしか付かないため、長いバンドルの途中で次々に起動して 116 などを
+# 二重投稿していた（11/18・11/19 朝に約13分で11回）。走っている間は後続を即終了させる。
+RUN_LOCK_PATH = STATE / "mac_morning_refresh.lock"
+_RUN_LOCK_FD: Any = None
 LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_night_triage"
 PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 MANUAL_DIR = (
@@ -121,6 +127,28 @@ def already_refreshed_today() -> bool:
         return LAST_REFRESH_PATH.read_text(encoding="utf-8").strip() == today_jst()
     except OSError:
         return False
+
+
+def acquire_run_lock(path: Path | None = None) -> bool:
+    """同時に1本だけ走らせる。取れなければ False（別のバンドルが実行中）。
+
+    flock なのでプロセスが落ちれば OS が自動で外す（古いロックが残らない）。
+    """
+    global _RUN_LOCK_FD
+    path = path or RUN_LOCK_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = open(path, "a+", encoding="utf-8")
+    try:
+        fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        fd.close()
+        return False
+    fd.seek(0)
+    fd.truncate()
+    fd.write(f"{os.getpid()} {now_iso()}\n")
+    fd.flush()
+    _RUN_LOCK_FD = fd
+    return True
 
 
 def mark_refreshed_today() -> None:
@@ -746,6 +774,10 @@ def main() -> int:
     )
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    if not args.dry_run and not acquire_run_lock():
+        print(f"# skip: another morning_mac_refresh is running ({RUN_LOCK_PATH})", flush=True)
+        return 0
 
     # 朝バンドル済でも、20:30以降に未実施の 111 夜枠だけ回収（Mac 再開）
     if (
