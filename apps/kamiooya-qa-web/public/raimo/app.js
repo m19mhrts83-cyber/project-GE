@@ -3600,6 +3600,15 @@ const App = {
     });
   },
 
+  // 時刻を「11/19 21:00」の形に（日本時間）。読めない値はそのまま
+  formatChatTime: (v) => {
+    const str = String(v);
+    // 時差の書いていない値は勝手に変換しない（秒だけ落とす）
+    if (!/(Z|[+-]\d\d:?\d\d)$/.test(str)) return str.replace(/:\d\d(\.\d+)?$/, '');
+    const d = new Date(str.replace(' ', 'T'));
+    if (isNaN(d.getTime())) return str;
+    try { return d.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (e) { return String(v); }
+  },
   renderChatMessages: () => {
     const area = App.elements.chatMessages;
     // 読み込み後の描き直し（参考情報・添付の一覧が届いた時）で一番下へ飛ばない（2026-11-19 スマホで評価ボタンが押せない）。
@@ -3610,7 +3619,21 @@ const App = {
     area.dataset.msgCount = String(App.state.chatMessages.length);
     area.innerHTML = '';
     if (App.state.chatMessages.length === 0) {
-      area.innerHTML = '<p class="text-sm text-slate-500">メッセージはまだありません。質問を送信してください。</p>';
+      // はじめの画面：よくある質問を真ん中に出す（2026-11-19 点検。スマホでは「＋」の中にしまってあり、初めての人が気づけないため）
+      const qs = (App.state.suggestedQuestions || []).slice(0, 4);
+      area.innerHTML = '<div class="chat-empty"><p class="chat-empty-title">下の欄に質問を入力してください</p>' +
+        (qs.length ? '<p class="chat-empty-sub">よくある質問から選ぶこともできます</p><div class="chat-empty-list">' +
+          qs.map(function (q, i) { return '<button type="button" class="chat-empty-q" data-i="' + i + '">' + App.escapeHtml(q.question_text || '') + '</button>'; }).join('') + '</div>' : '') +
+        '</div>';
+      area.querySelectorAll('.chat-empty-q').forEach(function (b) {
+        b.addEventListener('click', function () {
+          const q = qs[Number(b.getAttribute('data-i'))];
+          if (!q) return;
+          if (q.id) App.apiClient('PUT', '/suggested-questions/' + q.id + '/increment').catch(function () {});
+          void App.sendQuestion(q.question_text, true);
+        });
+      });
+      area.dataset.msgCount = '0';
       return;
     }
 
@@ -3635,7 +3658,7 @@ const App = {
       bubble.className = 'chat-bubble ' + role;
       bubble.innerHTML =
         '<div class="text-[11px] text-slate-500 mb-1">' +
-        App.escapeHtml(m.role) + ' ・ ' + App.escapeHtml(m.created_at || '') +
+        (m.role === 'user' ? 'あなた' : 'AIナビ') + (m.created_at ? ' ・ ' + App.escapeHtml(App.formatChatTime ? App.formatChatTime(m.created_at) : m.created_at) : '') +
         '</div>' +
         '<div>' +
         (m.role === 'assistant'
@@ -3812,6 +3835,7 @@ const App = {
       return;
     }
 
+    if (!(App.state.chatMessages || []).length && App.elements.chatMessages) App.renderChatMessages();
     App.state.suggestedQuestions.forEach(function (q) {
       const btn = document.createElement('button');
       btn.className = 'text-xs px-3 py-1 rounded-full border bg-slate-50 hover:bg-blue-50';
