@@ -3714,7 +3714,9 @@ const App = {
       return '<button type="button" class="' + App.feedbackBtnClass(on) + '" data-rating="' + c.rating + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + c.icon + ' ' + c.label + '</button>';
     }).join('');
     return '<div class="answer-feedback mt-2 pt-2 border-t border-slate-200 text-xs" data-message-id="' + App.escapeHtml(msgId) + '">' +
-      '<div class="flex flex-wrap items-center gap-2"><span class="text-slate-500">この回答はどうでしたか？</span>' + buttons + '</div>' +
+      // 問いかけは1行目、3つのボタンは2行目に横並び（2026-11-19 松野さん「悪いねだけ下に出る」）
+      '<div class="text-slate-500">この回答はどうでしたか？</div>' +
+      '<div class="answer-feedback-btns mt-1 grid grid-cols-3 gap-2">' + buttons + '</div>' +
       '<div class="answer-feedback-detail ' + (App.feedbackAsk(saved.rating) ? '' : 'hidden') + '">' +
       '<div class="answer-feedback-reasons">' + App.renderFeedbackReasons(saved.rating, saved) + '</div>' +
       '<div class="answer-feedback-comment mt-2 flex gap-2">' +

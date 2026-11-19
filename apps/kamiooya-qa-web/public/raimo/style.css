@@ -1001,3 +1001,6 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   #chatScreen.composer-is-collapsed #chatMessages { padding-bottom: 4.5rem; }
 }
 @media (prefers-reduced-motion: reduce) { .composer-tools-btn i { transition: none; } }
+
+/* 評価ボタン3つを1行に等幅で並べる（2026-11-19 松野さん）。文字が大きい設定でも折り返さず縮める */
+.answer-feedback-btns .answer-feedback-btn{display:flex;align-items:center;justify-content:center;gap:.25rem;min-height:40px;padding:.375rem .25rem;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
