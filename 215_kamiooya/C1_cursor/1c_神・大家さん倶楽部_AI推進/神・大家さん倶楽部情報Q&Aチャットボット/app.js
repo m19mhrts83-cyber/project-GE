@@ -6349,7 +6349,8 @@ const App = {
     const fab = document.getElementById('composerFab');
     if (!c || !fab) return;
     const narrow = App.isNarrowScreen();
-    const show = !narrow || !!open;
+    // 入力欄は常に表示（2026-11-19 隠す方式をやめた）。「質問する」ボタンは使わない
+    const show = true || !narrow || !!open;
     c.classList.toggle('composer-collapsed', !show);
     fab.classList.toggle('hidden', show);
     fab.setAttribute('aria-expanded', show ? 'true' : 'false');
@@ -6382,10 +6383,9 @@ const App = {
         const top = box.scrollTop;
         const input = App.elements.messageInput;
         const typing = input && document.activeElement === input && input.value;
-        if (App.isNarrowScreen() && !typing && top < last - 24) {
-          App.setComposerOpen(false);
-          App.setComposerTools(false);
-        }
+        // 入力欄は常に出したまま（2026-11-19 松野さん「質問欄がうまく出せない」→ LINE/ChatGPT 同様に隠さない）。
+        // 読み返しでスクロールしたら、開いていた「＋」の道具だけ閉じて読む場所を広げる。
+        if (App.isNarrowScreen() && !typing && Math.abs(top - last) > 24) App.setComposerTools(false);
         last = top;
       }, { passive: true });
     }
@@ -6411,7 +6411,6 @@ const App = {
     // スマホは送ったら入力欄をしまい、回答を広く読めるようにする
     if (App.isNarrowScreen()) {
       App.setComposerTools(false);
-      App.setComposerOpen(false);
       try { if (App.elements.messageInput) App.elements.messageInput.blur(); } catch (e) { /* ignore */ }
     }
 

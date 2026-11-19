@@ -198,6 +198,8 @@ body {
 
 #mainView {
   height: 100vh;
+  /* iPhone の Chrome/Safari で下の端がツールバーに隠れないよう、実際に見えている高さに合わせる（2026-11-19） */
+  height: 100dvh;
   overflow: hidden;
 }
 
