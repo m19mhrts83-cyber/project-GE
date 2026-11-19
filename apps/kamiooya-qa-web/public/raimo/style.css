@@ -1039,3 +1039,11 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 @media (prefers-reduced-motion: reduce) {
   .feedback-thanks, .feedback-thanks-check circle, .feedback-thanks-check path { animation: none; stroke-dashoffset: 0; }
 }
+
+/* スマホ：画面全体を見えている範囲にぴったり固定（2026-11-19 松野さん「最初に開くと質問バーが下に固定されず、余白が出て、少し下げると一番下に来る」）
+   ページ自体がスクロールしないようにし、入力欄を常に一番下に置く */
+@media (max-width: 767px) {
+  #mainView:not(.hidden) { position: fixed; top: 0; left: 0; right: 0; bottom: 0; height: auto; }
+  html:has(#mainView:not(.hidden)), body:has(#mainView:not(.hidden)) { overflow: hidden; overscroll-behavior: none; }
+  #chatMessages { overscroll-behavior: contain; }
+}
