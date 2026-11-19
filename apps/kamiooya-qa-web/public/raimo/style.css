@@ -616,7 +616,9 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 /* 文の区切りでだけ折り返す（11/11 松野さん「切り位置が気に入らない」） */
 .brand-hero-lead .nobr { white-space: nowrap; }
 /* トップの見出し（2026-11-18 松野さんの文面）: PCでは1行目を途中で折らない。スマホは自然に折り返す */
-@media (min-width: 641px) { .theme-a .brand-hero-title { font-size: 1.75rem; } .brand-hero-title .nobr { white-space: nowrap; } }
+@media (min-width: 641px) { .theme-a .brand-hero-title { font-size: 1.75rem; } }
+/* 見出しは「神大家の講座や／LINEの情報を、」のまとまりでだけ折り返す（2026-11-19 目黒さん: スマホで「を、」だけ1行になる） */
+.brand-hero-title .nobr { display: inline-block; white-space: nowrap; }
 @media (max-width: 640px) { .theme-a .brand-hero-lead { font-size: min(0.95rem, 3.6vw); } }
 
 /* 運営分析の新しい見た目（2026-11-11 松野さん「味気ない。見やすく把握しやすく、動きもつけて」）。design_theme の人だけ。
@@ -923,3 +925,16 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   html.ff-mobile-layout .openchat-table .openchat-thread-head { max-width: none; }
   html.ff-mobile-layout .openchat-table .openchat-thread-root-note { display: inline; margin: 0 .25rem 0 0; }
 }
+
+/* よくある質問の開け閉め・スマホの入力欄まわり（2026-11-19 目黒さん「スマホで少し使いにくい」） */
+.suggested-toggle { display: inline-flex; align-items: center; gap: .3rem; margin-bottom: .5rem; padding: .15rem .1rem; font-size: .75rem; color: #64748b; background: none; border: 0; cursor: pointer; }
+.suggested-toggle:hover, .suggested-toggle:focus-visible { color: #1e3a8a; outline: none; text-decoration: underline; text-underline-offset: 3px; }
+.suggested-count { color: #94a3b8; }
+.suggested-chevron { font-size: .7rem; transition: transform .2s; }
+.suggested-toggle[aria-expanded="false"] .suggested-chevron { transform: rotate(-90deg); }
+@media (max-width: 767px) {
+  .suggested-toggle { font-size: .85rem; padding: .35rem .6rem; border: 1px solid #cbd5e1; border-radius: 999px; background: #f8fafc; color: #334155; }
+  #semanticModeHint { display: none; }
+  #chatScreen > .shrink-0 { padding: .75rem; }
+}
+@media (prefers-reduced-motion: reduce) { .suggested-chevron { transition: none; } }
