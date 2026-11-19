@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20261119h" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
+    <link rel="stylesheet" href="style.css?v=20261119i" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
   <!-- (5) ロゴに合わせた配色: この端末で見えていた人は、ログイン画面から同じ色で出す（applyTheme が覚える） -->
   <script>try{if(localStorage.getItem('qa_design_theme')==='1')document.documentElement.classList.add('theme-a');}catch(e){}</script>
   <!-- 文字の大きさ（標準/大/特大、2026-11-11 松野さん「50代・60代にも優しく、選べるように」）。端末ごとに覚える。配色と同じスイッチの人だけ効く -->
@@ -258,6 +258,11 @@
       <div class="flex flex-1 min-h-0 overflow-hidden">
         <!-- サイドバー -->
         <aside id="sidebar" class="w-80 min-w-[20rem] shrink-0 bg-white border-r border-slate-200 hidden md:flex md:flex-col h-full overflow-hidden">
+          <!-- スマホ: メニューを閉じるボタン（2026-11-19 点検。幅の狭いiPhoneや文字「特大」だとメニューが画面いっぱいになり、外を押して閉じられなかった） -->
+          <div class="sidebar-close-row md:hidden">
+            <span class="sidebar-close-title">メニュー</span>
+            <button type="button" id="sidebarCloseBtn" class="sidebar-close-btn" aria-label="メニューを閉じる"><span aria-hidden="true">✕</span> 閉じる</button>
+          </div>
           <div class="p-3 border-b border-slate-200">
             <button id="newChatBtn" class="w-full py-2 rounded bg-blue-900 text-white text-sm">
               <i class="fa-solid fa-plus mr-1"></i> 新規チャット
@@ -301,6 +306,10 @@
           <div class="p-3 flex-1">
             <h3 class="text-sm font-semibold text-slate-600 mb-2">チャット履歴</h3>
             <ul id="sessionList" class="space-y-2"></ul>
+          </div>
+          <!-- スマホ: ログアウトはメニューの一番下へ（上の帯で文字サイズの隣にあり押し間違えやすいため。2026-11-19 点検） -->
+          <div class="sidebar-logout-row md:hidden">
+            <button type="button" id="sidebarLogoutBtn" class="sidebar-logout-btn">ログアウト</button>
           </div>
         </aside>
 

@@ -1047,3 +1047,22 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   html:has(#mainView:not(.hidden)), body:has(#mainView:not(.hidden)) { overflow: hidden; overscroll-behavior: none; }
   #chatMessages { overscroll-behavior: contain; }
 }
+
+/* 2026-11-19 点検（スマホ）: メニューに「閉じる」、ログアウトはメニューの下へ、押しやすい大きさ */
+.sidebar-close-row, .sidebar-logout-row { display: none; }
+@media (max-width: 767px) {
+  /* 文字「特大」でも画面の右端が少し見えるように（外を押して閉じられる）。rem だと文字サイズで広がるため vw と px で決める */
+  #sidebar.mobile-open { width: min(84vw, 320px); min-width: 0; max-width: none; }
+  #sidebar.mobile-open .sidebar-close-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px 6px 16px; border-bottom: 1px solid #e2e8f0; }
+  .sidebar-close-title { font-size: 14px; font-weight: 700; color: #475569; }
+  .sidebar-close-btn { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px; border-radius: 10px; font-size: 15px; font-weight: 600; color: #11366A; background: #eef3fa; border: 0; cursor: pointer; white-space: nowrap; }
+  .sidebar-close-btn:hover, .sidebar-close-btn:focus-visible { background: #dbe6f5; outline: none; }
+  #sidebar.mobile-open .sidebar-logout-row { display: block; padding: 12px 16px 20px; border-top: 1px solid #e2e8f0; }
+  .sidebar-logout-btn { width: 100%; min-height: 44px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; color: #475569; font-size: 15px; cursor: pointer; }
+  #sidebar.mobile-open .screen-tab { min-height: 44px; }
+  .session-item { min-height: 44px; }
+  /* 上の帯: ログアウトはメニューの中へ。空いた分、文字サイズのボタンを大きく */
+  #mainView > header #logoutBtn { display: none; }
+  .text-size-switch--header button { min-height: 32px; font-size: 13px; }
+}
+.chat-empty-title, .chat-empty-sub { text-wrap: balance; }
