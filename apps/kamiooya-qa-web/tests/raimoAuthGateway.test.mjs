@@ -168,3 +168,18 @@ test('bounded comment pages require an approved current session',async()=>{
  const token=await s.login();assert.equal((await s.handler(req('/comments-page',token,{after_id:500}))).status,200);
  s.members.get('u').status='withdrawn';assert.equal((await s.handler(req('/comments-page',token,{after_id:0}))).status,403);
 });
+
+test('根拠の「本文を見る」: ログインした会員だけ、comment_id で数件だけ取れる（全件を読まない）', async () => {
+  const s = setup(); let asked = null;
+  s.d.commentsByIds = async ids => { asked = ids; return [{ comment_id: '30701', content: '本文' }]; };
+  const h = createRaimoAuthGateway(s.d);
+  assert.equal((await h(req('/comments-by-id', '', { ids: ['30701'] }))).status, 401);
+  const token = await s.login();
+  const ok = await h(req('/comments-by-id', token, { ids: ['30701', '30701'] }));
+  assert.equal(ok.status, 200);
+  assert.deepEqual(asked, ['30701']);
+  assert.equal((await ok.json()).comments[0].content, '本文');
+  assert.equal((await h(req('/comments-by-id', token, { ids: [] }))).status, 400);
+  assert.equal((await h(req('/comments-by-id', token, { ids: ['a b'] }))).status, 400);
+  assert.equal((await h(req('/comments-by-id', token, { ids: Array.from({ length: 21 }, (_, i) => String(i)) }))).status, 400);
+});

@@ -142,6 +142,13 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       return {events,chunks,sources,jobs};
     },
     referenceMetadata:async()=>rest('rpc/qa_reference_metadata',{method:'POST',body:'{}'}),
+    commentsByIds:async(ids:string[])=>{
+      const keys='id,source_type,comment_id,posted_at,author_name,content,parent_comment_id,created_at,updated_at,source_system,source_kind,forum_category,topic_title,course_tab,section_name,lesson_title,lesson_url,content_hash';
+      const list=ids.map(x=>'"'+x+'"').join(',');
+      const rows=await rest('comments?select='+keys+'&comment_id=in.('+encodeURIComponent(list)+')&limit=20');
+      // 運営用の行は出さない（一覧 /comments-page と同じ条件）
+      return (Array.isArray(rows)?rows:[]).filter((r:any)=>!String(r.comment_id||'').startsWith('admin_')&&!['__admin_meta__','__master_xfer__'].includes(String(r.source_type||'')));
+    },
     featureFlags:async()=>rest('qa_feature_flags?select=feature,stage,owner_ids,reviewer_ids&limit=100'),
     roster:{
       has:rosterHas,

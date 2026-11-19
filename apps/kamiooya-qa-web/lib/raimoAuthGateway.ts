@@ -23,6 +23,8 @@ export type GatewayDependencies = {
   jobs?: {start(actor:AnswerActor,chatId:string,input:Record<string,unknown>):Promise<unknown>;get(actor:AnswerActor,chatId:string,id:string):Promise<unknown>};
   referenceEvents?(userId:string,chatId:string):Promise<unknown>;
   referenceMetadata?(): Promise<unknown>;
+  // 根拠の「本文を見る」用: コメントを comment_id で数件だけ取る（全件26,000件を読まずに済むように。2026-11-19）
+  commentsByIds?(ids: string[]): Promise<unknown[]>;
   semanticConfig?(): Promise<{url: string; secret: string}>;
   publicAction?(path: string, input: Record<string, unknown>): Promise<unknown>;
   // 段階公開スイッチ（lib/featureFlags.ts）。未設定なら全機能オフ。
@@ -253,6 +255,11 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
           chats:top.map(c=>({...c,member:people.get(c.user_id)||null}))});
       }
       if(path==='/reference-metadata' && req.method==='GET' && d.referenceMetadata)return json(await d.referenceMetadata());
+      if(path==='/comments-by-id' && req.method==='POST' && d.commentsByIds){
+        const ids=Array.isArray(input.ids)?input.ids.map((x:unknown)=>String(x??'').trim()):[];
+        if(!ids.length||ids.length>20||ids.some((x:string)=>!/^[A-Za-z0-9_.:-]{1,100}$/.test(x)))return json({error:'invalid_request'},400);
+        return json({comments:await d.commentsByIds([...new Set(ids)] as string[])});
+      }
       // This legacy browser search credential is separate from every privileged server secret.
       if(path==='/semantic-search-config' && req.method==='POST' && d.semanticConfig)return json(await d.semanticConfig());
       if (path === '/auth/attachment-session' && req.method === 'POST') {
