@@ -1540,6 +1540,7 @@ const App = {
     App.state.currentScreen = screenName || 'chat';
     if(['comments','lessons','knowledge'].includes(screenName))void App.ensureReferenceData(screenName);
     App.elements.sidebar.classList.remove('mobile-open');
+    if (App.syncSidebarBackdrop) App.syncSidebarBackdrop();
     // サイドバー手動遷移・戻る完了時は citation 用戻るバーを隠す
     if (opts.fromNav || opts.fromBack) {
       App.clearDbReturnBar();
@@ -1649,6 +1650,23 @@ const App = {
 
   toggleSidebarMobile: () => {
     App.elements.sidebar.classList.toggle('mobile-open');
+    App.syncSidebarBackdrop();
+  },
+  // メニューの外（暗くした部分）を押したら閉じる（2026-11-19 点検）
+  syncSidebarBackdrop: () => {
+    let bd = document.getElementById('sidebarBackdrop');
+    if (!bd) {
+      bd = document.createElement('div');
+      bd.id = 'sidebarBackdrop';
+      bd.className = 'sidebar-backdrop hidden';
+      bd.setAttribute('aria-hidden', 'true');
+      bd.addEventListener('click', function () { App.elements.sidebar.classList.remove('mobile-open'); App.syncSidebarBackdrop(); });
+      document.body.appendChild(bd);
+    }
+    const open = App.elements.sidebar.classList.contains('mobile-open') && App.isNarrowScreen();
+    bd.classList.toggle('hidden', !open);
+    const t = document.getElementById('sidebarToggleBtn');
+    if (t) { t.setAttribute('aria-expanded', open ? 'true' : 'false'); t.setAttribute('aria-label', open ? 'メニューを閉じる' : 'メニューを開く'); }
   },
 
   loadChatSessions: async () => {
@@ -3600,6 +3618,15 @@ const App = {
     });
   },
 
+  // 時刻を「11/19 21:00」の形に（日本時間）。読めない値はそのまま
+  formatChatTime: (v) => {
+    const str = String(v);
+    // 時差の書いていない値は勝手に変換しない（秒だけ落とす）
+    if (!/(Z|[+-]\d\d:?\d\d)$/.test(str)) return str.replace(/:\d\d(\.\d+)?$/, '');
+    const d = new Date(str.replace(' ', 'T'));
+    if (isNaN(d.getTime())) return str;
+    try { return d.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (e) { return String(v); }
+  },
   renderChatMessages: () => {
     const area = App.elements.chatMessages;
     // 読み込み後の描き直し（参考情報・添付の一覧が届いた時）で一番下へ飛ばない（2026-11-19 スマホで評価ボタンが押せない）。
@@ -3610,7 +3637,21 @@ const App = {
     area.dataset.msgCount = String(App.state.chatMessages.length);
     area.innerHTML = '';
     if (App.state.chatMessages.length === 0) {
-      area.innerHTML = '<p class="text-sm text-slate-500">メッセージはまだありません。質問を送信してください。</p>';
+      // はじめの画面：よくある質問を真ん中に出す（2026-11-19 点検。スマホでは「＋」の中にしまってあり、初めての人が気づけないため）
+      const qs = (App.state.suggestedQuestions || []).slice(0, 4);
+      area.innerHTML = '<div class="chat-empty"><p class="chat-empty-title">下の欄に質問を入力してください</p>' +
+        (qs.length ? '<p class="chat-empty-sub">よくある質問から選ぶこともできます</p><div class="chat-empty-list">' +
+          qs.map(function (q, i) { return '<button type="button" class="chat-empty-q" data-i="' + i + '">' + App.escapeHtml(q.question_text || '') + '</button>'; }).join('') + '</div>' : '') +
+        '</div>';
+      area.querySelectorAll('.chat-empty-q').forEach(function (b) {
+        b.addEventListener('click', function () {
+          const q = qs[Number(b.getAttribute('data-i'))];
+          if (!q) return;
+          if (q.id) App.apiClient('PUT', '/suggested-questions/' + q.id + '/increment').catch(function () {});
+          void App.sendQuestion(q.question_text, true);
+        });
+      });
+      area.dataset.msgCount = '0';
       return;
     }
 
@@ -3635,7 +3676,7 @@ const App = {
       bubble.className = 'chat-bubble ' + role;
       bubble.innerHTML =
         '<div class="text-[11px] text-slate-500 mb-1">' +
-        App.escapeHtml(m.role) + ' ・ ' + App.escapeHtml(m.created_at || '') +
+        (m.role === 'user' ? 'あなた' : 'AIナビ') + (m.created_at ? ' ・ ' + App.escapeHtml(App.formatChatTime ? App.formatChatTime(m.created_at) : m.created_at) : '') +
         '</div>' +
         '<div>' +
         (m.role === 'assistant'
@@ -3812,6 +3853,7 @@ const App = {
       return;
     }
 
+    if (!(App.state.chatMessages || []).length && App.elements.chatMessages) App.renderChatMessages();
     App.state.suggestedQuestions.forEach(function (q) {
       const btn = document.createElement('button');
       btn.className = 'text-xs px-3 py-1 rounded-full border bg-slate-50 hover:bg-blue-50';
@@ -6349,7 +6391,8 @@ const App = {
     const fab = document.getElementById('composerFab');
     if (!c || !fab) return;
     const narrow = App.isNarrowScreen();
-    const show = !narrow || !!open;
+    // 入力欄は常に表示（2026-11-19 隠す方式をやめた）。「質問する」ボタンは使わない
+    const show = true || !narrow || !!open;
     c.classList.toggle('composer-collapsed', !show);
     fab.classList.toggle('hidden', show);
     fab.setAttribute('aria-expanded', show ? 'true' : 'false');
@@ -6382,10 +6425,9 @@ const App = {
         const top = box.scrollTop;
         const input = App.elements.messageInput;
         const typing = input && document.activeElement === input && input.value;
-        if (App.isNarrowScreen() && !typing && top < last - 24) {
-          App.setComposerOpen(false);
-          App.setComposerTools(false);
-        }
+        // 入力欄は常に出したまま（2026-11-19 松野さん「質問欄がうまく出せない」→ LINE/ChatGPT 同様に隠さない）。
+        // 読み返しでスクロールしたら、開いていた「＋」の道具だけ閉じて読む場所を広げる。
+        if (App.isNarrowScreen() && !typing && Math.abs(top - last) > 24) App.setComposerTools(false);
         last = top;
       }, { passive: true });
     }
@@ -6411,7 +6453,6 @@ const App = {
     // スマホは送ったら入力欄をしまい、回答を広く読めるようにする
     if (App.isNarrowScreen()) {
       App.setComposerTools(false);
-      App.setComposerOpen(false);
       try { if (App.elements.messageInput) App.elements.messageInput.blur(); } catch (e) { /* ignore */ }
     }
 

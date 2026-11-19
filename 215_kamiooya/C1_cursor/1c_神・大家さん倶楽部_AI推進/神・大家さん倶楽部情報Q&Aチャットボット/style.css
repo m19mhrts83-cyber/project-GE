@@ -198,6 +198,8 @@ body {
 
 #mainView {
   height: 100vh;
+  /* iPhone の Chrome/Safari で下の端がツールバーに隠れないよう、実際に見えている高さに合わせる（2026-11-19） */
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -909,8 +911,9 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 
 /* スマホ縦（2026-11-18 松野さん・スイッチ mobile_layout の人だけ＝html.ff-mobile-layout）: メニューは縦に並べる（上にユーザメニュー、下にチャット履歴） */
 @media (max-width: 767px) {
-  html.ff-mobile-layout #sidebar.mobile-open { flex-direction: column; }
-  html.ff-mobile-layout #sidebar.mobile-open > * { flex-shrink: 0; }
+  /* メニューの縦並びは全員に（2026-11-19 点検：スイッチ外だと「新規チャット」が縦書きに崩れていた） */
+  #sidebar.mobile-open { flex-direction: column; overflow-y: auto; }
+  #sidebar.mobile-open > * { flex-shrink: 0; }
 }
 /* スマホ縦: オプチャ一覧は1件1カード。上の段にオプチャ・種別・日時・投稿者、下の段に本文を横幅いっぱい */
 @media (max-width: 640px) {
@@ -1005,3 +1008,17 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 /* 評価ボタン3つを1行に等幅で並べる（2026-11-19 松野さん）。文字が大きい設定でも折り返さず縮める */
 .answer-feedback-btn{touch-action:manipulation}
 .answer-feedback-btns .answer-feedback-btn{display:flex;align-items:center;justify-content:center;gap:.25rem;min-height:40px;padding:.375rem .25rem;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+/* はじめの画面のよくある質問（2026-11-19 点検） */
+.chat-empty { max-width: 34rem; margin: 2rem auto 0; text-align: center; color: #475569; }
+.chat-empty-title { font-weight: 700; font-size: 1rem; color: #1e293b; }
+.chat-empty-sub { margin-top: .35rem; font-size: .85rem; }
+.chat-empty-list { margin-top: .9rem; display: flex; flex-direction: column; gap: .5rem; }
+.chat-empty-q { text-align: left; padding: .75rem .9rem; border-radius: .75rem; border: 1px solid #cbd5e1; background: #fff; color: #1e3a8a; font-size: .95rem; line-height: 1.45; box-shadow: 0 1px 2px rgba(15,23,42,.05); touch-action: manipulation; }
+.chat-empty-q:hover { background: #eff6ff; }
+.theme-a .chat-empty-q { color: #11366A; border-color: rgba(17,54,106,.2); }
+
+/* メニューを開いた時の外側（押すと閉じる）（2026-11-19 点検） */
+.sidebar-backdrop { position: fixed; inset: 0; z-index: 39; background: rgba(15, 23, 42, .35); }
+.sidebar-backdrop.hidden { display: none; }
+@media (min-width: 768px) { .sidebar-backdrop { display: none; } }
