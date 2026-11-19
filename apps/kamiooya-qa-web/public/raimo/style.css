@@ -938,3 +938,38 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   #chatScreen > .shrink-0 { padding: .75rem; }
 }
 @media (prefers-reduced-motion: reduce) { .suggested-chevron { transition: none; } }
+
+/* 2026-11-19 松野さん（スマホ）: 送信ボタンが右で切れる／メニューが小さく誤タップしそう／確認用の欄が大きい */
+#messageForm { min-width: 0; }
+#messageForm #messageInput { min-width: 0; }
+#messageForm #sendMessageBtn { flex-shrink: 0; white-space: nowrap; }
+.menu-toggle-btn { flex-shrink: 0; white-space: nowrap; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; min-width: 48px; min-height: 44px; margin: -6px 4px -6px -6px; padding: 4px 6px; border-radius: 8px; line-height: 1; color: inherit; }
+.menu-toggle-btn i { font-size: 20px; }
+.menu-toggle-label { margin-top: 3px; font-size: 10px; letter-spacing: .02em; }
+.menu-toggle-btn:hover, .menu-toggle-btn:focus-visible { background: rgba(255,255,255,.15); outline: none; }
+@media (min-width: 768px) { .menu-toggle-btn { display: none; } }
+.feature-preview-bar { padding: 0 1rem; }
+.feature-preview-toggle { display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 36px; padding: .35rem 0; background: none; border: 0; text-align: left; cursor: pointer; }
+.feature-preview-summary { color: #6d28d9; font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.feature-preview-chevron { color: #6d28d9; font-size: .75rem; transition: transform .2s; }
+.feature-preview-toggle[aria-expanded="false"] .feature-preview-chevron { transform: rotate(-90deg); }
+.feature-preview-body:not(.hidden) { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1rem; padding: 0 0 .5rem; }
+@media (max-width: 640px) {
+  #messageForm { gap: 6px; }
+  #messageForm #sendMessageBtn { padding-left: .9rem; padding-right: .9rem; }
+  .feature-preview-bar { padding: 0 .75rem; }
+}
+/* 幅の狭いスマホ（iPhone SE 等）でも上の帯が1行に収まるように */
+@media (max-width: 400px) {
+  .theme-a #mainView > header { padding: 8px 8px; }
+  .theme-a #mainView > header h2 { font-size: 15px; }
+  .theme-a #mainView > header .gap-4 { gap: 4px; }
+  .text-size-switch--header button { padding: 4px 5px; }
+  .theme-a #logoutBtn { padding: 4px 6px; font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) { .feature-preview-chevron { transition: none; } }
+@media (max-width: 360px) {
+  .menu-toggle-label { display: none; }
+  .menu-toggle-btn { min-width: 40px; margin-right: 0; }
+  .theme-a #mainView > header h2 { font-size: 14px; }
+}
