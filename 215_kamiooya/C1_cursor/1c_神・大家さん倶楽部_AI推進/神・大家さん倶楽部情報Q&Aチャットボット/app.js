@@ -226,6 +226,9 @@ const App = {
     if (!on) { if (link) link.remove(); document.querySelectorAll('link[data-app-icon-hidden]').forEach((l) => { l.rel = l.getAttribute('data-app-icon-hidden'); l.removeAttribute('data-app-icon-hidden'); }); return; }
     document.querySelectorAll('link[rel~="icon"]').forEach((l) => { if (l.id !== 'appIconLink') { l.setAttribute('data-app-icon-hidden', l.rel); l.rel = 'x-icon-off'; } });
     if (!link) { link = document.createElement('link'); link.id = 'appIconLink'; link.rel = 'icon'; link.type = 'image/svg+xml'; head.appendChild(link); }
+    // iPhone の Chrome は SVG のアイコンを出せず Raimo の既定（LINE風）に戻るため、「神」は index.html の PNG を使う（2026-11-19）
+    const png = (App.APP_ICON_CHOICE === 'kami') ? document.querySelector('link[data-app-icon-png]') : null;
+    if (png) { link.type = 'image/png'; link.href = png.getAttribute('href'); return; }
     link.href = App.APP_ICONS[App.APP_ICON_CHOICE] || App.APP_ICONS.kami;
   },
   // 文字の大きさ（標準/大/特大）。年配の会員にも読みやすく（2026-11-11 松野さん）。端末ごとに覚える。
@@ -1661,7 +1664,9 @@ const App = {
       bd.className = 'sidebar-backdrop hidden';
       bd.setAttribute('aria-hidden', 'true');
       bd.addEventListener('click', function () { App.elements.sidebar.classList.remove('mobile-open'); App.syncSidebarBackdrop(); });
-      document.body.appendChild(bd);
+      // 画面全体（#mainView）の中に置く。外に置くとメニューより上に重なり、メニューが暗く見えて押せなくなる（2026-11-19）
+      const host = document.getElementById('mainView') || document.body;
+      host.appendChild(bd);
     }
     const open = App.elements.sidebar.classList.contains('mobile-open') && App.isNarrowScreen();
     bd.classList.toggle('hidden', !open);
