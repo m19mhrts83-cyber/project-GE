@@ -145,7 +145,10 @@ def put_snapshot(snap: dict[str, Any]) -> None:
 
 def snapshot(*, dry: bool, now: datetime) -> int:
     c = _io()
-    snap = build_snapshot(tasks=c.active_tasks(), held=held_ids(now), today=now.date(), now=now)
+    tasks = c.active_tasks()
+    labelled = [t for t in tasks if set(t.get("labels") or []) & CLEAN_LABELS]
+    print(f"Todoist から {len(tasks)} 件取得、対象ラベル付き {len(labelled)} 件")
+    snap = build_snapshot(tasks=tasks, held=held_ids(now), today=now.date(), now=now)
     by: dict[str, int] = {}
     for x in snap["cards"]:
         by[x["suggest"]] = by.get(x["suggest"], 0) + 1
