@@ -464,6 +464,11 @@ const App = {
     if(retryAttachmentsBtn)retryAttachmentsBtn.addEventListener('click',()=>{if(!App.state.attachmentLoading&&App.state.currentUser)void App.initializeAttachments('','',App.state.attachmentGeneration);});
     App.initTextSize();
     document.getElementById('logoutBtn').addEventListener('click', App.logout);
+    // スマホのメニュー内「閉じる」「ログアウト」（2026-11-19 点検）
+    const sbClose = document.getElementById('sidebarCloseBtn');
+    if (sbClose) sbClose.addEventListener('click', function () { App.elements.sidebar.classList.remove('mobile-open'); App.syncSidebarBackdrop(); const t = document.getElementById('sidebarToggleBtn'); if (t) t.focus(); });
+    const sbLogout = document.getElementById('sidebarLogoutBtn');
+    if (sbLogout) sbLogout.addEventListener('click', App.logout);
     document.getElementById('newChatBtn').addEventListener('click', App.createNewChatPlaceholder);
     App.elements.messageForm.addEventListener('submit', App.handleSendMessage);
     App.initComposer();
@@ -3614,7 +3619,7 @@ const App = {
       li.className = 'session-item border rounded p-2 cursor-pointer hover:bg-slate-50 ' + active;
       li.innerHTML =
         '<div class="text-sm font-medium">' + App.escapeHtml(s.title || '無題') + '</div>' +
-        '<div class="text-xs text-slate-500 mt-1">' + App.escapeHtml(s.created_at || '') + '</div>';
+        '<div class="text-xs text-slate-500 mt-1">' + App.escapeHtml(s.created_at ? App.formatChatTime(s.created_at) : '') + '</div>';
       li.addEventListener('click', function () {
         App.loadSessionDetails(s.id);
         App.switchScreen('chat');
