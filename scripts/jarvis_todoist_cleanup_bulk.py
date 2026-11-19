@@ -136,6 +136,23 @@ def held_ids(now: datetime) -> set[str]:
     return {str(r["target_id"]) for r in rows}
 
 
+def tasks_by_label() -> list[dict[str, Any]]:
+    import urllib.parse  # noqa: PLC0415
+
+    c = _io()
+    rows: list[dict[str, Any]] = []
+    for label in sorted(CLEAN_LABELS):
+        cursor = None
+        for _ in range(10):
+            path = f"tasks?label={urllib.parse.quote(label)}&limit=200" + (f"&cursor={urllib.parse.quote(cursor)}" if cursor else "")
+            data = c.todoist(path) or {}
+            rows.extend(data.get("results") or [])
+            cursor = data.get("next_cursor")
+            if not cursor:
+                break
+    return rows
+
+
 def put_snapshot(snap: dict[str, Any]) -> None:
     c = _io()
     c.sb("sync_meta", params={"on_conflict": "key"}, method="POST", prefer="resolution=merge-duplicates,return=minimal", body={
@@ -145,7 +162,16 @@ def put_snapshot(snap: dict[str, Any]) -> None:
 
 def snapshot(*, dry: bool, now: datetime) -> int:
     c = _io()
-    snap = build_snapshot(tasks=c.active_tasks(), held=held_ids(now), today=now.date(), now=now)
+    tasks = c.active_tasks()
+    labelled = [t for t in tasks if set(t.get("labels") or []) & CLEAN_LABELS]
+    print(f"Todoist から {len(tasks)} 件取得、対象ラベル付き {len(labelled)} 件、プロジェクト {len({t.get('project_id') for t in tasks})} 個")
+    if not labelled:
+        # 一覧に出てこないときはラベルで直接引く（取り方の違いか、見えるアカウントの違いかを切り分ける）
+        by_label = tasks_by_label()
+        print(f"ラベルで直接取得 {len(by_label)} 件")
+        have = {str(t["id"]) for t in tasks}
+        tasks = tasks + [t for t in by_label if str(t["id"]) not in have]
+    snap = build_snapshot(tasks=tasks, held=held_ids(now), today=now.date(), now=now)
     by: dict[str, int] = {}
     for x in snap["cards"]:
         by[x["suggest"]] = by.get(x["suggest"], 0) + 1
