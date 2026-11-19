@@ -3754,8 +3754,34 @@ const App = {
           '<span>' + App.escapeHtml(r[1]) + '</span></label>';
       }).join('') + '</div></fieldset>';
   },
+  // 評価を送り終えた後の表示（2026-11-19 松野さん「押したら『ありがとう』の動きを出してボタンを消し、終わったと分かるように」）
+  renderFeedbackThanks: (saved) => {
+    const c = App.feedbackChoice(saved.rating) || {};
+    return '<div class="feedback-thanks" role="status" aria-live="polite">' +
+      '<span class="feedback-thanks-check" aria-hidden="true"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M15 27 l7 7 l15 -16"/></svg></span>' +
+      '<span class="feedback-thanks-text"><strong>ありがとうございました！</strong><span>いただいた評価（' + App.escapeHtml((c.icon || '') + ' ' + (c.label || '')) + '）は、回答の改善に使います。</span></span>' +
+      '<button type="button" class="feedback-thanks-redo">評価をやり直す</button></div>';
+  },
+  // 送り終えた評価はこの端末に覚えておき、開き直しても「ありがとう」の表示のままにする（最新300件）
+  feedbackDoneStore: (msgId, rating) => {
+    try {
+      const m = JSON.parse(localStorage.getItem('qa_feedback_done') || '{}');
+      if (rating === undefined) return m[msgId] || '';
+      if (rating) m[msgId] = rating; else delete m[msgId];
+      const keys = Object.keys(m); if (keys.length > 300) keys.slice(0, keys.length - 300).forEach(function (k) { delete m[k]; });
+      localStorage.setItem('qa_feedback_done', JSON.stringify(m));
+    } catch (e) { /* ignore */ }
+    return '';
+  },
   renderFeedbackBox: (msgId) => {
-    const saved = (App.state.feedbackByMessage || {})[msgId] || {};
+    let saved = (App.state.feedbackByMessage || {})[msgId] || {};
+    if (!saved.rating && saved.done !== false) {
+      const r = App.feedbackDoneStore(msgId);
+      if (r) saved = { rating: r, done: true, sent: true };
+    }
+    if (saved.done && saved.rating) {
+      return '<div class="answer-feedback answer-feedback-done mt-2 pt-2 border-t border-slate-200 text-xs" data-message-id="' + App.escapeHtml(msgId) + '">' + App.renderFeedbackThanks(saved) + '</div>';
+    }
     const buttons = App.feedbackChoices.map(function (c) {
       const on = saved.rating === c.rating;
       return '<button type="button" class="' + App.feedbackBtnClass(on) + '" data-rating="' + c.rating + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + c.icon + ' ' + c.label + '</button>';
@@ -3768,11 +3794,33 @@ const App = {
       '<div class="answer-feedback-reasons">' + App.renderFeedbackReasons(saved.rating, saved) + '</div>' +
       '<div class="answer-feedback-comment mt-2 flex gap-2">' +
       '<input type="text" maxlength="1000" class="flex-1 border rounded px-2 py-1" placeholder="その他（任意）" aria-label="その他（任意）" value="' + App.escapeHtml(saved.comment || '') + '">' +
-      '<button type="button" class="answer-feedback-send px-2 py-1 rounded bg-blue-700 text-white">送る</button></div></div>' +
+      '<button type="button" class="answer-feedback-send px-2 py-1 rounded bg-blue-700 text-white">送る</button></div>' +
+      '<button type="button" class="answer-feedback-skip">理由は書かずに終える</button></div>' +
       '<div class="answer-feedback-status text-slate-500 mt-1" role="status" aria-live="polite">' + (saved.sent ? 'ありがとうございます。受け付けました。' : '') + '</div></div>';
   },
   bindFeedbackBox: (box) => {
     const msgId = box.getAttribute('data-message-id');
+    // 送り終えた表示：「評価をやり直す」でボタンに戻す
+    const redo = box.querySelector('.feedback-thanks-redo');
+    if (redo) {
+      redo.addEventListener('click', function () {
+        const cur = (App.state.feedbackByMessage || {})[msgId];
+        if (cur) cur.done = false; else App.state.feedbackByMessage = Object.assign({}, App.state.feedbackByMessage, { [msgId]: { done: false } });
+        App.feedbackDoneStore(msgId, null);
+        const tmp = document.createElement('div'); tmp.innerHTML = App.renderFeedbackBox(msgId);
+        const fresh = tmp.firstElementChild; box.replaceWith(fresh); App.bindFeedbackBox(fresh);
+      });
+      return;
+    }
+    const finish = function () {
+      const cur = (App.state.feedbackByMessage || {})[msgId];
+      if (!cur || !cur.sent) return;
+      cur.done = true;
+      App.feedbackDoneStore(msgId, cur.rating);
+      box.classList.add('answer-feedback-done');
+      box.innerHTML = App.renderFeedbackThanks(cur);
+      App.bindFeedbackBox(box);
+    };
     const status = box.querySelector('.answer-feedback-status');
     const detail = box.querySelector('.answer-feedback-detail');
     const input = box.querySelector('.answer-feedback-comment input');
@@ -3809,9 +3857,12 @@ const App = {
         };
         mark(rating);
         if (!(await send(rating, [], ''))) { mark(prev.rating || ''); return; }
+        // いいね（理由を聞かない）はここで完了。超いいね・悪いねは理由を聞いてから
+        if (!App.feedbackAsk(rating)) { finish(); return; }
         box.querySelector('.answer-feedback-reasons').innerHTML = App.renderFeedbackReasons(rating, null);
         input.value = '';
-        detail.classList.toggle('hidden', !App.feedbackAsk(rating));
+        detail.classList.remove('hidden');
+        status.textContent = '評価を受け付けました。よければ理由も教えてください。';
       });
     });
     box.querySelector('.answer-feedback-send').addEventListener('click', function () {
@@ -3819,8 +3870,10 @@ const App = {
       if (!cur || !cur.rating) { status.textContent = '先にボタンで評価を選んでください。'; return; }
       const reasons = picked(), comment = input.value.trim();
       if (!reasons.length && !comment) { status.textContent = '当てはまるものを選ぶか、その他に書いてください。'; return; }
-      void send(cur.rating, reasons, comment);
+      void send(cur.rating, reasons, comment).then(function (ok) { if (ok) finish(); });
     });
+    const skip = box.querySelector('.answer-feedback-skip');
+    if (skip) skip.addEventListener('click', finish);
   },
 
   // よくある質問の開け閉め（2026-11-19）。スマホ（幅767px以下）は最初たたむ。押すと開く
