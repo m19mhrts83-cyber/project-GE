@@ -1063,7 +1063,7 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   .session-item { min-height: 44px; }
   /* 上の帯: ログアウトはメニューの中へ。空いた分、文字サイズのボタンを大きく */
   #mainView > header #logoutBtn { display: none; }
-  .text-size-switch--header button { min-height: 32px; font-size: 13px; }
+  .text-size-switch--header button { min-height: 32px; min-width: 34px; font-size: 13px; }
 }
 .chat-empty-title, .chat-empty-sub { text-wrap: balance; }
 
@@ -1128,4 +1128,15 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   .comment-table td:nth-child(6), .lesson-table td:nth-child(4), .knowledge-table td:nth-child(6) { flex-basis: 100%; order: 10; margin-top: .35rem; font-size: 1rem; line-height: 1.75; color: #1e293b; word-break: break-word; }
   .lesson-table td:nth-child(5), .knowledge-table td:nth-child(7) { order: 11; flex-basis: 100%; margin-top: .3rem; font-size: .95rem; }
   .knowledge-table td:nth-child(2), .lesson-table td:nth-child(3) { flex-basis: 100%; font-size: .9rem; font-weight: 700; color: #11366A; order: -1; }
+}
+
+/* 2026-11-19 点検4: スマホで押しにくい小さな文字リンクを、指で押せる大きさに（50〜60代の会員向け） */
+@media (max-width: 767px) {
+  .citation-db-link {
+    display: inline-flex; align-items: center; min-height: 36px; padding: 0 .8rem; margin: .25rem 0 .1rem;
+    border: 1.5px solid #11366A; border-radius: 999px; background: #fff; color: #11366A !important;
+    text-decoration: none !important; font-weight: 700; font-size: .9em; white-space: nowrap;
+  }
+  .citation-db-link:active { background: #eef3fb; }
+  .brand-home-btn { min-height: 40px; display: inline-flex; align-items: center; }
 }
