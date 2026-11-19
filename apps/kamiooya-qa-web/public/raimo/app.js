@@ -2313,13 +2313,17 @@ const App = {
     if (!btn) return;
     const base = App.semanticBase();
     const on = base ? !!App.state.deepMode : !!App.state.semanticMode;
-    btn.textContent = (base ? 'より詳しく調べる: ' : '意味検索モード: ') + (on ? 'ON' : 'OFF');
+    // 2026-11-19 松野さん「オン・オフのボタンが目立たない」→ スイッチの形にして、OFFでもオレンジの枠、ONはオレンジで塗る
+    const label = base ? 'より詳しく調べる' : '意味検索モード';
+    btn.innerHTML = '<i class="fa-solid fa-magnifying-glass-plus deep-toggle-icon" aria-hidden="true"></i><span class="deep-toggle-label">' + label + '</span>' +
+      '<span class="deep-toggle-switch" aria-hidden="true"><span class="deep-toggle-knob"></span></span><span class="deep-toggle-state">' + (on ? 'ON' : 'OFF') + '</span>';
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.setAttribute('aria-label', label + '：' + (on ? 'ON' : 'OFF'));
     btn.title = base ? 'ONにすると、上位のAIで時間をかけて答えます（このタブのあいだだけ）' : '';
-    btn.className =
-      'shrink-0 px-3 py-1 rounded-full border ' +
-      (on
-        ? 'border-blue-900 bg-blue-900 text-white'
-        : 'border-slate-300 text-slate-700 hover:bg-slate-50');
+    btn.className = 'deep-toggle shrink-0' + (on ? ' is-on' : '');
+    // たたんだ「＋」にも、ONの間は印を付ける（開かなくても分かるように）
+    const tools = document.getElementById('composerToolsBtn');
+    if (tools) tools.classList.toggle('has-deep-on', on);
   },
 
   openSemanticSearchWarningDialog: () => {
@@ -6400,7 +6404,7 @@ const App = {
       card.innerHTML='<div class="search-motion">'+
         '<div class="search-motion-bar"><span></span><span></span><span></span><b>'+(deep?'より詳しく調べています':'神大家AIナビが調べています')+'</b></div>'+
         '<div class="search-motion-body">'+
-          '<div class="search-motion-scan" aria-hidden="true"><div class="search-motion-lines"><i></i><i></i><i></i><i></i></div><div class="search-motion-glass"><i class="fa-solid fa-magnifying-glass"></i></div></div>'+
+          '<div class="search-motion-scan" aria-hidden="true"><div class="search-motion-lines"><i></i><i></i><i></i><i></i></div><span class="search-motion-spark sm-spark-1">✦</span><span class="search-motion-spark sm-spark-2">✦</span><span class="search-motion-spark sm-spark-3">✦</span><div class="search-motion-glass"><i class="fa-solid fa-magnifying-glass"></i></div></div>'+
           '<ol class="search-motion-steps">'+steps.map((s,i)=>'<li data-step="'+i+'"><i class="'+(s.icon.indexOf('fa-brands')===0?s.icon:'fa-solid '+s.icon)+'" aria-hidden="true"></i><span>'+s.label+'</span></li>').join('')+'</ol>'+
           '<div class="search-motion-progress" aria-hidden="true"><div data-progress></div></div>'+
           '<div class="search-motion-meta"><span data-remain></span><span data-elapsed></span></div>'+
