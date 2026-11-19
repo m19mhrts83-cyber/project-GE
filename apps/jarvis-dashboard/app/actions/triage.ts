@@ -21,6 +21,7 @@ import {
 } from "@/lib/mailActionSkipMute";
 import { createServiceClient } from "@/lib/supabase/admin";
 import type { AskEngine } from "@/lib/askEngineTypes";
+import { meteredAllowed, meteredBlockedReason } from "@/lib/meteredAi";
 
 export type TriageActionResult =
   | { ok: true; message?: string }
@@ -606,7 +607,8 @@ export async function reviseTriageDraftWithCursor(
     };
   }
 
-  const apiKey = (process.env.CURSOR_API_KEY || "").trim();
+  const cloudOk = meteredAllowed("cursor_cloud");
+  const apiKey = cloudOk ? (process.env.CURSOR_API_KEY || "").trim() : "";
   if (apiKey) {
     const { reviseDraftWithCloudAgent } = await import("@/lib/cursor/cloudRevise");
     const cloud = await reviseDraftWithCloudAgent({
@@ -663,7 +665,7 @@ export async function reviseTriageDraftWithCursor(
     body,
     instr,
     payload,
-    fallbackReason: "CURSOR_API_KEY 未設定",
+    fallbackReason: cloudOk ? "CURSOR_API_KEY 未設定" : meteredBlockedReason("cursor_cloud"),
   });
 }
 
@@ -985,6 +987,13 @@ export async function launchMailCloudTask(
     draft: String(it.draft_text || ""),
     instruction,
   });
+  if (!meteredAllowed("cursor_cloud")) {
+    return {
+      ok: false,
+      error: `${meteredBlockedReason("cursor_cloud")}。Mac ワーカーかローカルコピーを使ってください。`,
+      localPrompt: prompt,
+    };
+  }
   const apiKey = (process.env.CURSOR_API_KEY || "").trim();
   if (!apiKey) {
     return {

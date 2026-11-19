@@ -5,6 +5,7 @@
  * plan＋リポ付きだと VM 起動・探索で 75s を超えやすい（2026-08 調査）。
  */
 
+import { meteredAllowed } from "@/lib/meteredAi";
 import {
   runCloudAgentPrompt,
   type CloudAgentMcpServer,
@@ -134,7 +135,7 @@ function configuredAskMcpServers():
 
   const tavilyEnabled =
     (process.env.CURSOR_CLOUD_ASK_ENABLE_TAVILY || "").trim() === "1";
-  const tavilyKey = (process.env.TAVILY_API_KEY || "").trim();
+  const tavilyKey = meteredAllowed("tavily") ? (process.env.TAVILY_API_KEY || "").trim() : "";
   const hasTavily = servers.some((s) => s.name.toLowerCase() === "tavily");
   if (tavilyEnabled && tavilyKey && !hasTavily) {
     servers.push({

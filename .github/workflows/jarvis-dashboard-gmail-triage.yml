@@ -258,7 +258,7 @@ jobs:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          CURSOR_API_KEY: ${{ contains(vars.METERED_AI_ALLOW, 'cursor_cloud') && secrets.CURSOR_API_KEY || '' }} # 従量課金: 松野さん了承後に repo 変数 METERED_AI_ALLOW へ（2026-11-20）
           CURSOR_CLOUD_REPO_URL: ${{ secrets.CURSOR_CLOUD_REPO_URL }}
           JARVIS_OPS_FAIL_AUTOFIX_DISABLE: ${{ vars.JARVIS_OPS_FAIL_AUTOFIX_DISABLE || secrets.JARVIS_OPS_FAIL_AUTOFIX_DISABLE || '' }}
         run: |

@@ -7,6 +7,7 @@ import {
 import { geminiReply } from "@/lib/geminiReply";
 import type { AskEngine, AskVia } from "@/lib/askEngineTypes";
 import { createHash } from "node:crypto";
+import { meteredAllowed, meteredBlockedReason } from "@/lib/meteredAi";
 
 // 短命・プロセス内のみ。権限確認後の利用者/対象スコープがない呼出は再利用しない。
 const replyCache = new Map<string, { expires: number; result: AskResolveOk }>();
@@ -49,7 +50,7 @@ function askCost(name: string): AskCost {
 export function autoRouteOrder(): { id: "gemini" | "cloud"; cost: AskCost; weight: number }[] {
   const routes: { id: "gemini" | "cloud"; cost: AskCost; weight: number }[] = [];
   if (process.env.ASK_AUTO_ALLOW_GEMINI === "1") routes.push({ id: "gemini", cost: askCost("ASK_COST_GEMINI"), weight: 0 });
-  if (process.env.ASK_AUTO_ALLOW_CLOUD === "1") routes.push({ id: "cloud", cost: askCost("ASK_COST_CLOUD"), weight: 1 });
+  if (process.env.ASK_AUTO_ALLOW_CLOUD === "1" && meteredAllowed("cursor_cloud")) routes.push({ id: "cloud", cost: askCost("ASK_COST_CLOUD"), weight: 1 });
   const rank = (c: AskCost) => (c === "metered" ? 1 : 0);
   return routes.sort((a, b) => rank(a.cost) - rank(b.cost) || a.weight - b.weight);
 }
@@ -120,8 +121,10 @@ async function resolveAskReplyInternal(opts: {
   }
 
   if (opts.engine === "cursor") {
-    const apiKey = (process.env.CURSOR_API_KEY || "").trim();
-    if (!apiKey) {
+    const apiKey = meteredAllowed("cursor_cloud") ? (process.env.CURSOR_API_KEY || "").trim() : "";
+    if (!meteredAllowed("cursor_cloud")) {
+      notices.push(`${meteredBlockedReason("cursor_cloud")}。Mac の定額AIで答えます`);
+    } else if (!apiKey) {
       notices.push(
         "Jarvis Cloud が使えなかったため（CURSOR_API_KEY 未設定）、Gemini に切り替えます",
       );
