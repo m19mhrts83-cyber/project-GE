@@ -261,6 +261,25 @@ const App = {
     document.getElementById('featurePreviewList').textContent = '会員に未公開：' + names.map(function (n) {
       return App.featureLabels[n] || n;
     }).join(' / ');
+    const summary = document.getElementById('featurePreviewSummary');
+    if (summary) summary.textContent = (App.state.viewAsMember ? '会員として表示中' : (App.state.featureViewNew ? '新しい版で表示中' : '今の版で表示中')) + '・未公開 ' + names.length + '件';
+    const fpToggle = document.getElementById('featurePreviewToggle');
+    const fpBody = document.getElementById('featurePreviewBody');
+    const setFpOpen = function (open) {
+      if (fpBody) fpBody.classList.toggle('hidden', !open);
+      if (fpToggle) fpToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    let fpOpen = false;
+    try { fpOpen = localStorage.getItem('qa_feature_preview_open') === '1'; } catch (e) { /* ignore */ }
+    setFpOpen(fpOpen);
+    if (fpToggle && !fpToggle.dataset.bound) {
+      fpToggle.dataset.bound = '1';
+      fpToggle.addEventListener('click', function () {
+        const open = fpToggle.getAttribute('aria-expanded') !== 'true';
+        setFpOpen(open);
+        try { localStorage.setItem('qa_feature_preview_open', open ? '1' : '0'); } catch (e) { /* ignore */ }
+      });
+    }
     if (!bar.dataset.bound) {
       bar.dataset.bound = '1';
       viewNew.addEventListener('change', function () {
