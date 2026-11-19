@@ -116,7 +116,14 @@ def count_pending(client: Client, table: str) -> int:
 
 
 def batch_embed_texts(texts: list[str]) -> list[list[float]]:
-    api_key = require_env("GEMINI_API_KEY")
+    # GHA は secret GEMINI_API_KEY。Mac は 11/14 に共用鍵を SHUHEN_ へ改名したため
+    # 神大家専用の KAMIOOYA_GEMINI_API_KEY を読む（59_ 従量課金ゼロ方針の例外＝神大家AIナビ）。
+    api_key = (
+        (os.environ.get("GEMINI_API_KEY") or "").strip()
+        or (os.environ.get("KAMIOOYA_GEMINI_API_KEY") or "").strip()
+    )
+    if not api_key:
+        raise RuntimeError("環境変数 GEMINI_API_KEY / KAMIOOYA_GEMINI_API_KEY が未設定です")
     payload = {
         "requests": [
             {
