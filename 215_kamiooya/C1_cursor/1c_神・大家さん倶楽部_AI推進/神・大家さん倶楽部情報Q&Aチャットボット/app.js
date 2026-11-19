@@ -463,6 +463,7 @@ const App = {
     document.getElementById('logoutBtn').addEventListener('click', App.logout);
     document.getElementById('newChatBtn').addEventListener('click', App.createNewChatPlaceholder);
     App.elements.messageForm.addEventListener('submit', App.handleSendMessage);
+    App.initComposer();
     if (App.elements.semanticModeToggle) {
       App.elements.semanticModeToggle.addEventListener('click', App.handleSemanticModeToggle);
     }
@@ -6329,6 +6330,59 @@ const App = {
     await App.sendQuestion(pending.query,true);
   },
 
+  // スマホの入力欄（2026-11-19 松野さん「文章を読むときに邪魔にならない工夫を」）。PC（768px以上）は従来どおり。
+  //  - 入力欄は1行。よくある質問・検索モードは「＋」で開く
+  //  - 読み返し中（上へスクロール）と質問を送った後は入力欄をしまい、右下の「質問する」を出す。押すと開いて入力できる
+  setComposerOpen: (open, focus) => {
+    const c = document.getElementById('chatComposer');
+    const fab = document.getElementById('composerFab');
+    if (!c || !fab) return;
+    const narrow = App.isNarrowScreen();
+    const show = !narrow || !!open;
+    c.classList.toggle('composer-collapsed', !show);
+    fab.classList.toggle('hidden', show);
+    fab.setAttribute('aria-expanded', show ? 'true' : 'false');
+    App.state.composerOpen = show;
+    const screen = document.getElementById('chatScreen');
+    if (screen) screen.classList.toggle('composer-is-collapsed', !show);
+    if (show && focus && App.elements.messageInput) {
+      try { App.elements.messageInput.focus({ preventScroll: true }); } catch (e) { App.elements.messageInput.focus(); }
+    }
+  },
+  setComposerTools: (open) => {
+    const tools = document.getElementById('composerTools');
+    const btn = document.getElementById('composerToolsBtn');
+    if (!tools || !btn) return;
+    tools.classList.toggle('composer-tools-open', !!open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open && App.state.suggestedQuestions && App.state.suggestedQuestions.length) App.setSuggestedOpen(true);
+  },
+  initComposer: () => {
+    const fab = document.getElementById('composerFab');
+    const toolsBtn = document.getElementById('composerToolsBtn');
+    const box = App.elements.chatMessages || document.getElementById('chatMessages');
+    if (fab) fab.addEventListener('click', function () { App.setComposerOpen(true, true); });
+    if (toolsBtn) toolsBtn.addEventListener('click', function () {
+      App.setComposerTools(toolsBtn.getAttribute('aria-expanded') !== 'true');
+    });
+    if (box) {
+      let last = box.scrollTop;
+      box.addEventListener('scroll', function () {
+        const top = box.scrollTop;
+        const input = App.elements.messageInput;
+        const typing = input && document.activeElement === input && input.value;
+        if (App.isNarrowScreen() && !typing && top < last - 24) {
+          App.setComposerOpen(false);
+          App.setComposerTools(false);
+        }
+        last = top;
+      }, { passive: true });
+    }
+    // 画面の向き・幅が変わったら PC では常に表示に戻す
+    window.addEventListener('resize', function () { if (!App.isNarrowScreen()) App.setComposerOpen(true); });
+    App.setComposerOpen(true);
+  },
+
   sendQuestion: async (questionText, fromSuggested) => {
     if (!questionText) {
       App.showToast('質問内容が空です', 'error');
@@ -6342,6 +6396,12 @@ const App = {
     if (App.state.loadingCount > 0 || App.state.sendAbortController) {
       App.showToast('回答生成中です。完了までお待ちください', 'info');
       return;
+    }
+    // スマホは送ったら入力欄をしまい、回答を広く読めるようにする
+    if (App.isNarrowScreen()) {
+      App.setComposerTools(false);
+      App.setComposerOpen(false);
+      try { if (App.elements.messageInput) App.elements.messageInput.blur(); } catch (e) { /* ignore */ }
     }
 
     App.state.pendingQuestionText = questionText;
