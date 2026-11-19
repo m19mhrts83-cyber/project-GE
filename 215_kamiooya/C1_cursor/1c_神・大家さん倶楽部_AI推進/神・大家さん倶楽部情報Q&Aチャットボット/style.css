@@ -915,18 +915,18 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   #sidebar.mobile-open { flex-direction: column; overflow-y: auto; }
   #sidebar.mobile-open > * { flex-shrink: 0; }
 }
-/* スマホ縦: オプチャ一覧は1件1カード。上の段にオプチャ・種別・日時・投稿者、下の段に本文を横幅いっぱい */
+/* スマホ縦: オプチャ一覧は1件1カード（2026-11-19 点検: スイッチ外の会員は表が縦書きに潰れていたので全員に）。上の段にオプチャ・種別・日時・投稿者、下の段に本文を横幅いっぱい */
 @media (max-width: 640px) {
-  html.ff-mobile-layout .openchat-table, html.ff-mobile-layout .openchat-table tbody { display: block; width: 100%; min-width: 0; }
-  html.ff-mobile-layout .openchat-table thead { display: none; }
-  html.ff-mobile-layout .openchat-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .6rem; padding: .65rem .75rem; }
-  html.ff-mobile-layout .openchat-table td { display: block; padding: 0 !important; white-space: normal !important; }
-  html.ff-mobile-layout .openchat-table td:nth-child(-n+4) { font-size: .75rem; color: #64748b; line-height: 1.4; }
-  html.ff-mobile-layout .openchat-table td:nth-child(1) { font-weight: 700; color: #334155; }
-  html.ff-mobile-layout .openchat-table td:nth-child(5) { flex-basis: 100%; font-size: .95rem; line-height: 1.6; color: #1e293b; margin-top: .3rem; word-break: break-word; }
-  html.ff-mobile-layout .openchat-table .openchat-thread-btn { font-size: .78rem; padding: .1rem .5rem; }
-  html.ff-mobile-layout .openchat-table .openchat-thread-head { max-width: none; }
-  html.ff-mobile-layout .openchat-table .openchat-thread-root-note { display: inline; margin: 0 .25rem 0 0; }
+  .openchat-table, .openchat-table tbody { display: block; width: 100%; min-width: 0; }
+  .openchat-table thead { display: none; }
+  .openchat-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .6rem; padding: .65rem .75rem; }
+  .openchat-table td { display: block; padding: 0 !important; white-space: normal !important; }
+  .openchat-table td:nth-child(-n+4) { font-size: .75rem; color: #64748b; line-height: 1.4; }
+  .openchat-table td:nth-child(1) { font-weight: 700; color: #334155; }
+  .openchat-table td:nth-child(5) { flex-basis: 100%; font-size: .95rem; line-height: 1.6; color: #1e293b; margin-top: .3rem; word-break: break-word; }
+  .openchat-table .openchat-thread-btn { font-size: .78rem; padding: .1rem .5rem; }
+  .openchat-table .openchat-thread-head { max-width: none; }
+  .openchat-table .openchat-thread-root-note { display: inline; margin: 0 .25rem 0 0; }
 }
 
 /* よくある質問の開け閉め・スマホの入力欄まわり（2026-11-19 目黒さん「スマホで少し使いにくい」） */
@@ -1115,3 +1115,17 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 .all-search-help:not([open]) > summary { margin-bottom: 0; }
 .all-search-help:not([open]) > summary::after { transform: rotate(-90deg); }
 #allSearchWorkingCard { scroll-margin-top: 8px; }
+
+/* 2026-11-19 点検: 参照データ（コメント・講座ページ説明文・動画文字起こし）もスマホでは1件1カード。
+   表のままだと列が細すぎて「投稿者」「レッスン」などが縦書きになり読めなかった。上の段に小さく項目、下に本文を横幅いっぱい */
+@media (max-width: 640px) {
+  .ref-card-table, .ref-card-table tbody { display: block; width: 100%; min-width: 0; }
+  .ref-card-table thead { display: none; }
+  .ref-card-table tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: .15rem .7rem; padding: .75rem .85rem; border-bottom: 1px solid #e2e8f0; }
+  .ref-card-table td { display: block; padding: 0 !important; white-space: normal !important; font-size: .78rem; color: #64748b; line-height: 1.5; border: 0 !important; }
+  .ref-card-table td[colspan] { flex-basis: 100%; font-size: .95rem; }
+  .ref-card-table td:first-child { font-weight: 700; color: #334155; }
+  .comment-table td:nth-child(6), .lesson-table td:nth-child(4), .knowledge-table td:nth-child(6) { flex-basis: 100%; order: 10; margin-top: .35rem; font-size: 1rem; line-height: 1.75; color: #1e293b; word-break: break-word; }
+  .lesson-table td:nth-child(5), .knowledge-table td:nth-child(7) { order: 11; flex-basis: 100%; margin-top: .3rem; font-size: .95rem; }
+  .knowledge-table td:nth-child(2), .lesson-table td:nth-child(3) { flex-basis: 100%; font-size: .9rem; font-weight: 700; color: #11366A; order: -1; }
+}
