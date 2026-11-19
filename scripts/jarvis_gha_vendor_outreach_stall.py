@@ -16,6 +16,15 @@ Secrets（gzip 後 B64・GitHub 64KB 上限対策）:
   設定例: gzip -9 -c config/kurashift_re_vendor_list.yaml | base64 | gh secret set …
 
 停止: JARVIS_VENDOR_OUTREACH_STALL_GHA_DISABLE=1
+
+Supabase 上書き（2026-11-19）:
+  RE 台帳は gzip 後も約87KB で Secret 上限（48KB）に入らず、Secret が 10/15 のまま
+  深夜の報告が「S2 直近7日0件・最終10/7」と古い数値を出していた。
+  Mac が毎回 Supabase（kurashift_re_vendors / _mgmt_vendors / _repair_vendors）へ投影して
+  いるので、Secret（settings・バッチ等の土台）を展開したあと、業者ごとの状態列
+  （status・contacted_at・replied_at など）を Supabase の行で上書きし、Secret に無い業者は足す。
+  Secret が無くても Supabase だけで動く（settings は空＝既定値）。
+  止める: JARVIS_VENDOR_STALL_SUPABASE_OVERLAY=0
 """
 from __future__ import annotations
 
@@ -69,6 +78,95 @@ def _b64_write(env_key: str, dest: Path) -> bool:
     return True
 
 
+SUPABASE_TABLES = {
+    "kurashift_re_vendor_list.yaml": "kurashift_re_vendors",
+    "kurashift_mgmt_vendor_list.yaml": "kurashift_re_mgmt_vendors",
+    "kurashift_repair_vendor_list.yaml": "kurashift_re_repair_vendors",
+}
+# 台帳側で正本が Mac の YAML にあり、Supabase には投影だけの列。上書きしない
+_SKIP_OVERLAY_KEYS = {"synced_at", "updated_at"}
+
+
+def _overlay_enabled() -> bool:
+    return (os.environ.get("JARVIS_VENDOR_STALL_SUPABASE_OVERLAY") or "1").strip().lower() not in (
+        "0", "false", "no", "off",
+    )
+
+
+def overlay_vendors(data: dict, rows: list[dict]) -> dict:
+    """Secret 由来の台帳に Supabase の行を重ねる（行の値を優先・None は上書きしない）。"""
+    data = dict(data or {})
+    data.setdefault("settings", {})
+    vendors = [v for v in (data.get("vendors") or []) if isinstance(v, dict)]
+    by_id = {str(v.get("id")): v for v in vendors if v.get("id")}
+    for r in rows:
+        vid = str(r.get("id") or "")
+        if not vid:
+            continue
+        fields = {k: v for k, v in r.items() if k not in _SKIP_OVERLAY_KEYS and v is not None}
+        if vid in by_id:
+            by_id[vid].update(fields)
+        else:
+            nv = dict(fields)
+            vendors.append(nv)
+            by_id[vid] = nv
+    data["vendors"] = vendors
+    return data
+
+
+def _fetch_rows(sb, table: str) -> list[dict]:
+    out: list[dict] = []
+    step = 1000
+    start = 0
+    while True:
+        res = sb.table(table).select("*").range(start, start + step - 1).execute()
+        batch = res.data or []
+        out.extend(batch)
+        if len(batch) < step:
+            return out
+        start += step
+
+
+def overlay_from_supabase(cfg: Path) -> list[str]:
+    """Supabase の業者表で YAML を最新化する。失敗しても Secret のまま進める（soft-fail）。"""
+    if not _overlay_enabled():
+        print("# supabase overlay: disabled", file=sys.stderr)
+        return []
+    url = os.environ.get("JARVIS_SUPABASE_URL")
+    key = os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        print("# supabase overlay: skip (no JARVIS_SUPABASE_*)", file=sys.stderr)
+        return []
+    try:
+        import yaml
+        from supabase import create_client
+
+        sb = create_client(url, key)
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::supabase overlay: client failed: {e}", file=sys.stderr)
+        return []
+    done: list[str] = []
+    for name, table in SUPABASE_TABLES.items():
+        dest = cfg / name
+        try:
+            rows = _fetch_rows(sb, table)
+        except Exception as e:  # noqa: BLE001
+            print(f"::warning::supabase overlay: {table} read failed: {e}", file=sys.stderr)
+            continue
+        if not rows:
+            print(f"# supabase overlay: {table} empty → keep", file=sys.stderr)
+            continue
+        base = yaml.safe_load(dest.read_text(encoding="utf-8")) if dest.is_file() else {}
+        merged = overlay_vendors(base or {}, rows)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(yaml.safe_dump(merged, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        latest = max((str(r.get("synced_at") or "") for r in rows), default="")
+        print(f"# supabase overlay: {name} ← {table} {len(rows)} rows (synced_at max {latest[:19]})",
+              file=sys.stderr)
+        done.append(name)
+    return done
+
+
 def materialize_yamls() -> list[str]:
     cfg = REPO / "config"
     written: list[str] = []
@@ -82,10 +180,13 @@ def materialize_yamls() -> list[str]:
             written.append(name)
         else:
             missing.append(env_key)
+    for name in overlay_from_supabase(cfg):
+        if name not in written:
+            written.append(name)
     if "kurashift_re_vendor_list.yaml" not in written:
         raise SystemExit(
-            "S2 YAML 必須。Secrets に KURASHIFT_RE_VENDOR_LIST_B64 を設定するか "
-            "config/kurashift_re_vendor_list.yaml を置け"
+            "S2 YAML 必須。Supabase の kurashift_re_vendors を読めず、"
+            "Secret KURASHIFT_RE_VENDOR_LIST_B64 も config/kurashift_re_vendor_list.yaml も無い"
         )
     if missing:
         print(f"# warn missing secrets (lane skip可能): {', '.join(missing)}", file=sys.stderr)
