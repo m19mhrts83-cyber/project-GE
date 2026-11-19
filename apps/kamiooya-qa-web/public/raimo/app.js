@@ -1540,6 +1540,7 @@ const App = {
     App.state.currentScreen = screenName || 'chat';
     if(['comments','lessons','knowledge'].includes(screenName))void App.ensureReferenceData(screenName);
     App.elements.sidebar.classList.remove('mobile-open');
+    if (App.syncSidebarBackdrop) App.syncSidebarBackdrop();
     // サイドバー手動遷移・戻る完了時は citation 用戻るバーを隠す
     if (opts.fromNav || opts.fromBack) {
       App.clearDbReturnBar();
@@ -1649,6 +1650,23 @@ const App = {
 
   toggleSidebarMobile: () => {
     App.elements.sidebar.classList.toggle('mobile-open');
+    App.syncSidebarBackdrop();
+  },
+  // メニューの外（暗くした部分）を押したら閉じる（2026-11-19 点検）
+  syncSidebarBackdrop: () => {
+    let bd = document.getElementById('sidebarBackdrop');
+    if (!bd) {
+      bd = document.createElement('div');
+      bd.id = 'sidebarBackdrop';
+      bd.className = 'sidebar-backdrop hidden';
+      bd.setAttribute('aria-hidden', 'true');
+      bd.addEventListener('click', function () { App.elements.sidebar.classList.remove('mobile-open'); App.syncSidebarBackdrop(); });
+      document.body.appendChild(bd);
+    }
+    const open = App.elements.sidebar.classList.contains('mobile-open') && App.isNarrowScreen();
+    bd.classList.toggle('hidden', !open);
+    const t = document.getElementById('sidebarToggleBtn');
+    if (t) { t.setAttribute('aria-expanded', open ? 'true' : 'false'); t.setAttribute('aria-label', open ? 'メニューを閉じる' : 'メニューを開く'); }
   },
 
   loadChatSessions: async () => {
