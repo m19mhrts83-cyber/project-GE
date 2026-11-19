@@ -48,7 +48,7 @@
       <aside class="brand-hero brand-only" aria-hidden="true">
         <div class="brand-hero-copy">
           <span class="brand-hero-kicker">会員専用 AIアシスタント</span>
-          <p class="brand-hero-title"><span class="nobr">神大家の講座やLINEの情報を、</span><br><em>すぐ引き出せる</em></p>
+          <p class="brand-hero-title"><span class="nobr">神大家の講座や</span><span class="nobr">LINEの情報を、</span><br><em>すぐ引き出せる</em></p>
           <p class="brand-hero-lead"><span class="nobr">会員サイトの動画・コミュニティ・LINEオプチャの</span><br><span class="nobr">内容から、根拠つきで答えます。</span></p>
           <p class="brand-hero-points-label">全4分野の神スキル</p>
           <div class="brand-hero-points"><span><i class="fa-solid fa-key"></i>購入</span><span><i class="fa-solid fa-door-open"></i>空室対策</span><span><i class="fa-solid fa-screwdriver-wrench"></i>修繕</span><span><i class="fa-solid fa-handshake"></i>売却</span></div>
@@ -300,7 +300,10 @@
 
             <div class="shrink-0 border-t bg-white p-4">
               <div>
-                <p class="text-xs text-slate-500 mb-2">よくある質問</p>
+                <!-- よくある質問はたためる（2026-11-19 目黒さん「スマホで見づらい」）。スマホは最初たたんだ状態 -->
+                <button type="button" id="suggestedToggle" class="suggested-toggle" aria-expanded="true" aria-controls="suggestedQuestions">
+                  <span>よくある質問</span><span id="suggestedCount" class="suggested-count"></span><i class="fa-solid fa-chevron-down suggested-chevron" aria-hidden="true"></i>
+                </button>
                 <div id="suggestedQuestions" class="flex flex-wrap gap-2 mb-3"></div>
               </div>
               <div class="flex items-center justify-between gap-3 mb-3 text-xs">

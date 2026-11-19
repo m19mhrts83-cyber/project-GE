@@ -315,6 +315,8 @@ const App = {
     App.elements.semanticWarningCancelBtn = document.getElementById('semanticWarningCancelBtn');
     App.elements.semanticWarningCloseBtn = document.getElementById('semanticWarningCloseBtn');
     App.elements.suggestedQuestions = document.getElementById('suggestedQuestions');
+    App.elements.suggestedToggle = document.getElementById('suggestedToggle');
+    App.elements.suggestedCount = document.getElementById('suggestedCount');
     App.elements.commentTableBody = document.getElementById('commentTableBody');
     App.elements.commentSearchInput = document.getElementById('commentSearchInput');
     App.elements.commentAttachmentsOnly = document.getElementById('commentAttachmentsOnly');
@@ -3749,9 +3751,31 @@ const App = {
     });
   },
 
+  // よくある質問の開け閉め（2026-11-19）。スマホ（幅767px以下）は最初たたむ。押すと開く
+  isNarrowScreen: () => !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches),
+  setSuggestedOpen: (open) => {
+    const box = App.elements.suggestedQuestions;
+    const btn = App.elements.suggestedToggle;
+    App.state.suggestedOpen = !!open;
+    if (box) box.classList.toggle('hidden', !open);
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  },
+  initSuggestedToggle: () => {
+    const btn = App.elements.suggestedToggle;
+    if (!btn || btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', function () { App.setSuggestedOpen(!App.state.suggestedOpen); });
+    App.setSuggestedOpen(!App.isNarrowScreen());
+  },
+
   renderSuggestedQuestions: () => {
     const box = App.elements.suggestedQuestions;
+    App.initSuggestedToggle();
     box.innerHTML = '';
+    if (App.elements.suggestedCount) {
+      const n = App.state.suggestedQuestions.length;
+      App.elements.suggestedCount.textContent = n ? '（' + n + '件）' : '';
+    }
     if (App.state.suggestedQuestions.length === 0) {
       box.innerHTML = '<span class="text-xs text-slate-400">提案はまだありません</span>';
       return;
@@ -3769,6 +3793,7 @@ const App = {
         } catch (e) {
           console.warn(e);
         }
+        if (App.isNarrowScreen()) App.setSuggestedOpen(false);
         await App.sendQuestion(q.question_text, true);
       });
       box.appendChild(btn);
