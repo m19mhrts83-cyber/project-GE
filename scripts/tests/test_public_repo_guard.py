@@ -75,5 +75,18 @@ class LineScanTest(unittest.TestCase):
             self.assertEqual(g.main(["--tree", "HEAD"]), 0)
 
 
+class UploadArtifactTest(unittest.TestCase):
+    """公開リポの Artifact は誰でも取れる（2026-11-20）。足した upload-artifact を止める。"""
+
+    def test_blocks_new_upload_artifact(self) -> None:
+        added = {".github/workflows/x.yml": [(10, "        uses: actions/upload-artifact@v4")]}
+        probs = g.check([".github/workflows/x.yml"], added, PAT, set())
+        self.assertTrue(any("upload-artifact" in p for p in probs), probs)
+
+    def test_public_ok_passes(self) -> None:
+        added = {".github/workflows/x.yml": [(10, "        uses: actions/upload-artifact@v4  # public-ok: 公開の為替グラフ")]}
+        self.assertEqual(g.check([".github/workflows/x.yml"], added, PAT, set()), [])
+
+
 if __name__ == "__main__":
     unittest.main()
