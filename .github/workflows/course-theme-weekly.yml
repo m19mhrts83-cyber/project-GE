@@ -5,9 +5,9 @@
 # - 2026-11-16 追加: LINEオープンチャットの質問ランキング（openchat_ranking.py → qa_openchat_rankings、スイッチ openchat_ranking）
 name: course-theme weekly
 
+# 2026-11-20 松野さん: 週次で回しても使えていないので、気になった時に手動で回す形へ（Gemini 従量のため）。
+#   回し方: Actions → course-theme weekly → Run workflow
 on:
-  schedule:
-    - cron: "0 21 * * 0" # 毎週月曜 6:00 JST
   workflow_dispatch:
 
 permissions:
