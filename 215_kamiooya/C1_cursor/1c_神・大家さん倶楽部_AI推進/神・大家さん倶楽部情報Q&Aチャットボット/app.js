@@ -603,8 +603,16 @@ const App = {
     // 左上のアプリ名を押したらトップ（Q&Aチャット）へ（2026-11-17 目黒さん要望）
     const brandHomeBtn = document.getElementById('brandHomeBtn');
     if (brandHomeBtn) {
+      // 2026-11-19 松野さん「PCでタイトルを押しても最初の画面に行かない」→ チャット画面にいる時も、最初の質問画面（新しいチャット）へ戻す。
+      // 前の会話はチャット履歴に残る。回答を作っている途中だけは会話を消さずにチャット画面へ切り替えるだけにする。
       brandHomeBtn.addEventListener('click', function () {
+        if (App.state.pendingAnswerRequest || App.state.sendAbortController) { App.switchScreen('chat', { fromNav: true }); return; }
+        App.state.currentSessionId = null;
+        App.state.chatMessages = [];
         App.switchScreen('chat', { fromNav: true });
+        App.renderChatMessages();
+        if (App.renderSessionList) App.renderSessionList();
+        if (App.elements.chatMessages) App.elements.chatMessages.scrollTop = 0;
       });
     }
     document.querySelectorAll('.screen-tab').forEach(function (btn) {
