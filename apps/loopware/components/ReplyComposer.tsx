@@ -249,7 +249,7 @@ export default function ReplyComposer({
 
       {log ? (
         <details className="reply-past">
-          <summary>やり取りログ（md）の末尾</summary>
+          <summary>{log.folder?.startsWith("台帳") ? "最近のやり取り（台帳・チャネル横断）" : "やり取りログ（md）の末尾"}</summary>
           <p className="meta">{log.notice}。下書きを作るときはこれも読ませます。</p>
           <pre className="reply-pre">{log.tail}</pre>
         </details>

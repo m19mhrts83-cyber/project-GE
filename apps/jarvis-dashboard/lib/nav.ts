@@ -36,6 +36,8 @@ export const NAV_GROUPS: NavGroup[] = [
       // 処理は判断デスク（loopware /desk）へ。処理キュー／パートナー／その他メールは
       // 2026-11-17 松野さん決定でメニューから外した（URL と /mail の下のリンクからは開ける）
       { href: "/mail", label: "メールの振り返り", icon: "mail" },
+      // 2026-11-20: 台帳（comm_items）から相手ごとの直近やり取り。返信は判断デスクで
+      { href: "/partners", label: "パートナーのやり取り", icon: "partner" },
       { href: "/openchat", label: "神大家オプチャ", icon: "chat" },
       { href: "/situation", label: "状況ウォッチ", icon: "watch" },
       { href: "/review", label: "週次レビュー", icon: "loop" },
