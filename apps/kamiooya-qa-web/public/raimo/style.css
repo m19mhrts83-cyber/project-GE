@@ -973,3 +973,10 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   .menu-toggle-btn { min-width: 40px; margin-right: 0; }
   .theme-a #mainView > header h2 { font-size: 14px; }
 }
+
+/* AIの回答の吹き出しを広く（2026-11-19 松野さん「文章が長いので幅広に」）。質問側は従来どおり */
+.chat-bubble.chat-assistant { max-width: min(94%, 64rem); }
+@media (max-width: 767px) {
+  .chat-bubble.chat-assistant { max-width: 100%; }
+  #chatMessages { padding-left: .6rem; padding-right: .6rem; }
+}
