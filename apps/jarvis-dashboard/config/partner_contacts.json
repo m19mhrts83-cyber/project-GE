@@ -46,11 +46,10 @@
     {
       "name": "神大家運営回答",
       "folder": "P809_神大家運営回答",
-      "emails": [
-        "kami.ooyasan-club@ooya.academy"
-      ],
+      "emails": [],
       "phones": [],
-      "via_ambiguous": false
+      "via_ambiguous": false,
+      "emails_private": true
     },
     {
       "name": "SHIFT AI代理店",

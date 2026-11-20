@@ -1,8 +1,12 @@
 /**
  * パートナー宛先解決（連絡先一覧のミラー）。
  * 正本は OneDrive 連絡先一覧.yaml。ミラー: config/partner_contacts.json
+ * 公開リポに置けない宛先（emails_private: true の行）は、サーバーの環境変数
+ * PARTNER_CONTACTS_PRIVATE_JSON（見本: config/partner_contacts.private.example.json）から足す。
+ * 未設定なら空のまま（受信メールの from_email があればそちらが使われる）。
  */
 import contacts from "@/config/partner_contacts.json";
+import { mergePrivateContacts } from "@/lib/privateContacts";
 
 export type PartnerContact = {
   name: string;
@@ -10,13 +14,17 @@ export type PartnerContact = {
   emails: string[];
   phones: string[];
   via_ambiguous: boolean;
+  emails_private?: boolean;
 };
 
-type ContactsFile = {
+export type ContactsFile = {
   partners: PartnerContact[];
 };
 
-const DATA = contacts as ContactsFile;
+const DATA = mergePrivateContacts(
+  contacts as ContactsFile,
+  typeof process !== "undefined" ? process.env.PARTNER_CONTACTS_PRIVATE_JSON : undefined,
+);
 
 function norm(s: string): string {
   return s.normalize("NFC").trim().toLowerCase();

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "_note": "見本。実物は同じ場所の partner_contacts.private.json（公開リポに入れない・非公開リポ project-GE-private へ写す）。Vercel では環境変数 PARTNER_CONTACTS_PRIVATE_JSON に同じ JSON を入れる。",
+  "emails_by_folder": {
+    "P809_神大家運営回答": [
+      "office@example.com"
+    ]
+  }
+}

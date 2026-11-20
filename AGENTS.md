@@ -16,6 +16,7 @@
 4. PR と main への push は `Public guard`（`scripts/public_repo_guard.py`）が変更分を見て、非公開の場所・メールアドレス・電話番号・口座番号らしき数字・IP・会員の列を持つ CSV・録音を止める。Mac では `sh scripts/install_git_hooks.sh` でコミット前にも止まる
 5. ガードに止められたら、まず非公開リポへ移す。見本や公式窓口など公開してよいものだけ、その行に `public-ok`（理由つき）か `config/public_guard_allow.txt`。迷ったら公開しない
 6. GitHub Pages（`docs/` の公開ページ）には HTML と、そこから使う資料だけが出る（`scripts/pages_collect_public.py`）。会員・取引先の情報を HTML に書かない
+7. コードが読む宛先などの実値は、ignore 済みの `*.private.json`（private_paths に登録）か環境変数から読み、公開側には `*.example.*` の見本だけ置く。例: Dashboard 連絡先は `partner_contacts.private.json`／Vercel は `PARTNER_CONTACTS_PRIVATE_JSON`（2026-11-21）。人が貼るだけの MD は「非公開側 ○○ を参照」に置き換える
 
 ## 神大家運営の新規作業（2026-10-29）
 
