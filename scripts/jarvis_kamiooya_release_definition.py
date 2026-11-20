@@ -26,6 +26,11 @@ def release_definition(source:dict)->dict:
         if route['endpoint'].startswith('GET '):
             clone=copy.deepcopy(route);clone['name']='gatewayRead_'+route['name'];clone['endpoint']='POST /internal/read'+route['endpoint'][4:];reads.append(clone)
     result['api']+=reads
+    # 参照データ一覧（/comments-page）。11/16 に手作業で足した道（jarvis_qa_comment_pages.py）を、公開のたびに必ず入れる。
+    # 11/21 東京切替で公開し直したとき、この道が消えて参照データが operation_failed になったため。
+    if not any(r['endpoint']=='POST /internal/read/comments-page' for r in result['api']):
+        from jarvis_qa_comment_pages import add_page_route
+        result=add_page_route(result)
     for field in ('email','user_id','reset_token'):
         key='id' if field=='user_id' else field
         result['api'].append({'name':'gatewayAuthLookup_'+field,'endpoint':'POST /internal/auth-user/'+field,
