@@ -28,7 +28,7 @@ import {
 export type LeftCard = DeskCard & { next: NextStep };
 
 const COLS =
-  "id,status,subject,partner,from_email,lane,kind,summary,draft_text,original_body,received_at,priority,gmail_thread_id,account,payload";
+  "id,status,subject,partner,from_email,lane,kind,channel,summary,draft_text,original_body,received_at,priority,gmail_thread_id,account,payload";
 
 export function dashboardBase(): string {
   return (process.env.JARVIS_DASHBOARD_URL || "https://jarvis-dashboard-amber.vercel.app").replace(/\/$/, "");
@@ -334,6 +334,8 @@ export type DraftResult = {
   message?: string;
   /** やり取り md の末尾（context のとき） */
   log?: { folder?: string; notice: string; tail: string } | null;
+  /** context のとき: Chatwork の返信待ちなら、送れる登録ルームと推定ルーム */
+  chatwork?: { rooms: { id: string; name: string }[]; guess: string } | null;
   /** status のとき: Mac の定額 AI の係の最後の生存報告から何秒か */
   macAgeSec?: number | null;
   macAlive?: boolean;
@@ -390,13 +392,22 @@ export async function draftViaDashboard(
 /** 送信（Slack の返信と同じ処理: Gmail 送信・Slack カード片付け・Todoist を閉じる・判断ログ） */
 export async function sendViaDashboard(
   id: string,
-  args: { body: string; to?: string; account?: string; openedAt?: number; assist?: { proofread?: number; revise?: number } },
+  args: {
+    body: string;
+    to?: string;
+    account?: string;
+    /** Chatwork の返信待ちで送るルーム */
+    room?: string;
+    openedAt?: number;
+    assist?: { proofread?: number; revise?: number };
+  },
 ): Promise<{ ok: boolean; message: string }> {
   const s = maSig(id, "reply");
   if (!s) return { ok: false, message: "MAIL_ACTION_TOKEN が loopware に設定されていません" };
   const form = new URLSearchParams({ s, intent: "send", via: "loopware", body: args.body });
   if (args.to) form.set("to", args.to);
   if (args.account) form.set("account", args.account);
+  if (args.room) form.set("room", args.room);
   if (args.openedAt) form.set("opened_at", String(args.openedAt));
   if (args.assist?.proofread) form.set("proofread", String(args.assist.proofread));
   if (args.assist?.revise) form.set("revise", String(args.assist.revise));

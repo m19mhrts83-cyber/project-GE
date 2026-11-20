@@ -24,7 +24,13 @@ export async function GET(req: Request) {
     draftViaDashboard(id, "context", {}).catch(() => null),
   ]);
   return NextResponse.json(
-    { ok: true, past, log: ctx?.ok ? ctx.log || null : null, logNotice: ctx?.message || ctx?.log?.notice || "" },
+    {
+      ok: true,
+      past,
+      log: ctx?.ok ? ctx.log || null : null,
+      logNotice: ctx?.message || ctx?.log?.notice || "",
+      chatwork: ctx?.ok ? ctx.chatwork || null : null,
+    },
     { headers: { "cache-control": "private, no-store" } },
   );
 }
@@ -36,6 +42,8 @@ type Body = {
   instruction?: string;
   to?: string;
   account?: string;
+  /** Chatwork の送り先ルーム */
+  room?: string;
   openedAt?: number;
   assist?: { proofread?: number; revise?: number };
   subject?: string;
@@ -63,6 +71,7 @@ export async function POST(req: Request) {
       body,
       to: String(b.to || "").trim() || undefined,
       account: String(b.account || "").trim() || undefined,
+      room: String(b.room || "").trim() || undefined,
       openedAt: Number(b.openedAt) || undefined,
       assist: b.assist,
     });

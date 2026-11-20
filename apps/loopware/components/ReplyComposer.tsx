@@ -93,6 +93,9 @@ export default function ReplyComposer({
   const [draft, setDraft] = useState(card.draftText);
   const [to, setTo] = useState(addrOf(card.fromEmail));
   const [account, setAccount] = useState(normAccount(card.account));
+  /** Chatwork の返信待ち: 送れるのは名簿に登録されたルームだけ。推定が無ければ選ぶまで送れない */
+  const [cwRooms, setCwRooms] = useState<{ id: string; name: string }[]>([]);
+  const [room, setRoom] = useState("");
   const [busy, setBusy] = useState<"" | "compose" | "proofread" | "revise" | "send">("");
   const [note, setNote] = useState("");
   const [changes, setChanges] = useState<string[]>([]);
@@ -115,6 +118,10 @@ export default function ReplyComposer({
         if (!alive) return;
         setPast(Array.isArray(j?.past) ? j.past : []);
         setLog(j?.log && typeof j.log.tail === "string" ? j.log : null);
+        if (j?.chatwork && Array.isArray(j.chatwork.rooms)) {
+          setCwRooms(j.chatwork.rooms);
+          setRoom(String(j.chatwork.guess || ""));
+        }
       })
       .catch(() => alive && setPast([]));
     return () => {
@@ -210,8 +217,7 @@ export default function ReplyComposer({
       itemId: card.id,
       op: "send",
       draft,
-      to,
-      account,
+      ...(card.isChatwork ? { room } : { to, account }),
       openedAt: openedAt.current,
       assist: assist.current,
     });
@@ -219,9 +225,11 @@ export default function ReplyComposer({
     setConfirm(false);
     if (r.ok) onSent(r.message || "送信しました");
     else setNote(`❌ ${r.message || "送れませんでした"}（本文はそのままです）`);
-  }, [busy, speech, card.id, draft, to, account, onSent]);
+  }, [busy, speech, card.id, card.isChatwork, draft, to, account, room, onSent]);
 
   const hasDraft = Boolean(draft.trim());
+  const roomName = cwRooms.find((r) => r.id === room)?.name || "";
+  const canSend = hasDraft && (!card.isChatwork || Boolean(roomName));
 
   return (
     <section className="reply" aria-label="返信">
@@ -318,25 +326,42 @@ export default function ReplyComposer({
         ) : null}
       </div>
 
+      {card.isChatwork ? (
+        <div className="reply-to">
+          <label>
+            送り先（Chatwork）
+            <select value={room} onChange={(e) => setRoom(e.target.value)}>
+              <option value="">選んでください</option>
+              {cwRooms.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {cwRooms.length === 0 ? <p className="meta">名簿にこの相手の Chatwork ルームが無いため、ここからは送れません。</p> : null}
+        </div>
+      ) : (
       <details className="reply-to">
-        <summary>
-          宛先 {to || "（Jarvis が推定）"}・送信元 {account}
-        </summary>
-        <label>
-          宛先
-          <input type="email" value={to} onChange={(e) => setTo(e.target.value.trim())} placeholder="空なら本文から推定します" />
-        </label>
-        <label>
-          送信元
-          <select value={account} onChange={(e) => setAccount(e.target.value)}>
-            {ACCOUNTS.map((a) => (
-              <option key={a.k} value={a.k}>
-                {a.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </details>
+          <summary>
+            宛先 {to || "（Jarvis が推定）"}・送信元 {account}
+          </summary>
+          <label>
+            宛先
+            <input type="email" value={to} onChange={(e) => setTo(e.target.value.trim())} placeholder="空なら本文から推定します" />
+          </label>
+          <label>
+            送信元
+            <select value={account} onChange={(e) => setAccount(e.target.value)}>
+              {ACCOUNTS.map((a) => (
+                <option key={a.k} value={a.k}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </details>
+      )}
 
       {note ? <p className="meta reply-note" role="status">{note}</p> : null}
 
@@ -363,11 +388,19 @@ export default function ReplyComposer({
       {confirm ? (
         <div className="reply-confirm">
           <p>
-            <b>{to || "（推定した宛先）"}</b> へ {account} から送ります。よろしいですか？
+            {card.isChatwork ? (
+              <>
+                Chatwork の <b>「{roomName}」</b> へ送ります。よろしいですか？
+              </>
+            ) : (
+              <>
+                <b>{to || "（推定した宛先）"}</b> へ {account} から送ります。よろしいですか？
+              </>
+            )}
           </p>
           <div className="btn-row">
             <button className="primary" onClick={() => void send()} disabled={Boolean(busy)}>
-              {busy === "send" ? "送信中…" : "この宛先で送る"}
+              {busy === "send" ? "送信中…" : card.isChatwork ? "このルームに送る" : "この宛先で送る"}
             </button>
             <button onClick={() => setConfirm(false)} disabled={busy === "send"}>
               やめる
@@ -376,7 +409,7 @@ export default function ReplyComposer({
         </div>
       ) : (
         <div className="btn-row">
-          <button className="primary" onClick={() => setConfirm(true)} disabled={Boolean(busy) || !hasDraft}>
+          <button className="primary" onClick={() => setConfirm(true)} disabled={Boolean(busy) || !canSend}>
             送信する
           </button>
           <button onClick={onBack} disabled={busy === "send"}>

@@ -9,7 +9,8 @@ import { composeDraft, proofreadDraft, reviseDraft, type DraftEngine } from "@/l
 import { geminiPaidConfigured } from "@/lib/geminiPaid";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { retrieveYoritooriForAsk } from "@/lib/onedrive/retrieveYoritoori";
-import { commHistoryForReply } from "@/lib/commHistoryServer";
+import { commHistoryForReply, loadChatworkRooms } from "@/lib/commHistoryServer";
+import { guessRoom, isChatworkRow } from "@/lib/chatworkSend";
 
 export const runtime = "nodejs";
 // Mac の定額 AI を最大 55 秒待つ
@@ -92,12 +93,19 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   }
 
   if (op === "context") {
+    // Chatwork の返信待ちなら、送り先に選べる登録ルームと推定ルームも返す（判断デスクの送信先の選択肢）
+    const chatwork = isChatworkRow(row)
+      ? await loadChatworkRooms(row.folder).then((rooms) => ({
+          rooms,
+          guess: guessRoom(rooms, String((row.payload || {}).channel_raw || ""))?.id || "",
+        }))
+      : null;
     const h = await history();
-    if (!h || !h.ok || !h.promptBlock) return out({ ok: true, log: null, message: h?.notice || "" });
+    if (!h || !h.ok || !h.promptBlock) return out({ ok: true, log: null, chatwork, message: h?.notice || "" });
     // 台帳の背景は最大 6000 字に整えてあるのでそのまま見せる。md は末尾 3500 字だけ
     const max = String(h.path || "").startsWith("台帳") ? 6000 : 3500;
     const tail = h.promptBlock.length > max ? `…\n${h.promptBlock.slice(-max)}` : h.promptBlock;
-    return out({ ok: true, log: { folder: h.path || "", notice: h.notice, tail } });
+    return out({ ok: true, log: { folder: h.path || "", notice: h.notice, tail }, chatwork });
   }
 
   if (String(row.status || "") === "sent") return out({ ok: false, message: "すでに送信済みです" }, 409);
