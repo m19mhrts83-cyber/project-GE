@@ -603,8 +603,20 @@ const App = {
     // 左上のアプリ名を押したらトップ（Q&Aチャット）へ（2026-11-17 目黒さん要望）
     const brandHomeBtn = document.getElementById('brandHomeBtn');
     if (brandHomeBtn) {
+      // 2026-11-19 松野さん: パソコンで会話を開いたまま押しても画面が変わらなかったので、
+      // 最初の画面（質問欄＋よくある質問）に戻す。回答を作っている間は画面を切り替えるだけ。
       brandHomeBtn.addEventListener('click', function () {
+        if (!App.state.pendingAnswerRequest && !App.state.sendAbortController) {
+          App.state.currentSessionId = null;
+          App.state.chatMessages = [];
+          App.renderChatMessages();
+          App.renderSessionList();
+        }
         App.switchScreen('chat', { fromNav: true });
+        const input = App.elements.messageInput;
+        if (input && window.matchMedia && window.matchMedia('(min-width: 768px)').matches) {
+          try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+        }
       });
     }
     document.querySelectorAll('.screen-tab').forEach(function (btn) {
