@@ -1133,13 +1133,27 @@ def load_partner_emails() -> dict[str, list[str]]:
 
     out: dict[str, list[str]] = {}
     mirror = REPO / "apps/jarvis-dashboard/config/partner_contacts.json"
+    # 公開リポに置けない宛先（ignore 済み・非公開リポへ写す）。無ければ公開分だけ
+    private_mirror = REPO / "apps/jarvis-dashboard/config/partner_contacts.private.json"
     if not mirror.is_file():
         return out
+    extra: dict[str, list[str]] = {}
+    if private_mirror.is_file():
+        try:
+            raw = json.loads(private_mirror.read_text(encoding="utf-8")).get("emails_by_folder") or {}
+            for k, v in raw.items():
+                if isinstance(v, list):
+                    extra[unicodedata.normalize("NFC", str(k))] = [str(e).strip() for e in v if "@" in str(e)]
+        except Exception:
+            extra = {}
     try:
         data = json.loads(mirror.read_text(encoding="utf-8"))
         for p in data.get("partners") or []:
             folder = str(p.get("folder") or "").strip()
             emails = [str(e).strip() for e in (p.get("emails") or []) if str(e).strip()]
+            for e in extra.get(unicodedata.normalize("NFC", folder), []):
+                if e and e not in emails:
+                    emails.append(e)
             if not folder or not emails:
                 continue
             for key in (

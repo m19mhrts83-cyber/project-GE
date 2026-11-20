@@ -91,11 +91,11 @@ Jarvis `--target resource` または `outbox_to_teams/resource/` に制約 MD �
 
 | やってはいけない | 正しい扱い |
 |---|---|
-| `kami.ooyasan-club@ooya.academy` 等へ物件資料依頼を送る | **絶対禁止**。運営＝相談窓口であり仲介ではない |
+| 事務局アドレス（実値は非公開側 `連絡先一覧.snapshot.yaml` の「神大家運営回答」）等へ物件資料依頼を送る | **絶対禁止**。運営＝相談窓口であり仲介ではない |
 | オレンジフォーム／戸建て購入／購入相談スレを第一問合せ案件にする | **not_applicable**。松野が運営と相談するスレ |
 | 運営メールの From を仲介メールとみなす | 仲介は地場業者・ポータル掲載の業者のみ |
 
-**禁止ドメイン／宛先（例）**: `*@ooya.academy` · `*@sakulife.org` · `*@orange-cloud7.com` · `kami.ooyasan-club@*`  
+**禁止ドメイン／宛先（例）**: 事務局アドレスのドメイン全体（同上） · `*@sakulife.org` · `*@orange-cloud7.com` · `kami.ooyasan-club@*`  
 **拾っても送らない**: 運営からの物件紹介・購入相談返信は **読取・要約・松野への共有まで**。対外テンプレ送信はしない。  
 社員（S1含む）にも同趣旨を徹底。estate Gmail で運営スレを見ても **Reply で第一問合せ文を送らない**。
 

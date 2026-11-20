@@ -237,3 +237,6 @@ docs/AIエージェントチーム/600_リソース・家計室/618_資産記録
 
 # Claudeプロジェクト「AIエージェントチーム開発/運用」から移したメモリ（経緯・決定。2026-11-19）
 docs/AIエージェントチーム/memory/
+
+# Dashboard 連絡先のうち公開しない宛先（事務局アドレスなど。見本 *.example.json は公開。2026-11-21）
+apps/jarvis-dashboard/config/partner_contacts.private.json
