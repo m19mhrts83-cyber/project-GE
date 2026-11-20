@@ -1,6 +1,13 @@
 #!/bin/zsh
 # Install ChatGPT review and read polling (every minute, Mac outbound-only).
 set -euo pipefail
+MODE_ARG=""
+if [[ $# -eq 1 && "$1" == "--reads-only" ]]; then
+  MODE_ARG="<string>--reads-only</string>"
+elif [[ $# -ne 0 ]]; then
+  echo "usage: $0 [--reads-only]" >&2
+  exit 2
+fi
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.obsidian-review-inbox"
 PLIST="${HOME}/Library/LaunchAgents/${LABEL}.plist"
@@ -15,7 +22,7 @@ cat >"$PLIST" <<EOF
 <dict>
   <key>Label</key><string>${LABEL}</string>
   <key>ProgramArguments</key>
-  <array><string>${RUNNER}</string></array>
+  <array><string>${RUNNER}</string>${MODE_ARG}</array>
   <key>StartInterval</key><integer>60</integer>
   <key>RunAtLoad</key><true/>
   <key>StandardOutPath</key><string>${HOME}/Library/Logs/jarvis_obsidian_review/launchd.out.log</string>

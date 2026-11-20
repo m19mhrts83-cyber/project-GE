@@ -103,6 +103,17 @@ Vault正本は `~/Documents/500_Obsidian_r1`。Google DriveはOGD同期ハブ、
 - Watchdog: `apps-script/obsidian-review-watchdog/`
 - submit schema: `docs/obsidian-review-submit-openapi.yaml`
 
+## 障害時の検索のみ復旧（2026-11-20）
+
+- `jarvis_obsidian_review_inbox.py --reads-only` は検索・抜粋要求だけを処理する。レビューはCloudに保留し、Vault保存も保存完了ackも行わない。`--dry-run` とは異なり検索結果は返す。
+- `launchd/install_obsidian_review_inbox_launchd.sh --reads-only` でこのモードを60秒間隔のLaunchAgentへ永続設定できる。保留レビューの確認が済むまで、この引数を外して再登録しない。
+- poll API自体の既存の期限切れ掃除・heartbeat更新・検索要求claimは動く。`--reads-only` は通信・DBを一切変更しない調査モードではない。
+- Mac実行用コピーは `~/.local/libexec/jarvis-obsidian-review/`（`scripts/` と `launchd/` の構造を保持）。Git worktreeとは分離する。認証情報はコピーせず既存 `~/git-repos/.env.jarvis_private` を使う。
+- 配置対象はworker、Vault reader、runner、installerの4ファイル。変更時はテスト済み版を配置し、ハッシュを照合する。実行フォルダを整理・削除するときは先にLaunchAgentの参照を確認する。
+- 復旧前にplistをバックアップ。`launchctl print gui/$(id -u)/com.matsunoma.jarvis.obsidian-review-inbox` の起動先・引数・終了コードと、`~/Library/Logs/jarvis_obsidian_review/inbox_*.log` を確認する。
+- 検証はChatGPTから新規検索→次の定時pollログで処理ID確認→同じIDで結果取得→必要なら抜粋取得。起動直後は `not running` でも正常（定時実行型）。終了コード0とheartbeat、実際の結果返却で判定する。
+- 監視DBの `offline` はMac本体の電源・スリープを断定するものではなく、poll停止を意味する。Cloudの受信成功、Macの保存成功、Drive/iPhone同期完了はそれぞれ分けて報告する。
+
 
 ## 2026-11-13 月別日付ノート保存（現行仕様）
 
