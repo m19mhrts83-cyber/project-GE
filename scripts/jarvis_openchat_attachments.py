@@ -23,8 +23,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'line_unofficial_poc'))
 from openchat_attachments import Queue,source_context
 
-PROJECT = 'https://mwubzgefkkjjbingrmqu.supabase.co'
-STORAGE = 'https://mwubzgefkkjjbingrmqu.storage.supabase.co'
+sys.path.insert(0,str(ROOT/'scripts'))
+import kamiooya_target  # noqa: E402
+
+PROJECT = kamiooya_target.base_url()  # 切替は KAMIOOYA_PROJECT_REF
+STORAGE = kamiooya_target.storage_url()
 BUCKET = 'openchat-attachments'
 CHUNK = 6*1024*1024
 MAX_FILE = 500*1024*1024

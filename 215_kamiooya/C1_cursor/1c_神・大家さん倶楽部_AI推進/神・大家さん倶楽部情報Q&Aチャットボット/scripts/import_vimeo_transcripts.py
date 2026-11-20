@@ -162,7 +162,7 @@ def main() -> int:
     ap.add_argument('--mirror-raimo', action='store_true')
     args = ap.parse_args()
     load_env()
-    if args.apply and os.environ.get('SUPABASE_URL', '').rstrip('/') != 'https://mwubzgefkkjjbingrmqu.supabase.co':
+    if args.apply and os.environ.get('SUPABASE_URL', '').rstrip('/') != ("https://" + (os.environ.get("KAMIOOYA_PROJECT_REF") or "mwubzgefkkjjbingrmqu") + ".supabase.co"):
         raise RuntimeError('接続先が kamiooya-qa ではありません。SUPABASE_URLを確認してください')
     manifest = json.loads(args.manifest.read_text())
     lessons = [r for r in manifest['lessons'] if not args.slug or r['slug'] in args.slug]
