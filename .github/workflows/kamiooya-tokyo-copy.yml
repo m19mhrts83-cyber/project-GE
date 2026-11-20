@@ -13,7 +13,7 @@ on:
         required: true
         default: "sufbsyddqgekvcgadhpv"
       stages:
-        description: "schema,data,storage,functions,verify のうち実行するもの（カンマ区切り）"
+        description: "schema,acl,data,storage,functions,verify のうち実行するもの（カンマ区切り）"
         required: true
         default: "verify"
 
@@ -27,7 +27,7 @@ concurrency:
 jobs:
   copy:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 300
     env:
       SOURCE_REF: mwubzgefkkjjbingrmqu
       TARGET_REF: ${{ github.event.inputs.target_ref }}
@@ -50,7 +50,7 @@ jobs:
           done
 
       - name: Install psql 17
-        if: ${{ contains(github.event.inputs.stages, 'schema') || contains(github.event.inputs.stages, 'data') }}
+        if: ${{ contains(github.event.inputs.stages, 'schema') || contains(github.event.inputs.stages, 'acl') || contains(github.event.inputs.stages, 'data') }}
         run: |
           set -euo pipefail
           sudo apt-get -qq update
@@ -60,7 +60,7 @@ jobs:
           /usr/lib/postgresql/17/bin/pg_dump --version
 
       - name: Connections (temporary login roles)
-        if: ${{ contains(github.event.inputs.stages, 'schema') || contains(github.event.inputs.stages, 'data') }}
+        if: ${{ contains(github.event.inputs.stages, 'schema') || contains(github.event.inputs.stages, 'acl') || contains(github.event.inputs.stages, 'data') }}
         run: |
           set -euo pipefail
           for side in SOURCE TARGET; do
@@ -80,39 +80,91 @@ jobs:
 
       - name: Schema (public)
         if: ${{ contains(github.event.inputs.stages, 'schema') }}
-        env:
-          PGOPTIONS: "-c role=postgres"
         run: |
           set -euo pipefail
           B=/usr/lib/postgresql/17/bin
           n=$($B/psql "$TARGET_DB" -tAq -c "select count(*) from pg_tables where schemaname='public'")
           [[ "$n" == "0" ]] || { echo "::error::写し先の public に表が ${n} 本あります（構造の写しは空のときだけ）"; exit 1; }
-          $B/pg_dump "$SOURCE_DB" --schema-only --schema=public --no-owner --quote-all-identifiers -f "$RUNNER_TEMP/schema.sql"
+          $B/pg_dump "$SOURCE_DB" --role=postgres --schema-only --schema=public --no-owner --quote-all-identifiers -f "$RUNNER_TEMP/schema.sql"
           # public スキーマ自体は既にあるので CREATE SCHEMA だけ外す
           sed -i -E '/^CREATE SCHEMA "public";$/d' "$RUNNER_TEMP/schema.sql"
-          $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 --single-transaction -f "$RUNNER_TEMP/schema.sql" >/dev/null
+          # Supabase 管理用ロール（supabase_admin）の既定権限は写し先で変えられないので外す（新プロジェクトに同じ既定が最初からある）
+          sed -i -E '/^ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin"/d' "$RUNNER_TEMP/schema.sql"
+          $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 --single-transaction -c "SET ROLE postgres" -f "$RUNNER_TEMP/schema.sql" >/dev/null
           rm -f "$RUNNER_TEMP/schema.sql"
           echo "public: $($B/psql "$TARGET_DB" -tAq -c "select count(*) from pg_tables where schemaname='public'") tables, $($B/psql "$TARGET_DB" -tAq -c "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'") functions"
 
-      - name: Data (public)
-        if: ${{ contains(github.event.inputs.stages, 'data') }}
-        env:
-          PGOPTIONS: "-c role=postgres"
+      - name: Privileges (public, same as source)
+        if: ${{ contains(github.event.inputs.stages, 'schema') || contains(github.event.inputs.stages, 'acl') }}
         run: |
           set -euo pipefail
           B=/usr/lib/postgresql/17/bin
+          # 新しいプロジェクトの既定権限は広い（anon にも全権）ので、旧の権限一覧を正本にして付け直す
+          $B/psql "$SOURCE_DB" -qtA -v ON_ERROR_STOP=1 -c "SET search_path = public, extensions" -c "$(python3 scripts/kamiooya_acl_sync.py --query)" \
+            | python3 scripts/kamiooya_acl_sync.py > "$RUNNER_TEMP/acl.sql"
+          echo "acl statements: $(grep -c . "$RUNNER_TEMP/acl.sql")"
+          $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 --single-transaction -c "SET search_path = public, extensions" -f "$RUNNER_TEMP/acl.sql"
+          rm -f "$RUNNER_TEMP/acl.sql"
+          echo "privileges: synced"
+
+      - name: Data (public)
+        if: ${{ contains(github.event.inputs.stages, 'data') }}
+        run: |
+          set -euo pipefail
+          B=/usr/lib/postgresql/17/bin
+          # 一時ログインは数分で新しい接続を受け付けなくなるので、接続のたびに作り直す
+          fresh_target() {
+            local j role pass host enc
+            j=$(curl -sS -X POST -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H "Content-Type: application/json" \
+              --data '{"read_only": false}' "https://api.supabase.com/v1/projects/${TARGET_REF}/cli/login-role")
+            role=$(jq -r '.role // empty' <<<"$j"); pass=$(jq -r '.password // empty' <<<"$j")
+            [[ -n "$role" && -n "$pass" ]] || { echo "::error::写し先の一時ログインを作れませんでした" >&2; return 1; }
+            echo "::add-mask::${pass}" >&2
+            enc=$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=""))' "$pass")
+            echo "::add-mask::${enc}" >&2
+            host=${TARGET_DB#*@}
+            printf 'postgresql://%s.%s:%s@%s' "$role" "$TARGET_REF" "$enc" "$host"
+          }
+          T() { local u; u=$(fresh_target); $B/psql "$u" -q -v ON_ERROR_STOP=1 "$@"; }
           # 写し先の public の表を空にしてから入れ直す（何度でもやり直せる。旧側には触れない）
-          tables=$($B/psql "$TARGET_DB" -tAq -c "select string_agg(format('%I.%I',schemaname,tablename), ',') from pg_tables where schemaname='public'")
+          tables=$(T -tA -c "select string_agg(format('%I.%I',schemaname,tablename), ',') from pg_tables where schemaname='public'")
           [[ -n "$tables" ]] || { echo "::error::写し先に表がありません。先に schema を実行してください"; exit 1; }
-          $B/pg_dump "$SOURCE_DB" --data-only --schema=public --no-owner -Fc -f "$RUNNER_TEMP/data.dump"
+          # ベクトル索引（ivfflat/hnsw）は旧側の定義を正本にし、入れる前に外して入れた後に作り直す。
+          # 空の表で作った ivfflat は検索の当たりが悪く、入れながら更新すると遅くて接続が切れるため。
+          $B/psql "$SOURCE_DB" -qtA -v ON_ERROR_STOP=1 -c "SET search_path = pg_catalog" -c "select format('%I.%I', n.nspname, c.relname) || E'\t' || pg_get_indexdef(i.indexrelid) from pg_index i join pg_class c on c.oid=i.indexrelid join pg_am a on a.oid=c.relam join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and a.amname in ('ivfflat','hnsw') order by 1" > "$RUNNER_TEMP/vec_idx.tsv"
+          echo "vector indexes: $(wc -l < "$RUNNER_TEMP/vec_idx.tsv")"
+          while IFS=$'\t' read -r name def; do
+            T -c "SET ROLE postgres" -c "DROP INDEX IF EXISTS ${name}"
+          done < "$RUNNER_TEMP/vec_idx.tsv"
+          # 前の実行が接続切れで残した写し先の取引（一時ログイン役のもの）を止めてから空にする
+          T -tA -c "select count(pg_terminate_backend(pid)) from pg_stat_activity where usename like 'cli_login_%' and pid <> pg_backend_pid() and xact_start < now() - interval '2 minutes'" | sed 's/^/stale sessions stopped: /'
+          T -c "SET ROLE postgres" -c "SET statement_timeout = 0" -c "TRUNCATE ${tables} RESTART IDENTITY CASCADE"
+          $B/pg_dump "$SOURCE_DB" --role=postgres --data-only --schema=public --no-owner -Fc -f "$RUNNER_TEMP/data.dump"
           echo "dump: $(du -h "$RUNNER_TEMP/data.dump" | cut -f1)"
-          $B/pg_restore --data-only --no-owner -f "$RUNNER_TEMP/data.sql" "$RUNNER_TEMP/data.dump"
-          rm -f "$RUNNER_TEMP/data.dump"
-          $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 --single-transaction \
-            -c "SET session_replication_role = replica" \
-            -c "TRUNCATE ${tables} RESTART IDENTITY CASCADE" \
-            -f "$RUNNER_TEMP/data.sql" >/dev/null
-          rm -f "$RUNNER_TEMP/data.sql"
+          # 表ごとに別の取引で入れる（1本の長い取引にしない）。順番は pg_dump の並び
+          $B/pg_restore -l "$RUNNER_TEMP/data.dump" > "$RUNNER_TEMP/toc.txt"
+          grep -E '^[0-9]+; [0-9]+ [0-9]+ TABLE DATA ' "$RUNNER_TEMP/toc.txt" > "$RUNNER_TEMP/toc_data.txt" || true
+          grep -E '^[0-9]+; [0-9]+ [0-9]+ SEQUENCE SET ' "$RUNNER_TEMP/toc.txt" > "$RUNNER_TEMP/toc_seq.txt" || true
+          n=0
+          while IFS= read -r entry; do
+            printf '%s\n' "$entry" > "$RUNNER_TEMP/one.txt"
+            $B/pg_restore --data-only --no-owner -L "$RUNNER_TEMP/one.txt" -f - "$RUNNER_TEMP/data.dump" \
+              | T --single-transaction -c "SET ROLE postgres" -c "SET statement_timeout = 0" \
+                  -c "SET session_replication_role = replica" -f - >/dev/null
+            n=$((n+1))
+          done < "$RUNNER_TEMP/toc_data.txt"
+          echo "tables loaded: ${n}"
+          if [[ -s "$RUNNER_TEMP/toc_seq.txt" ]]; then
+            $B/pg_restore --data-only --no-owner -L "$RUNNER_TEMP/toc_seq.txt" -f - "$RUNNER_TEMP/data.dump" \
+              | T --single-transaction -c "SET ROLE postgres" -f - >/dev/null
+          fi
+          echo "sequences: $(wc -l < "$RUNNER_TEMP/toc_seq.txt")"
+          rm -f "$RUNNER_TEMP/data.dump" "$RUNNER_TEMP/one.txt"
+          while IFS=$'\t' read -r name def; do
+            T -c "SET ROLE postgres" -c "SET statement_timeout = 0" -c "SET maintenance_work_mem = '256MB'" -c "${def}"
+            echo "index rebuilt: ${name}"
+          done < "$RUNNER_TEMP/vec_idx.tsv"
+          T -c "SET ROLE postgres" -c "ANALYZE"
           echo "data: loaded"
 
       - uses: actions/setup-python@v5
@@ -139,7 +191,7 @@ jobs:
         run: |
           pip -q install requests
           python scripts/kamiooya_storage_copy.py \
-            --source "https://${SOURCE_REF}.supabase.co" --target "https://${TARGET_REF}.supabase.co"
+            --source "https://${SOURCE_REF}.supabase.co" --target "https://${TARGET_REF}.supabase.co" --max-minutes 200
 
       - name: Edge Functions
         if: ${{ contains(github.event.inputs.stages, 'functions') }}
