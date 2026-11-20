@@ -1,6 +1,8 @@
 import { LEVEL_LABEL, mailPriorityToLevel } from "@/lib/homeLevels";
 import { isMailActionExcluded } from "@/lib/selfEmails";
 import { createClient } from "@/lib/supabase/server";
+import { CHANNEL_LABEL, clip, cleanBody, jstStamp } from "@/lib/commHistory";
+import { loadPartySummaries } from "@/lib/commHistoryServer";
 
 export default async function HomePartnerBand() {
   const supabase = await createClient();
@@ -14,6 +16,8 @@ export default async function HomePartnerBand() {
     .neq("kind", "activity")
     .order("received_at", { ascending: false })
     .limit(40);
+  const recent = await loadPartySummaries({ scan: 400, perParty: 1 }).catch(() => null);
+  const recentParties = recent && recent.ok ? recent.parties.slice(0, 6) : [];
 
   const partnerMails = (mailRows || [])
     .filter(
@@ -77,6 +81,37 @@ export default async function HomePartnerBand() {
           </div>
         )}
       </section>
+      {recentParties.length ? (
+        <section className="home-section">
+          <div className="home-section-head">
+            <h3>最近のやり取り</h3>
+            <a href="/partners" className="home-more">
+              相手ごとに見る →
+            </a>
+          </div>
+          <div className="watch-grid">
+            {recentParties.map((p) => {
+              const it = p.latest[0];
+              return (
+                <a key={p.name} href={`/partners/${encodeURIComponent(p.name)}`} className="card watch-card home-partner-card">
+                  <header>
+                    <strong title={p.folder}>{p.name}</strong>
+                    <span className="meta">
+                      {jstStamp(p.latestAt).slice(5, 16)} {it ? CHANNEL_LABEL[it.channel] || it.channel : ""}
+                    </span>
+                  </header>
+                  {it ? (
+                    <p className="sum">
+                      {it.direction === "outbound" ? "自分→ " : "←相手 "}
+                      {clip(cleanBody(it.summary || it.subject || "").replace(/\s+/g, " "), 60)}
+                    </p>
+                  ) : null}
+                </a>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { composeDraft, proofreadDraft, reviseDraft, type DraftEngine } from "@/l
 import { geminiPaidConfigured } from "@/lib/geminiPaid";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { retrieveYoritooriForAsk } from "@/lib/onedrive/retrieveYoritoori";
+import { commHistoryForReply } from "@/lib/commHistoryServer";
 
 export const runtime = "nodejs";
 // Mac の定額 AI を最大 55 秒待つ
@@ -16,10 +17,10 @@ export const maxDuration = 90;
 
 /**
  * 判断デスク（loopware）の返信欄から呼ぶ（サーバ間・JSON・ログイン不要・HMAC `ma:{id}:lwdraft`）。
- *   op=compose   届いたメール＋やり取り md の末尾＋松野さんの指示（声）から下書きを作る
+ *   op=compose   届いたメール＋最近のやり取り（台帳。無ければ md 末尾）＋松野さんの指示（声）から下書きを作る
  *   op=proofread 誤字脱字だけ直す（指示不要）
  *   op=revise    指示どおり書き直す
- *   op=context   やり取り md の末尾を読むだけ（AI は使わない）
+ *   op=context   最近のやり取り（台帳。無ければ md 末尾）を読むだけ（AI は使わない）
  *   op=status    Mac の定額 AI の係が動いているか（最後の生存報告から何秒か）。AI は使わない
  * engine=gemini は、Mac が応答しないときに松野さんが画面で1回ごとに了承したときだけ（従量課金）。
  * 作った下書きは triage_items.draft_text に保存（Slack の返信モーダルと同じ置き場所）。
@@ -56,7 +57,18 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   const instruction = String(b.instruction || "").trim().slice(0, 2000);
   const engine: DraftEngine = b.engine === "gemini" ? "gemini" : "flat";
 
-  const history = async () =>
+  // 背景は台帳（comm_items：チャネル横断の直近やり取り＋自分の過去の文面）を先に使い、
+  // 台帳で相手が見つからない・空のときだけ OneDrive のやり取り md 末尾に切り替える。
+  const history = async () => {
+    const db = await commHistoryForReply({
+      folder: row.folder,
+      partner: row.partner,
+      email: row.from_email,
+    }).catch(() => null);
+    if (db?.ok && db.promptBlock) return db;
+    return mdHistory();
+  };
+  const mdHistory = async () =>
     retrieveYoritooriForAsk({
       lane: row.lane,
       title: row.subject,
@@ -82,7 +94,9 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   if (op === "context") {
     const h = await history();
     if (!h || !h.ok || !h.promptBlock) return out({ ok: true, log: null, message: h?.notice || "" });
-    const tail = h.promptBlock.length > 3500 ? `…\n${h.promptBlock.slice(-3500)}` : h.promptBlock;
+    // 台帳の背景は最大 6000 字に整えてあるのでそのまま見せる。md は末尾 3500 字だけ
+    const max = String(h.path || "").startsWith("台帳") ? 6000 : 3500;
+    const tail = h.promptBlock.length > max ? `…\n${h.promptBlock.slice(-max)}` : h.promptBlock;
     return out({ ok: true, log: { folder: h.path || "", notice: h.notice, tail } });
   }
 
