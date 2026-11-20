@@ -8,3 +8,15 @@ class CommentPagesTest(unittest.TestCase):
   result=add_page_route(source);self.assertEqual(source,before);self.assertEqual(result['api'][:-1],source['api']);page=result['api'][-1];self.assertEqual(page['steps'][0],source['api'][0]['steps'][0]);query=page['steps'][-1]['tableFetchMany'];self.assertEqual(query['limit'],500);self.assertEqual(query['orderBy'],'id ASC');self.assertEqual(query['whereRaw']['params'],['input.after_id']);self.assertIn('admin_%',query['whereRaw']['sql'])
  def test_unguarded_or_duplicate_alias_is_rejected(self):
   with self.assertRaises(ValueError):add_page_route({'api':[{'endpoint':'POST /internal/read/comments','steps':[]}]})
+
+
+def test_release_definition_always_has_comment_pages():
+    # 11/21: 公開し直したら /comments-page が消え、参照データが operation_failed になった
+    import sys, yaml
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from jarvis_kamiooya_release_definition import release_definition
+    root = Path(__file__).resolve().parents[2]
+    src = yaml.safe_load(next(root.glob('215_kamiooya/C1_cursor/*/*/WeStudy_API_secret_admin_upgrade.yaml')).read_text())
+    eps = [r['endpoint'] for r in release_definition(src)['api']]
+    assert eps.count('POST /internal/read/comments-page') == 1
