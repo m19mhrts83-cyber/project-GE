@@ -8,6 +8,10 @@
  *   SHARED_SECRET  … 呼び出し元と共有する秘密（必須）
  *   ADMIN_TO       … 承認依頼の宛先（type=registration 時必須）。複数はカンマ区切り
  *   APP_URL        … アプリURL。type=approval では必須。registration / password_reset では任意
+ *   SENDER_NAME    … 差出人の表示名（任意。既定「神・大家さん倶楽部 事務局」）
+ *   REPLY_TO       … 返信先アドレス（任意。既定は事務局アドレス。空にしたい時は「none」）
+ *   ※ 送信元アドレスそのものは、このスクリプトを実行する Google アカウントになる。
+ *     事務局アドレスから送るには、事務局アカウントでデプロイし直す（運用手順の運営移管チェックリスト）。
  *
  * POST JSON:
  *   { secret, email, type?, member_no?, registered_at?, note?, ... }
@@ -359,12 +363,28 @@ function sendMail_(to, subject, parts) {
     htmlBlocks.join('') +
     '</div>';
 
-  MailApp.sendEmail({
+  var mail = {
     to: to,
     subject: subject,
     body: plainBlocks.join('\n\n'),
     htmlBody: htmlBody
-  });
+  };
+  var sender = senderOptions_();
+  if (sender.name) mail.name = sender.name;
+  if (sender.replyTo) mail.replyTo = sender.replyTo;
+  MailApp.sendEmail(mail);
+}
+
+/** 差出人名・返信先（2026-11-20 運営依頼: 神大家事務局から届いて見えるように） */
+var DEFAULT_SENDER_NAME_ = '神・大家さん倶楽部 事務局';
+var DEFAULT_REPLY_TO_ = 'kami.ooyasan-club@ooya.academy';
+
+function senderOptions_() {
+  var props = PropertiesService.getScriptProperties();
+  var name = String(props.getProperty('SENDER_NAME') || DEFAULT_SENDER_NAME_).trim();
+  var replyTo = String(props.getProperty('REPLY_TO') || DEFAULT_REPLY_TO_).trim();
+  if (replyTo.toLowerCase() === 'none') replyTo = '';
+  return { name: name, replyTo: replyTo };
 }
 
 function escapeHtml_(s) {
