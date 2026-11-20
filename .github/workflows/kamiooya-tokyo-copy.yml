@@ -13,7 +13,7 @@ on:
         required: true
         default: "sufbsyddqgekvcgadhpv"
       stages:
-        description: "schema,data,storage,functions,verify のうち実行するもの（カンマ区切り）"
+        description: "schema,acl,data,storage,functions,verify のうち実行するもの（カンマ区切り）"
         required: true
         default: "verify"
 
@@ -50,7 +50,7 @@ jobs:
           done
 
       - name: Install psql 17
-        if: ${{ contains(github.event.inputs.stages, 'schema') || contains(github.event.inputs.stages, 'data') }}
+        if: ${{ contains(github.event.inputs.stages, 'schema') || contains(github.event.inputs.stages, 'acl') || contains(github.event.inputs.stages, 'data') }}
         run: |
           set -euo pipefail
           sudo apt-get -qq update
@@ -60,7 +60,7 @@ jobs:
           /usr/lib/postgresql/17/bin/pg_dump --version
 
       - name: Connections (temporary login roles)
-        if: ${{ contains(github.event.inputs.stages, 'schema') || contains(github.event.inputs.stages, 'data') }}
+        if: ${{ contains(github.event.inputs.stages, 'schema') || contains(github.event.inputs.stages, 'acl') || contains(github.event.inputs.stages, 'data') }}
         run: |
           set -euo pipefail
           for side in SOURCE TARGET; do
@@ -93,6 +93,19 @@ jobs:
           $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 --single-transaction -c "SET ROLE postgres" -f "$RUNNER_TEMP/schema.sql" >/dev/null
           rm -f "$RUNNER_TEMP/schema.sql"
           echo "public: $($B/psql "$TARGET_DB" -tAq -c "select count(*) from pg_tables where schemaname='public'") tables, $($B/psql "$TARGET_DB" -tAq -c "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'") functions"
+
+      - name: Privileges (public, same as source)
+        if: ${{ contains(github.event.inputs.stages, 'schema') || contains(github.event.inputs.stages, 'acl') }}
+        run: |
+          set -euo pipefail
+          B=/usr/lib/postgresql/17/bin
+          # 新しいプロジェクトの既定権限は広い（anon にも全権）ので、旧の権限一覧を正本にして付け直す
+          $B/psql "$SOURCE_DB" -qtA -v ON_ERROR_STOP=1 -c "SET search_path = public, extensions" -c "$(python3 scripts/kamiooya_acl_sync.py --query)" \
+            | python3 scripts/kamiooya_acl_sync.py > "$RUNNER_TEMP/acl.sql"
+          echo "acl statements: $(grep -c . "$RUNNER_TEMP/acl.sql")"
+          $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 --single-transaction -c "SET search_path = public, extensions" -f "$RUNNER_TEMP/acl.sql"
+          rm -f "$RUNNER_TEMP/acl.sql"
+          echo "privileges: synced"
 
       - name: Data (public)
         if: ${{ contains(github.event.inputs.stages, 'data') }}
