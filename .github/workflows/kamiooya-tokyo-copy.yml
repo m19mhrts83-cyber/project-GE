@@ -99,19 +99,44 @@ jobs:
         run: |
           set -euo pipefail
           B=/usr/lib/postgresql/17/bin
+          T() { $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 "$@"; }
           # 写し先の public の表を空にしてから入れ直す（何度でもやり直せる。旧側には触れない）
-          tables=$($B/psql "$TARGET_DB" -tAq -c "select string_agg(format('%I.%I',schemaname,tablename), ',') from pg_tables where schemaname='public'")
+          tables=$(T -tA -c "select string_agg(format('%I.%I',schemaname,tablename), ',') from pg_tables where schemaname='public'")
           [[ -n "$tables" ]] || { echo "::error::写し先に表がありません。先に schema を実行してください"; exit 1; }
+          # ベクトル索引（ivfflat/hnsw）は旧側の定義を正本にし、入れる前に外して入れた後に作り直す。
+          # 空の表で作った ivfflat は検索の当たりが悪く、入れながら更新すると遅くて接続が切れるため。
+          $B/psql "$SOURCE_DB" -tA -v ON_ERROR_STOP=1 -c "SET search_path = pg_catalog" -c "select format('%I.%I', n.nspname, c.relname) || E'\t' || pg_get_indexdef(i.indexrelid) from pg_index i join pg_class c on c.oid=i.indexrelid join pg_am a on a.oid=c.relam join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and a.amname in ('ivfflat','hnsw') order by 1" > "$RUNNER_TEMP/vec_idx.tsv"
+          echo "vector indexes: $(wc -l < "$RUNNER_TEMP/vec_idx.tsv")"
+          while IFS=$'\t' read -r name def; do
+            T -c "SET ROLE postgres" -c "DROP INDEX IF EXISTS ${name}"
+          done < "$RUNNER_TEMP/vec_idx.tsv"
+          T -c "SET ROLE postgres" -c "TRUNCATE ${tables} RESTART IDENTITY CASCADE"
           $B/pg_dump "$SOURCE_DB" --role=postgres --data-only --schema=public --no-owner -Fc -f "$RUNNER_TEMP/data.dump"
           echo "dump: $(du -h "$RUNNER_TEMP/data.dump" | cut -f1)"
-          $B/pg_restore --data-only --no-owner -f "$RUNNER_TEMP/data.sql" "$RUNNER_TEMP/data.dump"
-          rm -f "$RUNNER_TEMP/data.dump"
-          $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 --single-transaction \
-            -c "SET ROLE postgres" \
-            -c "SET session_replication_role = replica" \
-            -c "TRUNCATE ${tables} RESTART IDENTITY CASCADE" \
-            -f "$RUNNER_TEMP/data.sql" >/dev/null
-          rm -f "$RUNNER_TEMP/data.sql"
+          # 表ごとに別の取引で入れる（1本の長い取引にしない）。順番は pg_dump の並び
+          $B/pg_restore -l "$RUNNER_TEMP/data.dump" > "$RUNNER_TEMP/toc.txt"
+          grep -E '^[0-9]+; [0-9]+ [0-9]+ TABLE DATA ' "$RUNNER_TEMP/toc.txt" > "$RUNNER_TEMP/toc_data.txt" || true
+          grep -E '^[0-9]+; [0-9]+ [0-9]+ SEQUENCE SET ' "$RUNNER_TEMP/toc.txt" > "$RUNNER_TEMP/toc_seq.txt" || true
+          n=0
+          while IFS= read -r entry; do
+            printf '%s\n' "$entry" > "$RUNNER_TEMP/one.txt"
+            $B/pg_restore --data-only --no-owner -L "$RUNNER_TEMP/one.txt" -f - "$RUNNER_TEMP/data.dump" \
+              | T --single-transaction -c "SET ROLE postgres" -c "SET statement_timeout = 0" \
+                  -c "SET session_replication_role = replica" -f - >/dev/null
+            n=$((n+1))
+          done < "$RUNNER_TEMP/toc_data.txt"
+          echo "tables loaded: ${n}"
+          if [[ -s "$RUNNER_TEMP/toc_seq.txt" ]]; then
+            $B/pg_restore --data-only --no-owner -L "$RUNNER_TEMP/toc_seq.txt" -f - "$RUNNER_TEMP/data.dump" \
+              | T --single-transaction -c "SET ROLE postgres" -f - >/dev/null
+          fi
+          echo "sequences: $(wc -l < "$RUNNER_TEMP/toc_seq.txt")"
+          rm -f "$RUNNER_TEMP/data.dump" "$RUNNER_TEMP/one.txt"
+          while IFS=$'\t' read -r name def; do
+            T -c "SET ROLE postgres" -c "SET statement_timeout = 0" -c "SET maintenance_work_mem = '256MB'" -c "${def}"
+            echo "index rebuilt: ${name}"
+          done < "$RUNNER_TEMP/vec_idx.tsv"
+          T -c "SET ROLE postgres" -c "ANALYZE"
           echo "data: loaded"
 
       - uses: actions/setup-python@v5
