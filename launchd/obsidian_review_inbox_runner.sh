@@ -25,7 +25,7 @@ STAMP="$(date +%Y%m%d_%H%M%S)"
 LOG="${LOG_DIR}/inbox_${STAMP}.log"
 {
   echo "# start $(date '+%Y-%m-%d %H:%M:%S %z')"
-  if "$PY" "${REPO_DIR}/scripts/jarvis_obsidian_review_inbox.py"; then
+  if "$PY" "${REPO_DIR}/scripts/jarvis_obsidian_review_inbox.py" "$@"; then
     RC=0
   else
     RC=$?

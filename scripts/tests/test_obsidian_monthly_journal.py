@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import os
 from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1]
@@ -47,6 +48,28 @@ class MonthlyJournalTest(unittest.TestCase):
         with self.assertRaises(inbox.InboxError):
             inbox.write_review(self.item)
         self.assertEqual(list(outside.iterdir()), [])
+
+    def test_reads_only_holds_reviews_but_returns_search_results(self):
+        request = {"id": "745b07d2-9a30-4cc7-b7cf-9110c14f8e65",
+                   "request_type": "search", "request_payload": {"query": "example"}}
+        calls = []
+
+        def api(url, key, **kwargs):
+            calls.append((url, kwargs))
+            if kwargs.get("method", "GET") == "GET":
+                return {"items": [self.item], "vault_read_items": [request]}
+            return {"ok": True}
+
+        with patch.dict(os.environ, {"OBSIDIAN_REVIEW_POLL_KEY": "poll", "OBSIDIAN_VAULT_POLL_KEY": "read"}), \
+             patch.object(sys, "argv", ["inbox", "--reads-only"]), \
+             patch.object(inbox, "api_request", side_effect=api), \
+             patch.object(inbox, "process_request", return_value={"result_count": 0}), \
+             patch.object(inbox, "write_review", side_effect=AssertionError("review write forbidden")):
+            self.assertEqual(inbox.main(), 0)
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(calls[1][0].endswith("/api/obsidian-vault/inbox"))
+        self.assertEqual(calls[1][1]["payload"]["request_id"], request["id"])
+        self.assertEqual(list(self.vault.iterdir()), [])
 
 
 if __name__ == "__main__":

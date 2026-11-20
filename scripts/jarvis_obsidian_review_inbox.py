@@ -184,6 +184,7 @@ def process_vault_read_requests(api: str, key: str, items: list) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="list pending review IDs without saving")
+    parser.add_argument("--reads-only", action="store_true", help="serve Vault reads while holding all review writes and acknowledgements")
     args = parser.parse_args()
     api = (os.environ.get("OBSIDIAN_REVIEW_INBOX_URL") or DEFAULT_API).rstrip("/")
     key = (os.environ.get("OBSIDIAN_REVIEW_POLL_KEY") or "").strip()
@@ -212,6 +213,9 @@ def main() -> int:
     failed = False
     for item in items:
         review_id = str(item.get("review_id") or "") if isinstance(item, dict) else "unknown"
+        if args.reads_only:
+            print(f"review held {review_id[:8]}; reads-only mode")
+            continue
         try:
             if not isinstance(item, dict):
                 raise InboxError("invalid inbox item")
