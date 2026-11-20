@@ -51,6 +51,8 @@ const App = {
     ].map(function (title) { return { chat_title: title }; }),
     forumCategoryLookup: null,
     pendingUsers: [],
+    adminSearch: { pending: '', users: '', admins: '', members: '' },
+    memberStatusFilter: 'all',
     approvedUsers: [],
     roleRequestUsers: [],
     members: [],
@@ -562,6 +564,22 @@ const App = {
     }
     const reloadMembersBtn = document.getElementById('reloadMembersBtn');
     if (reloadMembersBtn) reloadMembersBtn.addEventListener('click', App.loadMembers);
+    const membersImport = document.getElementById('membersImportDetails');
+    if (membersImport && window.matchMedia && window.matchMedia('(max-width: 767px)').matches) membersImport.open = false;
+    // 管理メニューの一覧を名前・メール・会員番号で探す（2026-11-20 松野さん「登録一覧・管理者一覧が見にくい」）
+    document.querySelectorAll('[data-admin-search]').forEach(function (inp) {
+      inp.addEventListener('input', function () {
+        App.state.adminSearch[inp.getAttribute('data-admin-search')] = inp.value;
+        App.rerenderAdminList(inp.getAttribute('data-admin-search'));
+      });
+    });
+    document.querySelectorAll('[data-member-status]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        App.state.memberStatusFilter = btn.getAttribute('data-member-status');
+        document.querySelectorAll('[data-member-status]').forEach(function (b) { b.classList.toggle('is-on', b === btn); });
+        App.renderMembers();
+      });
+    });
     const importSrtBtn = document.getElementById('importSrtBtn');
     if (importSrtBtn) importSrtBtn.addEventListener('click', App.importSrtTranscript);
     const reloadAnalyticsBtn = document.getElementById('reloadAnalyticsBtn');
@@ -3102,14 +3120,49 @@ const App = {
     });
   },
 
+  rerenderAdminList: (key) => {
+    if (key === 'pending') App.renderPendingUsers();
+    else if (key === 'users') App.renderApprovedUsers();
+    else if (key === 'admins') App.renderAdmins();
+    else if (key === 'members') App.renderMembers();
+  },
+  // 全角・半角、大文字小文字、空白の違いを気にせず探す
+  adminNorm: (v) => String(v == null ? '' : v).normalize('NFKC').toLowerCase().replace(/\s+/g, ''),
+  adminFilterList: (key, list) => {
+    const q = App.adminNorm((App.state.adminSearch || {})[key] || '');
+    if (!q) return list;
+    return list.filter(function (u) {
+      return [u.name, u.email, u.member_no, u.prefecture, u.id].some(function (v) { return App.adminNorm(v).indexOf(q) >= 0; });
+    });
+  },
+  adminSetCount: (key, shown, total, unit, more) => {
+    const el = document.querySelector('[data-admin-count="' + key + '"]');
+    if (!el) return;
+    const searching = !!String((App.state.adminSearch || {})[key] || '').trim();
+    el.textContent = (searching || shown !== total ? '該当 ' + shown + ' / 全 ' + total + ' ' + unit : '全 ' + total + ' ' + unit) + (more || '');
+  },
+  // 名前のセル（名前を大きく、IDは小さく下に）
+  adminNameCell: (u, extra) =>
+    '<td class="p-2 admin-cell-name" data-label="氏名"><span class="admin-name">' + (App.escapeHtml(u.name || '') || '（名前なし）') + '</span>' +
+    (extra || '') +
+    '<span class="admin-id">ID ' + App.escapeHtml(u.id) + '</span></td>',
+  adminCell: (label, html, cls) =>
+    '<td class="p-2' + (cls ? ' ' + cls : '') + '" data-label="' + label + '">' + (html || '<span class="text-slate-400">—</span>') + '</td>',
+  adminNoMatchRow: (cols, key, emptyText) => {
+    const searching = !!String((App.state.adminSearch || {})[key] || '').trim();
+    return '<tr class="admin-empty-row"><td colspan="' + cols + '" class="p-4 text-slate-500">' + (searching ? '探している条件に合う人はいません。検索の文字を変えてみてください。' : emptyText) + '</td></tr>';
+  },
+
   renderApprovedUsers: () => {
     const body = App.elements.approvedUsersTableBody;
     if (!body) return;
     body.innerHTML = '';
     if (!App.isStaffAdmin()) return;
-    const list = App.generalUsers();
+    const all = App.generalUsers();
+    const list = App.adminFilterList('users', all);
+    App.adminSetCount('users', list.length, all.length, '人');
     if (!list.length) {
-      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">一般ユーザはいません</td></tr>';
+      body.innerHTML = App.adminNoMatchRow(5, 'users', '一般ユーザはいません');
       return;
     }
     const isMaster = App.isMasterAdmin();
@@ -3121,41 +3174,30 @@ const App = {
       let actions = '';
       if (isMaster) {
         actions +=
-          '<button type="button" class="grant-admin-btn px-3 py-1 rounded bg-blue-600 text-white text-xs" data-id="' +
+          '<button type="button" class="grant-admin-btn admin-btn admin-btn-main" data-id="' +
           App.escapeHtml(u.id) +
           '">管理者にする</button>';
       } else {
         actions +=
-          '<button type="button" class="request-grant-btn px-3 py-1 rounded bg-blue-600 text-white text-xs" data-id="' +
+          '<button type="button" class="request-grant-btn admin-btn admin-btn-main" data-id="' +
           App.escapeHtml(u.id) +
           '"' +
           (req ? ' disabled' : '') +
           '>管理者申請</button>';
       }
       actions +=
-        '<button type="button" class="withdraw-user-btn px-3 py-1 rounded bg-red-600 text-white text-xs" data-id="' +
+        '<button type="button" class="withdraw-user-btn admin-btn admin-btn-danger" data-id="' +
         App.escapeHtml(u.id) +
         '" data-email="' +
         App.escapeHtml(u.email || '') +
         '">退会削除</button>';
+      tr.className = 'border-t admin-row';
       tr.innerHTML =
-        '<td class="p-2">' +
-        App.escapeHtml(u.id) +
-        '</td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(u.name || '') +
-        '</td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(u.email || '') +
-        reqNote +
-        '</td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(u.member_no || '') +
-        '</td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(u.prefecture || '') +
-        '</td>' +
-        '<td class="p-2"><div class="flex flex-wrap gap-2">' +
+        App.adminNameCell(u, reqNote) +
+        App.adminCell('メール', App.escapeHtml(u.email || ''), 'admin-cell-mail') +
+        App.adminCell('会員番号', App.escapeHtml(u.member_no || '')) +
+        App.adminCell('都道府県', App.escapeHtml(u.prefecture || '')) +
+        '<td class="p-2 admin-cell-ops"><div class="admin-ops">' +
         actions +
         '</div></td>';
       body.appendChild(tr);
@@ -3182,9 +3224,11 @@ const App = {
     if (!body) return;
     body.innerHTML = '';
     if (!App.isStaffAdmin()) return;
-    const list = App.adminUsersOnly();
+    const all = App.adminUsersOnly();
+    const list = App.adminFilterList('admins', all);
+    App.adminSetCount('admins', list.length, all.length, '人');
     if (!list.length) {
-      body.innerHTML = '<tr><td colspan="6" class="p-3 text-slate-500">管理者はいません</td></tr>';
+      body.innerHTML = App.adminNoMatchRow(5, 'admins', '管理者はいません');
       return;
     }
     const isMaster = App.isMasterAdmin();
@@ -3195,58 +3239,47 @@ const App = {
       const role = u.role || '';
       const roleLabel =
         role === 'master_admin'
-          ? '<span class="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-900 text-xs">マスター</span>'
-          : '<span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">管理者</span>';
+          ? '<span class="admin-badge admin-badge-master"><i class="fa-solid fa-crown" aria-hidden="true"></i> マスター管理者</span>'
+          : '<span class="admin-badge admin-badge-admin">管理者</span>';
       const req = App.pendingActionForUser(u.id);
       const reqNote = req ? '<div class="text-xs text-amber-700 mt-1">申請中: ' + App.escapeHtml(req) + '</div>' : '';
-      let actions = '—';
+      let actions = String(u.id) === selfId ? '<span class="text-slate-500 text-sm">（ご自身）</span>' : '<span class="text-slate-400">—</span>';
       if (role !== 'master_admin' && String(u.id) !== selfId) {
         if (isMaster) {
           actions =
-            '<button type="button" class="transfer-master-btn px-3 py-1 rounded bg-amber-700 text-white text-xs" data-id="' +
+            '<button type="button" class="transfer-master-btn admin-btn admin-btn-sub" data-id="' +
             App.escapeHtml(u.id) +
             '" data-email="' +
             App.escapeHtml(u.email || '') +
             '">マスターを移譲する</button>';
           actions +=
-            '<button type="button" class="revoke-admin-btn ml-2 px-3 py-1 rounded bg-slate-700 text-white text-xs" data-id="' +
+            '<button type="button" class="revoke-admin-btn admin-btn admin-btn-sub" data-id="' +
             App.escapeHtml(u.id) +
             '">管理者から外す</button>';
           actions +=
-            '<button type="button" class="withdraw-admin-btn ml-2 px-3 py-1 rounded bg-red-600 text-white text-xs" data-id="' +
+            '<button type="button" class="withdraw-admin-btn admin-btn admin-btn-danger" data-id="' +
             App.escapeHtml(u.id) +
             '" data-email="' +
             App.escapeHtml(u.email || '') +
             '">退会削除</button>';
         } else {
           actions =
-            '<button type="button" class="request-revoke-btn px-3 py-1 rounded bg-slate-700 text-white text-xs" data-id="' +
+            '<button type="button" class="request-revoke-btn admin-btn admin-btn-sub" data-id="' +
             App.escapeHtml(u.id) +
             '"' +
             (req ? ' disabled' : '') +
             '>除外申請</button>';
         }
       }
+      tr.className = 'border-t admin-row';
       tr.innerHTML =
-        '<td class="p-2">' +
-        App.escapeHtml(u.id) +
-        '</td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(u.name || '') +
-        '</td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(u.email || '') +
-        reqNote +
-        '</td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(u.member_no || '') +
-        '</td>' +
-        '<td class="p-2">' +
-        roleLabel +
-        '</td>' +
-        '<td class="p-2">' +
+        App.adminNameCell(u, roleLabel + reqNote) +
+        App.adminCell('メール', App.escapeHtml(u.email || ''), 'admin-cell-mail') +
+        App.adminCell('会員番号', App.escapeHtml(u.member_no || '')) +
+        '<td class="p-2 admin-cell-role" data-label="権限">' + roleLabel + '</td>' +
+        '<td class="p-2 admin-cell-ops"><div class="admin-ops">' +
         actions +
-        '</td>';
+        '</div></td>';
       body.appendChild(tr);
     });
     body.querySelectorAll('.transfer-master-btn').forEach(function (btn) {
@@ -3294,38 +3327,32 @@ const App = {
       let ops = '—';
       if (isMaster && targetId) {
         ops =
-          '<button type="button" class="approve-role-req-btn px-3 py-1 rounded bg-blue-600 text-white text-xs" data-id="' +
+          '<button type="button" class="approve-role-req-btn admin-btn admin-btn-main" data-id="' +
           App.escapeHtml(targetId) +
           '" data-action="' +
           App.escapeHtml(action) +
           '">承認</button>' +
-          '<button type="button" class="reject-role-req-btn ml-2 px-3 py-1 rounded bg-slate-500 text-white text-xs" data-id="' +
+          '<button type="button" class="reject-role-req-btn admin-btn admin-btn-sub" data-id="' +
           App.escapeHtml(targetId) +
           '">却下</button>';
       }
       const tr = document.createElement('tr');
-      tr.className = 'border-t';
+      tr.className = 'border-t admin-row';
       const targetLabel = target.name
         ? target.name + '（' + (target.email || '') + '）'
         : target.email || req.content || '';
       tr.innerHTML =
-        '<td class="p-2">' +
+        '<td class="p-2 admin-cell-name" data-label="対象"><span class="admin-name">' +
         App.escapeHtml(targetLabel) +
-        ' <span class="text-xs text-slate-400">#' +
+        '</span><span class="admin-id">ID ' +
         App.escapeHtml(targetId) +
         '</span></td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(actionLabel) +
-        '</td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(req.author_name || '') +
-        '</td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(req.posted_at || '') +
-        '</td>' +
-        '<td class="p-2">' +
+        App.adminCell('申請内容', App.escapeHtml(actionLabel)) +
+        App.adminCell('申請者', App.escapeHtml(req.author_name || '')) +
+        App.adminCell('申請日時', App.escapeHtml(req.posted_at || '')) +
+        '<td class="p-2 admin-cell-ops"><div class="admin-ops">' +
         ops +
-        '</td>';
+        '</div></td>';
       body.appendChild(tr);
     });
     body.querySelectorAll('.approve-role-req-btn').forEach(function (btn) {
@@ -3470,33 +3497,35 @@ const App = {
         '全 ' + list.length + ' 件（未登録 ' + activeCount + ' / 登録済 ' + registeredCount + '）';
     }
     if (!list.length) {
+      App.adminSetCount('members', 0, 0, '件');
       body.innerHTML = '<tr><td colspan="4" class="p-3 text-slate-500">名簿は空です。CSVを取り込んでください。</td></tr>';
       return;
     }
-    const sorted = list.slice().sort(function (a, b) {
+    const st = App.state.memberStatusFilter || 'all';
+    const filtered = App.adminFilterList('members', list).filter(function (m) { return st === 'all' || (m.status || '') === st; });
+    const sorted = filtered.sort(function (a, b) {
       return String(a.member_no || '').localeCompare(String(b.member_no || ''), 'ja');
     });
-    sorted.forEach(function (m) {
+    // 名簿は2,000件を超えるので、一度に出すのは200件まで（探すと絞れる）
+    const LIMIT = 200;
+    App.adminSetCount('members', sorted.length, list.length, '件', sorted.length > LIMIT ? '（先頭 ' + LIMIT + ' 件を表示。氏名や会員番号で探すと絞れます）' : '');
+    if (!sorted.length) {
+      body.innerHTML = App.adminNoMatchRow(4, 'members', '条件に合う人はいません');
+      return;
+    }
+    sorted.slice(0, LIMIT).forEach(function (m) {
       const tr = document.createElement('tr');
-      tr.className = 'border-t';
+      tr.className = 'border-t admin-row';
       const status = m.status || '';
       const statusLabel =
         status === 'registered'
-          ? '<span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs">登録済</span>'
-          : '<span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">未登録</span>';
+          ? '<span class="admin-badge admin-badge-ok">登録済</span>'
+          : '<span class="admin-badge admin-badge-admin">未登録</span>';
       tr.innerHTML =
-        '<td class="p-2">' +
-        App.escapeHtml(m.member_no || '') +
-        '</td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(m.name || '') +
-        '</td>' +
-        '<td class="p-2">' +
-        App.escapeHtml(m.email || '') +
-        '</td>' +
-        '<td class="p-2">' +
-        statusLabel +
-        '</td>';
+        App.adminCell('会員番号', App.escapeHtml(m.member_no || ''), 'admin-cell-no') +
+        '<td class="p-2 admin-cell-name" data-label="氏名"><span class="admin-name">' + (App.escapeHtml(m.name || '') || '（名前なし）') + '</span></td>' +
+        App.adminCell('メール', App.escapeHtml(m.email || ''), 'admin-cell-mail') +
+        '<td class="p-2 admin-cell-role" data-label="状態">' + statusLabel + '</td>';
       body.appendChild(tr);
     });
   },
@@ -4589,37 +4618,42 @@ const App = {
       return;
     }
 
-    if (App.state.pendingUsers.length === 0) {
-      body.innerHTML = '<tr><td colspan="8" class="p-3 text-slate-500">承認待ちユーザはいません</td></tr>';
+    // メニューの「ユーザ承認」に承認待ちの人数を出す（気づきやすく）
+    const navCount = document.getElementById('adminPendingNavCount');
+    if (navCount) { const n = App.state.pendingUsers.length; navCount.textContent = String(n); navCount.classList.toggle('hidden', !n); }
+    const pendingList = App.adminFilterList('pending', App.state.pendingUsers);
+    App.adminSetCount('pending', pendingList.length, App.state.pendingUsers.length, '人');
+    if (pendingList.length === 0) {
+      body.innerHTML = App.adminNoMatchRow(7, 'pending', '承認待ちユーザはいません');
       App.updateBulkApproveButtonState();
       return;
     }
 
-    App.state.pendingUsers.forEach(function (u) {
+    pendingList.forEach(function (u) {
       const tr = document.createElement('tr');
-      tr.className = 'border-t';
+      tr.className = 'border-t admin-row';
+      const statusText = (u.status || '') === 'pending' ? '承認待ち' : (u.status || '');
       tr.innerHTML =
-        '<td class="p-2">' +
-        '<input type="checkbox" class="pending-user-check" data-id="' +
+        '<td class="p-2 admin-cell-check">' +
+        '<label class="admin-check"><input type="checkbox" class="pending-user-check" data-id="' +
         App.escapeHtml(u.id) +
         '" data-email="' +
         App.escapeHtml(u.email || '') +
-        '" aria-label="選択" />' +
+        '" aria-label="' + App.escapeHtml((u.name || '') + 'を選択') + '" /><span class="admin-check-text">選ぶ</span></label>' +
         '</td>' +
-        '<td class="p-2">' + App.escapeHtml(u.id) + '</td>' +
-        '<td class="p-2">' + App.escapeHtml(u.name || '') + '</td>' +
-        '<td class="p-2">' + App.escapeHtml(u.email || '') + '</td>' +
-        '<td class="p-2">' + App.escapeHtml(u.member_no || '') + '</td>' +
-        '<td class="p-2">' + App.escapeHtml(u.prefecture || '') + '</td>' +
-        '<td class="p-2">' + App.escapeHtml(u.status || '') + App.rosterBadge(u.id) + '</td>' +
-        '<td class="p-2">' +
-        '<div class="flex flex-wrap gap-2">' +
-        '<button type="button" class="approve-btn px-3 py-1 rounded bg-blue-600 text-white text-xs" data-id="' +
+        App.adminNameCell(u) +
+        App.adminCell('メール', App.escapeHtml(u.email || ''), 'admin-cell-mail') +
+        App.adminCell('会員番号', App.escapeHtml(u.member_no || '')) +
+        App.adminCell('都道府県', App.escapeHtml(u.prefecture || '')) +
+        '<td class="p-2 admin-cell-role" data-label="状態">' + App.escapeHtml(statusText) + App.rosterBadge(u.id) + '</td>' +
+        '<td class="p-2 admin-cell-ops">' +
+        '<div class="admin-ops">' +
+        '<button type="button" class="approve-btn admin-btn admin-btn-main" data-id="' +
         App.escapeHtml(u.id) +
         '" data-email="' +
         App.escapeHtml(u.email || '') +
         '">承認</button>' +
-        '<button type="button" class="reject-btn px-3 py-1 rounded bg-red-600 text-white text-xs" data-id="' +
+        '<button type="button" class="reject-btn admin-btn admin-btn-danger" data-id="' +
         App.escapeHtml(u.id) +
         '" data-email="' +
         App.escapeHtml(u.email || '') +

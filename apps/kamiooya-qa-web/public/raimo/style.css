@@ -1162,3 +1162,76 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 .auth-switch-link:hover { color: #1e3a8a; }
 .theme-a .auth-switch-link { color: var(--brand-navy); }
 .theme-a .auth-switch-link:hover { color: var(--brand-orange); }
+
+/* 2026-11-20 松野さん「管理メニューの登録一覧・管理者一覧が見にくい」:
+   ・名前を太く大きく、IDは名前の下に小さく（ID列はやめる）
+   ・ボタンは指で押せる大きさ。退会・却下は白地に赤枠にして、主な操作（承認・管理者にする）と見分ける
+   ・氏名・メール・会員番号で探せる。件数を出す
+   ・スマホ（〜767px）は表をやめて1人1カード。表のままだと列が細く名前が縦書きになっていた */
+.admin-list-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; margin: 0 0 .75rem; }
+.admin-search { position: relative; flex: 1 1 16rem; max-width: 28rem; display: block; }
+.admin-search i { position: absolute; left: .85rem; top: 50%; transform: translateY(-50%); color: #64748b; font-size: .9rem; pointer-events: none; }
+.admin-search input { width: 100%; min-height: 44px; padding: .5rem .9rem .5rem 2.4rem; border: 1.5px solid #cbd5e1; border-radius: 999px; background: #fff; font-size: 1rem; color: #1e293b; }
+.admin-search input:focus { outline: none; border-color: #11366A; box-shadow: 0 0 0 3px rgba(17, 54, 106, .15); }
+.admin-list-count { margin: 0; font-size: .9rem; color: #475569; font-weight: 600; }
+.admin-filter-chips { display: inline-flex; gap: .35rem; }
+.admin-filter-chips button { min-height: 40px; padding: 0 1rem; border-radius: 999px; border: 1.5px solid #cbd5e1; background: #fff; color: #334155; font-size: .9rem; font-weight: 600; }
+.admin-filter-chips button.is-on { background: #11366A; border-color: #11366A; color: #fff; }
+
+.admin-list-table { font-size: .95rem; }
+.admin-list-table thead th { font-size: .85rem; color: #475569; white-space: nowrap; padding: .7rem .75rem; }
+.admin-list-table tbody td { padding: .8rem .75rem; vertical-align: middle; color: #1e293b; }
+.admin-list-table tbody tr.admin-row:nth-child(even) { background: #f8fafc; }
+.admin-list-table tbody tr.admin-row:hover { background: #eef3fa; }
+.admin-name { display: block; font-weight: 700; font-size: 1.02rem; color: #0f172a; white-space: nowrap; }
+.admin-id { display: block; margin-top: .1rem; font-size: .75rem; color: #94a3b8; }
+.admin-cell-mail { white-space: nowrap; color: #334155; }
+.admin-nav-count { display: inline-flex; align-items: center; justify-content: center; min-width: 1.5rem; height: 1.5rem; margin-left: .4rem; padding: 0 .4rem; border-radius: 999px; background: #dc2626; color: #fff; font-size: .78rem; font-weight: 700; vertical-align: middle; }
+.admin-cell-name .admin-badge { display: none; }
+.admin-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .65rem; border-radius: 999px; font-size: .8rem; font-weight: 700; white-space: nowrap; }
+.admin-badge-master { background: #FFE4C2; color: #8a4b00; }
+.admin-badge-admin { background: #e2e8f0; color: #334155; }
+.admin-badge-ok { background: #dcfce7; color: #166534; }
+.admin-ops { display: flex; flex-wrap: wrap; gap: .5rem; }
+.admin-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 0 1rem; border-radius: 8px; font-size: .9rem; font-weight: 700; white-space: nowrap; border: 1.5px solid transparent; }
+.admin-btn:disabled { opacity: .45; cursor: not-allowed; }
+.admin-btn-main { background: #11366A; color: #fff; }
+html.theme-a .admin-btn-main { background: #FE910B; }
+.admin-btn-main:hover:not(:disabled) { filter: brightness(1.08); }
+.admin-btn-sub { background: #fff; color: #11366A; border-color: #11366A; }
+.admin-btn-sub:hover:not(:disabled) { background: #eef3fa; }
+.admin-btn-danger { background: #fff; color: #b91c1c; border-color: #fca5a5; }
+.admin-btn-danger:hover:not(:disabled) { background: #fef2f2; border-color: #dc2626; }
+.admin-check { display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; }
+.admin-check input { width: 1.25rem; height: 1.25rem; }
+.admin-check-text { display: none; font-size: .9rem; font-weight: 600; color: #334155; }
+
+@media (max-width: 767px) {
+  .admin-search { max-width: none; flex-basis: 100%; }
+  .admin-list-wrap { background: transparent !important; border: 0 !important; overflow: visible !important; }
+  .admin-list-table, .admin-list-table tbody { display: block; width: 100%; min-width: 0 !important; }
+  .admin-list-table thead { display: none; }
+  .admin-list-table tbody tr { display: block; background: #fff !important; border: 1px solid #e2e8f0 !important; border-radius: 14px; padding: .9rem 1rem; margin-bottom: .75rem; box-shadow: 0 1px 3px rgba(15, 23, 42, .06); }
+  .admin-list-table tbody tr.admin-empty-row td { display: block; padding: 0 !important; }
+  .admin-list-table tbody td { display: flex; align-items: baseline; gap: .75rem; padding: .3rem 0 !important; border: 0 !important; white-space: normal; overflow-wrap: anywhere; }
+  .admin-list-table tbody td[data-label]::before { content: attr(data-label); flex: 0 0 5.2em; font-size: .8rem; color: #64748b; font-weight: 600; }
+  .admin-list-table tbody td.admin-cell-name { display: block; padding: 0 0 .5rem !important; margin-bottom: .35rem; border-bottom: 1px dashed #e2e8f0 !important; }
+  .admin-list-table tbody td.admin-cell-name::before { content: none; }
+  .admin-list-table .admin-name { display: inline; font-size: 1.15rem; white-space: normal; }
+  .admin-list-table .admin-cell-name .admin-badge { display: inline-flex; margin-left: .5rem; vertical-align: middle; }
+  .admin-list-table .admin-id { display: inline; margin-left: .5rem; }
+  .admin-list-table td.admin-cell-role:has(.admin-badge-master), .admin-admins-table td.admin-cell-role { display: none; }
+  .admin-list-table td.admin-cell-ops { display: block; padding-top: .65rem !important; }
+  .admin-ops { gap: .6rem; }
+  .admin-ops .admin-btn { flex: 1 1 8.5rem; min-height: 46px; font-size: 1rem; }
+  .admin-list-table td.admin-cell-check { padding: 0 0 .4rem !important; }
+  .admin-check-text { display: inline; }
+  .admin-members-table td.admin-cell-no { order: -1; }
+  .admin-members-table tbody tr { display: flex; flex-direction: column; }
+  .admin-members-table td.admin-cell-name { order: -2; }
+}
+.admin-import > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .5rem; min-height: 32px; margin-bottom: .5rem; }
+.admin-import > summary::-webkit-details-marker { display: none; }
+.admin-import > summary::after { content: "▾"; margin-left: auto; color: #64748b; transition: transform .2s; }
+.admin-import:not([open]) > summary { margin-bottom: 0; }
+.admin-import:not([open]) > summary::after { transform: rotate(-90deg); }
