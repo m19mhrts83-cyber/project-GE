@@ -99,7 +99,20 @@ jobs:
         run: |
           set -euo pipefail
           B=/usr/lib/postgresql/17/bin
-          T() { $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 "$@"; }
+          # 一時ログインは数分で新しい接続を受け付けなくなるので、接続のたびに作り直す
+          fresh_target() {
+            local j role pass host enc
+            j=$(curl -sS -X POST -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H "Content-Type: application/json" \
+              --data '{"read_only": false}' "https://api.supabase.com/v1/projects/${TARGET_REF}/cli/login-role")
+            role=$(jq -r '.role // empty' <<<"$j"); pass=$(jq -r '.password // empty' <<<"$j")
+            [[ -n "$role" && -n "$pass" ]] || { echo "::error::写し先の一時ログインを作れませんでした" >&2; return 1; }
+            echo "::add-mask::${pass}" >&2
+            enc=$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=""))' "$pass")
+            echo "::add-mask::${enc}" >&2
+            host=${TARGET_DB#*@}
+            printf 'postgresql://%s.%s:%s@%s' "$role" "$TARGET_REF" "$enc" "$host"
+          }
+          T() { local u; u=$(fresh_target); $B/psql "$u" -q -v ON_ERROR_STOP=1 "$@"; }
           # 写し先の public の表を空にしてから入れ直す（何度でもやり直せる。旧側には触れない）
           tables=$(T -tA -c "select string_agg(format('%I.%I',schemaname,tablename), ',') from pg_tables where schemaname='public'")
           [[ -n "$tables" ]] || { echo "::error::写し先に表がありません。先に schema を実行してください"; exit 1; }
