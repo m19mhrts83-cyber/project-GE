@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-19T01:26:55+09:00",
+  "updated": "2026-11-21T00:35:13+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -293,7 +293,12 @@
       "name": "品質・タスク運用管理室",
       "path": "300_品質・タスク運用管理室",
       "genre_id": "jarvis_cross",
-      "genre_name": "Jarvis横断"
+      "genre_name": "Jarvis横断",
+      "lead": {
+        "name": "300品質・タスクBL_ラスカル",
+        "kind": "orca_bot",
+        "status": "試行"
+      }
     },
     {
       "id": "400",

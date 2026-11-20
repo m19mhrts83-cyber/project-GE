@@ -1259,15 +1259,22 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
     for did, dept in sorted(depts.items(), key=lambda x: str(x[0])):
         sid = str(did)
         gid = ai_genre_map.get(sid, "")
-        dept_list.append(
-            {
-                "id": sid,
-                "name": dept.get("name") or "",
-                "path": dept.get("path") or "",
-                "genre_id": gid,
-                "genre_name": genre_name.get(gid, ""),
+        entry = {
+            "id": sid,
+            "name": dept.get("name") or "",
+            "path": dept.get("path") or "",
+            "genre_id": gid,
+            "genre_name": genre_name.get(gid, ""),
+        }
+        # BL（室のリーダー役ボット）。registry に lead がある室だけ載せる
+        lead = dept.get("lead")
+        if isinstance(lead, dict) and lead.get("name"):
+            entry["lead"] = {
+                "name": str(lead.get("name")),
+                "kind": str(lead.get("kind") or ""),
+                "status": str(lead.get("status") or ""),
             }
-        )
+        dept_list.append(entry)
 
     counts: dict[str, int] = {
         "候補": 0,
