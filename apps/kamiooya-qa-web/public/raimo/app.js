@@ -87,7 +87,7 @@ const App = {
       const response = await fetch(url, options);
       if (!response.ok) {
         if (response.status === 401 && App.authGatewayBase && App.state.authToken) {
-          App.state.authToken = ''; App.state.attachmentToken = ''; App.state.currentUser = null; App.showAuthView();
+          App.state.authToken = ''; App.state.attachmentToken = ''; App.state.currentUser = null; App.clearSavedAuth(); App.showAuthView();
         }
         const text = await response.text();
         let errorData = {};
@@ -172,7 +172,39 @@ const App = {
     } catch (e) {
       /* ignore */
     }
+    if (App.restoreSavedAuth()) return;
     App.showAuthView();
+  },
+
+  // ログイン状態を端末に残す（2026-11-20 目黒さん「F5で更新するとログイン画面に戻る」）。
+  // 中身はサーバーが発行したトークン（有効8時間）と表示用のユーザー情報だけ。パスワードは残さない。
+  // 期限切れ・無効ならサーバーが401を返し、apiClient が消してログイン画面へ戻す。
+  savedAuthKey: 'qa_auth_session',
+  saveAuth: (token, user, expiresIn) => {
+    if (!App.authGatewayBase || !/^[0-9a-f]{64}$/.test(String(token || ''))) return;
+    const sec = Number(expiresIn) > 0 ? Number(expiresIn) : 28800;
+    try { localStorage.setItem(App.savedAuthKey, JSON.stringify({ token: token, user: user, expires_at: Date.now() + sec * 1000 })); } catch (e) { /* ignore */ }
+  },
+  clearSavedAuth: () => {
+    try { localStorage.removeItem(App.savedAuthKey); } catch (e) { /* ignore */ }
+  },
+  restoreSavedAuth: () => {
+    if (!App.authGatewayBase) return false;
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(App.savedAuthKey) || 'null'); } catch (e) { saved = null; }
+    if (!saved || !/^[0-9a-f]{64}$/.test(String(saved.token || '')) || !saved.user || !saved.user.id || !(Number(saved.expires_at) > Date.now())) {
+      App.clearSavedAuth();
+      return false;
+    }
+    App.state.authToken = saved.token;
+    App.state.currentUser = saved.user;
+    App.state.attachmentGeneration += 1;
+    App.state.attachmentToken = '';
+    App.state.attachmentIndex = {};
+    Promise.resolve(App.afterLogin()).then(() => App.resumePendingAnswer()).catch(() => {});
+    void App.initializeAttachments(String(saved.user.email || ''), '', App.state.attachmentGeneration);
+    void App.loadReferenceMetadata(App.state.attachmentGeneration);
+    return true;
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
@@ -1416,6 +1448,7 @@ const App = {
       });
       App.state.authToken = App.authGatewayBase ? String(res.auth_token || '') : '';
       App.state.currentUser = res.user;
+      App.saveAuth(App.state.authToken, res.user, res.expires_in);
       document.getElementById('loginPassword').value = '';
       App.state.attachmentGeneration += 1;
       App.state.attachmentToken = '';
@@ -1497,6 +1530,7 @@ const App = {
   logout: () => {
     if (App.authGatewayBase && App.state.authToken) void App.apiClient('POST', '/auth/logout', {}).catch(() => {});
     App.state.authToken = '';
+    App.clearSavedAuth();
     if(App.state.sendAbortController)App.state.sendAbortController.abort();
     App.state.pendingAnswerRequest=null;App.state.answerJobStatus='';App.renderAnswerJobStatus();
     App.state.attachmentGeneration += 1;
