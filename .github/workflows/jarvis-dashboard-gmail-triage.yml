@@ -13,7 +13,9 @@ name: Jarvis Dashboard Gmail Triage
 # 日中便（317・2026-11-15）: 9〜21時 JST に2時間おき。1) の general 取込だけを
 #   「まだ入っていない新着だけ・Gmail は既読にしない・ダイジェストは作らない」で回す。
 #   昼・夜の 116 カードに当日届いたメールを載せるため。起票は 116 のボタンのまま。
-#   パートナー MD・Chatwork・受付・Ops 監視は 05:00 本便だけ。
+#   パートナー MD・受付・Ops 監視は 05:00 本便だけ。
+#   Chatwork → やり取り.md と、その未返信判定（→台帳・判断デスク）は日中便でも回す
+#   （2026-11-20: 返信が翌朝まで読めなかったため。Chatwork は既読位置で続きだけ取る。AI なし）。
 #   止める: リポジトリ変数 JARVIS_GMAIL_DAYTIME_DISABLE=1
 
 on:
@@ -178,7 +180,7 @@ jobs:
           python scripts/jarvis_gha_triage_sent_yoritoori.py "${ARGS[@]}"
 
       - name: Partner Chatwork → OneDrive MD (Graph)
-        if: ${{ env.DAYTIME != 'true' && github.event.inputs.skip_partner != 'true' }}
+        if: ${{ github.event.inputs.skip_partner != 'true' }}
         env:
           CHATWORK_API_TOKEN: ${{ secrets.CHATWORK_API_TOKEN }}
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
@@ -210,8 +212,9 @@ jobs:
           fi
           python scripts/jarvis_gha_partner_chatwork_yoritoori.py "${ARGS[@]}"
 
+      # 日中便でも回す（2026-11-20）: 上の Chatwork 取込で入った返信を、同じ便で台帳と判断デスクへ載せる。AI なし
       - name: Partner Gmail/Chatwork unreplied → triage_items
-        if: ${{ env.DAYTIME != 'true' && github.event.inputs.skip_partner != 'true' }}
+        if: ${{ github.event.inputs.skip_partner != 'true' }}
         env:
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
