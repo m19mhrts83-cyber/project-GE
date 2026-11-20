@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import {
   formatHistoryBlock,
   matchPartyIds,
+  normFolder,
   summarizeByParty,
   type CommItem,
   type CommParty,
@@ -43,15 +44,46 @@ export async function loadPartySummaries(opts: { scan?: number; perParty?: numbe
   return { ok: true, parties: summarizeByParty(parties, (items.data || []) as CommItem[], new Date(), opts.perParty ?? 3) };
 }
 
+export type PendingReply = {
+  id: string;
+  subject: string | null;
+  summary: string | null;
+  received_at: string | null;
+  draft_text: string | null;
+  channel: string | null;
+};
+
 export async function loadPartyTimeline(
   name: string,
   limit = 40,
-): Promise<{ ok: true; party: CommParty | null; items: CommItem[] } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; party: CommParty | null; items: CommItem[]; pending: PendingReply[] } | { ok: false; error: string }
+> {
   const sb = createServiceClient();
   if (!sb) return { ok: false, error: "Supabase が未設定です" };
   const parties = await loadParties(sb);
   const same = parties.filter((p) => p.name === name);
-  if (same.length === 0) return { ok: true, party: null, items: [] };
+  if (same.length === 0) return { ok: true, party: null, items: [], pending: [] };
+  // 返信待ち（判断デスクのカードと同じ triage_items）。フォルダは P 付き・無しの両方で拾う
+  const folders = new Set<string>();
+  for (const p of same) {
+    const f = normFolder(p.partner_folder);
+    if (f) {
+      folders.add(f);
+      folders.add(`P${f}`);
+    }
+  }
+  const pendingQ = sb
+    .from("triage_items")
+    .select("id,subject,summary,received_at,draft_text,channel")
+    .eq("status", "pending")
+    .eq("lane", "partner")
+    .neq("kind", "activity")
+    .order("received_at", { ascending: false })
+    .limit(10);
+  const pendingRes = folders.size
+    ? await pendingQ.in("folder", [...folders])
+    : await pendingQ.eq("partner", name);
   const { data, error } = await sb
     .from("comm_items")
     .select(ITEM_COLS)
@@ -64,7 +96,7 @@ export async function loadPartyTimeline(
     .limit(limit);
   if (error) return { ok: false, error: error.message };
   const party = same.find((p) => /^P\d/.test(p.partner_folder || "")) || same[0];
-  return { ok: true, party, items: (data || []) as CommItem[] };
+  return { ok: true, party, items: (data || []) as CommItem[], pending: (pendingRes.data || []) as PendingReply[] };
 }
 
 /**
