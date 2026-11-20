@@ -88,6 +88,8 @@ jobs:
           $B/pg_dump "$SOURCE_DB" --role=postgres --schema-only --schema=public --no-owner --quote-all-identifiers -f "$RUNNER_TEMP/schema.sql"
           # public スキーマ自体は既にあるので CREATE SCHEMA だけ外す
           sed -i -E '/^CREATE SCHEMA "public";$/d' "$RUNNER_TEMP/schema.sql"
+          # Supabase 管理用ロール（supabase_admin）の既定権限は写し先で変えられないので外す（新プロジェクトに同じ既定が最初からある）
+          sed -i -E '/^ALTER DEFAULT PRIVILEGES FOR ROLE "supabase_admin"/d' "$RUNNER_TEMP/schema.sql"
           $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 --single-transaction -c "SET ROLE postgres" -f "$RUNNER_TEMP/schema.sql" >/dev/null
           rm -f "$RUNNER_TEMP/schema.sql"
           echo "public: $($B/psql "$TARGET_DB" -tAq -c "select count(*) from pg_tables where schemaname='public'") tables, $($B/psql "$TARGET_DB" -tAq -c "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'") functions"
