@@ -84,6 +84,10 @@ def inject_runtime_placeholders(api_yaml: str) -> str:
 
     if "__SEMANTIC_SEARCH_URL__" in out or "__SEMANTIC_SEARCH_SHARED_SECRET__" in out:
         semantic_url = (os.environ.get("SEMANTIC_SEARCH_URL") or "").strip()
+        # 接続先（KAMIOOYA_PROJECT_REF）を東京へ変えたとき、.env の SEMANTIC_SEARCH_URL が旧のままだと
+        # raimo-auth の照合（URL が自分のプロジェクトと一致すること）で回答が全部止まる。接続先から作り直す。
+        if re.fullmatch(r"https://[a-z0-9]{20}\.supabase\.co/functions/v1/semantic-search", semantic_url):
+            semantic_url = _kamiooya_base() + "/functions/v1/semantic-search"
         semantic_secret = (os.environ.get("SEMANTIC_SEARCH_SHARED_SECRET") or "").strip()
         if not semantic_url:
             raise SystemExit("SEMANTIC_SEARCH_URL が未設定です。.env.jarvis_private を確認してください。")
