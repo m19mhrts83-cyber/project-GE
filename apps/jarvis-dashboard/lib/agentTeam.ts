@@ -146,6 +146,8 @@ export type AgentTeamDept = {
   path: string;
   genre_id?: string;
   genre_name?: string;
+  /** BL（ブランチリーダー）＝室のリーダー役ボット。置いた室だけ入る */
+  lead?: { name: string; kind?: string; status?: string };
 };
 
 export type AgentTeamGenre = {

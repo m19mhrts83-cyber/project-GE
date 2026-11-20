@@ -398,6 +398,14 @@ export default function AgentTeamClient({
                             .join(" · ")}
                         </p>
                       ) : null}
+                      {aiRooms
+                        .filter((d) => d.lead?.name)
+                        .map((d) => (
+                          <p key={d.id} className="meta at-genre-sub">
+                            BL: {d.lead?.name}
+                            {d.lead?.status ? `（${d.lead.status}）` : ""}
+                          </p>
+                        ))}
                       <ul>
                         {aiList.map((a) => (
                           <li key={a.id}>
@@ -502,6 +510,12 @@ export default function AgentTeamClient({
                     </h3>
                     {d.genre_name ? (
                       <p className="meta at-org-meta">{d.genre_name}</p>
+                    ) : null}
+                    {d.lead?.name ? (
+                      <p className="meta at-org-meta">
+                        BL: {d.lead.name}
+                        {d.lead.status ? `（${d.lead.status}）` : ""}
+                      </p>
                     ) : null}
                     <ul>
                       {list.map((a) => (
