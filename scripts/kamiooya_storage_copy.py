@@ -88,12 +88,20 @@ def main(argv: list[str] | None = None) -> int:
             q = urllib.parse.quote(path)
             try:
                 s = _session()
-                g = s.get(f"{a.source}/storage/v1/object/{bucket}/{q}", headers=_h(skey), timeout=300)
-                g.raise_for_status()
-                ctype = g.headers.get("content-type", "application/octet-stream")
-                r = s.post(f"{a.target}/storage/v1/object/{bucket}/{q}", data=g.content, timeout=300,
-                           headers=_h(tkey, **{"content-type": ctype, "x-upsert": "true"}))
-                r.raise_for_status()
+                for attempt in range(3):  # 一時的な 5xx・接続切れは少し待って2回までやり直す
+                    try:
+                        g = s.get(f"{a.source}/storage/v1/object/{bucket}/{q}", headers=_h(skey), timeout=300)
+                        g.raise_for_status()
+                        ctype = g.headers.get("content-type", "application/octet-stream")
+                        r = s.post(f"{a.target}/storage/v1/object/{bucket}/{q}", data=g.content, timeout=300,
+                                   headers=_h(tkey, **{"content-type": ctype, "x-upsert": "true"}))
+                        r.raise_for_status()
+                        break
+                    except requests.RequestException as e:
+                        code = getattr(getattr(e, "response", None), "status_code", None)
+                        if attempt == 2 or (code is not None and code < 500):
+                            raise
+                        time.sleep(5 * (attempt + 1))
                 with lock:
                     copied += 1
                     moved += len(g.content)
