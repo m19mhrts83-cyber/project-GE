@@ -566,6 +566,15 @@ const App = {
     if (reloadMembersBtn) reloadMembersBtn.addEventListener('click', App.loadMembers);
     const membersImport = document.getElementById('membersImportDetails');
     if (membersImport && window.matchMedia && window.matchMedia('(max-width: 767px)').matches) membersImport.open = false;
+    // 管理メニューの一覧: スマホでカード／表を切り替え（端末ごとに覚える。2026-11-20 松野さん）
+    App.applyAdminListView((function () { try { return localStorage.getItem('qa_admin_list_view') || 'card'; } catch (e) { return 'card'; } })());
+    document.querySelectorAll('[data-admin-view]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const v = btn.getAttribute('data-admin-view');
+        try { localStorage.setItem('qa_admin_list_view', v); } catch (e) { /* ignore */ }
+        App.applyAdminListView(v);
+      });
+    });
     // 管理メニューの一覧を名前・メール・会員番号で探す（2026-11-20 松野さん「登録一覧・管理者一覧が見にくい」）
     document.querySelectorAll('[data-admin-search]').forEach(function (inp) {
       inp.addEventListener('input', function () {
@@ -3120,6 +3129,15 @@ const App = {
     });
   },
 
+  applyAdminListView: (v) => {
+    const table = v === 'table';
+    document.documentElement.classList.toggle('admin-table-mode', table);
+    document.querySelectorAll('[data-admin-view]').forEach(function (b) {
+      const on = b.getAttribute('data-admin-view') === (table ? 'table' : 'card');
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  },
   rerenderAdminList: (key) => {
     if (key === 'pending') App.renderPendingUsers();
     else if (key === 'users') App.renderApprovedUsers();
