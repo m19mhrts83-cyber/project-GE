@@ -289,7 +289,8 @@ export default function DeskClient() {
       setBeads((b) => [...b, "take"]);
       const n = (tallyWeek?.total || 0) + beads.length + 1;
       flash(`✓ ${message}・判断ログに記録（今週 ${n} 件）`);
-      logged({ beads: ["take"], compact: true });
+      // 送信は区切りの手応えを中央で見せる（2026-11-20 松野FB「送信しました！をモーションで」）
+      logged({ beads: ["take"], label: "送信しました！" });
       next();
     },
     [tallyWeek, beads.length, next],
