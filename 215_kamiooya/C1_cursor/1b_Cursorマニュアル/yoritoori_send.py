@@ -99,6 +99,8 @@ def trigger_editor_save_all():
     """
     Cursor / VS Code で「すべて保存」を実行し、未保存の送信下書きをディスクに書き込む。
     Mac のみ。送信前に必ず呼び、黒丸（未保存）のまま送るミスを防ぐ。
+    Cursor も VS Code も起動していないときは、保存すべき編集が無いので True（2026-11-20:
+    以前はここで False になり「Cursor を前面にして再実行」で送信が止まっていた）。
     """
     if sys.platform != "darwin":
         return True
@@ -134,6 +136,10 @@ def trigger_editor_save_all():
         end tell
     end trySaveAll
 
+    -- Cursor も VS Code も起動していなければ、未保存の編集は存在しない（保存不要で続行）
+    tell application "System Events"
+        if not (exists process "Cursor") and not (exists process "Code") then return "noeditor"
+    end tell
     set ok to my trySaveAll("Cursor")
     if ok is false then
         set ok to my trySaveAll("Code")

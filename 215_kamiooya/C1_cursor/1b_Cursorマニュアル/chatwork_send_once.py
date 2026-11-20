@@ -232,7 +232,9 @@ def main():
     # 送った文はやり取り.mdに移したので、下書きは空にする（同じ文の二重送信も防ぐ）
     draft_path.write_text("", encoding="utf-8")
     label = room_name or room_id
-    print(f"Chatwork へ送信しました（{label}）。5.やり取り.md に追記し、送信下書きを空にしました。")
+    kind = "グループ" if room_id == ROOM_ALIASES["group"] else "個人チャット"
+    # 送信報告には送り先（グループか個人か）を必ず書く（2026-11-20: 個人チャットを見て「届いていない」と誤解した件）
+    print(f"Chatwork へ送信しました。送り先: {kind}「{label}」（room_id={room_id}）。5.やり取り.md に追記し、送信下書きを空にしました。")
     print(r.json())
 
 
