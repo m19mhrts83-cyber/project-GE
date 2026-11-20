@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20261120b" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
+    <link rel="stylesheet" href="style.css?v=20261120c" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
   <!-- (5) ロゴに合わせた配色: この端末で見えていた人は、ログイン画面から同じ色で出す（applyTheme が覚える） -->
   <!-- 2026-11-20 新しい配色は全員に公開済み（design_theme=all）。初めて開く人も新しい配色で出す。スイッチで外れた人だけ '0' を覚えて旧配色 -->
   <script>try{var dt=null;try{dt=localStorage.getItem('qa_design_theme');}catch(e){}if(dt!=='0'){document.documentElement.classList.add('theme-a');document.title='神大家AIナビ';}}catch(e){}</script>
@@ -532,7 +532,7 @@
                 </div>
               </div>
               <p id="rosterMatchInfo" class="hidden text-xs text-slate-600 mb-2" role="status" aria-live="polite"></p>
-              <div class="admin-list-tools"><label class="admin-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" data-admin-search="pending" placeholder="氏名・メール・会員番号で探す" aria-label="氏名・メール・会員番号で探す" autocomplete="off" /></label><p class="admin-list-count" data-admin-count="pending" role="status" aria-live="polite"></p></div>
+              <div class="admin-list-tools"><label class="admin-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" data-admin-search="pending" placeholder="氏名・メール・会員番号で探す" aria-label="氏名・メール・会員番号で探す" autocomplete="off" /></label><div class="admin-view-switch" role="group" aria-label="一覧の見せ方"><button type="button" data-admin-view="card"><i class="fa-regular fa-id-card" aria-hidden="true"></i>カード</button><button type="button" data-admin-view="table"><i class="fa-solid fa-table-list" aria-hidden="true"></i>表</button></div><p class="admin-list-count" data-admin-count="pending" role="status" aria-live="polite"></p></div>
               <div class="overflow-auto bg-white rounded border admin-list-wrap">
                 <table class="min-w-full text-sm admin-list-table admin-pending-table">
                   <thead class="bg-slate-100">
@@ -564,7 +564,7 @@
                 </div>
                 <button id="reloadApprovedUsersBtn" type="button" class="px-4 py-2 rounded bg-blue-900 text-white">再取得</button>
               </div>
-              <div class="admin-list-tools"><label class="admin-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" data-admin-search="users" placeholder="氏名・メール・会員番号で探す" aria-label="氏名・メール・会員番号で探す" autocomplete="off" /></label><p class="admin-list-count" data-admin-count="users" role="status" aria-live="polite"></p></div>
+              <div class="admin-list-tools"><label class="admin-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" data-admin-search="users" placeholder="氏名・メール・会員番号で探す" aria-label="氏名・メール・会員番号で探す" autocomplete="off" /></label><div class="admin-view-switch" role="group" aria-label="一覧の見せ方"><button type="button" data-admin-view="card"><i class="fa-regular fa-id-card" aria-hidden="true"></i>カード</button><button type="button" data-admin-view="table"><i class="fa-solid fa-table-list" aria-hidden="true"></i>表</button></div><p class="admin-list-count" data-admin-count="users" role="status" aria-live="polite"></p></div>
               <div class="overflow-auto bg-white rounded border admin-list-wrap">
                 <table class="min-w-full text-sm admin-list-table admin-users-table">
                   <thead class="bg-slate-100">
@@ -597,7 +597,7 @@
                   </div>
                 </div>
                 <p id="masterTransferPendingNote" class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3 mb-3 hidden"></p>
-                <div class="admin-list-tools"><label class="admin-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" data-admin-search="admins" placeholder="氏名・メールで探す" aria-label="氏名・メールで探す" autocomplete="off" /></label><p class="admin-list-count" data-admin-count="admins" role="status" aria-live="polite"></p></div>
+                <div class="admin-list-tools"><label class="admin-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" data-admin-search="admins" placeholder="氏名・メールで探す" aria-label="氏名・メールで探す" autocomplete="off" /></label><div class="admin-view-switch" role="group" aria-label="一覧の見せ方"><button type="button" data-admin-view="card"><i class="fa-regular fa-id-card" aria-hidden="true"></i>カード</button><button type="button" data-admin-view="table"><i class="fa-solid fa-table-list" aria-hidden="true"></i>表</button></div><p class="admin-list-count" data-admin-count="admins" role="status" aria-live="polite"></p></div>
                 <div class="overflow-auto bg-white rounded border admin-list-wrap">
                   <table class="min-w-full text-sm admin-list-table admin-admins-table">
                     <thead class="bg-slate-100">
@@ -663,7 +663,7 @@
                     <p id="membersListMeta" class="text-sm text-slate-500">—</p>
                   </div>
                 </div>
-                <div class="admin-list-tools"><label class="admin-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" data-admin-search="members" placeholder="氏名・メール・会員番号で探す" aria-label="氏名・メール・会員番号で探す" autocomplete="off" /></label><div class="admin-filter-chips" role="group" aria-label="登録の状態で絞り込む"><button type="button" data-member-status="all" class="is-on">すべて</button><button type="button" data-member-status="registered">登録済</button><button type="button" data-member-status="active">未登録</button></div><p class="admin-list-count" data-admin-count="members" role="status" aria-live="polite"></p></div>
+                <div class="admin-list-tools"><label class="admin-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" data-admin-search="members" placeholder="氏名・メール・会員番号で探す" aria-label="氏名・メール・会員番号で探す" autocomplete="off" /></label><div class="admin-filter-chips" role="group" aria-label="登録の状態で絞り込む"><button type="button" data-member-status="all" class="is-on">すべて</button><button type="button" data-member-status="registered">登録済</button><button type="button" data-member-status="active">未登録</button></div><div class="admin-view-switch" role="group" aria-label="一覧の見せ方"><button type="button" data-admin-view="card"><i class="fa-regular fa-id-card" aria-hidden="true"></i>カード</button><button type="button" data-admin-view="table"><i class="fa-solid fa-table-list" aria-hidden="true"></i>表</button></div><p class="admin-list-count" data-admin-count="members" role="status" aria-live="polite"></p></div>
                 <div class="overflow-auto border rounded admin-list-wrap">
                   <table class="min-w-full text-sm admin-list-table admin-members-table">
                     <thead class="bg-slate-100">

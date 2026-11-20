@@ -1208,27 +1208,45 @@ html.theme-a .admin-btn-main { background: #FE910B; }
 
 @media (max-width: 767px) {
   .admin-search { max-width: none; flex-basis: 100%; }
-  .admin-list-wrap { background: transparent !important; border: 0 !important; overflow: visible !important; }
-  .admin-list-table, .admin-list-table tbody { display: block; width: 100%; min-width: 0 !important; }
-  .admin-list-table thead { display: none; }
-  .admin-list-table tbody tr { display: block; background: #fff !important; border: 1px solid #e2e8f0 !important; border-radius: 14px; padding: .9rem 1rem; margin-bottom: .75rem; box-shadow: 0 1px 3px rgba(15, 23, 42, .06); }
-  .admin-list-table tbody tr.admin-empty-row td { display: block; padding: 0 !important; }
-  .admin-list-table tbody td { display: flex; align-items: baseline; gap: .75rem; padding: .3rem 0 !important; border: 0 !important; white-space: normal; overflow-wrap: anywhere; }
-  .admin-list-table tbody td[data-label]::before { content: attr(data-label); flex: 0 0 5.2em; font-size: .8rem; color: #64748b; font-weight: 600; }
-  .admin-list-table tbody td.admin-cell-name { display: block; padding: 0 0 .5rem !important; margin-bottom: .35rem; border-bottom: 1px dashed #e2e8f0 !important; }
-  .admin-list-table tbody td.admin-cell-name::before { content: none; }
-  .admin-list-table .admin-name { display: inline; font-size: 1.15rem; white-space: normal; }
-  .admin-list-table .admin-cell-name .admin-badge { display: inline-flex; margin-left: .5rem; vertical-align: middle; }
-  .admin-list-table .admin-id { display: inline; margin-left: .5rem; }
-  .admin-list-table td.admin-cell-role:has(.admin-badge-master), .admin-admins-table td.admin-cell-role { display: none; }
-  .admin-list-table td.admin-cell-ops { display: block; padding-top: .65rem !important; }
-  .admin-ops { gap: .6rem; }
-  .admin-ops .admin-btn { flex: 1 1 8.5rem; min-height: 46px; font-size: 1rem; }
-  .admin-list-table td.admin-cell-check { padding: 0 0 .4rem !important; }
-  .admin-check-text { display: inline; }
-  .admin-members-table td.admin-cell-no { order: -1; }
-  .admin-members-table tbody tr { display: flex; flex-direction: column; }
-  .admin-members-table td.admin-cell-name { order: -2; }
+  html:not(.admin-table-mode) .admin-list-wrap { background: transparent !important; border: 0 !important; overflow: visible !important; }
+  html:not(.admin-table-mode) .admin-list-table, html:not(.admin-table-mode) .admin-list-table tbody { display: block; width: 100%; min-width: 0 !important; }
+  html:not(.admin-table-mode) .admin-list-table thead { display: none; }
+  html:not(.admin-table-mode) .admin-list-table tbody tr { display: block; background: #fff !important; border: 1px solid #e2e8f0 !important; border-radius: 14px; padding: .9rem 1rem; margin-bottom: .75rem; box-shadow: 0 1px 3px rgba(15, 23, 42, .06); }
+  html:not(.admin-table-mode) .admin-list-table tbody tr.admin-empty-row td { display: block; padding: 0 !important; }
+  html:not(.admin-table-mode) .admin-list-table tbody td { display: flex; align-items: baseline; gap: .75rem; padding: .3rem 0 !important; border: 0 !important; white-space: normal; overflow-wrap: anywhere; }
+  html:not(.admin-table-mode) .admin-list-table tbody td[data-label]::before { content: attr(data-label); flex: 0 0 5.2em; font-size: .8rem; color: #64748b; font-weight: 600; }
+  html:not(.admin-table-mode) .admin-list-table tbody td.admin-cell-name { display: block; padding: 0 0 .5rem !important; margin-bottom: .35rem; border-bottom: 1px dashed #e2e8f0 !important; }
+  html:not(.admin-table-mode) .admin-list-table tbody td.admin-cell-name::before { content: none; }
+  html:not(.admin-table-mode) .admin-list-table .admin-name { display: inline; font-size: 1.15rem; white-space: normal; }
+  html:not(.admin-table-mode) .admin-list-table .admin-cell-name .admin-badge { display: inline-flex; margin-left: .5rem; vertical-align: middle; }
+  html:not(.admin-table-mode) .admin-list-table .admin-id { display: inline; margin-left: .5rem; }
+  html:not(.admin-table-mode) .admin-list-table td.admin-cell-role:has(.admin-badge-master), html:not(.admin-table-mode) .admin-admins-table td.admin-cell-role { display: none; }
+  html:not(.admin-table-mode) .admin-list-table td.admin-cell-ops { display: block; padding-top: .65rem !important; }
+  html:not(.admin-table-mode) .admin-ops { gap: .6rem; }
+  html:not(.admin-table-mode) .admin-ops .admin-btn { flex: 1 1 8.5rem; min-height: 46px; font-size: 1rem; }
+  html:not(.admin-table-mode) .admin-list-table td.admin-cell-check { padding: 0 0 .4rem !important; }
+  html:not(.admin-table-mode) .admin-check-text { display: inline; }
+  html:not(.admin-table-mode) .admin-members-table td.admin-cell-no { order: -1; }
+  html:not(.admin-table-mode) .admin-members-table tbody tr { display: flex; flex-direction: column; }
+  html:not(.admin-table-mode) .admin-members-table td.admin-cell-name { order: -2; }
+}
+
+/* 2026-11-20 松野さん「一覧で表形式で見やすくするモードもほしい」: スマホでもカード／表を切り替えられる（端末ごとに覚える）。
+   表のときは文字を少し小さく、列は折り返さず横にスクロール。PCは常に表なので切り替えは出さない */
+.admin-view-switch { display: none; }
+@media (max-width: 767px) {
+  .admin-view-switch { display: inline-flex; margin-left: auto; border: 1.5px solid #cbd5e1; border-radius: 999px; overflow: hidden; background: #fff; }
+  .admin-view-switch button { min-height: 40px; padding: 0 .9rem; font-size: .9rem; font-weight: 700; color: #334155; display: inline-flex; align-items: center; gap: .35rem; }
+  .admin-view-switch button.is-on { background: #11366A; color: #fff; }
+  html.admin-table-mode .admin-list-table { font-size: .85rem; }
+  html.admin-table-mode .admin-list-table thead th { padding: .55rem .6rem; font-size: .78rem; }
+  html.admin-table-mode .admin-list-table tbody td { padding: .55rem .6rem; white-space: nowrap; }
+  html.admin-table-mode .admin-list-table .admin-name { font-size: .95rem; }
+  html.admin-table-mode .admin-list-table .admin-id { display: none; }
+  html.admin-table-mode .admin-list-table tbody tr.admin-row:nth-child(even) { background: #f1f5f9; }
+  html.admin-table-mode .admin-ops { flex-wrap: nowrap; gap: .35rem; }
+  html.admin-table-mode .admin-btn { min-height: 36px; padding: 0 .7rem; font-size: .82rem; }
+  html.admin-table-mode .admin-list-wrap { -webkit-overflow-scrolling: touch; }
 }
 .admin-import > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .5rem; min-height: 32px; margin-bottom: .5rem; }
 .admin-import > summary::-webkit-details-marker { display: none; }
