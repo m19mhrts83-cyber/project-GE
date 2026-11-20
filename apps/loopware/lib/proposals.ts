@@ -127,6 +127,7 @@ export const VERDICTS: {
  */
 export const WHY_TAGS: Record<"skip" | "hold", string[]> = {
   skip: [
+    "対応済み",
     "自分の担当ではない",
     "共有だけ",
     "まだ依頼ではない",
