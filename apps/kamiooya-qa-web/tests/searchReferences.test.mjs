@@ -118,3 +118,21 @@ test('fully labelled cached reference history skips redundant server retrieval w
  const app=load();app.authGatewayBase='https://gateway.example';app.state.currentUser={id:'one'};app.state.currentSessionId='mine';app.state.messageLoadGeneration=1;app.state.chatMessages=[{id:'a',role:'assistant',content:'コミュニティ1'}];app.state.citationsByMessageId={a:[{citationLabel:'コミュニティ1',postedAt:'2026-11-01'}]};let calls=0;app.apiClient=async()=>{calls++;throw new Error('unexpected read');};
  await app.hydrateHistoricalReferences('mine',1);assert.equal(calls,0);assert.equal(app.state.citationsByMessageId.a[0].postedAt,'2026-11-01');
 });
+
+test('category choices are available before and while the community listing loads, and partial pages are shown',async()=>{
+ const app=vm.runInNewContext(readFileSync(new URL('../public/raimo/app.js',import.meta.url),'utf8')+'\nApp;',{
+  document:{addEventListener(){},getElementById:()=>null,createElement:()=>({})},window:{setTimeout,FORUM_CATEGORY_LOOKUP:{'1':'DIY部','2':'月次活動報告'}},console,URL,fetch,Intl,Date
+ });
+ const options=[];const select={value:'',attrs:{},get options(){return options;},set innerHTML(v){options.length=0;options.push({value:''});},appendChild(o){options.push(o);},getAttribute(k){return this.attrs[k];},setAttribute(k,v){this.attrs[k]=v;}};
+ app.elements.commentCategoryFilter=select;app.elements.commentTableBody={};
+ app.authGatewayBase='https://gateway.example';app.state.currentUser={id:'one'};app.state.referenceLoads={comments:true};
+ const seen=[];app.renderCommentTable=()=>{seen.push((app.state.commentsPartial||[]).length);};
+ ['renderLessonCourseTabFilterOptions','renderLessonTable','renderCommentLoadProgress'].forEach(k=>app[k]=()=>{});
+ let release;app.apiClient=async(m,p,body)=>{if(body.after_id===0)return {comments:Array.from({length:500},(_,i)=>({id:i+1,comment_id:String(i+1)}))};await new Promise(r=>{release=r;});return {comments:[{id:501,comment_id:'501'}]};};
+ const task=app.loadComments();
+ assert.deepEqual(options.slice(1).map(o=>o.value).sort(),['DIY部','月次活動報告'].sort());
+ while(!release)await new Promise(r=>setTimeout(r,0));
+ assert.equal(seen.at(-1),500);assert.equal(app.state.commentsPartial[0].forum_category,'DIY部');
+ select.value='DIY部';release();await task;
+ assert.equal(app.state.commentsPartial,null);assert.equal(app.state.comments.length,501);assert.equal(select.value,'DIY部');
+});
