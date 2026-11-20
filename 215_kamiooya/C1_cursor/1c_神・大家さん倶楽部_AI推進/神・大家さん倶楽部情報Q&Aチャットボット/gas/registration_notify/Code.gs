@@ -9,7 +9,7 @@
  *   ADMIN_TO       … 承認依頼の宛先（type=registration 時必須）。複数はカンマ区切り
  *   APP_URL        … アプリURL。type=approval では必須。registration / password_reset では任意
  *   SENDER_NAME    … 差出人の表示名（任意。既定「神・大家さん倶楽部 事務局」）
- *   REPLY_TO       … 返信先アドレス（任意。既定は事務局アドレス。空にしたい時は「none」）
+ *   REPLY_TO       … 返信先アドレス（任意。事務局アドレスを入れる。未設定なら返信先は送信元のまま）
  *   ※ 送信元アドレスそのものは、このスクリプトを実行する Google アカウントになる。
  *     事務局アドレスから送るには、事務局アカウントでデプロイし直す（運用手順の運営移管チェックリスト）。
  *
@@ -377,13 +377,12 @@ function sendMail_(to, subject, parts) {
 
 /** 差出人名・返信先（2026-11-20 運営依頼: 神大家事務局から届いて見えるように） */
 var DEFAULT_SENDER_NAME_ = '神・大家さん倶楽部 事務局';
-var DEFAULT_REPLY_TO_ = 'kami.ooyasan-club@ooya.academy';
+var DEFAULT_REPLY_TO_ = ''; // 事務局アドレスはスクリプトプロパティ REPLY_TO に入れる（公開リポにアドレスを書かない）
 
 function senderOptions_() {
   var props = PropertiesService.getScriptProperties();
   var name = String(props.getProperty('SENDER_NAME') || DEFAULT_SENDER_NAME_).trim();
   var replyTo = String(props.getProperty('REPLY_TO') || DEFAULT_REPLY_TO_).trim();
-  if (replyTo.toLowerCase() === 'none') replyTo = '';
   return { name: name, replyTo: replyTo };
 }
 
