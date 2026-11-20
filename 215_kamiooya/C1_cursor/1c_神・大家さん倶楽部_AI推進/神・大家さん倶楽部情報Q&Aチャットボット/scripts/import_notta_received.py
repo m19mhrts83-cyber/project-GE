@@ -21,7 +21,7 @@ def main():
     load_env()
     manifest = json.loads(args.manifest.read_text())
     client = get_client()
-    if os.environ['SUPABASE_URL'].rstrip('/') != 'https://mwubzgefkkjjbingrmqu.supabase.co':
+    if os.environ['SUPABASE_URL'].rstrip('/') != ("https://" + (os.environ.get("KAMIOOYA_PROJECT_REF") or "mwubzgefkkjjbingrmqu") + ".supabase.co"):
         raise RuntimeError('kamiooya-qa以外への接続を拒否')
     base = os.environ.get('RAIMO_APP_URL') or os.environ.get('LIMO_APP_URL')
     cache = {}

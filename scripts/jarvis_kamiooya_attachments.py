@@ -12,6 +12,7 @@ import io
 import json
 import os
 import re
+import sys
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,7 +20,10 @@ from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
-PROJECT_URL = "https://mwubzgefkkjjbingrmqu.supabase.co"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kamiooya_target  # noqa: E402
+
+PROJECT_URL = kamiooya_target.base_url()  # 切替は KAMIOOYA_PROJECT_REF
 BUCKET = "community-attachments"
 MAX_BYTES = 50 * 1024 * 1024
 ARCHIVE = Path.home() / "Library/CloudStorage/GoogleDrive-admin@livingsupport-matsu.co.jp/マイドライブ/215_神大家_WeStudyスクレイプ/runs"

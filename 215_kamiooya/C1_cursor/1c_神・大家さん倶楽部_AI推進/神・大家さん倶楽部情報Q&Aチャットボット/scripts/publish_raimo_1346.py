@@ -14,6 +14,14 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 CHATBOT = Path(__file__).resolve().parents[1]
+_DEFAULT_REF = "mwubzgefkkjjbingrmqu"  # 現行ムンバイ。東京切替は KAMIOOYA_PROJECT_REF
+
+
+def _kamiooya_base() -> str:
+    ref = (os.environ.get("KAMIOOYA_PROJECT_REF") or _DEFAULT_REF).strip()
+    if not re.fullmatch(r"[a-z0-9]{20}", ref):
+        raise SystemExit("KAMIOOYA_PROJECT_REF の形式が違います")
+    return f"https://{ref}.supabase.co"
 OUT = CHATBOT / ".raimo_export_1346"
 APP_ID = 1346
 BACKEND_ID = 1046
@@ -59,7 +67,7 @@ def inject_runtime_placeholders(api_yaml: str) -> str:
         if len(secret) < 32:
             raise SystemExit("COMMUNITY_ATTACHMENTS_PROXY_SECRET が未設定です。")
         out = out.replace("__COMMUNITY_ATTACHMENTS_PROXY_SECRET__", secret)
-        out = out.replace("__COMMUNITY_ATTACHMENTS_URL__", "https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/community-attachments")
+        out = out.replace("__COMMUNITY_ATTACHMENTS_URL__", _kamiooya_base() + "/functions/v1/community-attachments")
 
     if "__NOTIFY_WEBHOOK_URL__" in out or "__NOTIFY_SHARED_SECRET__" in out:
         url = (os.environ.get("NOTIFY_WEBHOOK_URL") or "").strip()
@@ -95,7 +103,10 @@ def inject_js_placeholders(js: str) -> str:
             "app.js に SEMANTIC_SEARCH プレースホルダが残っています。"
             "ブラウザ直呼びは廃止済みです。プレースホルダを削除してください。"
         )
-    return js.replace("authGatewayBase: '',", "authGatewayBase: 'https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/raimo-auth',", 1)
+    # 接続先（KAMIOOYA_PROJECT_REF）が東京へ変わったら、app.js 内の現行 ref もまとめて置き換える。
+    base = _kamiooya_base()
+    js = js.replace("https://" + _DEFAULT_REF + ".", base[: -len("supabase.co")])
+    return js.replace("authGatewayBase: '',", "authGatewayBase: '" + base + "/functions/v1/raimo-auth',", 1)
 
 
 def prepare_html_for_raimo(html: str) -> str:

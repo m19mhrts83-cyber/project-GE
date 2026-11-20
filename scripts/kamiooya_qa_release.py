@@ -36,7 +36,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 QA_WEB = REPO / "apps" / "kamiooya-qa-web"
 MIGRATIONS = QA_WEB / "supabase" / "migrations"
-PROJECT_REF = "mwubzgefkkjjbingrmqu"
+sys.path.insert(0, str(REPO / "scripts"))
+import kamiooya_target  # noqa: E402
+
+PROJECT_REF = kamiooya_target.project_ref()  # 切替は KAMIOOYA_PROJECT_REF
 ALLOWED_FUNCTIONS = {
     "semantic-search", "qa-analytics", "qa-search-log",
     "raimo-auth", "community-attachments", "srt-ingest",
@@ -216,6 +219,9 @@ def main() -> int:
     if not re.fullmatch(r"[a-z0-9,\-]*", a.functions):
         raise SystemExit("--functions の形式が不正です")
     load_env()
+    global PROJECT_REF
+    PROJECT_REF = kamiooya_target.project_ref()  # .env.jarvis_private の KAMIOOYA_PROJECT_REF も反映
+    print(f"target: {PROJECT_REF}")
     step_migration(a.migration, a.dry_run)
     step_functions([f for f in a.functions.split(",") if f], a.dry_run)
     if a.check_analytics:

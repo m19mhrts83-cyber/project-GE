@@ -199,7 +199,7 @@ def main() -> int:
     ap.add_argument("--apply", action="store_true")
     args = ap.parse_args()
     load_env()
-    if os.environ.get("SUPABASE_URL", "").rstrip("/") != "https://mwubzgefkkjjbingrmqu.supabase.co":
+    if os.environ.get("SUPABASE_URL", "").rstrip("/") != ("https://" + (os.environ.get("KAMIOOYA_PROJECT_REF") or "mwubzgefkkjjbingrmqu") + ".supabase.co"):
         raise RuntimeError("接続先が kamiooya-qa ではありません。SUPABASE_URLを確認してください")
     client = get_client()
     sources: dict[int, dict] = {}

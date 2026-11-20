@@ -30,7 +30,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      PROJECT_REF: mwubzgefkkjjbingrmqu
+      # 東京切替は repo 変数 KAMIOOYA_PROJECT_REF（未設定なら現行ムンバイ）
+      PROJECT_REF: ${{ vars.KAMIOOYA_PROJECT_REF || 'mwubzgefkkjjbingrmqu' }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_KAMIOOYA || secrets.SUPABASE_ACCESS_TOKEN }}
       HAS_KAMIOOYA_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_KAMIOOYA != '' }}
       MIGRATIONS: ${{ github.event.inputs.migrations }}
