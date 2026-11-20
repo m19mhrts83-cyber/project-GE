@@ -80,35 +80,32 @@ jobs:
 
       - name: Schema (public)
         if: ${{ contains(github.event.inputs.stages, 'schema') }}
-        env:
-          PGOPTIONS: "-c role=postgres"
         run: |
           set -euo pipefail
           B=/usr/lib/postgresql/17/bin
           n=$($B/psql "$TARGET_DB" -tAq -c "select count(*) from pg_tables where schemaname='public'")
           [[ "$n" == "0" ]] || { echo "::error::写し先の public に表が ${n} 本あります（構造の写しは空のときだけ）"; exit 1; }
-          $B/pg_dump "$SOURCE_DB" --schema-only --schema=public --no-owner --quote-all-identifiers -f "$RUNNER_TEMP/schema.sql"
+          $B/pg_dump "$SOURCE_DB" --role=postgres --schema-only --schema=public --no-owner --quote-all-identifiers -f "$RUNNER_TEMP/schema.sql"
           # public スキーマ自体は既にあるので CREATE SCHEMA だけ外す
           sed -i -E '/^CREATE SCHEMA "public";$/d' "$RUNNER_TEMP/schema.sql"
-          $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 --single-transaction -f "$RUNNER_TEMP/schema.sql" >/dev/null
+          $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 --single-transaction -c "SET ROLE postgres" -f "$RUNNER_TEMP/schema.sql" >/dev/null
           rm -f "$RUNNER_TEMP/schema.sql"
           echo "public: $($B/psql "$TARGET_DB" -tAq -c "select count(*) from pg_tables where schemaname='public'") tables, $($B/psql "$TARGET_DB" -tAq -c "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'") functions"
 
       - name: Data (public)
         if: ${{ contains(github.event.inputs.stages, 'data') }}
-        env:
-          PGOPTIONS: "-c role=postgres"
         run: |
           set -euo pipefail
           B=/usr/lib/postgresql/17/bin
           # 写し先の public の表を空にしてから入れ直す（何度でもやり直せる。旧側には触れない）
           tables=$($B/psql "$TARGET_DB" -tAq -c "select string_agg(format('%I.%I',schemaname,tablename), ',') from pg_tables where schemaname='public'")
           [[ -n "$tables" ]] || { echo "::error::写し先に表がありません。先に schema を実行してください"; exit 1; }
-          $B/pg_dump "$SOURCE_DB" --data-only --schema=public --no-owner -Fc -f "$RUNNER_TEMP/data.dump"
+          $B/pg_dump "$SOURCE_DB" --role=postgres --data-only --schema=public --no-owner -Fc -f "$RUNNER_TEMP/data.dump"
           echo "dump: $(du -h "$RUNNER_TEMP/data.dump" | cut -f1)"
           $B/pg_restore --data-only --no-owner -f "$RUNNER_TEMP/data.sql" "$RUNNER_TEMP/data.dump"
           rm -f "$RUNNER_TEMP/data.dump"
           $B/psql "$TARGET_DB" -q -v ON_ERROR_STOP=1 --single-transaction \
+            -c "SET ROLE postgres" \
             -c "SET session_replication_role = replica" \
             -c "TRUNCATE ${tables} RESTART IDENTITY CASCADE" \
             -f "$RUNNER_TEMP/data.sql" >/dev/null
