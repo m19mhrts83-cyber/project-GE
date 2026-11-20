@@ -29,6 +29,10 @@ NAMES = [
     "COMMUNITY_ATTACHMENTS_PROXY_SECRET", "COMMUNITY_ATTACHMENTS_SESSION_SECRET",
     "COMMUNITY_ATTACHMENTS_MEMBER_READS_ENABLED", "SEMANTIC_SEARCH_DISABLED",
 ]
+# .env で別の名前になっているもの（11/14 に GEMINI_API_KEY を周辺MAP用へ改名し、神大家用は KAMIOOYA_ 付き）
+ALIASES = {"GEMINI_API_KEY": "KAMIOOYA_GEMINI_API_KEY"}
+# 秘密ではない切替。旧では会員の添付閲覧を有効にして運用中なので同じ値を入れる
+FIXED = {"COMMUNITY_ATTACHMENTS_MEMBER_READS_ENABLED": "1"}
 
 
 def read_env() -> dict[str, str]:
@@ -65,6 +69,11 @@ def main(argv: list[str] | None = None) -> int:
         print("旧プロジェクトには書き込みません", file=sys.stderr)
         return 2
     env = read_env()
+    for name, alias in ALIASES.items():
+        if name not in env and alias in env:
+            env[name] = env[alias]
+    for name, value in FIXED.items():
+        env.setdefault(name, value)
     token = os.environ.get("SUPABASE_ACCESS_TOKEN_KAMIOOYA") or env.get("SUPABASE_ACCESS_TOKEN_KAMIOOYA") \
         or os.environ.get("SUPABASE_ACCESS_TOKEN") or env.get("SUPABASE_ACCESS_TOKEN") or ""
     if not token:
