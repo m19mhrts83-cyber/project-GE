@@ -244,7 +244,7 @@ const App = {
     // アプリ名「神大家AIナビ」（2026-11-11 目黒さん「一旦これで」）。配色と同じスイッチの人だけ。
     document.title = on ? '神大家AIナビ' : '神・大家さん倶楽部Q&Aチャットボット';
     App.applyAppIcon(on);
-    try { if (on) localStorage.setItem('qa_design_theme', '1'); else localStorage.removeItem('qa_design_theme'); } catch (e) { /* ignore */ }
+    try { localStorage.setItem('qa_design_theme', on ? '1' : '0'); } catch (e) { /* ignore */ }
   },
   // タブのアイコン（2026-11-11 松野さん「ラ」の字は LINE っぽいので変えたい）。配色と同じスイッチの人だけ。
   // 案1「神」の字 / 案2 家マーク。APP_ICON_CHOICE で切り替え。
@@ -1560,7 +1560,7 @@ const App = {
     App.state.feedbackByMessage = {};
     // ログアウト後のログイン画面は、この端末で配色が見えていた人だけ案Aのまま（applyTheme で覚えた分）
     let keepTheme = false;
-    try { keepTheme = localStorage.getItem('qa_design_theme') === '1'; } catch (e) { /* ignore */ }
+    try { keepTheme = localStorage.getItem('qa_design_theme') !== '0'; } catch (e) { keepTheme = true; }
     if (document.documentElement) document.documentElement.classList.toggle('theme-a', keepTheme);
     const featureBar = document.getElementById('featurePreviewBar');
     if (featureBar) featureBar.classList.add('hidden');
