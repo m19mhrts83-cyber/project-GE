@@ -130,3 +130,21 @@ test('パスワード再設定メールの有効期限は日本時間の「年�
   assert.equal(jstDeadlineLabel('2026-12-31T15:05:00Z'), '2027年1月1日 00:05');
   assert.equal(jstDeadlineLabel('壊れた値'), '');
 });
+
+test('Raimo が errorCode なし（status と message だけ）で返しても、名簿外は not_on_roster として画面に渡す（2026-11-20）',async()=>{
+ const config={origin,raimoBase:origin+'/miniAppApi/test',gatewaySecret:'g'.repeat(40),proxySecret:'p'.repeat(40),projectUrl:'https://fixture.supabase.co',serviceKey:'service-only'};
+ const transport=async(url,opts={})=>{
+  const u=new URL(url);
+  if(u.pathname.endsWith('/rpc/raimo_auth_take_limit'))return Response.json(true);
+  if(url.startsWith(config.raimoBase)&&u.pathname.endsWith('/auth/register-roster'))return Response.json({status:400,message:'名簿に一致する会員が見つかりません'},{status:400});
+  if(url.startsWith(config.raimoBase)&&u.pathname.endsWith('/auth/register'))return Response.json({status:400,message:'このメールアドレスは既に登録されています。退会済みの場合は同じ内容でもう一度「アカウント作成」してください（再登録）。それ以外はログインまたはパスワード再設定をご利用ください'},{status:400});
+  return Response.json({},{status:500});
+ };
+ const adapter=createProductionAdapter(config,async()=>true,async p=>'hashed:'+p,transport);
+ const gw=createRaimoAuthGateway(adapter.deps);
+ const body={email:'new@example.test',password_hash:'longenough1',member_no:'X1',name:'名前',prefecture:'愛知県'};
+ const r1=await gw(new Request(origin+'/auth/register-roster',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)}));
+ assert.equal(r1.status,400);assert.equal((await r1.json()).errorCode,'not_on_roster');
+ const r2=await gw(new Request(origin+'/auth/register',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)}));
+ assert.equal((await r2.json()).errorCode,'email_taken');
+});

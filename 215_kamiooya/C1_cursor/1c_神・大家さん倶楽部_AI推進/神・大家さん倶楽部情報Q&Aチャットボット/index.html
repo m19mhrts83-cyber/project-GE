@@ -17,9 +17,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20261119n" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
+    <link rel="stylesheet" href="style.css?v=20261120a" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
   <!-- (5) ロゴに合わせた配色: この端末で見えていた人は、ログイン画面から同じ色で出す（applyTheme が覚える） -->
-  <script>try{if(localStorage.getItem('qa_design_theme')==='1')document.documentElement.classList.add('theme-a');}catch(e){}</script>
+  <!-- 2026-11-20 新しい配色は全員に公開済み（design_theme=all）。初めて開く人も新しい配色で出す。スイッチで外れた人だけ '0' を覚えて旧配色 -->
+  <script>try{var dt=null;try{dt=localStorage.getItem('qa_design_theme');}catch(e){}if(dt!=='0'){document.documentElement.classList.add('theme-a');document.title='神大家AIナビ';}}catch(e){}</script>
   <!-- 文字の大きさ（標準/大/特大、2026-11-11 松野さん「50代・60代にも優しく、選べるように」）。端末ごとに覚える。配色と同じスイッチの人だけ効く -->
   <script>try{var t=localStorage.getItem('qa_text_size');if(t==='l'||t==='xl')document.documentElement.setAttribute('data-text-size',t);}catch(e){}</script>
   <!-- (5) ロゴに合わせた配色・案A（2026-11-10 松野さん決定）。スイッチ design_theme が見える人だけ html.theme-a が付く。
@@ -64,12 +65,8 @@
       <div class="auth-card w-full max-w-md bg-white shadow-lg rounded-xl p-6">
         <div class="brand-logo brand-only" role="img" aria-label="神・大家さん倶楽部"></div>
         <h1 class="text-xl font-bold text-center text-blue-900 mb-2"><span class="brand-hide">神・大家さん倶楽部Q&A</span><span class="brand-only-inline">神大家AIナビ</span></h1>
-        <p class="text-sm text-slate-500 text-center mb-6">ログインまたは新規登録</p>
-
-        <div class="flex gap-2 mb-4">
-          <button id="showLoginTabBtn" class="w-1/2 py-2 rounded-md bg-blue-900 text-white">ログイン</button>
-          <button id="showRegisterTabBtn" class="w-1/2 py-2 rounded-md bg-slate-200 text-slate-700">新規登録</button>
-        </div>
+        <!-- 2026-11-20 ログインの入口は1つ（目黒さん）。新規登録・パスワード再設定は下のリンクから -->
+        <p id="authSubtitle" class="text-sm text-slate-500 text-center mb-6">会員のメールアドレスでログイン</p>
 
         <form id="loginForm" class="space-y-3">
           <div id="registerSuccessNotice" class="hidden rounded-md border border-blue-200 bg-blue-50 text-blue-900 text-sm p-3"></div>
@@ -80,9 +77,13 @@
           </button>
           <!-- 改修: パスワードリマインダー画面へのリンク -->
           <div class="text-right mt-2">
-            <button type="button" id="toForgotPasswordBtn" class="text-xs text-blue-600 underline hover:text-blue-800">
+            <button type="button" id="toForgotPasswordBtn" class="auth-link text-xs text-blue-600 underline hover:text-blue-800">
               パスワードを忘れた方はこちら
             </button>
+          </div>
+          <div class="auth-switch">
+            <span class="auth-switch-lead">はじめてご利用の方</span>
+            <button type="button" id="toRegisterBtn" class="auth-link auth-switch-link">新規登録はこちら</button>
           </div>
         </form>
 
@@ -145,6 +146,10 @@
           <button id="registerSubmitBtn" type="submit" class="w-full py-2 rounded-md bg-blue-600 text-white">
             アカウント作成
           </button>
+          <div class="auth-switch">
+            <span class="auth-switch-lead">登録済みの方</span>
+            <button type="button" id="toLoginBtn" class="auth-link auth-switch-link">ログインはこちら</button>
+          </div>
         </form>
       </div>
     </section>

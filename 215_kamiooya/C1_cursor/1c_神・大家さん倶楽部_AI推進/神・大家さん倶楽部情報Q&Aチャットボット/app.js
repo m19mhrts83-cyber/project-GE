@@ -87,7 +87,7 @@ const App = {
       const response = await fetch(url, options);
       if (!response.ok) {
         if (response.status === 401 && App.authGatewayBase && App.state.authToken) {
-          App.state.authToken = ''; App.state.attachmentToken = ''; App.state.currentUser = null; App.showAuthView();
+          App.state.authToken = ''; App.state.attachmentToken = ''; App.state.currentUser = null; App.clearSavedAuth(); App.showAuthView();
         }
         const text = await response.text();
         let errorData = {};
@@ -172,7 +172,39 @@ const App = {
     } catch (e) {
       /* ignore */
     }
+    if (App.restoreSavedAuth()) return;
     App.showAuthView();
+  },
+
+  // ログイン状態を端末に残す（2026-11-20 目黒さん「F5で更新するとログイン画面に戻る」）。
+  // 中身はサーバーが発行したトークン（有効8時間）と表示用のユーザー情報だけ。パスワードは残さない。
+  // 期限切れ・無効ならサーバーが401を返し、apiClient が消してログイン画面へ戻す。
+  savedAuthKey: 'qa_auth_session',
+  saveAuth: (token, user, expiresIn) => {
+    if (!App.authGatewayBase || !/^[0-9a-f]{64}$/.test(String(token || ''))) return;
+    const sec = Number(expiresIn) > 0 ? Number(expiresIn) : 28800;
+    try { localStorage.setItem(App.savedAuthKey, JSON.stringify({ token: token, user: user, expires_at: Date.now() + sec * 1000 })); } catch (e) { /* ignore */ }
+  },
+  clearSavedAuth: () => {
+    try { localStorage.removeItem(App.savedAuthKey); } catch (e) { /* ignore */ }
+  },
+  restoreSavedAuth: () => {
+    if (!App.authGatewayBase) return false;
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(App.savedAuthKey) || 'null'); } catch (e) { saved = null; }
+    if (!saved || !/^[0-9a-f]{64}$/.test(String(saved.token || '')) || !saved.user || !saved.user.id || !(Number(saved.expires_at) > Date.now())) {
+      App.clearSavedAuth();
+      return false;
+    }
+    App.state.authToken = saved.token;
+    App.state.currentUser = saved.user;
+    App.state.attachmentGeneration += 1;
+    App.state.attachmentToken = '';
+    App.state.attachmentIndex = {};
+    Promise.resolve(App.afterLogin()).then(() => App.resumePendingAnswer()).catch(() => {});
+    void App.initializeAttachments(String(saved.user.email || ''), '', App.state.attachmentGeneration);
+    void App.loadReferenceMetadata(App.state.attachmentGeneration);
+    return true;
   },
 
   // 改善機能の段階公開（2026-11-10）。判定の正本はサーバー。ここは表示の切り替えだけ。
@@ -210,7 +242,7 @@ const App = {
     // アプリ名「神大家AIナビ」（2026-11-11 目黒さん「一旦これで」）。配色と同じスイッチの人だけ。
     document.title = on ? '神大家AIナビ' : '神・大家さん倶楽部Q&Aチャットボット';
     App.applyAppIcon(on);
-    try { if (on) localStorage.setItem('qa_design_theme', '1'); else localStorage.removeItem('qa_design_theme'); } catch (e) { /* ignore */ }
+    try { localStorage.setItem('qa_design_theme', on ? '1' : '0'); } catch (e) { /* ignore */ }
   },
   // タブのアイコン（2026-11-11 松野さん「ラ」の字は LINE っぽいので変えたい）。配色と同じスイッチの人だけ。
   // 案1「神」の字 / 案2 家マーク。APP_ICON_CHOICE で切り替え。
@@ -409,8 +441,11 @@ const App = {
   },
 
   bindEvents: () => {
-    document.getElementById('showLoginTabBtn').addEventListener('click', App.showLoginTab);
-    document.getElementById('showRegisterTabBtn').addEventListener('click', App.showRegisterTab);
+    // ログインの入口は1つ。新規登録⇔ログインはフォーム下のリンクで切り替える（2026-11-20）
+    const toRegisterBtn = document.getElementById('toRegisterBtn');
+    if (toRegisterBtn) toRegisterBtn.addEventListener('click', App.showRegisterTab);
+    const toLoginBtn = document.getElementById('toLoginBtn');
+    if (toLoginBtn) toLoginBtn.addEventListener('click', App.showLoginTab);
     App.elements.loginForm.addEventListener('submit', App.handleLogin);
     App.elements.registerForm.addEventListener('submit', App.handleRegister);
     const toForgotBtn = document.getElementById('toForgotPasswordBtn');
@@ -1240,17 +1275,20 @@ const App = {
     }
   },
 
+  setAuthSubtitle: (text) => {
+    const el = document.getElementById('authSubtitle');
+    if (el) el.textContent = text;
+  },
+
   showLoginTab: () => {
-    document.getElementById('showLoginTabBtn').className = 'w-1/2 py-2 rounded-md bg-blue-900 text-white';
-    document.getElementById('showRegisterTabBtn').className = 'w-1/2 py-2 rounded-md bg-slate-200 text-slate-700';
+    App.setAuthSubtitle('会員のメールアドレスでログイン');
     App.elements.loginForm.classList.remove('hidden');
     App.elements.registerForm.classList.add('hidden');
   },
 
   showRegisterTab: () => {
     App.clearRegisterSuccessNotice();
-    document.getElementById('showRegisterTabBtn').className = 'w-1/2 py-2 rounded-md bg-blue-900 text-white';
-    document.getElementById('showLoginTabBtn').className = 'w-1/2 py-2 rounded-md bg-slate-200 text-slate-700';
+    App.setAuthSubtitle('新規登録（会員番号で利用を始める）');
     App.elements.registerForm.classList.remove('hidden');
     App.elements.loginForm.classList.add('hidden');
   },
@@ -1410,6 +1448,7 @@ const App = {
       });
       App.state.authToken = App.authGatewayBase ? String(res.auth_token || '') : '';
       App.state.currentUser = res.user;
+      App.saveAuth(App.state.authToken, res.user, res.expires_in);
       document.getElementById('loginPassword').value = '';
       App.state.attachmentGeneration += 1;
       App.state.attachmentToken = '';
@@ -1491,6 +1530,7 @@ const App = {
   logout: () => {
     if (App.authGatewayBase && App.state.authToken) void App.apiClient('POST', '/auth/logout', {}).catch(() => {});
     App.state.authToken = '';
+    App.clearSavedAuth();
     if(App.state.sendAbortController)App.state.sendAbortController.abort();
     App.state.pendingAnswerRequest=null;App.state.answerJobStatus='';App.renderAnswerJobStatus();
     App.state.attachmentGeneration += 1;
@@ -1502,7 +1542,7 @@ const App = {
     App.state.feedbackByMessage = {};
     // ログアウト後のログイン画面は、この端末で配色が見えていた人だけ案Aのまま（applyTheme で覚えた分）
     let keepTheme = false;
-    try { keepTheme = localStorage.getItem('qa_design_theme') === '1'; } catch (e) { /* ignore */ }
+    try { keepTheme = localStorage.getItem('qa_design_theme') !== '0'; } catch (e) { keepTheme = true; }
     if (document.documentElement) document.documentElement.classList.toggle('theme-a', keepTheme);
     const featureBar = document.getElementById('featurePreviewBar');
     if (featureBar) featureBar.classList.add('hidden');
