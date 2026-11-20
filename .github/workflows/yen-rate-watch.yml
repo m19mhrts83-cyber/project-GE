@@ -30,7 +30,7 @@ jobs:
         env:
           SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
           SLACK_WEBHOOK_AI_TEAM_OPS: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_OPS }}
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          TAVILY_API_KEY: ${{ contains(vars.METERED_AI_ALLOW, 'tavily') && secrets.TAVILY_API_KEY || '' }} # 従量課金は METERED_AI_ALLOW（2026-11-20）
           JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
           JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
           JARVIS_YEN_RATE_WATCH_DISABLE: ${{ vars.JARVIS_YEN_RATE_WATCH_DISABLE }}

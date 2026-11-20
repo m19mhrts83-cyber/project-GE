@@ -161,14 +161,13 @@ jobs:
           path: 215_kamiooya/C1_cursor/finance/zaim_budget_sync/.zaim_storage_state.json
           key: zaim-storage-state-${{ env.STATE_HASH }}-${{ github.run_id }}
 
-      - name: Upload Cleaned CSV & Logs Artifacts
+      # 公開リポの Artifact は誰でも取れるため、明細・画面の写しは Supabase の非公開バケットへ（2026-11-20）
+      - name: Keep CSV & screenshots in private storage
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: zaim-finance-artifacts
-          path: |
-            downloads/
-            .jarvis_state/zaim_*.json
-            .jarvis_state/finance_metrics.json
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python3 scripts/gha_private_artifact.py --name zaim-finance --keep-days 14 \
+            downloads/ '.jarvis_state/zaim_*.json' .jarvis_state/finance_metrics.json \
             215_kamiooya/C1_cursor/finance/zaim_budget_sync/screenshots/
-          retention-days: 14

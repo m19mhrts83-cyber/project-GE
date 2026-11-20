@@ -316,20 +316,19 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload logs artifact
+      # 公開リポの Artifact は誰でも取れるため、会員コメントの差分・画面の写しは
+      # 神大家 Q&A の Supabase（非公開バケット）へ置く（2026-11-20）
+      - name: Keep logs in private storage
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: westudy-raimo-logs-${{ github.run_id }}
-          path: |
-            ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/logs/
-            ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/delta_*.csv
-            ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/lessons/lesson_delta_*.csv
-            ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/raw/**/*.png
-            ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/raw/**/*.html
-            ${{ env.CHATBOT_OUTPUT_ROOT }}/exports/raw/**/*.log
-          if-no-files-found: warn
-          retention-days: 14
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          R="$CHATBOT_OUTPUT_ROOT/exports"
+          python3 scripts/gha_private_artifact.py --name westudy-raimo-logs --keep-days 14 \
+            "$R/logs/" "$R/delta_*.csv" "$R/lessons/lesson_delta_*.csv" \
+            "$R/raw/**/*.png" "$R/raw/**/*.html" "$R/raw/**/*.log"
 
       - name: Commit state updates
         if: success()

@@ -101,10 +101,10 @@ jobs:
           fi
           python scripts/jarvis_teiki_barai_chance.py "${ARGS[@]}"
 
-      - name: Upload screenshots on failure
+      # 公開リポの Artifact は誰でも取れるため、カード画面の写しは Supabase の非公開バケットへ（2026-11-20）
+      - name: Keep screenshots in private storage on failure
         if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: teiki-shots
-          path: .jarvis_state/teiki_barai_chance/
-          if-no-files-found: ignore
+        env:
+          JARVIS_SUPABASE_URL: ${{ secrets.JARVIS_SUPABASE_URL }}
+          JARVIS_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JARVIS_SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 scripts/gha_private_artifact.py --name teiki-shots --keep-days 14 .jarvis_state/teiki_barai_chance/

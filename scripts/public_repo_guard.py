@@ -13,6 +13,8 @@ project-GE は public。取引先とのやり取り・契約・神大家メン�
      - IPv4 アドレス（ローカル・見本用は除く）
      - CSV の見出しに投稿者名・メール・会員番号など
   3. 録音・書き起こし（.srt .vtt .m4a .mp3 .wav）
+  4. ワークフローに足した actions/upload-artifact（公開リポの Artifact は GitHub の誰でも取れる。
+     調査用ファイルは scripts/gha_private_artifact.py で Supabase の非公開バケットへ。2026-11-20）
 
 使い方:
   python3 scripts/public_repo_guard.py --base origin/main            # 手元のブランチの変更
@@ -187,6 +189,9 @@ def check(names: list[str], added: dict[str, list[tuple[int, str]]],
         for i, (no, text) in enumerate(rows):
             for h in scan_line(text, allow):
                 problems.append(f"{n}:{no}: {h}")
+            if (n.startswith(".github/workflows/") and "actions/upload-artifact" in text
+                    and "public-ok" not in text):
+                problems.append(f"{n}:{no}: upload-artifact は公開される（scripts/gha_private_artifact.py を使う）")
             if n.lower().endswith(".csv") and no == 1 and CSV_HEADER_RE.search(text):
                 problems.append(f"{n}:1: CSV に個人の列（名前・メール・会員番号など）")
     return problems

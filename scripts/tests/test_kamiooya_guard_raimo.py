@@ -28,7 +28,11 @@ class GuardRaimoTest(unittest.TestCase):
             enabled=config['git']['deploymentEnabled']
             # Git 連動を丸ごと止めたプロジェクト（false）も、このブランチのプレビューは作られない
             if enabled is not False:
-                self.assertIs(enabled['codex/kamiooya-auth-offline-review'], False)
+                # 枝名そのもの、または codex/** のような枝のパターン（2026-11-20）で止まっていればよい
+                from fnmatch import fnmatchcase
+                branch='codex/kamiooya-auth-offline-review'
+                hits=[v for k,v in enabled.items() if k==branch or fnmatchcase(branch,k)]
+                self.assertTrue(hits and all(v is False for v in hits), path)
 
 if __name__ == '__main__':
     unittest.main()

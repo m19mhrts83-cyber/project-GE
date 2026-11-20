@@ -5,6 +5,14 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import crypto from 'node:crypto';
 
+function loadMetered(env) {
+  const source = readFileSync(new URL('../lib/meteredAi.ts', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const exports = {};
+  vm.runInNewContext(code, { exports, process: { env } });
+  return exports;
+}
+
 // 実ソースを変換し、ネットワーク境界だけを差し替える。
 function load(env, gemini, cloud, records = []) {
   const source = readFileSync(new URL('../lib/askEngine.ts', import.meta.url), 'utf8');
@@ -14,6 +22,7 @@ function load(env, gemini, cloud, records = []) {
     if (name === 'node:crypto') return crypto;
     if (name === '@/lib/geminiReply') return { geminiReply: gemini };
     if (name === '@/lib/cursor/cloudAsk') return { askWithCloudAgent: cloud, CLOUD_ASK_TIMEOUT_MS: 1000 };
+    if (name === '@/lib/meteredAi') return loadMetered(env);
     throw new Error(`Unexpected dependency ${name}`);
   }});
   return exports.resolveAskReply;
@@ -55,7 +64,7 @@ test('usage record excludes content and reports unknown cost honestly', async ()
 
 test('auto: lightweight success avoids Cloud', async () => {
   const calls = [];
-  const resolve = load({ ASK_AUTO_ALLOW_GEMINI: '1', ASK_AUTO_ALLOW_CLOUD: '1', CURSOR_API_KEY: 'test' }, async (_, opts) => {
+  const resolve = load({ ASK_AUTO_ALLOW_GEMINI: '1', ASK_AUTO_ALLOW_CLOUD: '1', METERED_AI_ALLOW: 'cursor_cloud', CURSOR_API_KEY: 'test' }, async (_, opts) => {
     calls.push('gemini'); assert.equal(opts.maxAttempts, 1); return { ok: true, text: 'answer' };
   }, () => { throw new Error('Cloud must not be called'); });
   assert.equal((await resolve({ engine: 'auto', prompt: 'question' })).via, 'gemini');
@@ -64,7 +73,7 @@ test('auto: lightweight success avoids Cloud', async () => {
 
 test('auto: failure escalates once only to authorized Cloud', async () => {
   const calls = [];
-  const resolve = load({ ASK_AUTO_ALLOW_GEMINI: '1', ASK_AUTO_ALLOW_CLOUD: '1', CURSOR_API_KEY: 'test' }, async () => {
+  const resolve = load({ ASK_AUTO_ALLOW_GEMINI: '1', ASK_AUTO_ALLOW_CLOUD: '1', METERED_AI_ALLOW: 'cursor_cloud', CURSOR_API_KEY: 'test' }, async () => {
     calls.push('gemini'); return { ok: false, error: 'unavailable' };
   }, async () => { calls.push('cloud'); return { ok: false, error: 'unavailable' }; });
   assert.equal((await resolve({ engine: 'auto', prompt: 'question' })).needLocal, true);
@@ -73,7 +82,7 @@ test('auto: failure escalates once only to authorized Cloud', async () => {
 
 test('auto: flat-rate Cloud goes before metered Gemini (R4)', async () => {
   const calls = [];
-  const resolve = load({ ASK_AUTO_ALLOW_GEMINI: '1', ASK_AUTO_ALLOW_CLOUD: '1', ASK_COST_CLOUD: 'flat', CURSOR_API_KEY: 'test' },
+  const resolve = load({ ASK_AUTO_ALLOW_GEMINI: '1', ASK_AUTO_ALLOW_CLOUD: '1', METERED_AI_ALLOW: 'cursor_cloud', ASK_COST_CLOUD: 'flat', CURSOR_API_KEY: 'test' },
     () => { throw new Error('Gemini must not be called'); },
     async () => { calls.push('cloud'); return { ok: true, text: 'answer' }; });
   const result = await resolve({ engine: 'auto', prompt: 'question' });
@@ -83,11 +92,30 @@ test('auto: flat-rate Cloud goes before metered Gemini (R4)', async () => {
 });
 
 test('auto: escalation to metered route states the reason (R4)', async () => {
-  const resolve = load({ ASK_AUTO_ALLOW_GEMINI: '1', ASK_AUTO_ALLOW_CLOUD: '1', ASK_COST_GEMINI: 'free', CURSOR_API_KEY: 'test' },
+  const resolve = load({ ASK_AUTO_ALLOW_GEMINI: '1', ASK_AUTO_ALLOW_CLOUD: '1', METERED_AI_ALLOW: 'cursor_cloud', ASK_COST_GEMINI: 'free', CURSOR_API_KEY: 'test' },
     async () => ({ ok: false, error: 'quota' }),
     async () => ({ ok: true, text: 'answer' }));
   const result = await resolve({ engine: 'auto', prompt: 'question' });
   assert.equal(result.via, 'cloud');
   assert.ok(result.fallbackNotices.some(n => n.includes('Geminiで回答できませんでした')));
   assert.ok(result.fallbackNotices.some(n => n.includes('次の経路へ上げます: 従量')));
+});
+
+test('metered gate: Cloud is never called without METERED_AI_ALLOW (2026-11-20)', async () => {
+  const forbidden = () => { throw new Error('metered Cloud must not be called'); };
+  const resolve = load({ ASK_AUTO_ALLOW_GEMINI: '1', ASK_AUTO_ALLOW_CLOUD: '1', CURSOR_API_KEY: 'test' },
+    async () => ({ ok: false, error: 'mac asleep' }), forbidden);
+  const auto = await resolve({ engine: 'auto', prompt: 'q' });
+  assert.equal(auto.needLocal, true);
+  const cursor = await resolve({ engine: 'cursor', prompt: 'q2' });
+  assert.equal(cursor.needLocal, true);
+  assert.ok(cursor.fallbackNotices.some(n => n.includes('止めています')));
+});
+
+test('metered gate: engine cursor answers on the flat Mac AI while blocked', async () => {
+  const forbidden = () => { throw new Error('metered Cloud must not be called'); };
+  const resolve = load({ CURSOR_API_KEY: 'test' }, async () => ({ ok: true, text: 'flat answer' }), forbidden);
+  const r = await resolve({ engine: 'cursor', prompt: 'q' });
+  assert.equal(r.ok, true);
+  assert.equal(r.via, 'gemini');
 });

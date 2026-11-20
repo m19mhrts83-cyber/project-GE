@@ -49,7 +49,7 @@ jobs:
           SLACK_WEBHOOK_AI_TEAM_REPORT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_REPORT }}
           SLACK_WEBHOOK_AI_TEAM_CONSULT: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_CONSULT }}
           # Cloud L2 は手動 phase_b のときだけ鍵を渡す
-          CURSOR_API_KEY: ${{ inputs.phase_b == 'true' && secrets.CURSOR_API_KEY || '' }}
+          CURSOR_API_KEY: ${{ inputs.phase_b == 'true' && contains(vars.METERED_AI_ALLOW, 'cursor_cloud') && secrets.CURSOR_API_KEY || '' }} # 従量課金は METERED_AI_ALLOW（2026-11-20）
           JARVIS_COMMENT_DISPATCH_STALE_MIN: "10"
           FORCE: ${{ inputs.force || 'false' }}
           PHASE_B: ${{ inputs.phase_b || 'false' }}

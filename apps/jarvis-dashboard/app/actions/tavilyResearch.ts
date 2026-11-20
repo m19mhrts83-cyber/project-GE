@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { meteredAllowed } from "@/lib/meteredAi";
 
 export type TavilyResearchResult =
   | {
@@ -18,7 +19,7 @@ export async function researchWithTavily(
   const q = query.trim().slice(0, 400);
   if (q.length < 2) return { ok: false, error: "検索語が短すぎます" };
 
-  const key = (process.env.TAVILY_API_KEY || "").trim();
+  const key = meteredAllowed("tavily") ? (process.env.TAVILY_API_KEY || "").trim() : "";
   if (!key) {
     const cached = await researchFromStore(q);
     if (cached) return cached;
