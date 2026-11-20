@@ -2217,6 +2217,9 @@ const App = {
     const uid=String((App.state.currentUser||{}).id||'');
     const current=()=>App.state.attachmentGeneration===generation&&String((App.state.currentUser||{}).id||'')===uid;
     let rows=[];
+    App.state.commentsPartial=[];
+    App.renderCommentCategoryFilterOptions();
+    try{
     if(App.authGatewayBase){
       let after=0;
       for(let page=0;page<100;page++){
@@ -2227,13 +2230,16 @@ const App = {
         let previous=after;
         for(const row of part){const id=Number(row.id);if(!Number.isSafeInteger(id)||id<=previous)throw new Error('コメント一覧の順序を確認できませんでした');previous=id;}
         rows.push(...part);
+        App.state.commentsPartial=App.state.commentsPartial.concat(part.map(App.enrichCommentCategory));
         App.state.commentsLoadedCount=rows.length;
         App.renderCommentLoadProgress();
+        App.renderCommentsWhileLoading();
         if(part.length<500)break;
         after=previous;
         if(page===99)throw new Error('コメント一覧の上限を超えました');
       }
     }else{const res=await App.apiClient('GET','/comments');rows=(res&&res.comments)||[];}
+    }finally{if(current())App.state.commentsPartial=null;}
     if(!current())return;
     rows.sort((a,b)=>String(b.posted_at||'').localeCompare(String(a.posted_at||''))||Number(b.id)-Number(a.id));
     App.state.comments = rows.map(App.enrichCommentCategory);
@@ -2242,6 +2248,14 @@ const App = {
     App.renderCommentTable();
     App.renderLessonCourseTabFilterOptions();
     App.renderLessonTable();
+  },
+
+  // 読み込み途中の分を分類・検索で絞って見せる（全件そろうと loadComments が確定版で描き直す）
+  renderCommentsWhileLoading: () => {
+    if (App.state.commentSingleView || !App.elements.commentTableBody) return;
+    App.renderCommentCategoryFilterOptions();
+    // 読み込み中に「次の100件」で見ている位置は保つ
+    App.renderCommentTable({ offset: App.state.commentTableOffset || 0 });
   },
 
   ensureForumCategoryLookup: () => {
@@ -4097,9 +4111,14 @@ const App = {
     const select = App.elements.commentCategoryFilter;
     if (!select) return;
     const current = select.value || '';
+    // 分類の候補は読み込み前から分かっている（公開時に入る分類表）ので、読み込み中でも選べるようにする（2026-11-20 松野さん）
+    const lookupCats = Object.keys(App.ensureForumCategoryLookup()).map(function (k) {
+      return String(App.state.forumCategoryLookup[k] || '').trim();
+    });
     const cats = Array.from(
       new Set(
         (App.state.comments || [])
+          .concat(App.state.commentsPartial || [])
           .filter(function (row) {
             return !App.isLessonCommentRow(row);
           })
@@ -4108,6 +4127,7 @@ const App = {
               String(App.commentField(row, 'forum_category') || '').trim() || '未分類'
             );
           })
+          .concat(lookupCats)
           .filter(Boolean)
       )
     ).sort(function (a, b) {
@@ -4115,6 +4135,11 @@ const App = {
       if (b === '未分類') return -1;
       return a.localeCompare(b, 'ja');
     });
+    if (current && cats.indexOf(current) === -1) cats.push(current);
+    // 候補が変わらない時は作り直さない（読み込み中に開いている選択欄が閉じないように）
+    const signature = cats.join('\n');
+    if (select.options.length === cats.length + 1 && select.getAttribute('data-cats') === signature) return;
+    select.setAttribute('data-cats', signature);
     select.innerHTML = '<option value="">全分類</option>';
     cats.forEach(function (cat) {
       const opt = document.createElement('option');
@@ -4441,7 +4466,12 @@ const App = {
     const attachmentsOnly = !!(App.elements.commentAttachmentsOnly && App.elements.commentAttachmentsOnly.checked);
     body.innerHTML = '';
 
-    const communityRows = (App.state.comments || []).filter(function (row) {
+    // 読み込み中は届いた分（新しい順に並べ直す）で表示し、分類・検索の絞り込みもその場で効かせる
+    const partial = commentsLoading && !App.state.commentSingleView && Array.isArray(App.state.commentsPartial) ? App.state.commentsPartial : null;
+    const sourceRows = partial
+      ? partial.slice().sort(function (a, b) { return String(b.posted_at || '').localeCompare(String(a.posted_at || '')) || Number(b.id) - Number(a.id); })
+      : (App.state.comments || []);
+    const communityRows = sourceRows.filter(function (row) {
       return !App.isLessonCommentRow(row);
     });
     const filtered = communityRows.filter(function (row) {
@@ -4482,6 +4512,7 @@ const App = {
     const requestedOffset = Number.isInteger(opts.offset) && opts.offset >= 0 ? opts.offset : 0;
     const offset = Math.min(requestedOffset, Math.max(0, Math.floor((filtered.length - 1) / pageSize) * pageSize));
     const visibleRows = filtered.slice(offset, offset + pageSize);
+    App.state.commentTableOffset = offset;
     const totalCount = communityRows.length;
     const missingDateCount = communityRows.reduce(function (n, row) {
       return n + (App.hasPostedAtValue(row) ? 0 : 1);
