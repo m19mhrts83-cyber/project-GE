@@ -13,6 +13,8 @@ export type TriageRow = {
   from_email?: string | null;
   lane?: string | null;
   kind?: string | null;
+  /** Gmail / Chatwork / LINE など */
+  channel?: string | null;
   summary?: string | null;
   draft_text?: string | null;
   original_body?: string | null;
@@ -33,6 +35,8 @@ export type DeskCard = {
   fromEmail: string;
   lane: string;
   kind: string;
+  /** Chatwork の返信待ちなら送信は Chatwork（宛先メール・送信元は使わない） */
+  isChatwork: boolean;
   summary: string;
   bodyLines: string[];
   /** メール全文（取り込み時に 8000 字まで。続き・添付は Jarvis の詳細） */
@@ -155,6 +159,7 @@ export function toCard(r: TriageRow): DeskCard {
     fromEmail: String(r.from_email || ""),
     lane: String(r.lane || ""),
     kind: String(r.kind || "mail"),
+    isChatwork: /chatwork/i.test(String(r.channel || "")) || /Chatwork/.test(String(pl.channel_raw || "")),
     summary: String(digest.summary || r.summary || "").slice(0, 400),
     bodyLines: bodyHead(r.original_body),
     bodyFull: fullBody(r.original_body),

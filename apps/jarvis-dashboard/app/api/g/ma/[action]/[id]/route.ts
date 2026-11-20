@@ -173,6 +173,7 @@ export async function POST(
         source: "loopware_desk",
         to: String(form.get("to") || "").trim() || undefined,
         account: String(form.get("account") || "").trim() || undefined,
+        chatworkRoomId: String(form.get("room") || "").trim() || undefined,
         timing: { openedAt: num("opened_at"), proofread: num("proofread"), revise: num("revise") },
       });
       return NextResponse.json(result, { status: result.ok ? 200 : 409 });

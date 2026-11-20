@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/admin";
+import { roomsFromChatIds, type ChatworkRoom } from "@/lib/chatworkSend";
 import {
   formatHistoryBlock,
   matchPartyIds,
@@ -137,4 +138,17 @@ export async function commHistoryForReply(q: {
   } catch (e) {
     return { ok: false, promptBlock: "", notice: `台帳読取失敗: ${e instanceof Error ? e.message : String(e)}`.slice(0, 160) };
   }
+}
+
+/** 相手（フォルダ）に登録された Chatwork ルーム。P 付き・無しの両方の名簿行をまとめる */
+export async function loadChatworkRooms(folder: string | null | undefined): Promise<ChatworkRoom[]> {
+  const f = normFolder(folder);
+  const sb = createServiceClient();
+  if (!f || !sb) return [];
+  const { data } = await sb.from("comm_parties").select("chat_ids").in("partner_folder", [f, `P${f}`]);
+  const seen = new Map<string, ChatworkRoom>();
+  for (const row of data || []) {
+    for (const r of roomsFromChatIds((row as { chat_ids?: unknown }).chat_ids)) if (!seen.has(r.id)) seen.set(r.id, r);
+  }
+  return [...seen.values()];
 }

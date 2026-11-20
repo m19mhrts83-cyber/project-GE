@@ -3,6 +3,8 @@
  * 署名は PROPERTY_GATE_ACTION_TOKEN（物件ゲートと同系）
  */
 import { createHmac, timingSafeEqual } from "crypto";
+import { isChatworkRow, postChatworkMessage, roomLabel } from "@/lib/chatworkSend";
+import { loadChatworkRooms } from "@/lib/commHistoryServer";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { sendGmailViaEnv } from "@/lib/gmail/sendFromEnv";
@@ -560,6 +562,8 @@ export async function applyMailActionSlack(
     keepCard?: boolean;
     /** 返信モーダルで測ったこと（判断ログ用） */
     timing?: { openedAt?: number; proofread?: number; revise?: number; findFiles?: number };
+    /** Chatwork の返信待ちで送るルーム（判断デスクで選択。名簿に登録されたルームだけ） */
+    chatworkRoomId?: string;
   },
 ): Promise<MaApplyResult> {
   const row = await fetchMailActionTriage(id);
@@ -813,6 +817,65 @@ export async function applyMailActionSlack(
   const body = (opts?.body ?? row.draft_text ?? "").trim();
   if (!body) {
     return { ok: false, message: "返信本文が空です。編集してから送ってください" };
+  }
+
+  // Chatwork の返信待ち → Chatwork API で送る（2026-11-20。メールの宛先・送信元は使わない）
+  if (isChatworkRow(row)) {
+    const rooms = await loadChatworkRooms(row.folder);
+    const roomId = String(opts?.chatworkRoomId || "").trim();
+    const room = rooms.find((r) => r.id === roomId);
+    if (!room) {
+      return {
+        ok: false,
+        message: rooms.length
+          ? "送り先の Chatwork ルームを選んでください（名簿に登録されたルームだけ送れます）"
+          : "この相手の Chatwork ルームが名簿（連絡先一覧.yaml）に登録されていません",
+      };
+    }
+    const posted = await postChatworkMessage(room.id, body);
+    if (!posted.ok) {
+      payload.last_send_error = posted.error;
+      payload.last_send_error_at = now;
+      await sb.from("triage_items").update({ payload, updated_at: now }).eq("id", id);
+      return { ok: false, message: posted.error };
+    }
+    payload.sent_at = now;
+    payload.chatwork_sent_message_id = posted.messageId;
+    payload.chatwork_sent_room_id = room.id;
+    payload.chatwork_sent_room_name = room.name;
+    payload.sent_to = roomLabel(room);
+    const t = opts?.timing;
+    payload.slack_ma_action = {
+      action: "reply",
+      at: now,
+      source,
+      channel: "chatwork",
+      edit_ratio: editRatio(row.draft_text, body),
+      draft_source: payload.draft_source || undefined,
+      decide_ms: t?.openedAt && Date.now() > t.openedAt ? Date.now() - t.openedAt : undefined,
+    };
+    delete payload.last_send_error;
+    const { error } = await sb
+      .from("triage_items")
+      .update({ status: "sent", draft_text: body, payload, updated_at: now })
+      .eq("id", id);
+    if (error) return { ok: false, message: `送信はできましたが記録に失敗: ${error.message}` };
+    const todoistTaskId = String(payload.todoist_task_id || "");
+    if (todoistTaskId && !payload.todoist_closed_at) {
+      const closed = await closeTodoistTaskById(todoistTaskId, `【Jarvis】判断デスクから Chatwork 送信済み → ${room.name}`);
+      if (closed.ok) {
+        payload.todoist_closed_at = now;
+        await sb.from("triage_items").update({ payload }).eq("id", id);
+      }
+    }
+    const digestSync = await syncDigestFromPayload(payload);
+    revalidateMailActionPaths();
+    return {
+      ok: true,
+      message: `送信しました → 送り先: ${roomLabel(room)}（${row.partner || id}）。やり取り.md と台帳には次の取り込みで入ります`,
+      status: "sent",
+      ...digestSync,
+    };
   }
   const to = (opts?.to || guessMailReplyTo(row)).trim();
   if (!to) {
