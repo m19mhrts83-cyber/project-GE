@@ -10,12 +10,23 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import threading
+import time
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
 BUCKETS = ["community-attachments", "openchat-attachments"]
 PAGE = 1000
+WORKERS = 16
+_local = threading.local()
+
+
+def _session() -> requests.Session:
+    if not hasattr(_local, "s"):
+        _local.s = requests.Session()
+    return _local.s
 
 
 def _h(key: str, **extra: str) -> dict:
@@ -47,7 +58,10 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--source", required=True)
     ap.add_argument("--target", required=True)
+    ap.add_argument("--workers", type=int, default=WORKERS)
+    ap.add_argument("--max-minutes", type=float, default=0, help="この分数を過ぎたら新しいファイルに手を付けない（0 は無制限）")
     a = ap.parse_args(argv)
+    deadline = time.monotonic() + (a.max_minutes * 60 if a.max_minutes else 10**9)
     skey, tkey = os.environ.get("SOURCE_KEY", ""), os.environ.get("TARGET_KEY", "")
     if not skey or not tkey:
         print("SOURCE_KEY / TARGET_KEY が必要です", file=sys.stderr)
@@ -57,26 +71,42 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     failed = 0
     for bucket in BUCKETS:
+        t0 = time.monotonic()
         src = walk(a.source, skey, bucket)
         dst = walk(a.target, tkey, bucket)
+        print(f"{bucket}: 一覧 {time.monotonic() - t0:.0f}秒", flush=True)
         todo = [p for p, size in src.items() if dst.get(p) != size]
-        copied = 0
-        moved = 0
-        for path in todo:
+        copied = moved = 0
+        lock = threading.Lock()
+
+        def one(path: str) -> None:
+            nonlocal copied, moved, failed
+            if time.monotonic() > deadline:
+                with lock:
+                    failed += 1
+                return
             q = urllib.parse.quote(path)
             try:
-                g = requests.get(f"{a.source}/storage/v1/object/{bucket}/{q}", headers=_h(skey), timeout=300)
+                s = _session()
+                g = s.get(f"{a.source}/storage/v1/object/{bucket}/{q}", headers=_h(skey), timeout=300)
                 g.raise_for_status()
                 ctype = g.headers.get("content-type", "application/octet-stream")
-                p = requests.post(f"{a.target}/storage/v1/object/{bucket}/{q}", data=g.content, timeout=300,
-                                  headers=_h(tkey, **{"content-type": ctype, "x-upsert": "true"}))
-                p.raise_for_status()
-                copied += 1
-                moved += len(g.content)
+                r = s.post(f"{a.target}/storage/v1/object/{bucket}/{q}", data=g.content, timeout=300,
+                           headers=_h(tkey, **{"content-type": ctype, "x-upsert": "true"}))
+                r.raise_for_status()
+                with lock:
+                    copied += 1
+                    moved += len(g.content)
+                    if copied % 250 == 0:
+                        print(f"{bucket}: {copied}/{len(todo)} 件・{moved // 1024 // 1024}MB", flush=True)
             except requests.RequestException as e:
-                failed += 1
                 code = getattr(getattr(e, "response", None), "status_code", type(e).__name__)
-                print(f"::warning::{bucket}: 1件写せませんでした（{code}）")
+                with lock:
+                    failed += 1
+                print(f"::warning::{bucket}: 1件写せませんでした（{code}）", flush=True)
+
+        with ThreadPoolExecutor(max_workers=a.workers) as ex:
+            list(ex.map(one, todo))
         extra = len(set(dst) - set(src))
         print(f"{bucket}: 元 {len(src)} 件 / 写し済み {len(src) - len(todo)} 件 / 今回 {copied} 件・{moved // 1024 // 1024}MB"
               + (f" / 写し先だけにある {extra} 件" if extra else ""))

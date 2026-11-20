@@ -27,7 +27,7 @@ concurrency:
 jobs:
   copy:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 300
     env:
       SOURCE_REF: mwubzgefkkjjbingrmqu
       TARGET_REF: ${{ github.event.inputs.target_ref }}
@@ -178,7 +178,7 @@ jobs:
         run: |
           pip -q install requests
           python scripts/kamiooya_storage_copy.py \
-            --source "https://${SOURCE_REF}.supabase.co" --target "https://${TARGET_REF}.supabase.co"
+            --source "https://${SOURCE_REF}.supabase.co" --target "https://${TARGET_REF}.supabase.co" --max-minutes 200
 
       - name: Edge Functions
         if: ${{ contains(github.event.inputs.stages, 'functions') }}
