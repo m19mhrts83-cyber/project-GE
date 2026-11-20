@@ -54,7 +54,9 @@ function permission(method: string, path: string): 'member' | 'staff' | 'master'
   if (method === 'POST' && path === '/comments-page') return 'member';
   if (method === 'GET' && ['/comments', '/knowledge-chunks', '/knowledge-sources', '/suggested-questions'].includes(path)) return 'member';
   if (method === 'GET' && ['/admin/users', '/admin/users/pending'].includes(path)) return 'staff';
-  if (method === 'PUT' && /^\/admin\/users\/[a-zA-Z0-9_-]+\/(approve|reject)$/.test(path)) return 'master';
+  // 新規登録の承認・却下は管理者もできる（2026-11-20 松野さん: 社員アカウントの承認は管理者の目黒さん・今村さんにお願い。
+  // 画面も管理者に承認ボタンを出しており、master 限定だと 403 になっていた）。権限の変更・移譲はマスターのまま
+  if (method === 'PUT' && /^\/admin\/users\/[a-zA-Z0-9_-]+\/(approve|reject)$/.test(path)) return 'staff';
   if (method === 'POST' && path === '/chat-sessions') return 'member';
   if ((method === 'POST' && path === '/suggested-questions') || (method === 'PUT' && /^\/suggested-questions\/[a-zA-Z0-9_-]+\/increment$/.test(path))) return 'member';
   if ((method === 'GET' && ['/admin/members','/admin/role-requests/pending'].includes(path)) ||
@@ -64,7 +66,8 @@ function permission(method: string, path: string): 'member' | 'staff' | 'master'
       (method === 'PUT' && /^\/admin\/(users\/[a-zA-Z0-9_-]+\/withdraw|role-requests\/[a-zA-Z0-9_-]+\/(approve|reject))$/.test(path)) ||
       (method === 'POST' && ['/admin/master-transfer/start','/admin/master-transfer/cancel'].includes(path))) return 'master';
   if (method === 'POST' && ['/admin/master-transfer/validate','/admin/master-transfer/accept'].includes(path)) return 'staff';
-  if (method === 'POST' && ['/notify/approval','/notify/rejection','/notify/master-transfer'].includes(path)) return 'master';
+  if (method === 'POST' && ['/notify/approval','/notify/rejection'].includes(path)) return 'staff';
+  if (method === 'POST' && path === '/notify/master-transfer') return 'master';
   if (method === 'GET' && /^\/users\/[a-zA-Z0-9_-]+\/chat-sessions$/.test(path)) return 'own-list';
   if ((method === 'GET' && /^\/chat-sessions\/[a-zA-Z0-9_-]+$/.test(path)) ||
       (method === 'PUT' && /^\/chat-sessions\/[a-zA-Z0-9_-]+\/touch$/.test(path)) ||

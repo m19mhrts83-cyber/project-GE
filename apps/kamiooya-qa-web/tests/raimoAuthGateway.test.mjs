@@ -65,7 +65,12 @@ test('current membership, role and credential version are checked on every reque
 test('browser user and role claims cannot authorize admin access; lists exclude credential fields', async () => {
   const s = setup(), user = await s.login(), admin = await s.login('a');
   assert.equal((await s.handler(req('/admin/users/u/approve', user, {role:'master_admin', actor_user_id:'m'}, 'PUT'))).status, 403);
-  assert.equal((await s.handler(req('/admin/users/u/approve', admin, {}, 'PUT'))).status, 403);
+  // 新規登録の承認・却下は管理者もできる（2026-11-20）。役割の即時変更はマスターだけ
+  assert.equal((await s.handler(req('/admin/users/u/approve', admin, {}, 'PUT'))).status, 200);
+  assert.equal((await s.handler(req('/admin/users/u/reject', admin, {}, 'PUT'))).status, 200);
+  assert.equal((await s.handler(req('/notify/approval', admin, {email:'u@example.test'}))).status, 200);
+  assert.equal((await s.handler(req('/admin/users/u/set-role', admin, {role:'admin'}))).status, 403);
+  assert.equal((await s.handler(req('/notify/master-transfer', admin, {email:'u@example.test'}))).status, 403);
   const result = await s.handler(req('/admin/users', admin, undefined, 'GET'));
   assert.equal(result.status, 200);
   assert.equal(JSON.stringify(await result.json()).includes('never-return'), false);
