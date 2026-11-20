@@ -409,8 +409,11 @@ const App = {
   },
 
   bindEvents: () => {
-    document.getElementById('showLoginTabBtn').addEventListener('click', App.showLoginTab);
-    document.getElementById('showRegisterTabBtn').addEventListener('click', App.showRegisterTab);
+    // ログインの入口は1つ。新規登録⇔ログインはフォーム下のリンクで切り替える（2026-11-20）
+    const toRegisterBtn = document.getElementById('toRegisterBtn');
+    if (toRegisterBtn) toRegisterBtn.addEventListener('click', App.showRegisterTab);
+    const toLoginBtn = document.getElementById('toLoginBtn');
+    if (toLoginBtn) toLoginBtn.addEventListener('click', App.showLoginTab);
     App.elements.loginForm.addEventListener('submit', App.handleLogin);
     App.elements.registerForm.addEventListener('submit', App.handleRegister);
     const toForgotBtn = document.getElementById('toForgotPasswordBtn');
@@ -1240,17 +1243,20 @@ const App = {
     }
   },
 
+  setAuthSubtitle: (text) => {
+    const el = document.getElementById('authSubtitle');
+    if (el) el.textContent = text;
+  },
+
   showLoginTab: () => {
-    document.getElementById('showLoginTabBtn').className = 'w-1/2 py-2 rounded-md bg-blue-900 text-white';
-    document.getElementById('showRegisterTabBtn').className = 'w-1/2 py-2 rounded-md bg-slate-200 text-slate-700';
+    App.setAuthSubtitle('会員のメールアドレスでログイン');
     App.elements.loginForm.classList.remove('hidden');
     App.elements.registerForm.classList.add('hidden');
   },
 
   showRegisterTab: () => {
     App.clearRegisterSuccessNotice();
-    document.getElementById('showRegisterTabBtn').className = 'w-1/2 py-2 rounded-md bg-blue-900 text-white';
-    document.getElementById('showLoginTabBtn').className = 'w-1/2 py-2 rounded-md bg-slate-200 text-slate-700';
+    App.setAuthSubtitle('新規登録（会員番号で利用を始める）');
     App.elements.registerForm.classList.remove('hidden');
     App.elements.loginForm.classList.add('hidden');
   },
