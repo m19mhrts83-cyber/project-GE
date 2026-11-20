@@ -19,6 +19,29 @@ export function jstDeadlineLabel(iso: string): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return d.getUTCFullYear() + '年' + (d.getUTCMonth() + 1) + '月' + d.getUTCDate() + '日 ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
 }
+// Raimo API YAML（WeStudy_API_secret_admin_upgrade.yaml）の errorMessage → errorCode。
+// Raimo が errorCode を返さなくなっても、画面が「名簿外なら通常登録へ」などの分岐を続けられるようにする。
+const BACKEND_MESSAGE_CODES: Array<[string,string]> = [
+  ['名簿に一致する会員が見つかりません','not_on_roster'],
+  ['名簿に会員番号が見つかりません','member_not_found'],
+  ['このメールアドレスは既に登録されています','email_taken'],
+  ['再登録できる退会・却下アカウントが見つかりません','user_not_found'],
+  ['移譲先ユーザーが見つかりません','user_not_found'],
+  ['対象ユーザーが見つかりません','user_not_found'],
+  ['登録されたメールアドレスを入力してください','user_not_found'],
+  ['リンクが無効です','invalid_token'],
+  ['承認待ちです','not_approved'],
+  ['承認済みユーザーのみ','not_approved'],
+  ['会員権限を確認してください','not_approved'],
+  ['管理者のみ','forbidden'],
+];
+export function backendCodeFromMessage(message: string): string {
+  const m=String(message||'');
+  if(!m)return '';
+  for(const [text,code] of BACKEND_MESSAGE_CODES) if(m.includes(text)) return code;
+  return '';
+}
+
 export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, stored: string) => Promise<boolean>, hash: (raw: string) => Promise<string>, transport: typeof fetch = fetch, jobsRuntime?:{schedule(task:Promise<void>):void;semantic(req:Request):Promise<Response>}) {
   if (!/^https:\/\//.test(c.raimoBase) || !c.raimoBase.startsWith(c.origin+'/miniAppApi/') ||
       !/^https:\/\/[a-z]+\.supabase\.co$/.test(c.projectUrl) || [c.gatewaySecret,c.proxySecret].some(v=>v.length<32) || !c.serviceKey) throw new Error('invalid_configuration');
@@ -40,7 +63,10 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     let result;try{result=await r.json();}catch{throw new Error('backend_unavailable');}
     if(!r.ok) {
       const codes=['email_taken','not_on_roster','already_registered','invalid_token','not_approved','user_not_found','forbidden','member_not_found'];
-      const code=codes.includes(result.errorCode)?result.errorCode:'operation_failed';
+      // 2026-11-20: Raimo の返事から errorCode が消え、{status,message} だけになった（新規登録が全件 operation_failed に）。
+      // errorCode が無いときは、API YAML の errorMessage から元のコードに戻す。
+      const raw=String(result?.errorCode||result?.error_code||'')||backendCodeFromMessage(String(result?.errorMessage||result?.message||''));
+      const code=codes.includes(raw)?raw:'operation_failed';
       throw new UpstreamError(code,r.status>=500?503:400);
     }
     return result;
