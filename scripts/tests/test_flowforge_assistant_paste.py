@@ -36,7 +36,7 @@ class FlowIdForAgentTests(unittest.TestCase):
 
     def test_315_is_a_and_315b_is_b(self):
         assert ff.flow_id_for_agent("315") == "flow_S5g_i7CCiE0P6RKIp2_MkMTA"
-        assert ff.flow_id_for_agent("315-B") == "flow_qJcURKdC36ARzDdSwEfLisvt"
+        assert ff.flow_id_for_agent("315-B") == "flow_ZQIfYZY4GJF2XspXY8i0sGWD"
 
     def test_other_agent_unchanged(self):
         assert ff.flow_id_for_agent("316") == "flow_TA9fHAyKHFlfTFb8fvpDG6Nh"

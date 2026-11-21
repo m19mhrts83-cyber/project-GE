@@ -42,3 +42,14 @@
 - 検証: Python 84、Node 6、TypeScript、Next build成功
 - 次の一手: Todoist `6hqg5j75rjx8RWG6` を確認
 - ロック: `codex-quality-plan-20261025` を final=done で解放済み
+
+## 2026-11-22 315-B参照切替
+
+- task_id: task_0d225d7c3974
+- executor: codex（Chappy）
+- status: done（実装・ローカル検証完了、PRチェック確認後もマージは本人）
+- 依頼: 作り直した315-Bへregistry・共有URL・Dashboard投影を切り替える。315-A・旧フロー・FlowForge内容は変更しない。
+- 完了条件: 対象参照だけの差分、315/315-B resolve・patch宛先検証、Node/Python/tsc/build/public guard成功、PR作成とチェック確認。マージは本人。
+- 検証: Dashboard npm test 134件・Python unittest 23件・tsc --noEmit・Next build成功。ローカルMCPのresolve(view=edit)は315-B→flow_ZQIfYZY4GJF2XspXY8i0sGWD、315→flow_S5g_i7CCiE0P6RKIp2_MkMTA。共有APIの読取のみで確認。
+- 差分: agentTeam.jsonはupdatedと315.extra_flows以外同一。同期で日付だけ変わった31ファイルは復元。patch待ち箱の実関数をメモリ内の保存先で実行し、315-B/315のflow_idを検証（本番書込なし）。
+- マージ後: Vercelデプロイ成功と本番resolveを確認し、Macのmainを追従。今回のデータ変更に見張り再起動は不要（1件ごとにJSON読取）。切替前の待ち箱が残っていれば内容と新フローのノードIDの適合を確認してから扱う。

@@ -234,9 +234,11 @@ ChatGPT 側は、道具が増えたあとプラグイン「FlowForge Jarvis MCP�
   その社員行に `extra_flows` として写す（社員の行は増やさない・置き換えない）。
 - 形式は3桁、または3桁＋`-`＋英大文字。`resolve`／`queue`／`patch` の `agentId` は同じ表で解決し、未登録は今までのエラー。
 - 登録済み: 315-A（`315`）週次連携健全性点検 ＝ `flow_S5g_i7CCiE0P6RKIp2_MkMTA`／
-  315-B 300番台 停止・空回り監視（日次）＝ `flow_qJcURKdC36ARzDdSwEfLisvt`（共有 `oHjDFZowlMMaxtkb`）
+  315-B 300番台 停止・空回り監視（日次）＝ `flow_ZQIfYZY4GJF2XspXY8i0sGWD`（共有 `smnVr23mbD8pb2sT`、2026-11-22 切替）。
+  旧315-B（`flow_qJcURKdC36ARzDdSwEfLisvt`／共有 `oHjDFZowlMMaxtkb`）は記録として残し、削除・編集していない。
 - Mac の待ち箱処理は、待ち箱の `agent_id`（`315-B`）から registry の今の flowId を引く。Mac の `~/git-repos` が古いと
-  `315-B` が見つからず止まる（`main` へ追従してから見張りを再起動）。
+  `315-B` が見つからないか旧315-Bを参照する。マージ・デプロイ後に Mac の `~/git-repos` を `main` へ追従させ、共有リンク経由で resolve を確認する。
+  `flow_id_for_agent` は1件ごとに `agentTeam.json` を読み直すため、今回の参照先だけの変更では見張り再起動は不要。処理中の依頼があれば完了を待ち、旧flowIdを持つ待ち箱の扱いは別途確認する。
 
 ### Mac 側のコマンド
 
