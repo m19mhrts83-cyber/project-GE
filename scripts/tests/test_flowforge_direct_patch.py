@@ -197,3 +197,52 @@ class StaleTabTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class CreationTests(unittest.TestCase):
+    def flow(self):
+        return {"id": "flow_test12345", "name": "Synthetic workflow", "description": "test", "nodes": [
+            {"id":"start", "kind":"start", "title":"Start", "x":0, "y":0},
+            {"id":"end", "kind":"end", "title":"End", "x":200, "y":0}],
+            "edges":[{"id":"e", "source":"start", "target":"end"}]}
+
+    def test_create_and_native_shape(self):
+        f = dp.validate_flow(self.flow())
+        native = dp.native_flow(f)
+        self.assertEqual(native["nodes"][0]["data"]["kind"], "start")
+        self.assertEqual(native["nodes"][0]["position"], {"x":0,"y":0})
+
+    def test_rejects_duplicate_ids_invalid_parent_branch_and_cycle(self):
+        import copy
+        f = self.flow(); f["nodes"].append(dict(f["nodes"][0]))
+        with self.assertRaises(dp.PatchError): dp.validate_flow(f)
+        f = self.flow(); f["nodes"][1]["parentId"] = "missing"
+        with self.assertRaises(dp.PatchError): dp.validate_flow(f)
+        f = self.flow(); f["nodes"].append({"id":"x","kind":"tool","title":"X","x":1,"y":1})
+        f["edges"].append({"id":"e2","source":"start","target":"x"})
+        with self.assertRaises(dp.PatchError): dp.validate_flow(f)
+        f = self.flow(); f["nodes"][0]["x"] = float("nan")
+        with self.assertRaises(dp.PatchError): dp.validate_flow(f)
+
+    def test_add_node_is_exact_and_does_not_connect(self):
+        f = dp.validate_flow(self.flow())
+        n = {"id":"n","kind":"tool","subtype":"api","title":"Card","x":100,"y":0}
+        p = dp.plan_patch(f, [{"op":"add_node", "node":n}])
+        self.assertEqual(p["expected"]["edges"], f["edges"])
+        self.assertEqual(p["expected"]["nodes"][-1], n)
+        with self.assertRaises(dp.PatchError):
+            dp.plan_patch(p["expected"], [{"op":"add_node","node":n}])
+        p = dp.plan_patch(f,[{"op":"add_node","node":n}, {"op":"remove_edge","id":"e"},
+            {"op":"add_edge","source":"start","target":"n"},{"op":"add_edge","source":"n","target":"end"}])
+        self.assertEqual(len(p["expected"]["edges"]),2)
+
+class NodeRemovalTests(unittest.TestCase):
+    def test_removal_requires_explicit_edges_and_children(self):
+        snap=make_snap()
+        with self.assertRaises(dp.PatchError):dp.plan_patch(snap,[{'op':'remove_node','id':'start'}])
+        with self.assertRaises(dp.PatchError):dp.plan_patch(snap,[{'op':'remove_node','id':'missing'}])
+        node={'id':'x','kind':'tool','title':'X','x':0,'y':0}
+        p=dp.plan_patch({'nodes':[node],'edges':[]},[{'op':'remove_node','id':'x'}])
+        self.assertEqual(p['expected']['nodes'],[])
+        with self.assertRaises(dp.PatchError):dp.plan_patch({'nodes':[node],'edges':[{'id':'e','source':'x','target':'y'}]},[{'op':'remove_node','id':'x'}])
+        parent={'id':'p','kind':'subflow','title':'P','x':0,'y':0}
+        with self.assertRaises(dp.PatchError):dp.plan_patch({'nodes':[parent,{**node,'parentId':'p'}],'edges':[]},[{'op':'remove_node','id':'p'}])

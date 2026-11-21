@@ -92,6 +92,95 @@ def edge_label(snap: dict[str, Any], e: dict[str, Any]) -> str:
 
 # ---------- 計画 ----------
 
+def validate_node(raw: Any, existing: dict[str, Any]) -> dict[str, Any]:
+    """Stable IDs and explicit positions; never infer an assignee or connect arrows."""
+    import math
+    import re
+    if not isinstance(raw, dict):
+        raise PatchError("node must be an object")
+    n = dict(raw)
+    allowed = {"id", "parentId", "kind", "subtype", "x", "y", *PATCHABLE_KEYS}
+    if set(n) - allowed:
+        raise PatchError("unknown node fields")
+    if not isinstance(n.get("id"), str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", n["id"]):
+        raise PatchError("invalid node id")
+    if n["id"] in existing:
+        raise PatchError("node id already exists")
+    if n.get("kind") not in {"start", "end", "tool", "claude", "human", "subflow"}:
+        raise PatchError("invalid node kind")
+    if n["kind"] in {"start","end"} and any(v.get("kind")==n["kind"] for v in existing.values()):
+        raise PatchError("start/end already exists")
+    if n.get("subtype") and n["subtype"] not in {"think","web","folder","code","mcp","connector","api","cli","browser","desktop","notify","human"}:
+        raise PatchError("invalid subtype")
+    for k in ("title", "description", "meta", "toolName", "subtype"):
+        if k in n and (not isinstance(n[k], str) or len(n[k]) > MAX_TEXT):
+            raise PatchError("invalid node text")
+    if not n.get("title", "").strip():
+        raise PatchError("empty node title")
+    for k in ("x", "y"):
+        if isinstance(n.get(k), bool) or not isinstance(n.get(k), (int, float)) or not math.isfinite(n[k]) or n[k] != round(n[k]):
+            raise PatchError("node position must be a finite integer")
+    if n.get("parentId") and existing.get(n["parentId"], {}).get("kind") != "subflow":
+        raise PatchError("parent must be an existing subflow")
+    return n
+
+
+def validate_flow(flow: Any) -> dict[str, Any]:
+    """Validate new full-flow JSON before touching the owner's store."""
+    import re
+    if not isinstance(flow, dict) or not re.fullmatch(r"flow_[A-Za-z0-9_-]{8,80}", str(flow.get("id", ""))):
+        raise PatchError("invalid flow id")
+    if not isinstance(flow.get("name"), str) or not flow["name"].strip() or len(flow["name"]) > MAX_TEXT:
+        raise PatchError("invalid flow name")
+    if not isinstance(flow.get("description", ""), str) or len(flow.get("description", "")) > MAX_TEXT:
+        raise PatchError("invalid flow description")
+    if not isinstance(flow.get("nodes"), list) or not 2 <= len(flow["nodes"]) <= 100:
+        raise PatchError("invalid nodes")
+    seen = {}
+    for n in flow["nodes"]:
+        checked = validate_node(n, seen)
+        seen[checked["id"]] = checked
+    if sum(n["kind"] == "start" for n in seen.values()) != 1 or sum(n["kind"] == "end" for n in seen.values()) != 1:
+        raise PatchError("exactly one start and end required")
+    edges = flow.get("edges")
+    if not isinstance(edges, list) or len(edges) > 100:
+        raise PatchError("invalid edges")
+    snap = {"nodes": list(seen.values()), "edges": []}
+    ids = set()
+    for edge in edges:
+        if not isinstance(edge, dict) or not edge.get("id") or edge["id"] in ids:
+            raise PatchError("invalid or duplicate edge id")
+        ids.add(edge["id"])
+        plan = plan_patch(snap, [{"op": "add_edge", "source": edge.get("source"), "target": edge.get("target")}])
+        snap = plan["expected"]
+        snap["edges"][-1]["id"] = edge["id"]
+    # Flat paths and each subflow's interior must have no islands or cycles.
+    for scope in [None] + [n["id"] for n in seen.values() if n["kind"] == "subflow"]:
+        group = {k for k,n in seen.items() if (n.get("parentId") or None) == scope}
+        incoming = {e["target"] for e in edges if e["source"] in group and e["target"] in group}
+        roots = group - incoming
+        if len(roots) != 1:
+            raise PatchError("flow must be a single path per scope")
+        visited = set(); cur = next(iter(roots))
+        while cur not in visited:
+            visited.add(cur)
+            nxt = [e["target"] for e in edges if e["source"] == cur and e["target"] in group]
+            if not nxt: break
+            cur = nxt[0]
+        if visited != group:
+            raise PatchError("flow contains islands or cycles")
+    return {"id": flow["id"], "name": flow["name"], "description": flow.get("description", ""), **snap}
+
+
+def native_flow(flow: dict[str, Any]) -> dict[str, Any]:
+    """Convert the public flat input to FlowForge's stored shape."""
+    return {**flow, "nodes": [
+        {"id": n["id"], **({"parentId": n["parentId"]} if n.get("parentId") else {}),
+         "position": {"x": n["x"], "y": n["y"]},
+         "data": {k:v for k,v in n.items() if k not in {"id", "parentId", "x", "y"}}}
+        for n in flow["nodes"]]}
+
+
 def plan_patch(snap: dict[str, Any], ops: list[dict[str, Any]]) -> dict[str, Any]:
     """操作の列を点検し、実行する手順と「実行後こうなるはず」を返す。問題があれば PatchError。
 
@@ -117,7 +206,21 @@ def plan_patch(snap: dict[str, Any], ops: list[dict[str, Any]]) -> dict[str, Any
     for i, op in enumerate(ops, 1):
         kind = op.get("op") if isinstance(op, dict) else None
         nodes = node_map(work)
-        if kind == "update_node":
+        if kind == "add_node":
+            n = validate_node(op.get("node"), nodes)
+            work["nodes"].append(n)
+            steps.append({"op": "add_node", "node": n})
+        elif kind == "remove_node":
+            nid = str(op.get("id") or "")
+            if nid not in nodes or nodes[nid].get("kind") in {"start","end"}:
+                raise PatchError("cannot remove missing/start/end node")
+            if any(e["source"] == nid or e["target"] == nid for e in work["edges"]):
+                raise PatchError("remove incident edges explicitly before removing a node")
+            if any(n.get("parentId") == nid for n in work["nodes"]):
+                raise PatchError("remove subflow children explicitly first")
+            work["nodes"] = [n for n in work["nodes"] if n["id"] != nid]
+            steps.append({"op":"remove_node","id":nid})
+        elif kind == "update_node":
             nid = str(op.get("id") or "")
             if nid not in nodes:
                 raise PatchError(f"{i}件目: ノードが見つかりません（{nid}）")
@@ -298,7 +401,7 @@ function __ffApi(){
 }
 function __ffSnap(api,fid){
   var f=api.getState().flows[fid]; if(!f) return null;
-  return {id:f.id,name:f.name,updatedAt:f.updatedAt,
+  return {id:f.id,name:f.name,description:f.description||'',updatedAt:f.updatedAt,
     history:(api.getState().history[fid]||[]).length,
     historyTop:(function(h){return h.length?String(h[h.length-1].label||''):'';})(api.getState().history[fid]||[]),
     nodes:f.nodes.map(function(n){var d=n.data||{};return {id:n.id,parentId:n.parentId||null,kind:d.kind||null,subtype:d.subtype||null,
@@ -327,6 +430,14 @@ def js_apply(fid: str, steps: list[dict[str, Any]], label: str) -> str:
         f"api.getState().runWithHistoryEntry(fid,{json.dumps(label, ensure_ascii=False)},function(){{"
         "try{ for(var i=0;i<steps.length;i++){ var st=steps[i], s=api.getState();"
         "if(st.op==='update_node'){ s.updateNodeData(fid,st.id,st.patch); }"
+        "else if(st.op==='add_node'){ var f=JSON.parse(JSON.stringify(s.flows[fid])); var n=st.node;"
+        "if(f.nodes.some(function(v){return v.id===n.id;})) throw new Error('node_exists');"
+        "var data={}; Object.keys(n).forEach(function(k){if(['id','parentId','x','y'].indexOf(k)<0)data[k]=n[k];});"
+        "f.nodes.push({id:n.id,parentId:n.parentId||undefined,position:{x:n.x,y:n.y},data:data});"
+        "f.updatedAt=new Date().toISOString();s.loadFlow(f); }"
+        "else if(st.op==='remove_node'){var f=JSON.parse(JSON.stringify(s.flows[fid]));"
+        "if(f.nodes.some(function(n){return n.parentId===st.id;})||f.edges.some(function(e){return e.source===st.id||e.target===st.id;}))throw new Error('node_has_links');"
+        "f.nodes=f.nodes.filter(function(n){return n.id!==st.id;});f.updatedAt=new Date().toISOString();s.loadFlow(f); }"
         "else if(st.op==='add_edge'){ s.addEdge(fid,{source:st.source,target:st.target}); }"
         "else if(st.op==='remove_edge'){ s.removeEdge(fid,st.id); }"
         "else { throw new Error('unknown op '+st.op); } done++; } }catch(e){ err=String(e); }"
