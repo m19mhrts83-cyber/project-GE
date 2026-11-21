@@ -7,7 +7,7 @@
  *
  * ここは FlowForge へ直接書かない（書き込み口が無い）。置き場は Supabase。
  */
-import { getAgentById } from "@/lib/agentTeam";
+import { getFlowRefById } from "@/lib/agentTeam";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { checkEditRequest, checkPatchRequest, EDIT_QUEUE_MAX_WAITING } from "@/lib/flowforgeEditView";
 
@@ -18,7 +18,7 @@ export type QueueResult = { ok: true; data: Record<string, unknown> } | { ok: fa
 export async function queueFlowforgeEdit(args: Record<string, unknown>): Promise<QueueResult> {
   const checked = checkEditRequest(args);
   if (!checked.ok) return checked;
-  const agent = getAgentById(checked.agentId);
+  const agent = getFlowRefById(checked.agentId);
   if (!agent?.flowforge_id) return { ok: false, error: "flow_not_registered_for_agent" };
   const sb = createServiceClient();
   if (!sb) return { ok: false, error: "queue_storage_not_configured" };
@@ -62,7 +62,7 @@ export async function queueFlowforgeEdit(args: Record<string, unknown>): Promise
 export async function queueFlowforgePatch(args: Record<string, unknown>): Promise<QueueResult> {
   const checked = checkPatchRequest(args);
   if (!checked.ok) return checked;
-  const agent = getAgentById(checked.agentId);
+  const agent = getFlowRefById(checked.agentId);
   if (!agent?.flowforge_id) return { ok: false, error: "flow_not_registered_for_agent" };
   const sb = createServiceClient();
   if (!sb) return { ok: false, error: "queue_storage_not_configured" };
