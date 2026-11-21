@@ -19,7 +19,8 @@ ID: **311**（旧フォルダ `10_` → 3桁化）。
 - **上流**: 211＝apply後自動enqueue／ホーク＝`action: send_gate_311`（bucho poll）／手順 `docs/phase3-upstream.md`
 - 禁止パターン: `config/banned_patterns.yaml`
 - Phase 1〜3 済
-- NG報告は「要約・内訳・見方・次」を必ず含める（運用しながら文言を磨く）
+- NG／要確認の報告は「要約・内訳・見方・次」を必ず含める（運用しながら文言を磨く）
+- **判定は3状態**（2026-11-21）: OK＝全点検が確認済み／**要確認**＝NGではないが確認できていない項目あり（「照合スキップ」「紐づけのみ」「To空欄」「送信経路不明」）。送信者は From 明記なら本人名義か検査、From 無しでも **source が本人名義の確かな経路**（yoritoori_send＝個人Gmailトークンのみ／kurashift＝本人の estate・admin トークン）なら ok、経路不明は要確認。**物件問合せ（source=kurashift_inquiry）の宛先**は物件進行ゲートで本人が Yes を押してから送るため、照合なし・紐づけのみでも ok（理由「物件ゲートで本人承認済み」。禁止宛先・From本人外は ng のまま／2026-11-21 松野さん判断）／NG＝明らかな問題。exit code: OK=0・NG=10・要確認=11。**要確認は送信許可ではない**（0以外は上流が送らない）
 - **重複防止**（2026-11-21）: 経路A（`--post`）は依頼ID（ファイル名の時刻＋source）と内容ハッシュ（draft_path＋下書き本文）を `.jarvis_state/send_gate_311_seen.json` に記録。判定済みは「重複スキップ」でログのみ→processed/ へ。再判定は `--force-recheck`（履歴に残る）
 
 ## AIオートメーション（作業フロー）
@@ -33,8 +34,8 @@ ID: **311**（旧フォルダ `10_` → 3桁化）。
 
 - やること:
   - 渡された **下書き1件** について、初版チェック3点を実施
-  - 結果は **OK／NG** と NG理由1行
-  - NG → Slack `#consult`（送信を止める材料）／通過 → `#report` に件数のみ
+  - 結果は **OK／要確認／NG** と理由1行
+  - NG・要確認 → Slack `#consult`（送信を止める材料。見出しで区別）／OK → `#report` に件数のみ
 - やらないこと:
   - 日次で「何が下書きに入ったか」のデルタ探索
   - 文面の書き換え・誤字校正・トーン修正（**それは Jarvis の送信プレビュー点検**＝`jarvis-outbound-confirm`。311ではない）
@@ -97,7 +98,7 @@ OK→送信／NG→送らず再確認。311自体は送信ボタンを押さな�
 | 種別 | 行き先 |
 |---|---|
 | 通過（件数） | Slack `#report` |
-| NG・要判断 | Slack `#consult` |
+| NG・要確認・要判断 | Slack `#consult` |
 | Webhook | `SLACK_WEBHOOK_AI_TEAM_REPORT`（URLは env のみ） |
 
 ### Slack 書き出し（FRIDAY／Jarvis 共通）
@@ -122,8 +123,8 @@ OK→送信／NG→送らず再確認。311自体は送信ボタンを押さな�
 
 1. A または B で `draft_path` を受け取り、更新日時を確認（1件）
 2. 3点点検（自動・人間待ちなし）
-3. OK／NG＋理由1行を出す（書き換え・送信はしない）
-4. NG → `#consult`／通過 → `#report` 件数
+3. OK／要確認／NG＋理由1行を出す（書き換え・送信はしない）
+4. NG・要確認 → `#consult`／OK → `#report` 件数
 5. ユーザー了承後の送信は別タスク（outbound-confirm）
 
 ## 7. 改善ログ
@@ -139,4 +140,4 @@ OK→送信／NG→送らず再確認。311自体は送信ボタンを押さな�
 | 2026-10-18 | Phase1 CLI＋Slack。Phase2 inbox poll（15分 launchd） |
 | 2026-10-18 | Phase3 上流キック（enqueue・211配線・ホーク action） |
 | 2026-10-18 | 本文宛名↔実To（yoritoori dry-run）。Jarvis「了承後→311→送信」ルール接続 |
-| 2026-11-21 | 重複防止: 依頼の重複排除（state＋`--force-recheck`）・非公開 restore が処理済み依頼を input/ へ戻さない（同名が processed/ にあれば戻さない）。11/19 の1依頼が30分ごとに82回再判定された事故の再発防止 |
+| 2026-11-21 | P0: 3状態判定（OK／要確認／NG）・依頼の重複排除（state＋`--force-recheck`）・非公開 restore が処理済み依頼を input/ へ戻さない（同名が processed/ にあれば戻さない）。11/19 の1依頼が30分ごとに82回再判定された事故の再発防止 |

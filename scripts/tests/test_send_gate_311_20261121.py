@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""311 送信前品質係 P0（2026-11-21）: 重複排除・restore が処理済み依頼を戻さない。
+"""311 送信前品質係 P0（2026-11-21）: 重複排除・3状態判定・restore が処理済み依頼を戻さない。
 
 取引先名・実アドレスは使わない（ダミー名・example ドメインのみ）。
 """
@@ -38,10 +38,108 @@ CFG = {
 PARTNER = {"folder": "P900_ダミー社", "name": "ダミー社", "emails": ["yamada@example.net"]}
 
 
-def run(body: str, partner=PARTNER, **kw):
+def run(body: str, partner=PARTNER, source="manual", **kw):
     return gate.run_checks(
-        draft_path=Path("/tmp/x.txt"), body=body, source="manual", partner=partner, cfg=CFG, **kw
+        draft_path=Path("/tmp/x.txt"), body=body, source=source, partner=partner, cfg=CFG, **kw
     )
+
+
+class ThreeStateTest(unittest.TestCase):
+    def test_all_verified_is_ok(self) -> None:
+        r = run("From: me@example.com\nTo: yamada@example.net\n\n山田様\n本文")
+        self.assertEqual(r.overall, "OK")
+        self.assertEqual(gate.exit_code_of(r.overall), 0)
+
+    def test_no_from_known_route_sender_ok(self) -> None:
+        for src in ("manual", "211", "s9", "hawk", "s2", "kurashift_inquiry"):
+            r = run("To: yamada@example.net\n\n山田様\n本文", source=src)
+            sender = [c for c in r.checks if c.code == "sender"][0]
+            self.assertEqual(sender.status, "ok", src)
+            self.assertIn("経路で本人名義を確認", sender.detail)
+            self.assertEqual(r.overall, "OK", src)
+
+    def test_no_from_unknown_route_is_review_not_ok(self) -> None:
+        r = run("To: yamada@example.net\n\n山田様\n本文", source="unknown_x")
+        self.assertEqual(r.overall, "REVIEW")
+        self.assertNotEqual(gate.exit_code_of(r.overall), 0)
+        self.assertEqual({c.code: c.status for c in r.checks}["sender"], "unverified")
+
+    def test_explicit_foreign_from_is_ng_even_on_known_route(self) -> None:
+        r = run("From: someone@example.org\nTo: yamada@example.net\n\n本文", source="211")
+        self.assertEqual(r.overall, "NG")
+
+    def test_sender_spoof_is_ng(self) -> None:
+        r = run("From: someone@example.org\nTo: yamada@example.net\n\n山田様\n本文")
+        self.assertEqual(r.overall, "NG")
+        self.assertEqual(gate.exit_code_of(r.overall), 10)
+
+    def test_empty_to_is_review(self) -> None:
+        r = run("From: me@example.com\nTo:\n件名: テスト\n\n本文")
+        self.assertEqual(r.overall, "REVIEW")
+        dest = [c for c in r.checks if c.code == "dest"][0]
+        self.assertEqual(dest.status, "unverified")
+        self.assertIn("To空欄", dest.detail)
+
+    def test_partner_unknown_is_review(self) -> None:
+        r = run("From: me@example.com\n\n本文", partner=None)
+        self.assertEqual(r.overall, "REVIEW")
+
+    def test_kurashift_dest_without_check_is_ok(self) -> None:
+        r = run("To: broker@example.net\n\n本文", partner=None, source="kurashift_inquiry")
+        dest = [c for c in r.checks if c.code == "dest"][0]
+        self.assertEqual(dest.status, "ok")
+        self.assertIn("物件ゲートで本人承認済み", dest.detail)
+        self.assertEqual(r.overall, "OK")
+        self.assertEqual(gate.exit_code_of(r.overall), 0)
+
+    def test_kurashift_banned_dest_is_still_ng(self) -> None:
+        r = run("To: noreply@example.net\n\n本文", partner=None, source="kurashift_inquiry")
+        self.assertEqual(r.overall, "NG")
+
+    def test_kurashift_foreign_from_is_still_ng(self) -> None:
+        r = run("From: someone@example.org\nTo: broker@example.net\n\n本文", partner=None,
+                source="kurashift_inquiry")
+        self.assertEqual(r.overall, "NG")
+
+    def test_other_source_dest_skip_stays_review(self) -> None:
+        for src in ("manual", "211", "s9", "hawk", "s2"):
+            r = run("To: broker@example.net\n\n本文", partner=None, source=src)
+            self.assertEqual(r.overall, "REVIEW", src)
+            r2 = run("本文", partner=PARTNER, source=src)  # 紐づけのみ
+            self.assertEqual(r2.overall, "REVIEW", src)
+
+    def test_legacy_kurashift_dest_ok(self) -> None:
+        d = "パートナー未特定のため宛先照合はスキップ（パスに三桁フォルダ推奨）"
+        self.assertEqual(gate.legacy_status(True, d, "dest", "kurashift_inquiry"), "ok")
+        self.assertEqual(gate.legacy_status(True, d, "dest", "manual"), "unverified")
+
+    def test_banned_is_ng_over_review(self) -> None:
+        r = run("To: noreply@example.net\n\n本文")
+        self.assertEqual(r.overall, "NG")
+
+    def test_greeting_word_is_not_a_name(self) -> None:
+        self.assertEqual(gate._greet_names("お疲れ様です。\n皆様\nご担当様\n山田様"), ["山田"])
+
+    def test_parent_folder_is_not_partner(self) -> None:
+        with mock.patch.object(gate, "_load_yaml", return_value={"partners": []}):
+            p = gate._partner_from_path(Path("/x/215_神・大家さん倶楽部/000_共通/4.送信下書き.txt"))
+        self.assertIsNone(p)
+
+    def test_legacy_json_reclassified(self) -> None:
+        d = "From明示なし（送信経路側で本人名義想定）"
+        self.assertEqual(gate.legacy_status(True, d, "sender", "manual"), "ok")
+        self.assertEqual(gate.legacy_status(True, d, "sender", "zzz"), "unverified")
+        self.assertEqual(gate.legacy_status(True, "パートナー紐づけのみ確認（x）。To明示なし"), "unverified")
+        self.assertEqual(gate.legacy_status(True, "禁止宛先なし"), "ok")
+        self.assertEqual(gate.legacy_status(False, "x"), "ng")
+
+    def test_review_slack_goes_to_consult_with_label(self) -> None:
+        r = run("To: yamada@example.net\n\n山田様\n本文", source="unknown_x")
+        ch, text = gate._format_slack(r)
+        self.assertEqual(ch, "consult")
+        self.assertIn("要確認", text.splitlines()[1])
+        for key in ("要約", "内訳", "見方", "次"):
+            self.assertIn(f"- {key}", text)
 
 
 class DedupeTest(unittest.TestCase):
