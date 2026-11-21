@@ -170,7 +170,11 @@ https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl
 | 7 | AI | ChatGPT＋MCP `get_flowforge_edit_status` → `view=edit` で読み直し | 狙いどおりか照合。ずれていれば 2 へ戻る（今回の取り直し） |
 
 - 5 は AI を呼ばない。Mac が起きていて、Chrome が開いている時だけ動く
-- 5 を自動で回す仕組み（launchd）は未設定。今は手で `--queue-once` を実行する
+- 5 を自動で回す見張り（launchd 常駐・5秒ごと）: `launchd/install_flowforge_edit_queue_launchd.sh` で登録する
+  - 置かれてから60分を過ぎた依頼は送らない（了承が古い）。`cancelled` になる
+  - 持ち主のタブが無ければ、置き場のプロフィール（`FLOWFORGE_CHROME_PROFILE`、既定 `Default`）で FlowForge のトップを開いて探し直す
+  - 初回は macOS が「Google Chrome の制御を許可しますか」と聞く。許可が要る
+  - ログ: `~/Library/Logs/jarvis_flowforge_edit_queue/`。止める: `launchctl bootout "gui/$(id -u)/com.matsunoma.jarvis.flowforge-edit-queue"`
 - 7 の読み直しは共有リンク経由。共有リンクは編集の最新を映す（2026-11-21 確認）
 
 ### 置き場の決まり
@@ -222,7 +226,8 @@ FlowForge は、頼んでいない変更をすることがある。311 で「経
 - 済: 311 のコピーを Chrome の既定プロフィールに作成（中身は元と一致）。確認モード・入力だけ・送信
   （編集を伴わない質問）・返事の取り込み・前後比較
 - 済（追記）: 311 の registry 付け替え、待ち箱を通した送信、実際の修正文での書き換え、差分の記録、取り消し（送信前の状態へ復帰を確認）。共有リンクは編集の最新を映す
-- 未: 待ち箱の取り消し（`undo_flowforge_edit`）を本番 MCP から通す試験、待ち箱を自動で拾う仕組み
+- 済（追記2）: 本番 MCP から送信→取り消しを通す試験、見張り（`--queue-watch`）を手元で動かして自動で拾うこと
+- 未: 見張りの launchd 登録（本人了承の後）、312〜317 の移行
 
 ## curl 例（値は出さない）
 

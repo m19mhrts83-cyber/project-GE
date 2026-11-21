@@ -24,6 +24,7 @@ AppleScript 経由で JavaScript を実行して入力欄へ文を入れる。
 待ち箱（ChatGPT が MCP の queue_flowforge_edit で置いた、本人了承済みの修正文）:
   python scripts/jarvis_flowforge_assistant_paste.py --queue-list
   python scripts/jarvis_flowforge_assistant_paste.py --queue-once     # 1件拾って送信し、結果を書き戻す
+  python scripts/jarvis_flowforge_assistant_paste.py --queue-watch    # 見張り続ける（launchd/install_flowforge_edit_queue_launchd.sh）
   （JARVIS_SUPABASE_URL / JARVIS_SUPABASE_SERVICE_ROLE_KEY は環境変数か .env.jarvis_private）
 """
 from __future__ import annotations
@@ -44,6 +45,11 @@ TEAM_JSON = REPO / "apps" / "jarvis-dashboard" / "data" / "agentTeam.json"
 MAX_CHARS = 2000
 QUEUE_TABLE = "flowforge_edit_queue"
 REPLY_WAIT_SEC = 120
+WATCH_POLL_SEC = 5
+QUEUE_EXPIRE_MIN = 60  # 置かれてからこの時間を過ぎた依頼は送らない（了承が古い）
+QUEUE_STUCK_MIN = 10
+# フローの置き場にしている Chrome のプロフィール（既定プロフィール＝Default）
+CHROME_PROFILE = os.environ.get("FLOWFORGE_CHROME_PROFILE", "Default")
 
 
 def flow_id_for_agent(agent_id: str) -> str:
@@ -107,6 +113,14 @@ def open_tab(url: str) -> None:
         "  tell front window to make new tab with properties "
         f"{{URL:{as_str(url)}}}\n"
         "end tell"
+    )
+
+
+def open_in_home_profile(url: str) -> None:
+    """置き場の Chrome プロフィールで URL を開く（Chrome が閉じていても、そのプロフィールで開く）。"""
+    subprocess.run(
+        ["open", "-na", "Google Chrome", "--args", f"--profile-directory={CHROME_PROFILE}", url],
+        check=False,
     )
 
 
@@ -201,24 +215,31 @@ def prepare(fid: str) -> tuple[tuple[int, int], dict[str, Any]]:
     edit_part = f"/flows/{fid}"
     # FlowForge のタブは複数のプロフィールにありうる。対象フローを持つタブ（＝持ち主）を探す。
     # 許可設定がオフのプロフィールのタブは読めないので飛ばす。
-    candidates = find_tabs(BASE)
-    if not candidates:
-        open_tab(BASE + "/")
-        time.sleep(4)
-        candidates = find_tabs(BASE)
+    def look() -> tuple[list[tuple[int, int]], tuple[int, int] | None, dict[str, Any], int]:
+        try:
+            cands = find_tabs(BASE)
+        except Exception:
+            cands = []  # Chrome が起動していない等
+        hit, info, bad = None, {}, 0
+        for cand in cands:
+            try:
+                got = json.loads(run_js(*cand, JS_OWNS % {"fid": json.dumps(fid)}))
+            except Exception:
+                bad += 1
+                continue
+            if got.get("ok") and got.get("has") and got.get("nodes", 0) > 2:
+                return cands, cand, got, bad
+            info = info or got
+        return cands, hit, info, bad
+
+    candidates, owner_tab, owns, unreadable = look()
+    if owner_tab is None:
+        # トップページは開いても空のフローを作らない。置き場のプロフィールで開いて探し直す
+        open_in_home_profile(BASE + "/")
+        time.sleep(6)
+        candidates, owner_tab, owns, unreadable = look()
     if not candidates:
         raise PasteStop(6, "FlowForge のタブを開けませんでした")
-    owner_tab, owns, unreadable = None, {}, 0
-    for cand in candidates:
-        try:
-            got = json.loads(run_js(*cand, JS_OWNS % {"fid": json.dumps(fid)}))
-        except Exception:
-            unreadable += 1
-            continue
-        if got.get("ok") and got.get("has") and got.get("nodes", 0) > 2:
-            owner_tab, owns = cand, got
-            break
-        owns = owns or got
     print("持ち主確認:", {k: owns.get(k) for k in ("ok", "count", "has", "nodes", "updatedAt")},
           f"（見たタブ {len(candidates)}・読めないタブ {unreadable}）")
     if owner_tab is None:
@@ -387,14 +408,50 @@ def queue_list() -> int:
     return 0
 
 
-def queue_once() -> int:
-    sb = queue_client()
+def queue_housekeeping(sb: Any) -> None:
+    """古い依頼は送らない。止まったままの running は error にする。"""
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    old = (now - timedelta(minutes=QUEUE_EXPIRE_MIN)).isoformat()
+    sb.table(QUEUE_TABLE).update(
+        {"status": "cancelled", "finished_at": now_iso(), "error": f"置かれてから{QUEUE_EXPIRE_MIN}分を過ぎたため送りませんでした"}
+    ).eq("status", "queued").lt("created_at", old).execute()
+    stuck = (now - timedelta(minutes=QUEUE_STUCK_MIN)).isoformat()
+    sb.table(QUEUE_TABLE).update(
+        {"status": "error", "finished_at": now_iso(), "error": "処理の途中で止まりました。フローの状態を確かめてください"}
+    ).eq("status", "running").lt("started_at", stuck).execute()
+
+
+def queue_watch() -> int:
+    """待ち箱を見張り続ける（launchd 常駐用）。1件ずつ処理し、失敗しても止まらない。"""
+    print(f"待ち箱の見張りを始めます（{WATCH_POLL_SEC}秒ごと・置き場 {CHROME_PROFILE}）", flush=True)
+    sb = None
+    fails = 0
+    while True:
+        try:
+            if sb is None:
+                sb = queue_client()
+            queue_housekeeping(sb)
+            queue_once(sb, quiet_when_empty=True)
+            fails = 0
+        except Exception as e:
+            fails += 1
+            sb = None
+            print("見張りの失敗:", str(e)[:200], flush=True)
+        time.sleep(WATCH_POLL_SEC if fails == 0 else min(300, 10 * fails))
+
+
+def queue_once(sb: Any = None, quiet_when_empty: bool = False) -> int:
+    sb = sb or queue_client()
+    queue_housekeeping(sb)
     rows = (
         sb.table(QUEUE_TABLE).select("*").eq("status", "queued").order("created_at").limit(1).execute().data
         or []
     )
     if not rows:
-        print("待ち箱は空です")
+        if not quiet_when_empty:
+            print("待ち箱は空です")
         return 0
     row = rows[0]
     got = (
@@ -408,7 +465,7 @@ def queue_once() -> int:
     if not got:
         print("他の実行が先に拾いました")
         return 0
-    print(f"拾いました: {row['id']} agent={row['agent_id']}")
+    print(f"拾いました: {row['id']} agent={row['agent_id']} kind={row.get('kind') or 'edit'}", flush=True)
 
     def finish(status: str, **cols: Any) -> None:
         sb.table(QUEUE_TABLE).update({"status": status, "finished_at": now_iso(), **cols}).eq(
@@ -447,7 +504,7 @@ def queue_once() -> int:
         print("失敗:", e)
         finish("error", error=str(e)[:500])
         return 1
-    print("結果:", {k: v for k, v in result.items() if k != "reply"})
+    print("結果:", {k: v for k, v in result.items() if k != "reply"}, flush=True)
     finish("sent", result=json.dumps(result, ensure_ascii=False)[:4000])
     return 0
 
@@ -459,6 +516,7 @@ def main() -> int:
     g.add_argument("--flow-id", help="flow_… を直接指定")
     g.add_argument("--queue-once", action="store_true", help="待ち箱から1件拾って送信し、結果を書き戻す")
     g.add_argument("--queue-list", action="store_true", help="待ち箱の直近10件を表示")
+    g.add_argument("--queue-watch", action="store_true", help="待ち箱を見張り続ける（launchd 常駐用）")
     ap.add_argument("--text-file", help="修正文のファイル（UTF-8）")
     ap.add_argument("--check", action="store_true", help="持ち主かどうかと画面の状態だけ確かめる")
     ap.add_argument("--send", action="store_true", help="入力後に送信まで行う（既定は入力だけ）")
@@ -469,6 +527,8 @@ def main() -> int:
         return queue_list()
     if args.queue_once:
         return queue_once()
+    if args.queue_watch:
+        return queue_watch()
 
     fid = args.flow_id or flow_id_for_agent(args.agent)
     text = ""
