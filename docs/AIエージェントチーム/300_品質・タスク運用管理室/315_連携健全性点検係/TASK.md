@@ -60,3 +60,10 @@
 - 依頼: 315-Aのみ、既存週次運用と確定FlowForgeを照合し最小差分を実装する。
 - 完了条件: GHA履歴・保存済みSquare probe・CHRLINE healthを突合、成功/部分成功/失敗を区別、dry-runで投稿/mark/復旧なし、テストとpublic guard成功、PR確認。マージ/デプロイなし。
 - 方針: Square liveはtoken削除/更新を伴うため呼ばない。保存済み結果だけ参照する（調整担当了承済み）。
+
+## 2026-11-22 315-B 停止・空回り監視の実装
+
+- 依頼: FlowForge 315-B の 11 ノードどおり、既存の鮮度監視の最小拡張で日次の停止・空回り監視を作る。315-A は触らない。
+- 実装: `scripts/jarvis_stall_watch_315b.py`、`config/freshness_slo.yaml` の `stall_watch_315b`、`launchd/freshness_watch_runner.sh`（相乗り）、Dashboard `StallWatchSection`。
+- 完了条件: 工程対応、基準の読取失敗を正常にしない、311・313 の反復をテストで検知、異常継続中の重複なし、回復 1 回、通知失敗後の再送、成功／部分成功／失敗の区別、315-A 退行なし。
+- 詳細・未確認: [`315-B_停止空回り監視_20261122.md`](./315-B_停止空回り監視_20261122.md)。マージ・Mac 追従は本人。

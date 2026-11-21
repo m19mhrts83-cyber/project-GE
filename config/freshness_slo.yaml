@@ -146,3 +146,74 @@ products:
     max_age_h: 200
     owner: 314 業務品質監査
     action: "launchctl kickstart gui/$(id -u)/com.matsunoma.jarvis.weekly-review-314"
+
+# 315-B 300番台 停止・空回り監視（日次・AI なし）— scripts/jarvis_stall_watch_315b.py
+# 設計の正本: FlowForge 315-B（flow_ZQIfYZY4GJF2XspXY8i0sGWD）。上の products とは別の通知状態
+# （.jarvis_state/stall_watch_315b.json）で、異常の発生・回復のときだけ #ops。対象は 311・312・313・314・317 だけ。
+# stop: 最終成功の取り方（kind は上と同じ＋ log_last_match）。ref は上の products の設定をそのまま使う
+# idle: 空回りの判定（gate_draft_repeat=311／candidate_repeat=313／skip=判定なし）
+stall_watch_315b:
+  targets:
+    - id: "311"
+      label: 311 送信前品質
+      owner: 311 送信前品質係
+      action: "launchctl list | grep send-gate-311 → ~/Library/Logs/jarvis_send_gate_311/poll.err.log の末尾"
+      # 依頼が無い時間は停止にしない。15 分ごとの定時実行（runner の見出し行）の生存で見る
+      stop:
+        kind: log_last_match
+        glob: ~/Library/Logs/jarvis_send_gate_311/poll.log
+        pattern: '(?m)^======== (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ========$'
+        max_age_h: 1
+      # 同じ下書き（gate_*.json の draft_path）を 60 分で 4 回以上判定したら空回り。14h は監視の間隔（10h/14h）を覆う
+      idle:
+        kind: gate_draft_repeat
+        dir: docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/output
+        threshold: 4
+        window_min: 60
+        lookback_h: 14
+    - id: "312"
+      label: 312 Todoist起票整理
+      owner: 312 Todoist起票整理係
+      action: "gh run list -w todoist-312-collect.yml → 失敗なら --log-failed"
+      # 本線は Nody の GHA（collect 月水金＋reflect）。旧 todoist_312_digest.json は 10/21 で役目を終えたので見ない
+      stop:
+        kind: gha
+        workflow: todoist-312-collect.yml
+        max_age_h: 192
+    - id: "313"
+      label: 313 完了候補確認
+      owner: 313 完了候補確認係
+      action: "launchctl list | grep 313 → ~/Library/Logs/jarvis_todoist_313_digest/todoist_313_digest.err.log の末尾"
+      # 20:00 の runner は 片付け（Slack 送信）が通ったときだけ「外で済んだ候補」を書く。超過 0 件の日もここは書かれる
+      # 旧 todoist_313_digest.json は段階1（片付け 1 通）への切替で更新されなくなったので見ない
+      stop:
+        kind: json_time
+        file: .jarvis_state/todoist_313_done_elsewhere.json
+        path: at
+        max_age_h: 26
+      # 候補（外で済んだ候補＋同じ回の片付け）の集合が 3 回連続で同じ、かつ超過合計が減っていなければ空回り
+      idle:
+        kind: candidate_repeat
+        file: .jarvis_state/todoist_313_done_elsewhere.json
+        extra_file: .jarvis_state/todoist_313_cleanup.json
+        same_run_within_min: 120
+        runs: 3
+    - id: "314"
+      label: 314 業務品質監査
+      owner: 314 業務品質監査
+      action: "launchctl kickstart gui/$(id -u)/com.matsunoma.jarvis.weekly-review-314"
+      stop:
+        ref: weekly_review_facts
+    - id: "317"
+      label: 317 コメント起動
+      owner: 317 コメント起動係
+      action: "launchctl list | grep comment-dispatch → ~/Library/Logs/jarvis_comment_dispatch/launchd.err.log の末尾"
+      # 300 秒ごと。0〜6 時は止まる（最終実行は前夜）が、監視は 08:20・18:20 なので 2h で足りる
+      stop:
+        kind: json_time
+        file: .jarvis_state/comment_dispatch.json
+        path: last_run_at
+        max_age_h: 2
+      idle:
+        kind: skip
+        note: 空回り判定は後で（枠だけ）
