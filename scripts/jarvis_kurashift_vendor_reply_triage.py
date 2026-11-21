@@ -133,6 +133,21 @@ def is_unsafe_vendor_reply_sender(from_email: str, from_raw: str = "") -> bool:
     return bool(NOISE_FROM_RE.search(from_email or "") or NOISE_FROM_RE.search(from_raw or ""))
 
 
+# 業者の一斉配信（メルマガ・読み物）。個別の返信ではないので返信候補にしない。
+# 2026-11-21 松野さん: 中央不動産の「不動産購入に関する消費税」は「メルマガ。リアクション不要」。
+# 物件紹介の一斉配信は KURASHIFT 側（property_mail_match）が別に拾うので、ここで落としてよい。
+NEWSLETTER_RE = re.compile(
+    r"(メルマガ|メールマガジン|配信停止|配信解除|配信を停止|バックナンバー|unsubscribe|"
+    r"毎号|今回の記事は|本メールでは.{0,60}お届け)",
+    re.I | re.S,
+)
+
+
+def is_vendor_newsletter(subject: str, body: str) -> bool:
+    """業者からの一斉配信（メルマガ）か。本文は HTML 混じりでもよい。"""
+    return bool(NEWSLETTER_RE.search(f"{subject or ''}\n{body or ''}"))
+
+
 def parse_internal_dt(ms: str) -> datetime | None:
     try:
         return datetime.fromtimestamp(int(ms) / 1000, tz=JST)
@@ -202,6 +217,9 @@ def find_vendor_replies(
             from_email, from_display=display, subject=subject, index=vindex
         )
         if not vendor:
+            continue
+        if is_vendor_newsletter(subject, body):
+            print(f"# skip newsletter: {vendor.get('name')} / {subject[:40]}", file=sys.stderr)
             continue
 
         dt = parse_internal_dt(str(last.get("internalDate") or "0"))

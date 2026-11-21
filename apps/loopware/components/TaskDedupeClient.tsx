@@ -26,9 +26,7 @@ export default function TaskDedupeClient({
 }) {
   const sp = useSearchParams();
   const topicFromUrl = sp.get("topic") || initialTopicId;
-  const [topicId, setTopicId] = useState(
-    topicFromUrl || SEED_TOPICS_312[0].id,
-  );
+  const [topicId, setTopicId] = useState(topicFromUrl || "");
   const [customText, setCustomText] = useState("");
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editBody, setEditBody] = useState("");
@@ -44,9 +42,11 @@ export default function TaskDedupeClient({
     status: SaveStatus;
   } | null>(null);
   const voice = useVoiceLog("312");
-  // 本物のお題（312 collect が Slack から拾ったもの）。見本の前に並べる
+  // 本物のお題（312 collect が Slack から拾ったもの）だけを並べる。
+  // 見本（例題）は出さない（2026-11-21 松野さん）。空なら「判断するタスクなし」を祝う
   const [live, setLive] = useState<SeedTopic[]>([]);
-  const allTopics = useMemo(() => [...live, ...SEED_TOPICS_312], [live]);
+  const [loaded, setLoaded] = useState(false);
+  const allTopics = live;
   const [sel, setSel] = useState<number | null>(1);
   const [rate, setRate] = useState<Record<number, "good" | "bad" | null>>({});
 
@@ -60,7 +60,8 @@ export default function TaskDedupeClient({
         // URL でお題を指定していなければ、本物の1件目から始める
         if (list.length && !topicFromUrl) setTopicId(list[0].id);
       })
-      .catch(() => setLive([]));
+      .catch(() => setLive([]))
+      .finally(() => setLoaded(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -91,7 +92,7 @@ export default function TaskDedupeClient({
         ],
       };
     }
-    return allTopics[0];
+    return allTopics[0] ?? null;
   }, [topicId, customText, allTopics]);
 
   function toggleTag(t: string) {
@@ -183,7 +184,47 @@ export default function TaskDedupeClient({
     }
   }
 
-  if (!topic) return null;
+  const tabsEl = (
+    <div className="tabs">
+      {allTopics.map((t) => {
+        const done = results.some((r) => r.topicId === t.id);
+        return (
+          <button
+            key={t.id}
+            type="button"
+            className={`tab ${topic?.id === t.id ? "active" : ""}`}
+            onClick={() => setTopicId(t.id)}
+          >
+            {done ? <Icon name="check" size={14} stroke={3} /> : null}
+            {shortTitle(t.title)}
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        className={`tab ${topicId === "custom" ? "active" : ""}`}
+        onClick={() => setTopicId("custom")}
+      >
+        手入力
+      </button>
+    </div>
+  );
+
+  // 決めていないお題が1つも無い（お題ゼロ、または全部決めた）
+  const allClear =
+    loaded &&
+    topicId !== "custom" &&
+    !saved &&
+    allTopics.every((t) => results.some((r) => r.topicId === t.id));
+
+  if (!topic) {
+    return (
+      <div>
+        {tabsEl}
+        {loaded ? <AllClear /> : <p className="meta">読み込み中…</p>}
+      </div>
+    );
+  }
 
   const doneRec = results.find((r) => r.topicId === topic.id);
   const doneIdx = topicIndexOf(allTopics, topic.id);
@@ -226,29 +267,8 @@ export default function TaskDedupeClient({
           }}
         />
       ) : null}
-      <div className="tabs">
-        {allTopics.map((t) => {
-          const done = results.some((r) => r.topicId === t.id);
-          return (
-            <button
-              key={t.id}
-              type="button"
-              className={`tab ${topicId === t.id ? "active" : ""}`}
-              onClick={() => setTopicId(t.id)}
-            >
-              {done ? <Icon name="check" size={14} stroke={3} /> : null}
-              {shortTitle(t.title)}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          className={`tab ${topicId === "custom" ? "active" : ""}`}
-          onClick={() => setTopicId("custom")}
-        >
-          手入力
-        </button>
-      </div>
+      {allClear ? <AllClear /> : null}
+      {tabsEl}
 
       <div className="glass card topic">
         <div className="eyebrow" style={{ margin: 0 }}>
@@ -553,6 +573,26 @@ export default function TaskDedupeClient({
         </div>
       </div>
       )}
+    </div>
+  );
+}
+
+/** 判断するお題が残っていないときの表示（輪とチェックが描かれ、粒がはじける） */
+function AllClear() {
+  return (
+    <div className="glass card allclear" role="status">
+      <div className="ac-art" aria-hidden="true">
+        <svg className="ac-ring" width="84" height="84" viewBox="0 0 84 84">
+          <circle className="ac-ring-bg" cx="42" cy="42" r="36" />
+          <circle className="ac-ring-fg" cx="42" cy="42" r="36" />
+          <path className="ac-check" d="M27 43 L38 54 L58 31" />
+        </svg>
+        {Array.from({ length: 10 }, (_, i) => (
+          <i key={i} className={`ac-spark c${i % 4}`} style={{ ["--a" as string]: `${i * 36}deg` }} />
+        ))}
+      </div>
+      <strong className="ac-title">判断するタスクなし</strong>
+      <span className="ac-sub">ぜんぶ片づいています。すばらしい！</span>
     </div>
   );
 }

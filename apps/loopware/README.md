@@ -32,7 +32,7 @@ npm run dev   # http://127.0.0.1:3004
 - `scripts/jarvis_todoist_312_collect.py`（`.github/workflows/todoist-312-collect.yml`）
   - collect（月・水・金 20:30 JST）: Slack の松野さんの発言から『起こり』を拾い、`task_loop_topics`（source_kind=slack, status=open）と3案を入れて #consult に「Nody で開く」
   - reflect（30分ごと）: 「既存タスクへ追記」「別タスクを作る」を選んだものだけ Todoist へ反映し `reflected_todoist_id` に記録
-- 画面: `/312` は `/api/topics`（鍵が要る）の本物のお題を見本の前に並べる。決めると status=decided
+- 画面: `/312` は `/api/topics`（鍵が要る）の本物のお題だけを並べる（見本＝例題は出さない・2026-11-21）。お題が空、または全部決めたら「判断するタスクなし」の祝い表示（輪とチェックが描かれ粒がはじける）。決めると status=decided
 - 試す: `python3 scripts/jarvis_todoist_312_collect.py --dry-run --hours 240`
 
 ## 今週の9件（`/week`・日曜の夜）
