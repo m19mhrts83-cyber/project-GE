@@ -119,6 +119,7 @@ def _run_inquiry_311_gate(
                 reason = line[len("reason=") :].strip()
             if line.startswith("overall="):
                 overall = line[len("overall=") :].strip() or overall
+        # OK（exit 0 かつ overall=OK）だけ通す。要確認（REVIEW・exit 11）は NG と同じく送らない。
         if proc.returncode == 0 and overall.upper() == "OK":
             return {"ok": True, "overall": "OK"}
         # Slack 通知（NG 時のみ・失敗しても送信は止める）
@@ -133,7 +134,7 @@ def _run_inquiry_311_gate(
                     "311 送信前品質",
                     "--text",
                     (
-                        "【相談】311 送信前品質｜物件問合せ NG\n"
+                        f"【相談】311 送信前品質｜物件問合せ {'要確認' if overall.upper() == 'REVIEW' else 'NG'}\n"
                         f"- To: {to_email}\n"
                         f"- 件名: {subject[:80]}\n"
                         f"- 理由: {reason or overall}\n"

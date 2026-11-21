@@ -51,6 +51,7 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_send_gate_311.py
 
    - **overall=OK** → その場で `yoritoori_send.py … --skip-confirm` まで進めてよい（了承は既に得ている）
    - **overall=NG** → **送らない**。NG理由を出し、修正案（例: Toを清水に新規／本文を和久様に合わせる）を示して **再確認**を取る。再了承後に再度ゲート→送信
+   - **overall=REVIEW（要確認・exit 11）** → **送らない**（OK 扱いにしない）。確認できていない項目（To空欄・From明示なし・パートナー紐づけのみ等）を出し、人が確かめて To／From を明記→再ゲート
    - 例外: ユーザーが同一ターンで「311スキップで送って」と明示したときだけゲート省略可
    - 311は宛先／名義／運営宛／**本文宛名↔実To**。文面の見栄え点検（手順3）とは別
 6. 了承後かつゲートOKのときだけ `yoritoori_send.py` 等を実行。非対話なら `--skip-confirm` は **了承後だけ**可。了承前の `--skip-confirm` は禁止。
