@@ -226,6 +226,18 @@ https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl
 待ち箱の表は `apps/jarvis-dashboard/supabase/migrations/20261121_flowforge_edit_queue.sql`（適用が要る）。
 ChatGPT 側は、道具が増えたあとプラグイン「FlowForge Jarvis MCP」をつなぎ直す。
 
+### 1社員に複数フローがある時の agentId（2026-11-21・315-B）
+
+- 本体は社員番号のまま（`315` ＝ 315-A）。2本目以降は **社員番号＋`-`＋英大文字**（例: `315-B`）で、`agents_registry.yaml` の
+  その社員の `extra_flows`（id・label・flowforge_id・flowforge_url）に登録し、共有リンクは
+  `config/flowforge_share_urls.json` の `by_agent_id` に同じキー（`"315-B"`）で足す。`status_sync` が `agentTeam.json` の
+  その社員行に `extra_flows` として写す（社員の行は増やさない・置き換えない）。
+- 形式は3桁、または3桁＋`-`＋英大文字。`resolve`／`queue`／`patch` の `agentId` は同じ表で解決し、未登録は今までのエラー。
+- 登録済み: 315-A（`315`）週次連携健全性点検 ＝ `flow_S5g_i7CCiE0P6RKIp2_MkMTA`／
+  315-B 300番台 停止・空回り監視（日次）＝ `flow_qJcURKdC36ARzDdSwEfLisvt`（共有 `oHjDFZowlMMaxtkb`）
+- Mac の待ち箱処理は、待ち箱の `agent_id`（`315-B`）から registry の今の flowId を引く。Mac の `~/git-repos` が古いと
+  `315-B` が見つからず止まる（`main` へ追従してから見張りを再起動）。
+
 ### Mac 側のコマンド
 
 ```bash

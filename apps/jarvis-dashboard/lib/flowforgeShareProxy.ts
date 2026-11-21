@@ -2,7 +2,7 @@
  * FlowForge (AI Automation) read-only share proxy helpers.
  * Upstream rejects non-FlowForge Origins; we fetch server-side with Origin set.
  */
-import { getAgentById, getAgentTeam } from "@/lib/agentTeam";
+import { getFlowRefByFlowId, getFlowRefById } from "@/lib/agentTeam";
 
 export const FLOWFORGE_BASE =
   process.env.FLOWFORGE_BASE_URL?.trim() ||
@@ -72,13 +72,13 @@ export function resolveShareId(opts: {
 }
 
 function resolveShareIdFromFlowId(flowId: string): string | null {
-  const hit = getAgentTeam().agents.find((a) => a.flowforge_id === flowId);
+  const hit = getFlowRefByFlowId(flowId);
   if (hit?.flowforge_share_url) return extractShareId(hit.flowforge_share_url);
   return null;
 }
 
 function resolveShareIdFromAgentId(agentId: string): string | null {
-  const hit = getAgentById(agentId);
+  const hit = getFlowRefById(agentId);
   if (hit?.flowforge_share_url) return extractShareId(hit.flowforge_share_url);
   return null;
 }

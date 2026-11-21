@@ -215,6 +215,11 @@ agents:
     tool_fit: B
     tool_notes: GHA21:00検知→Mac21:45で1回トライ→結果報告。Gmail再同意は人
     schedule: Sun 21:00 GHA / 21:45 Mac
+    extra_flows:
+    - id: 315-B
+      label: 300番台 停止・空回り監視（日次）
+      flowforge_id: flow_qJcURKdC36ARzDdSwEfLisvt
+      flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_qJcURKdC36ARzDdSwEfLisvt
   '316':
     name: データアナリスト
     path: 300_品質・タスク運用管理室/316_データアナリスト

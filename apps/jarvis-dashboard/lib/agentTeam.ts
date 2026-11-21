@@ -1,4 +1,5 @@
 import data from "@/data/agentTeam.json";
+import { findFlowRef, findFlowRefByFlowId, type FlowRef } from "@/lib/flowforgeAgentRef";
 
 export type AgentStatus = "候補" | "設計中" | "運用確認" | "運用" | "停止" | string;
 
@@ -136,6 +137,14 @@ export type AgentTeamAgent = {
   flowforge_url: string;
   flowforge_share_url?: string;
   flowforge_edit_url?: string;
+  /** 1社員に複数フローがある時の枝（例: 315-B）。agentId で個別に指定できる */
+  extra_flows?: Array<{
+    id: string;
+    label?: string;
+    flowforge_id: string;
+    flowforge_url?: string;
+    flowforge_share_url?: string;
+  }>;
   permissions?: AgentPermissions;
   ops?: AgentOps;
 };
@@ -302,6 +311,15 @@ export function getAgentTeam(): AgentTeamPayload {
 
 export function getAgentById(id: string): AgentTeamAgent | undefined {
   return getAgentTeam().agents.find((a) => a.id === id);
+}
+
+/** agentId（315 / 315-B）→ フロー参照 */
+export function getFlowRefById(id: string): FlowRef | undefined {
+  return findFlowRef(getAgentTeam().agents, id);
+}
+
+export function getFlowRefByFlowId(flowId: string): FlowRef | undefined {
+  return findFlowRefByFlowId(getAgentTeam().agents, flowId);
 }
 
 export function getGrok(): GrokPayload {

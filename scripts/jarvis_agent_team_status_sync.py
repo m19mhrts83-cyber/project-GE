@@ -1031,6 +1031,26 @@ def _merge_flowforge_share_raw(raw: dict, out: dict[str, str]) -> None:
             out[f"flow:{k}"] = v
 
 
+def _extra_flows_field(a: dict, share_map: dict[str, str]) -> dict:
+    """1社員に複数フローがある時の枝（例: 315-B）。registry の extra_flows → agentId で個別に指定できる。"""
+    out = []
+    for x in a.get("extra_flows") or []:
+        xid = str(x.get("id") or "")
+        fid = x.get("flowforge_id") or ""
+        if not xid or not fid:
+            continue
+        out.append(
+            {
+                "id": xid,
+                "label": x.get("label") or "",
+                "flowforge_id": fid,
+                "flowforge_url": x.get("flowforge_url") or "",
+                "flowforge_share_url": share_map.get(xid) or share_map.get(f"flow:{fid}") or "",
+            }
+        )
+    return {"extra_flows": out} if out else {}
+
+
 def load_flowforge_share_map() -> dict[str, str]:
     """agent_id / flow_id → share URL（閲覧専用・外部ブラウザ向け）.
 
@@ -1349,6 +1369,7 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
                 "flowforge_url": ff_url,
                 "flowforge_share_url": share,
                 "flowforge_edit_url": flowforge_edit_via_account_chooser(ff_url),
+                **_extra_flows_field(a, share_map),
                 "permissions": permissions,
                 "ops": ops,
             }

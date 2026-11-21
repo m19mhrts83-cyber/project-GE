@@ -6,6 +6,9 @@
  * 所属サブフロー・矢印）。座標や見た目は返さない。
  */
 
+/** 社員番号。3桁、または複数フローの枝（例: 315-B）。 */
+export const AGENT_ID_RE = /^\d{3}(-[A-Z])?$/;
+
 export type EditViewNode = {
   id: string;
   kind: string;
@@ -129,8 +132,8 @@ export type EditRequestCheck =
  */
 export function checkEditRequest(args: Record<string, unknown>): EditRequestCheck {
   const agentId = str(args.agentId).trim();
-  if (!/^\d{3}$/.test(agentId)) {
-    return { ok: false, error: "agentId_required_3_digits" };
+  if (!AGENT_ID_RE.test(agentId)) {
+    return { ok: false, error: "agentId_required_3_digits_or_with_letter" };
   }
   if (args.confirmedByUser !== true) {
     return { ok: false, error: "user_confirmation_required" };
@@ -168,7 +171,7 @@ export type PatchRequestCheck =
  */
 export function checkPatchRequest(args: Record<string, unknown>): PatchRequestCheck {
   const agentId = str(args.agentId).trim();
-  if (!/^\d{3}$/.test(agentId)) return { ok: false, error: "agentId_required_3_digits" };
+  if (!AGENT_ID_RE.test(agentId)) return { ok: false, error: "agentId_required_3_digits_or_with_letter" };
   if (args.confirmedByUser !== true) return { ok: false, error: "user_confirmation_required" };
   const raw = args.operations;
   if (!Array.isArray(raw) || raw.length === 0) return { ok: false, error: "operations_required" };

@@ -31,5 +31,22 @@ class DiffTests(unittest.TestCase):
         assert d["changed"] is False and d["edges_added"] == [] and d["edges_removed"] == []
 
 
+class FlowIdForAgentTests(unittest.TestCase):
+    """Mac 側の待ち箱・直接編集が開くフロー（315=315-A、315-B=別フロー）。"""
+
+    def test_315_is_a_and_315b_is_b(self):
+        assert ff.flow_id_for_agent("315") == "flow_S5g_i7CCiE0P6RKIp2_MkMTA"
+        assert ff.flow_id_for_agent("315-B") == "flow_qJcURKdC36ARzDdSwEfLisvt"
+
+    def test_other_agent_unchanged(self):
+        assert ff.flow_id_for_agent("316") == "flow_TA9fHAyKHFlfTFb8fvpDG6Nh"
+
+    def test_unregistered_still_errors(self):
+        with self.assertRaises(SystemExit):
+            ff.flow_id_for_agent("315-C")
+        with self.assertRaises(SystemExit):
+            ff.flow_id_for_agent("999")
+
+
 if __name__ == "__main__":
     unittest.main()

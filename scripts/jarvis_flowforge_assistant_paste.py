@@ -61,6 +61,10 @@ def flow_id_for_agent(agent_id: str) -> str:
     for a in data.get("agents", []):
         if a.get("id") == agent_id and a.get("flowforge_id"):
             return str(a["flowforge_id"])
+        # 1社員に複数フローがある時の枝（例: 315-B）。315 は本体（315-A）のまま
+        for x in a.get("extra_flows") or []:
+            if x.get("id") == agent_id and x.get("flowforge_id"):
+                return str(x["flowforge_id"])
     raise SystemExit(f"flowforge_id が見つかりません: agent {agent_id}")
 
 

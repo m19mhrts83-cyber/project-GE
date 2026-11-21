@@ -85,7 +85,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        agentId: { type: "string", description: "Agent team id such as 311" },
+        agentId: { type: "string", description: "Agent team id such as 311, or a branch flow such as 315-B (315 means 315-A, the base flow)" },
         instructions: {
           type: "string",
           description: "Japanese instruction text to send to FlowForge's AI assistant",
@@ -112,7 +112,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        agentId: { type: "string", description: "Agent team id such as 311" },
+        agentId: { type: "string", description: "Agent team id such as 311, or a branch flow such as 315-B (315 means 315-A, the base flow)" },
         operations: {
           type: "array",
           description: "1 to 12 operations, applied in order as one undo step",
