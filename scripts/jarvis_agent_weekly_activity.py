@@ -160,7 +160,13 @@ def count_stamped_files(paths: Iterable[Path], pattern: str, since: datetime, un
     for p in paths:
         m = pat.search(p.name)
         ts = parse_stamp(m.group(1)) if m else None
-        if not ts or not (since <= ts < until):
+        # 日付だけの名前（facts_20261114.md）は 0:00 と読まれる。週次の集計は同じ曜日の 9:00 に走るので、
+        # 先週の同じ時刻に作ったファイルが「7日前の 9:00 より前」になって毎週落ちていた
+        # （2026-11-21: 314 が毎週「動いた跡なし」）。日付だけのときは、その日のうちなら窓の内とみなす
+        lo = since
+        if m and re.fullmatch(r"\d{8}", m.group(1)):
+            lo = since.replace(hour=0, minute=0, second=0, microsecond=0)
+        if not ts or not (lo <= ts < until):
             continue
         out["runs"] += 1
         out["last_at"] = later(out["last_at"], ts.isoformat())

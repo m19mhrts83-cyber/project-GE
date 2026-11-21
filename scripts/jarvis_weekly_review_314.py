@@ -45,6 +45,18 @@ ERROR_RE = re.compile(
 ZERO_COUNT_RE = re.compile(
     r"(?<![a-z])(fail|failed|errors?)\"?\s*[=:]?\s*(0|なし)(?!\d)", re.I
 )
+# 行頭に [ok]／[update]／✅ の印がある行は「処理できた」の記録。処理した項目の名前に fail が入っていても
+# エラーではない（2026-11-21: 部長ブリッジの「· [ok] gha_workflow_fail」が ×84 の誤検知）
+OK_MARK_RE = re.compile(r"^[\s·・\-*]*(\[(ok|update)\]|✅)", re.I)
+
+
+def is_error_line(ln: str) -> bool:
+    """launchd ログの1行がエラーか。正常の集計行（failed=0）と [ok] 印の行は除く。"""
+    if OK_MARK_RE.match(ln):
+        return False
+    return bool(ERROR_RE.search(ZERO_COUNT_RE.sub("", ln)))
+
+
 AI_CALL_RE = re.compile(
     r"openai|anthropic|chat\.completions|find_cursor_agent|launch_cloud_agent"
     r"|api\.x\.ai|generativelanguage|claude -p|cursor-agent"
@@ -281,7 +293,7 @@ def collect_launchd_logs(
                 # Traceback／raise 行は本体のエラー行と重複するので数えない
                 if re.match(r"\s*(Traceback|raise |File \")", ln):
                     continue
-                if ERROR_RE.search(ZERO_COUNT_RE.sub("", ln)):
+                if is_error_line(ln):
                     m = _normalize(ln)
                     counter[m] += 1
                     last_seen[m] = max(last_seen.get(m, 0.0), st.st_mtime)

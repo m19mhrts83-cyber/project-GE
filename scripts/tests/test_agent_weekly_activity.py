@@ -63,6 +63,17 @@ class StampedFileTests(unittest.TestCase):
                 r'KURASHIFT_RESULT:\{"ok": true, "count": (\d+)', "Traceback")
         self.assertEqual((r["runs"], r["worked"], r["items"], r["fail"]), (2, 1, 162, 1))
 
+    def test_date_only_stamp_on_window_edge_counts(self):
+        # 314 の facts_YYYYMMDD.md: 先週の同じ曜日・同じ時刻に作ったファイルを落とさない（2026-11-21）
+        since = datetime(2026, 11, 14, 9, 0, tzinfo=w.JST)
+        now = datetime(2026, 11, 21, 9, 0, tzinfo=w.JST)
+        paths = [Path("facts_20261107.md"), Path("facts_20261114.md")]
+        r = w.count_stamped_files(paths, r"facts_(\d{8})\.md$", since, now)
+        self.assertEqual(r["runs"], 1)
+        # 時刻つきの名前は今までどおり窓の境目で切る
+        r2 = w.count_stamped_files([Path("run_20261114_085959.log")], r"run_(\d{8}_\d{6})\.log$", since, now)
+        self.assertEqual(r2["runs"], 0)
+
 
 class GhaTests(unittest.TestCase):
     def test_counts_success_and_failure_skips_cancelled(self):
