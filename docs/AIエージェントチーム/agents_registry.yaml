@@ -205,8 +205,8 @@ agents:
   '315':
     name: 連携健全性点検係
     path: 300_品質・タスク運用管理室/315_連携健全性点検係
-    flowforge_id: flow_zYjp6A4HDURefJhSm0h_zUtX
-    flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_zYjp6A4HDURefJhSm0h_zUtX
+    flowforge_id: flow_S5g_i7CCiE0P6RKIp2_MkMTA
+    flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_S5g_i7CCiE0P6RKIp2_MkMTA
     status: 運用確認
     report: ops
     tool_assigned: gha

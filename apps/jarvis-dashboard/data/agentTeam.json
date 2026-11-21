@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-21T17:30:56+09:00",
+  "updated": "2026-11-21T21:32:11+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -2494,10 +2494,10 @@
       "builder_tag": "",
       "mixup_kind": "",
       "grok_counterpart": "",
-      "flowforge_id": "flow_zYjp6A4HDURefJhSm0h_zUtX",
-      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_zYjp6A4HDURefJhSm0h_zUtX",
-      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/7yRpKP0SB8QufwBL",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_zYjp6A4HDURefJhSm0h_zUtX",
+      "flowforge_id": "flow_S5g_i7CCiE0P6RKIp2_MkMTA",
+      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_S5g_i7CCiE0P6RKIp2_MkMTA",
+      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/2bg4-Vc8WOFzjEGe",
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_S5g_i7CCiE0P6RKIp2_MkMTA",
       "permissions": {
         "can_do": "連携健全性点検・軽微リカバリ提案（QR／Gmail再同意は人）",
         "methods": [
@@ -2580,7 +2580,7 @@
           {
             "title": "FlowForge（作業フロー）",
             "path": "",
-            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/7yRpKP0SB8QufwBL",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/2bg4-Vc8WOFzjEGe",
             "kind": "flowforge"
           },
           {

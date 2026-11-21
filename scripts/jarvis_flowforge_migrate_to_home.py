@@ -202,12 +202,44 @@ def issue_share(fid: str) -> str:
 
 # ---------- 登録の付け替え ----------
 
+# 付け替えない場所: 過去の記録（当時の ID のまま残す）と非公開メモ
+SKIP_DIRS = {"logs", "output", "memory", "_archive", "_inbox"}
+# プログラムにも ID が直接書かれていることがある（例: 315 の点検スクリプトの FLOW_URL）
+CODE_DIRS = ("scripts", "apps/jarvis-dashboard/lib", "apps/jarvis-dashboard/app", ".cursor/rules")
+CODE_SUFFIXES = {".py", ".ts", ".tsx", ".mdc", ".sh"}
+
+
+def should_rewrite(rel_parts: tuple[str, ...]) -> bool:
+    """この資料の ID を付け替えてよいか（過去の記録は付け替えない）。"""
+    return not (set(rel_parts[:-1]) & SKIP_DIRS)
+
+
+def code_references(old_id: str) -> list[str]:
+    """プログラムに残っている古い ID の参照（自動では直さない。人が見て直す）。"""
+    hits: list[str] = []
+    for d in CODE_DIRS:
+        base = REPO / d
+        if not base.is_dir():
+            continue
+        for path in base.rglob("*"):
+            if path.suffix not in CODE_SUFFIXES or "node_modules" in path.parts or "tests" in path.parts:
+                continue
+            if path.resolve() == Path(__file__).resolve():
+                continue
+            try:
+                if old_id in path.read_text(encoding="utf-8", errors="ignore"):
+                    hits.append(str(path.relative_to(REPO)))
+            except Exception:
+                continue
+    return sorted(hits)
+
+
 def write_repo(agent_id: str, old_id: str, new_id: str, new_share_url: str) -> list[str]:
     if REPO.resolve() == (Path.home() / "git-repos").resolve():
         raise SystemExit("~/git-repos の本体では付け替えません。worktree で実行してください。")
     changed: list[str] = []
     for path in list(HUB.rglob("*.md")) + [HUB / "agents_registry.yaml"]:
-        if "memory" in path.parts or not path.is_file():
+        if not path.is_file() or not should_rewrite(path.relative_to(HUB).parts):
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -243,7 +275,8 @@ def main() -> int:
         if not (args.write_repo and args.new_flow_id and args.new_share_url):
             ap.error("--new-flow-id と --new-share-url は、--write-repo と3つ一緒に指定します")
         changed = write_repo(args.agent, old_id, args.new_flow_id, args.new_share_url)
-        print(json.dumps({"agent": args.agent, "old_flow_id": old_id, "new_flow_id": args.new_flow_id, "changed": changed}, ensure_ascii=False, indent=1))
+        print(json.dumps({"agent": args.agent, "old_flow_id": old_id, "new_flow_id": args.new_flow_id, "changed": changed,
+                          "code_references_to_fix": code_references(old_id)}, ensure_ascii=False, indent=1))
         return 0
 
     share_url = agent.get("flowforge_share_url") or ""
@@ -317,6 +350,7 @@ def main() -> int:
     info["new_share_url"] = issue_share(new_id)
     if args.write_repo:
         info["changed"] = write_repo(args.agent, old_id, new_id, info["new_share_url"])
+        info["code_references_to_fix"] = code_references(old_id)
         info["next"] = "status_sync（--no-drive）で agentTeam.json を作り直し、意図したファイルだけを PR にする"
     print(json.dumps(info, ensure_ascii=False, indent=1))
     return 0

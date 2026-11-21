@@ -64,5 +64,16 @@ class ShareConfigTests(unittest.TestCase):
         self.assertEqual(after["updated"], "x")
 
 
+class RewriteScopeTests(unittest.TestCase):
+    def test_past_records_are_not_rewritten(self):
+        self.assertTrue(mg.should_rewrite(("300_室", "315_係", "README.md")))
+        self.assertTrue(mg.should_rewrite(("00_チーム索引.md",)))
+        self.assertFalse(mg.should_rewrite(("300_室", "315_係", "logs", "20261011_ops_health.md")))
+        self.assertFalse(mg.should_rewrite(("300_室", "315_係", "output", "report.md")))
+        self.assertFalse(mg.should_rewrite(("memory", "MEMORY.md")))
+        # ファイル名が logs.md でも、フォルダでなければ対象
+        self.assertTrue(mg.should_rewrite(("300_室", "logs.md")))
+
+
 if __name__ == "__main__":
     unittest.main()

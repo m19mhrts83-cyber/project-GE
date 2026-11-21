@@ -1,6 +1,6 @@
 # フロー — 連携健全性点検係（315）
 
-- FlowForge（設計図）: [flow_zYjp6A4HDURefJhSm0h_zUtX](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_zYjp6A4HDURefJhSm0h_zUtX)
+- FlowForge（設計図）: [flow_S5g_i7CCiE0P6RKIp2_MkMTA](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_S5g_i7CCiE0P6RKIp2_MkMTA)
 - **一目の流れ図**: [`docs/flow-overview.html`](./docs/flow-overview.html)（**Gmail token 含む3系統**）
 - **実行エンジン（本線）**: GitHub Actions `ops-health-315.yml`
 - **Mac補完**: launchd 日曜 21:45 `--remediate-once`

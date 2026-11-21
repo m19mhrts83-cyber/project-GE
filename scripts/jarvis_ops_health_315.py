@@ -55,7 +55,7 @@ WATCH_ERR = Path.home() / "Library/Logs/line_open_chat/watch.err.log"
 WATCH_RESUME = REPO / "line_unofficial_poc" / "launchd" / "open_chat_watch_resume.sh"
 FLOW_URL = (
     "https://flowforge-259747770348.asia-northeast1.run.app"
-    "/flows/flow_zYjp6A4HDURefJhSm0h_zUtX"
+    "/flows/flow_S5g_i7CCiE0P6RKIp2_MkMTA"
 )
 
 
