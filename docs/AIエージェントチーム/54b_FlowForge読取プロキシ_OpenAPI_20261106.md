@@ -171,7 +171,7 @@ https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl
 
 - 5 は AI を呼ばない。Mac が起きていて、Chrome が開いている時だけ動く
 - 5 を自動で回す仕組み（launchd）は未設定。今は手で `--queue-once` を実行する
-- 7 の読み直しは共有リンク経由。共有リンクが編集の最新を映すかは未確認（映さない場合は共有リンクの発行し直しが要る）
+- 7 の読み直しは共有リンク経由。共有リンクは編集の最新を映す（2026-11-21 確認）
 
 ### 置き場の決まり
 
@@ -191,7 +191,8 @@ https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl
 |---|---|
 | `resolve_flowforge_flow` | `view`: `summary`（既定）／`edit`（修正文づくり・照合用）／`full` |
 | `queue_flowforge_edit` | `agentId`・`instructions`・`confirmedByUser=true`。2000文字・箇条書き6項目まで。待ち5件で満杯 |
-| `get_flowforge_edit_status` | `id` → `queued`／`running`／`sent`／`error` と AIアシスタントの返事 |
+| `get_flowforge_edit_status` | `id` → `queued`／`running`／`sent`／`error` 、AIアシスタントの返事、増えた／消えた矢印とノード |
+| `undo_flowforge_edit` | 送信済みの修正の `id`・`confirmedByUser=true`。その修正の直前の状態まで「元に戻す」を押す |
 
 待ち箱の表は `apps/jarvis-dashboard/supabase/migrations/20261121_flowforge_edit_queue.sql`（適用が要る）。
 ChatGPT 側は、道具が増えたあとプラグイン「FlowForge Jarvis MCP」をつなぎ直す。
@@ -204,11 +205,24 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_flowforge_assist
 cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_flowforge_assistant_paste.py --queue-once
 ```
 
+### 頼んでいない変更に気づく（2026-11-21 の試験で判明）
+
+FlowForge は、頼んでいない変更をすることがある。311 で「経路B → 合流 の矢印を1本追加」を2回試し、2回とも同じ結果だった。
+
+- 頼んだ矢印は追加された
+- もともとあった「経路A → 合流」が消えた（1つのノードに矢印を2本合流させる形を保てない可能性。1例だけで断定はしない）
+- 孤立していたノードが自動でつながれた（返事に「孤立を機械接続しました」。意味として誤った輪ができた）
+- 「それ以外は変更しないで」と書いても防げない
+
+対応: 送信の結果に、増えた／消えた矢印とノードを記録する。ChatGPT は頼んだ内容と比べ、余分があれば本人へ伝え、
+`undo_flowforge_edit`（Mac 手動なら `--agent 311 --undo N`）で戻す。取り消しは直後向け（間に別の編集があると戻りきれない）。
+
 ### 検証（2026-11-21）
 
 - 済: 311 のコピーを Chrome の既定プロフィールに作成（中身は元と一致）。確認モード・入力だけ・送信
   （編集を伴わない質問）・返事の取り込み・前後比較
-- 未: 実際の修正文での書き換え、待ち箱を通した一連の流れ（表の適用とデプロイの後）、311 の registry 付け替え
+- 済（追記）: 311 の registry 付け替え、待ち箱を通した送信、実際の修正文での書き換え、差分の記録、取り消し（送信前の状態へ復帰を確認）。共有リンクは編集の最新を映す
+- 未: 待ち箱の取り消し（`undo_flowforge_edit`）を本番 MCP から通す試験、待ち箱を自動で拾う仕組み
 
 ## curl 例（値は出さない）
 
