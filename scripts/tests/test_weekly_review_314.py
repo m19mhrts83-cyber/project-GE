@@ -45,6 +45,20 @@ class ErrorLineTests(unittest.TestCase):
         self.assertTrue(self._is_err("RuntimeError: ZAIM_PASSWORD が未設定です"))
         self.assertTrue(self._is_err("# cursor ask done=3 failed=2 scanned=10"))
 
+    def test_ok_marked_lines_are_not_errors(self):
+        # 2026-11-21: 部長ブリッジの「· [ok] gha_workflow_fail」（処理できた項目の名前）が ×84 の誤検知
+        self.assertFalse(wr.is_error_line("  · [ok] gha_workflow_fail"))
+        self.assertFalse(wr.is_error_line("  · [update] gha_workflow_fail"))
+        self.assertFalse(wr.is_error_line("✅ Slack webhook OK status=200 (retry after HTTP 429)"))
+        self.assertFalse(wr.is_error_line("# cursor ask done=3 failed=0 scanned=10"))
+
+    def test_is_error_line_keeps_real_errors(self):
+        self.assertTrue(wr.is_error_line("  · [ng] gha_workflow_fail"))
+        self.assertTrue(wr.is_error_line("# error id=gha_workflow_fail: Command failed"))
+        self.assertTrue(wr.is_error_line("# #hub history 失敗: not_in_channel"))
+        # 印が行頭でなければ除外しない
+        self.assertTrue(wr.is_error_line("RuntimeError: [ok] のはずが失敗"))
+
 
 if __name__ == "__main__":
     unittest.main()
