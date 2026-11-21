@@ -7,7 +7,7 @@
 
 ## AIオートメーション（作業フロー）
 
-- **FlowForge（開く）**: [flow_AzrNV2o5gb9M2JMFxeX5aZSa](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AzrNV2o5gb9M2JMFxeX5aZSa)
+- **FlowForge（開く）**: [flow_33PanU2Pe9a6Wm2upTvxTQ_4](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_33PanU2Pe9a6Wm2upTvxTQ_4)
 - 流れ図: [`flow.md`](./flow.md)
 - 機械チェック CLI: `scripts/jarvis_weekly_review_314.py`（AI なし）
 - 週次稼働 CLI: `scripts/jarvis_agent_weekly_activity.py`（AI なし。9:30 のレビューでは 🔴🟡 の社員を先に見る）
