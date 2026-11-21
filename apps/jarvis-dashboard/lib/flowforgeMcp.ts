@@ -1,17 +1,23 @@
 /**
  * Minimal Streamable HTTP MCP (JSON-RPC) for FlowForge read proxy.
  * ChatGPT Plugins → Add custom MCP server 向け。
+ *
+ * 2026-11-21: 編集用の読み取り（view=edit）と、修正文の待ち箱
+ * （queue_flowforge_edit / get_flowforge_edit_status）を追加。
+ * FlowForge へ直接は書かない。待ち箱は Mac のプログラムが拾う。
  */
 import {
   fetchFlowforgeShare,
   resolveShareId,
   summarizeFlowPayload,
 } from "@/lib/flowforgeShareProxy";
+import { editViewFlowPayload } from "@/lib/flowforgeEditView";
+import { getFlowforgeEditStatus, queueFlowforgeEdit } from "@/lib/flowforgeEditQueue";
 
 export const FLOWFORGE_MCP_PROTOCOL = "2024-11-05";
 export const FLOWFORGE_MCP_SERVER_INFO = {
   name: "jarvis-flowforge-read",
-  version: "1.0.0",
+  version: "1.1.0",
 };
 
 type JsonRpcId = string | number | null;
@@ -57,7 +63,46 @@ const TOOLS = [
           description: "If true (default), return node titles only",
           default: true,
         },
+        view: {
+          type: "string",
+          enum: ["summary", "edit", "full"],
+          description:
+            "summary = ids/kinds/titles only. edit = what you need to write edit instructions: node id/kind/title/description/tool/parent subflow plus edges (from→to, label) and unconnected nodes, no coordinates. full = raw JSON. Use edit before proposing changes and again after an edit to verify. Overrides summary.",
+        },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "queue_flowforge_edit",
+    description:
+      "Put edit instructions for one agent's FlowForge flow into a waiting box. A program on the owner's Mac types them into FlowForge's own AI assistant in the owner's browser. Call ONLY after the user has read the exact instruction text in this chat and said to apply it; set confirmedByUser=true only then. Keep each request small (up to about 4 changes, max 6 list items, 2000 chars), one operation per line, refer to nodes by their exact current titles, and do not delete nodes unless the user asked. Does not write to FlowForge directly; the Mac must be awake.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        agentId: { type: "string", description: "Agent team id such as 311" },
+        instructions: {
+          type: "string",
+          description: "Japanese instruction text to send to FlowForge's AI assistant",
+        },
+        confirmedByUser: {
+          type: "boolean",
+          description: "true only if the user approved this exact text in the chat",
+        },
+        note: { type: "string", description: "Optional short memo (why)" },
+      },
+      required: ["agentId", "instructions", "confirmedByUser"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_flowforge_edit_status",
+    description:
+      "Read the state of a queued edit (queued / running / sent / error) and the FlowForge AI assistant's reply. After status=sent, re-read the flow with resolve_flowforge_flow view=edit to verify the change.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string", description: "id returned by queue_flowforge_edit" } },
+      required: ["id"],
       additionalProperties: false,
     },
   },
@@ -83,10 +128,13 @@ async function callResolveFlow(
   const shareId = typeof args.shareId === "string" ? args.shareId : null;
   const flowId = typeof args.flowId === "string" ? args.flowId : null;
   const agentId = typeof args.agentId === "string" ? args.agentId : null;
-  const summary =
-    args.summary === undefined || args.summary === null
-      ? true
-      : Boolean(args.summary);
+  const viewArg = typeof args.view === "string" ? args.view : "";
+  const view: "summary" | "edit" | "full" =
+    viewArg === "edit" || viewArg === "full" || viewArg === "summary"
+      ? viewArg
+      : args.summary === undefined || args.summary === null || Boolean(args.summary)
+        ? "summary"
+        : "full";
 
   const resolved = resolveShareId({ shareId, url, flowId, agentId });
   if ("error" in resolved) {
@@ -109,17 +157,25 @@ async function callResolveFlow(
     };
   }
 
-  const payload = summary
-    ? {
-        ok: true,
-        shareId: resolved.shareId,
-        summary: summarizeFlowPayload(upstream.body),
-      }
-    : {
-        ok: true,
-        shareId: resolved.shareId,
-        ...(upstream.body as object),
-      };
+  const payload =
+    view === "summary"
+      ? {
+          ok: true,
+          shareId: resolved.shareId,
+          summary: summarizeFlowPayload(upstream.body),
+        }
+      : view === "edit"
+        ? {
+            ok: true,
+            shareId: resolved.shareId,
+            note: "共有リンクの内容です。編集直後は updatedAt が変わったかを見て、最新かどうか確かめてください。",
+            edit: editViewFlowPayload(upstream.body),
+          }
+        : {
+            ok: true,
+            shareId: resolved.shareId,
+            ...(upstream.body as object),
+          };
   return { isError: false, text: JSON.stringify(payload, null, 2) };
 }
 
@@ -162,6 +218,16 @@ export async function handleFlowforgeMcpRequest(
       params.arguments && typeof params.arguments === "object"
         ? (params.arguments as Record<string, unknown>)
         : {};
+    if (name === "queue_flowforge_edit" || name === "get_flowforge_edit_status") {
+      const res =
+        name === "queue_flowforge_edit"
+          ? await queueFlowforgeEdit(args)
+          : await getFlowforgeEditStatus(args);
+      return rpcResult(id, {
+        content: [{ type: "text", text: JSON.stringify(res, null, 2) }],
+        isError: !res.ok,
+      });
+    }
     if (name !== "resolve_flowforge_flow") {
       return rpcError(id, -32601, `Unknown tool: ${name}`);
     }
