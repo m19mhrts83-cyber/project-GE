@@ -1128,42 +1128,47 @@ def expire_stale_pending(items: list[dict[str, Any]], *, now: datetime | None = 
 
 
 def load_partner_emails() -> dict[str, list[str]]:
-    """folder → emails。Dashboard ミラー JSON を読む。"""
+    """folder → emails。実値は private 側（環境変数 or ignore 済み JSON）。公開ミラーに残っていれば足す。"""
     import unicodedata
 
-    out: dict[str, list[str]] = {}
-    mirror = REPO / "apps/jarvis-dashboard/config/partner_contacts.json"
-    # 公開リポに置けない宛先（ignore 済み・非公開リポへ写す）。無ければ公開分だけ
-    private_mirror = REPO / "apps/jarvis-dashboard/config/partner_contacts.private.json"
-    if not mirror.is_file():
-        return out
-    extra: dict[str, list[str]] = {}
-    if private_mirror.is_file():
+    config = REPO / "apps/jarvis-dashboard/config"
+    by_folder: dict[str, list[str]] = {}
+
+    def add(folder: str, emails: list[str]) -> None:
+        folder = unicodedata.normalize("NFC", str(folder or "").strip())
+        cur = by_folder.setdefault(folder, [])
+        for e in emails:
+            e = str(e).strip()
+            if folder and "@" in e and e not in cur:
+                cur.append(e)
+
+    private_text = os.environ.get("PARTNER_CONTACTS_PRIVATE_JSON", "").strip()
+    private_file = config / "partner_contacts.private.json"
+    if not private_text and private_file.is_file():
         try:
-            raw = json.loads(private_mirror.read_text(encoding="utf-8")).get("emails_by_folder") or {}
-            for k, v in raw.items():
-                if isinstance(v, list):
-                    extra[unicodedata.normalize("NFC", str(k))] = [str(e).strip() for e in v if "@" in str(e)]
+            private_text = private_file.read_text(encoding="utf-8")
         except Exception:
-            extra = {}
-    try:
-        data = json.loads(mirror.read_text(encoding="utf-8"))
-        for p in data.get("partners") or []:
-            folder = str(p.get("folder") or "").strip()
-            emails = [str(e).strip() for e in (p.get("emails") or []) if str(e).strip()]
-            for e in extra.get(unicodedata.normalize("NFC", folder), []):
-                if e and e not in emails:
-                    emails.append(e)
-            if not folder or not emails:
-                continue
-            for key in (
-                folder,
-                unicodedata.normalize("NFC", folder),
-                unicodedata.normalize("NFD", folder),
-            ):
-                out[key] = emails
-    except Exception:
-        return out
+            private_text = ""
+    if private_text:
+        try:
+            for k, v in (json.loads(private_text).get("emails_by_folder") or {}).items():
+                if isinstance(v, list):
+                    add(k, v)
+        except Exception:
+            pass
+    mirror = config / "partner_contacts.json"
+    if mirror.is_file():
+        try:
+            for p in json.loads(mirror.read_text(encoding="utf-8")).get("partners") or []:
+                add(str(p.get("folder") or ""), list(p.get("emails") or []))
+        except Exception:
+            pass
+    out: dict[str, list[str]] = {}
+    for folder, emails in by_folder.items():
+        if not folder or not emails:
+            continue
+        for key in (folder, unicodedata.normalize("NFC", folder), unicodedata.normalize("NFD", folder)):
+            out[key] = emails
     return out
 
 

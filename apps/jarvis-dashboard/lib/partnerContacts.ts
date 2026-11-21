@@ -1,10 +1,13 @@
 /**
  * パートナー宛先解決（連絡先一覧のミラー）。
  * 正本は OneDrive 連絡先一覧.yaml。ミラー: config/partner_contacts.json
- * 公開リポに置けない宛先（emails_private: true の行）は、サーバーの環境変数
+ * 公開側にはメール・電話を置かない（2026-11-21）。実値はサーバーの環境変数
  * PARTNER_CONTACTS_PRIVATE_JSON（見本: config/partner_contacts.private.example.json）から足す。
- * 未設定なら空のまま（受信メールの from_email があればそちらが使われる）。
+ * ローカルでは ignore 済みの config/partner_contacts.private.json を同じ形で読む。
+ * どちらも無ければ空のまま（受信メールの from_email があればそちらが使われる）。
  */
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import contacts from "@/config/partner_contacts.json";
 import { mergePrivateContacts } from "@/lib/privateContacts";
 
@@ -15,16 +18,26 @@ export type PartnerContact = {
   phones: string[];
   via_ambiguous: boolean;
   emails_private?: boolean;
+  phones_private?: boolean;
 };
 
 export type ContactsFile = {
   partners: PartnerContact[];
 };
 
-const DATA = mergePrivateContacts(
-  contacts as ContactsFile,
-  typeof process !== "undefined" ? process.env.PARTNER_CONTACTS_PRIVATE_JSON : undefined,
-);
+/** 環境変数が優先。無ければローカルの partner_contacts.private.json（ignore 済み）。読めなければ undefined */
+function loadPrivateJson(): string | undefined {
+  if (typeof process === "undefined") return undefined;
+  const env = process.env.PARTNER_CONTACTS_PRIVATE_JSON;
+  if (env && env.trim()) return env;
+  try {
+    return readFileSync(path.join(process.cwd(), "config", "partner_contacts.private.json"), "utf-8");
+  } catch {
+    return undefined;
+  }
+}
+
+const DATA = mergePrivateContacts(contacts as ContactsFile, loadPrivateJson());
 
 function norm(s: string): string {
   return s.normalize("NFC").trim().toLowerCase();
