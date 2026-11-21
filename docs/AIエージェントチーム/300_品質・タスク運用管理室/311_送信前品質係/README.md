@@ -4,10 +4,14 @@
 
 DX向けデモのため、**変更前フローは上書きせず残す**。本線の磨きは改訂版。
 
-| 版 | 用途 | リンク |
-|---|---|---|
-| **改訂版（本線）** | きっかけ起動・3点ゲート | [flow_jTD-Wasy2tAaUlkDk_1EFdTk を開く](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_jTD-Wasy2tAaUlkDk_1EFdTk) |
-| **変更前（デモ用）** | 紹介・比較用。触らない | [flow_AKQv6lgUEtudWlE5fQUhQnh2 を開く](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AKQv6lgUEtudWlE5fQUhQnh2) |
+**書き込み（編集）は `/flows/…` のみ。** `/share/…` は閲覧専用（読み取り専用と出る）。  
+編集は **Chrome の既定プロフィール**で開く（FlowForge は最初に保存したブラウザを持ち主として扱う。2026-11-21）。  
+他のブラウザで `/flows/…` を開くと、同じ ID の空のフローができて同期失敗になる。詳細: [`54b_`](../../54b_FlowForge読取プロキシ_OpenAPI_20261106.md)
+
+| 版 | 用途 | 編集（書き込み可） | 閲覧専用 |
+|---|---|---|---|
+| **改訂版（本線）** | きっかけ起動・3点ゲート | [編集で開く](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_jTD-Wasy2tAaUlkDk_1EFdTk) | [閲覧](https://flowforge-259747770348.asia-northeast1.run.app/share/tzFi37vNihjDMlGW) |
+| **変更前（デモ用）** | 紹介・比較用。触らない | [編集で開く](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AKQv6lgUEtudWlE5fQUhQnh2) | [閲覧](https://flowforge-259747770348.asia-northeast1.run.app/share/LAPAAYJTXS-4Opu8) |
 
 | 項目 | 内容 |
 |---|---|
