@@ -20,6 +20,7 @@ ID: **311**（旧フォルダ `10_` → 3桁化）。
 - 禁止パターン: `config/banned_patterns.yaml`
 - Phase 1〜3 済
 - NG報告は「要約・内訳・見方・次」を必ず含める（運用しながら文言を磨く）
+- **重複防止**（2026-11-21）: 経路A（`--post`）は依頼ID（ファイル名の時刻＋source）と内容ハッシュ（draft_path＋下書き本文）を `.jarvis_state/send_gate_311_seen.json` に記録。判定済みは「重複スキップ」でログのみ→processed/ へ。再判定は `--force-recheck`（履歴に残る）
 
 ## AIオートメーション（作業フロー）
 
@@ -138,3 +139,4 @@ OK→送信／NG→送らず再確認。311自体は送信ボタンを押さな�
 | 2026-10-18 | Phase1 CLI＋Slack。Phase2 inbox poll（15分 launchd） |
 | 2026-10-18 | Phase3 上流キック（enqueue・211配線・ホーク action） |
 | 2026-10-18 | 本文宛名↔実To（yoritoori dry-run）。Jarvis「了承後→311→送信」ルール接続 |
+| 2026-11-21 | 重複防止: 依頼の重複排除（state＋`--force-recheck`）・非公開 restore が処理済み依頼を input/ へ戻さない（同名が processed/ にあれば戻さない）。11/19 の1依頼が30分ごとに82回再判定された事故の再発防止 |
