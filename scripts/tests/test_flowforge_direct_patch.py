@@ -167,5 +167,33 @@ class DirectPatchTests(unittest.TestCase):
         assert dp.js_snapshot("flow_1").count("flow_1") == 1
 
 
+class StaleTabTests(unittest.TestCase):
+    def test_same_is_fresh(self):
+        m = {"flow_a": "t1", "flow_b": "t2"}
+        self.assertEqual(dp.stale_reasons(m, dict(m)), [])
+
+    def test_tab_does_not_know_a_stored_flow(self):
+        r = dp.stale_reasons({"flow_a": "t1"}, {"flow_a": "t1", "flow_b": "t2"})
+        self.assertEqual(len(r), 1)
+        self.assertIn("知らないフロー", r[0])
+
+    def test_other_flow_was_edited_elsewhere(self):
+        """311 のタブが、別のタブで直した 312 の古い内容を持っている（上書きの危険）。"""
+        r = dp.stale_reasons({"flow_311": "t1", "flow_312": "old"}, {"flow_311": "t1", "flow_312": "new"})
+        self.assertEqual(len(r), 1)
+        self.assertIn("flow_312", r[0])
+
+    def test_flow_only_in_tab(self):
+        r = dp.stale_reasons({"flow_a": "t1", "flow_gone": "t9"}, {"flow_a": "t1"})
+        self.assertIn("このタブにだけある", r[0])
+
+    def test_js_freshness_reads_only(self):
+        js = dp.js_freshness()
+        self.assertIn("localStorage.getItem", js)
+        # 書き込みの呼び出しが無いこと（typeof v.setState の判定は呼び出しではない）
+        for call in ("setItem(", ".setState(", "updateNodeData(", "addEdge(", "removeEdge(", "deleteFlow(", ".undo("):
+            self.assertNotIn(call, js)
+
+
 if __name__ == "__main__":
     unittest.main()

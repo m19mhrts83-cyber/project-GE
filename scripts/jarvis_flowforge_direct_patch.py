@@ -342,3 +342,34 @@ def js_undo_once(fid: str) -> str:
         f"var fid={json.dumps(fid)}; var r=api.getState().undo(fid);"
         "return JSON.stringify({ok:!!r,snap:__ffSnap(api,fid)});})()"
     )
+
+
+# ---------- 古いタブの検知（複数タブでの上書き防止） ----------
+#
+# FlowForge は、タブごとに「全フローの内容」をメモリに持ち、何か編集するたびに全フローをまとめて
+# ブラウザ（localStorage）へ保存する。タブ同士で内容を合わせる仕組みは無いので、古いタブで編集すると、
+# 他のタブで直したフローが古い内容で上書きされる。編集の直前に、タブのメモリと保存内容を比べる。
+
+def stale_reasons(memory: dict[str, str | None], stored: dict[str, str | None]) -> list[str]:
+    """タブのメモリ（id→更新日時）と、ブラウザの保存内容（id→更新日時）の食い違い。空なら最新。"""
+    out: list[str] = []
+    for fid in sorted(stored.keys() - memory.keys()):
+        out.append(f"このタブが知らないフローが保存されている（{fid}）")
+    for fid in sorted(memory.keys() - stored.keys()):
+        out.append(f"このタブにだけあるフローがある（{fid}）")
+    for fid in sorted(memory.keys() & stored.keys()):
+        if memory[fid] != stored[fid]:
+            out.append(f"更新日時が違う（{fid}: タブ {memory[fid]} ／ 保存 {stored[fid]}）")
+    return out
+
+
+def js_freshness() -> str:
+    """タブのメモリと保存内容の、フローごとの更新日時を読む式（読むだけ）。"""
+    return (
+        "(function(){" + JS_FIND_API + "var api=__ffApi(); if(!api) return JSON.stringify({ok:false,error:'store_not_found'});"
+        "var mem={}, f=api.getState().flows; Object.keys(f).forEach(function(k){mem[k]=f[k].updatedAt||null;});"
+        "var st={}; try{ var raw=JSON.parse(localStorage.getItem('flowforge:flows')||'null');"
+        "var fl=raw&&raw.state&&raw.state.flows||{}; Object.keys(fl).forEach(function(k){st[k]=fl[k].updatedAt||null;}); }"
+        "catch(e){ return JSON.stringify({ok:false,error:'storage_unreadable'}); }"
+        "return JSON.stringify({ok:true,memory:mem,stored:st});})()"
+    )
