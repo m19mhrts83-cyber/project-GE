@@ -2,6 +2,7 @@
  * Minimal Streamable HTTP MCP (JSON-RPC) for FlowForge read proxy.
  * ChatGPT Plugins → Add custom MCP server 向け。
  */
+import { runWriteAction, type WriteArgs } from "@/lib/flowforgeWriteUpstream";
 import {
   fetchFlowforgeShare,
   resolveShareId,
@@ -11,7 +12,7 @@ import {
 export const FLOWFORGE_MCP_PROTOCOL = "2024-11-05";
 export const FLOWFORGE_MCP_SERVER_INFO = {
   name: "jarvis-flowforge-read",
-  version: "1.0.0",
+  version: "1.1.0",
 };
 
 type JsonRpcId = string | number | null;
@@ -60,6 +61,62 @@ const TOOLS = [
       },
       additionalProperties: false,
     },
+  },
+  {
+    name: "preview_flowforge_change",
+    description:
+      "FlowForge の許可リスト内（テスト用）フローに対する変更案を当てた差分を返す。何も書かない。confirmToken と baseUpdatedAt を返す。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        shareId: { type: "string", description: "FlowForge share id（…/share/xxxx の xxxx）" },
+        url: { type: "string", description: "FlowForge share URL（shareId の代わり）" },
+        flowId: { type: "string", description: "flow_… 取り違え防止の確認用（共有リンクのフローと一致が必要）" },
+        changes: {
+          type: "object",
+          description:
+            "変更案。nodes: [{id, title?, description?}]、addEdges: [{source,target}]、removeEdges: [{id}|{source,target}]。ノード種別・位置の変更は不可。",
+          properties: {
+            nodes: { type: "array", items: { type: "object" } },
+            addEdges: { type: "array", items: { type: "object" } },
+            removeEdges: { type: "array", items: { type: "object" } },
+          },
+          additionalProperties: false,
+        },
+      },
+      required: ["changes"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: "apply_flowforge_change",
+    description:
+      "FlowForge のフローへ変更を書き込む（非公式 API）。松野さんが会話で明示的に承認した後だけ呼ぶこと。preview と同じ changes、preview が返した confirmToken と expectedUpdatedAt（= baseUpdatedAt）が必須。書き込み後に読み直して一致を確認し、一致しなければ失敗を返す。",
+    inputSchema: {
+      type: "object",
+      properties: {
+        shareId: { type: "string", description: "FlowForge share id（…/share/xxxx の xxxx）" },
+        url: { type: "string", description: "FlowForge share URL（shareId の代わり）" },
+        flowId: { type: "string", description: "flow_… 取り違え防止の確認用（共有リンクのフローと一致が必要）" },
+        changes: {
+          type: "object",
+          description:
+            "変更案。nodes: [{id, title?, description?}]、addEdges: [{source,target}]、removeEdges: [{id}|{source,target}]。ノード種別・位置の変更は不可。",
+          properties: {
+            nodes: { type: "array", items: { type: "object" } },
+            addEdges: { type: "array", items: { type: "object" } },
+            removeEdges: { type: "array", items: { type: "object" } },
+          },
+          additionalProperties: false,
+        },
+        expectedUpdatedAt: { type: "string", description: "preview の baseUpdatedAt" },
+        confirmToken: { type: "string", description: "preview の confirmToken" },
+      },
+      required: ["changes", "expectedUpdatedAt", "confirmToken"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true },
   },
 ] as const;
 
@@ -162,6 +219,25 @@ export async function handleFlowforgeMcpRequest(
       params.arguments && typeof params.arguments === "object"
         ? (params.arguments as Record<string, unknown>)
         : {};
+    if (name === "preview_flowforge_change" || name === "apply_flowforge_change") {
+      const wargs: WriteArgs = {
+        shareId: typeof args.shareId === "string" ? args.shareId : null,
+        url: typeof args.url === "string" ? args.url : null,
+        flowId: typeof args.flowId === "string" ? args.flowId : null,
+        changes: args.changes,
+        expectedUpdatedAt:
+          typeof args.expectedUpdatedAt === "string" ? args.expectedUpdatedAt : null,
+        confirmToken: typeof args.confirmToken === "string" ? args.confirmToken : null,
+      };
+      const out = await runWriteAction(
+        name === "preview_flowforge_change" ? "preview" : "apply",
+        wargs,
+      );
+      return rpcResult(id, {
+        content: [{ type: "text", text: JSON.stringify(out.body, null, 2) }],
+        isError: out.status >= 400,
+      });
+    }
     if (name !== "resolve_flowforge_flow") {
       return rpcError(id, -32601, `Unknown tool: ${name}`);
     }

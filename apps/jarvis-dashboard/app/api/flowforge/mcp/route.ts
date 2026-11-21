@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       ok: true,
       transport: "streamable-http",
       mcp: "/api/flowforge/mcp",
-      tools: ["resolve_flowforge_flow"],
+      tools: ["resolve_flowforge_flow", "preview_flowforge_change", "apply_flowforge_change"],
       auth: "Bearer または ?key=（ChatGPT カスタムMCPは後者）",
     },
     { headers: CORS },

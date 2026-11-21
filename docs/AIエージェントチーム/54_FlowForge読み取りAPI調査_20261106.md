@@ -110,3 +110,19 @@ Phase 2 の利点: project-GE 側だけで完結。編集権限は持たせず�
 - 一覧: [`15_FlowForge全体系_進捗_20261010.md`](./15_FlowForge全体系_進捗_20261010.md)
 - CLI: `scripts/jarvis_flowforge_share_fetch.py`
 - コマンド: `docs/運用コマンド一覧.md`「FlowForge フロー読取」
+
+## 追記（2026-11-21）書き込み経路の調査（画面の公開 JS を読んだ結果）
+
+方式B（非公式保存 API）の試作に向けた調査。詳細・使い方は 54b「書き込み（試作）」。
+
+| 項目 | 結果 | 確度 |
+|---|---|---|
+| 保存 | `POST /api/flows/sync` に `{anonId, flow}`。flow は `{id,name,description,nodes,edges,createdAt,updatedAt,look}`。失敗時は `{detail}`、成功は HTTP 200 のみ参照 | 確認（JS） |
+| セッション | 保存・共有の前に `POST /api/session`（cookie 同一オリジン）。`428` なら作り直して 1 回再試行 | 確認（JS） |
+| anonId | ブラウザ localStorage `flowforge:anon-id`（`anon_…`）。共有発行（`/api/flows/{id}/share`）でも使用 | 確認（JS） |
+| 保存のタイミング | 画面は nodes/edges/name/description/look が前回保存と違うときだけ、2 秒デバウンスで送信（一方向） | 確認（JS） |
+| 読み戻し | サーバから flow を読み戻す API 呼び出しは JS に無い（読むのは共有 `GET /api/shares/{id}` のみ）。編集の正本は localStorage（zustand persist `flowforge:flows`） | 確認（JS）。ブラウザ画面は書き込みで更新されず、ブラウザ編集で上書きされうる |
+| updatedAt の競合 | クライアントは期待版を送らない。サーバ側が updatedAt/anonId で競合や所有をどう扱うか | **未確認**（サーバ挙動。実機で未試験） |
+| anonId と所有 | 他人の anonId のフローに書けるか、flow ID が既存で anonId が違うとどうなるか | **未確認** |
+| 共有リンクが最新か | 編集後も最新を指すか／スナップショットか | **未確認**（試作は読み直し不一致を失敗にして検知する） |
+| 利用規約 | 非公式 API の利用可否 | **未確認** |

@@ -66,6 +66,7 @@ export async function middleware(request: NextRequest) {
   if (
     path === "/api/flowforge/resolve" ||
     path === "/api/flowforge/mcp" ||
+    path.startsWith("/api/flowforge/write/") ||
     path.startsWith("/api/flowforge/share/")
   ) {
     return NextResponse.next({ request });
