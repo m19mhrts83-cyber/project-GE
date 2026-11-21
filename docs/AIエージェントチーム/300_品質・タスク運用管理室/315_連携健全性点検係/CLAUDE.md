@@ -9,7 +9,7 @@ WeStudy／GitHub Actions の失敗、LINE オープンチャット取込、**Gma
 
 ## AIオートメーション（作業フロー）
 
-- **FlowForge（開く）**: [flow_zYjp6A4HDURefJhSm0h_zUtX](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_zYjp6A4HDURefJhSm0h_zUtX)
+- **FlowForge（開く）**: [flow_S5g_i7CCiE0P6RKIp2_MkMTA](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_S5g_i7CCiE0P6RKIp2_MkMTA)
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
 - 設計の流れ図: [`flow.md`](./flow.md)
 - FlowForge「エージェントへの指示」貼付: [`flowforge_エージェントへの指示.md`](./flowforge_エージェントへの指示.md)（たたき台。下の表が実装正）

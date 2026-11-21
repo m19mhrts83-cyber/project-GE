@@ -197,6 +197,22 @@ https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl
   「みんなのフローに載せる」は押さなくてよい
 - Chrome の「表示 > デベロッパー > Apple Events からの JavaScript を許可」がオンであること
 
+#### 置き場へ移すコマンド（2026-11-21）
+
+社員ごとに1回。AI は呼ばない。**worktree で実行する**（`~/git-repos` の本体では登録を付け替えない）。
+
+```bash
+~/selenium_env/venv/bin/python scripts/jarvis_flowforge_migrate_to_home.py --agent 315 --dry-run     # 何も作らず状況だけ
+~/selenium_env/venv/bin/python scripts/jarvis_flowforge_migrate_to_home.py --agent 315 --write-repo  # コピー・照合・共有リンク発行・登録の付け替え
+```
+
+- やること: 登録の共有リンクを読む → 置き場の Chrome でコピー → 中身を元と照合 → 新しい共有リンクを発行 → registry・共有リンク一覧・資料の ID を付け替え
+- 止まる時: 共有リンクが未登録（317）／共有リンクが登録の ID と違うフローを指している／置き場に同じ内容のコピーがすでにある／照合で違いが出た
+- 実行の後: `jarvis_agent_team_status_sync.py --no-drive` で `agentTeam.json` を作り直し、意図したファイルだけを PR にする
+  （同期は他の部門ボードの日付も書き換えるので、それらは戻す）
+- 元のフロー（Cursor 側）は消さない。FlowForge 側には、コピーを消してもクラウドに写しが残る（画面からは消せない）
+- 2026-11-21 時点: `--dry-run` と止まる条件は実機で確認済み。コピー・共有リンク発行の部分は 315 で初めて通す
+
 ### 道具（MCP）
 
 | Tool | 用途 |
