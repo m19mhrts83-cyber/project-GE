@@ -1,5 +1,5 @@
 #!/bin/zsh
-# install: 315 鮮度監視（毎日 08:20・18:20）。対象は config/freshness_slo.yaml
+# install: 315 鮮度監視＋315-B 停止・空回り監視（毎日 08:20・18:20）。対象は config/freshness_slo.yaml
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.matsunoma.jarvis.freshness-watch"

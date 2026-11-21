@@ -11,11 +11,13 @@ import {
   type Signal,
 } from "@/lib/agentWeeklyActivity";
 import MaturityCountUp from "./MaturityCountUp";
+import StallWatchSection from "./StallWatchSection";
 
 /**
  * /agent-team「週次稼働」タブ（サーバー描画）。エラーだけでなく、各AI社員・Grok Bot が今週どれだけ機能したか。
  * 見る順: ① 機能した社員の数と判定の内訳 → ② 次の一手（🔴🟡） → ③ 社員ごとの表（押すと内訳）。
  * 数えるのは土曜 9:00 の scripts/jarvis_agent_weekly_activity.py（314 週次と同時）。
+ * 先頭は 315-B の日次（300番台 停止・空回り。StallWatchSection）。週次の集計とは別の記録。
  */
 
 type Vars = CSSProperties & Record<`--${string}`, string | number>;
@@ -169,6 +171,7 @@ export default async function WeeklyActivityPanel() {
   if (!report) {
     return (
       <section className="wa">
+        <StallWatchSection />
         {error ? <p className="meta">記録を読めませんでした（{error}）。</p> : null}
         <p className="meta">まだ週次稼働の記録がありません。最初の集計は次の土曜 9:00（314 週次と同時）に入ります。</p>
       </section>
@@ -183,6 +186,7 @@ export default async function WeeklyActivityPanel() {
 
   return (
     <section className="wa">
+      <StallWatchSection />
       <div className="wa-hero">
         <div>
           <p className="wa-eyebrow">今週機能したAI社員・Grok Bot</p>
