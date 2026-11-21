@@ -3,7 +3,7 @@
 第2段階の作業フロー正本（会話磨き 2026-10-21）。  
 作り方: [`06_社員の作り方_二段階_20261009.md`](../../06_社員の作り方_二段階_20261009.md)
 
-- FlowForge（閲覧／編集）: [flow_M8SvKC1IDTDi496Vw-DgGjpD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD)
+- FlowForge（閲覧／編集）: [flow_k3luzQfsGTzYu7-2q5fibdXd](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_k3luzQfsGTzYu7-2q5fibdXd)
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - Nody 版の見直し（2026-11-10、FlowForge 版との比較用）: [flow_Nody版_20261110.md](./flow_Nody版_20261110.md) ／ 図つき [flow_Nody版_20261110.html](./flow_Nody版_20261110.html)
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH

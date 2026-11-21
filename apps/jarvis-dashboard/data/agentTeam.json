@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-21T21:32:11+09:00",
+  "updated": "2026-11-21T21:40:04+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -1889,10 +1889,10 @@
       "builder_tag": "",
       "mixup_kind": "",
       "grok_counterpart": "",
-      "flowforge_id": "flow_M8SvKC1IDTDi496Vw-DgGjpD",
-      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD",
-      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_M8SvKC1IDTDi496Vw-DgGjpD",
+      "flowforge_id": "flow_k3luzQfsGTzYu7-2q5fibdXd",
+      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_k3luzQfsGTzYu7-2q5fibdXd",
+      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/vg-hTz_zTJwBGVMK",
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_k3luzQfsGTzYu7-2q5fibdXd",
       "permissions": {
         "can_do": "Todoist起票の本線（L0整理／L1ダイジェスト見るだけ／L2了承後create。closeはしない）",
         "methods": [
@@ -1997,7 +1997,7 @@
           {
             "title": "FlowForge（作業フロー）",
             "path": "",
-            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/vg-hTz_zTJwBGVMK",
             "kind": "flowforge"
           },
           {

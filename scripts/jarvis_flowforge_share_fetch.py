@@ -6,7 +6,7 @@ This CLI sets Origin so Codex / Cursor / Claude can read flows without screensho
 
 Usage:
   python scripts/jarvis_flowforge_share_fetch.py --share tn9-F4fhdIgHVpRl
-  python scripts/jarvis_flowforge_share_fetch.py --flow-id flow_M8SvKC1IDTDi496Vw-DgGjpD
+  python scripts/jarvis_flowforge_share_fetch.py --flow-id flow_k3luzQfsGTzYu7-2q5fibdXd
   python scripts/jarvis_flowforge_share_fetch.py --url 'https://…/share/tn9-F4fhdIgHVpRl'
   python scripts/jarvis_flowforge_share_fetch.py --share tn9-… --summary
 """
