@@ -89,8 +89,28 @@ def cmd_push(dst: Path, dry: bool) -> int:
     return 0
 
 
+# 311 送信前品質係: input/ の依頼 MD は処理後 input/processed/ へ移る。非公開 clone には
+# input/ 側が残るので、そのまま restore すると毎回 input/ へ戻って再判定・再通知が続く（2026-11-21）。
+INBOX_311 = ("docs/AIエージェントチーム/300_品質・タスク運用管理室/311_送信前品質係/input/")
+
+
+def already_processed(rel: str, repo: Path = REPO) -> bool:
+    """311 の依頼 MD で、processed/ に同名（同名_時刻・error_ 付き含む）の処理済みがあるか。"""
+    if not rel.startswith(INBOX_311):
+        return False
+    name = rel[len(INBOX_311):]
+    if "/" in name or not name.startswith("2") or not name.endswith(".md"):
+        return False
+    processed = repo / INBOX_311 / "processed"
+    if not processed.is_dir():
+        return False
+    stem = name[:-3]
+    return (processed / name).exists() or (processed / f"error_{name}").exists() \
+        or any(processed.glob(f"{stem}_*.md")) or any(processed.glob(f"error_{stem}_*.md"))
+
+
 def cmd_restore(dst: Path, dry: bool) -> int:
-    rels = private_files(dst)
+    rels = [r for r in private_files(dst) if not already_processed(r)]
     back = copy_newer(dst, REPO, rels, overwrite=False, dry=dry)
     print(f"private restore: {len(back)} 件を戻す" + ("（dry-run）" if dry else ""))
     return 0

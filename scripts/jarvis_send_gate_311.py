@@ -625,6 +625,76 @@ def _write_output(res: GateResult) -> Path:
     return path
 
 
+# ---- 重複排除（2026-11-21）----
+# 同じ依頼（ファイル名の時刻＋source）・同じ内容（draft_path＋下書き本文のハッシュ）は
+# 2回目から判定も通知もしない。state は .jarvis_state/（git 管理外）。
+STATE_PATH = REPO / ".jarvis_state" / "send_gate_311_seen.json"
+_STAMP_RE = re.compile(r"^(\d{8}_\d{6})")
+
+
+def request_id_of(md: Path, source: str) -> str:
+    m = _STAMP_RE.match(md.name)
+    return f"{m.group(1) if m else md.stem}_{source}"
+
+
+def content_hash_of(draft: Path, body: str) -> str:
+    import hashlib
+
+    h = hashlib.sha256()
+    h.update(str(draft).encode("utf-8"))
+    h.update(b"\0")
+    h.update((body or "").encode("utf-8"))
+    return h.hexdigest()
+
+
+def _load_state(path: Path) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            data.setdefault("requests", {})
+            data.setdefault("contents", {})
+            data.setdefault("history", [])
+            return data
+    except (OSError, ValueError):
+        pass
+    return {"requests": {}, "contents": {}, "history": []}
+
+
+def _save_state(path: Path, state: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    state["history"] = state.get("history", [])[-200:]
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
+def find_duplicate(state: dict[str, Any], request_id: str, chash: str) -> str:
+    """重複なら理由（request|content）、新規なら空文字。"""
+    prev = state["requests"].get(request_id)
+    if prev and prev.get("content_hash") == chash:
+        return "request"
+    if chash in state["contents"]:
+        return "content"
+    return ""
+
+
+def record_judged(
+    state: dict[str, Any],
+    request_id: str,
+    chash: str,
+    *,
+    overall: str,
+    forced: bool,
+) -> None:
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    state["requests"][request_id] = {"content_hash": chash, "overall": overall, "at": now}
+    state["contents"][chash] = {"request_id": request_id, "overall": overall, "at": now}
+    if forced:
+        state["history"].append(
+            {"at": now, "event": "force_recheck", "request_id": request_id, "overall": overall}
+        )
+
+
 def _process_one(
     draft: Path,
     source: str,
@@ -634,8 +704,11 @@ def _process_one(
     cfg: dict[str, Any],
     resolved_to: list[str] | None = None,
     resolved_cc: list[str] | None = None,
+    info: dict[str, Any] | None = None,
+    body: str | None = None,
 ) -> int:
-    body = _read_draft(draft)
+    if body is None:
+        body = _read_draft(draft)
     partner = _partner_from_path(draft)
     res = run_checks(
         draft_path=draft,
@@ -647,6 +720,9 @@ def _process_one(
         resolved_cc=resolved_cc,
     )
     out_path = _write_output(res)
+    if info is not None:
+        info["overall"] = res.overall
+        info["posted"] = False
     print(f"overall={res.overall}")
     if res.reason:
         print(f"reason={res.reason}")
@@ -664,7 +740,18 @@ def _process_one(
         code = _post_slack(ch, text)
         if code != 0:
             return code
+        if info is not None:
+            info["posted"] = True
     return 0 if res.overall == "OK" else 10
+
+
+def _move_processed(md: Path, processed_dir: Path) -> Path:
+    dest = processed_dir / md.name
+    if dest.exists():
+        dest = processed_dir / f"{md.stem}_{datetime.now().strftime('%H%M%S')}{md.suffix}"
+    md.rename(dest)
+    print(f"inbox_processed={dest}")
+    return dest
 
 
 def main() -> int:
@@ -703,6 +790,17 @@ def main() -> int:
         "--partner",
         default="",
         help="--enqueue 時の partner_or_thread（省略時はパスから推定）",
+    )
+    ap.add_argument(
+        "--force-recheck",
+        action="store_true",
+        help="重複済みの依頼でも再判定する（--from-inbox 用。履歴に残る）",
+    )
+    ap.add_argument(
+        "--state-path",
+        type=Path,
+        default=Path(os.environ.get("JARVIS_311_STATE_PATH") or STATE_PATH),
+        help="重複排除 state（既定 .jarvis_state/send_gate_311_seen.json）",
     )
     ap.add_argument("--dry-run", action="store_true", help="Slackに投稿しない")
     ap.add_argument("--post", action="store_true", help="Slack #report/#consult へ投稿")
@@ -783,6 +881,8 @@ def main() -> int:
             print(f"inbox に処理対象 MD がありません: {inbox}")
             return 0
         worst = 0
+        state_path = args.state_path
+        state = _load_state(state_path)
         processed_dir = inbox / "processed"
         processed_dir.mkdir(parents=True, exist_ok=True)
         for md in mds:
@@ -807,6 +907,22 @@ def main() -> int:
                     print(f"inbox_error={bad}")
                 continue
             try:
+                body = _read_draft(draft)
+                rid = request_id_of(md, source)
+                chash = content_hash_of(draft, body)
+                # 状態を使うのは --post のときだけ（dry-run が本番の通知を消さないように）
+                use_state = bool(args.post)
+                dup = (
+                    find_duplicate(state, rid, chash)
+                    if use_state and not args.force_recheck
+                    else ""
+                )
+                if dup:
+                    print(f"重複スキップ: {md.name}（{dup}一致・判定も通知もしない）")
+                    if not args.keep_inbox:
+                        _move_processed(md, processed_dir)
+                    continue
+                info: dict[str, Any] = {}
                 code = _process_one(
                     draft,
                     source,
@@ -815,7 +931,14 @@ def main() -> int:
                     cfg=cfg,
                     resolved_to=resolved_to or None,
                     resolved_cc=resolved_cc or None,
+                    info=info,
+                    body=body,
                 )
+                if use_state and info.get("posted"):
+                    record_judged(
+                        state, rid, chash, overall=info.get("overall", ""), forced=args.force_recheck
+                    )
+                    _save_state(state_path, state)
             except DraftNotReady as e:
                 # 1 件読めないだけで poll 全体を落とさない。MD は inbox に残し次回読み直す
                 print(f"⏳ {e}（inbox に残して次回）", file=sys.stderr)
@@ -823,14 +946,7 @@ def main() -> int:
                 continue
             worst = max(worst, code)
             if not args.keep_inbox:
-                dest = processed_dir / md.name
-                if dest.exists():
-                    dest = (
-                        processed_dir
-                        / f"{md.stem}_{datetime.now().strftime('%H%M%S')}{md.suffix}"
-                    )
-                md.rename(dest)
-                print(f"inbox_processed={dest}")
+                _move_processed(md, processed_dir)
         print(f"inbox_done count={len(mds)} worst_exit={worst}")
         return worst
 
