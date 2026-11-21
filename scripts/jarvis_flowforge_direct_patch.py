@@ -26,6 +26,8 @@ from typing import Any
 
 # 直接編集で書き換えてよいノードの項目（種別や位置は変えない）
 PATCHABLE_KEYS = ("title", "description", "meta", "toolName")
+# 直接編集で書き換えてよいフロー全体の項目（update_flow。2026-11-22 新規作成の整形用）
+FLOW_KEYS = ("name", "description")
 MAX_OPS = 12
 # 直接編集が履歴に残す名前。自動で戻す時は、いちばん上の履歴がこの名前であることを確かめてから戻す
 HISTORY_LABEL = "Jarvis 直接編集"
@@ -99,7 +101,7 @@ def validate_node(raw: Any, existing: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise PatchError("node must be an object")
     n = dict(raw)
-    allowed = {"id", "parentId", "kind", "subtype", "x", "y", *PATCHABLE_KEYS}
+    allowed = {"id", "parentId", "kind", "subtype", "x", "y", "width", "height", *PATCHABLE_KEYS}
     if set(n) - allowed:
         raise PatchError("unknown node fields")
     if not isinstance(n.get("id"), str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", n["id"]):
@@ -120,6 +122,9 @@ def validate_node(raw: Any, existing: dict[str, Any]) -> dict[str, Any]:
     for k in ("x", "y"):
         if isinstance(n.get(k), bool) or not isinstance(n.get(k), (int, float)) or not math.isfinite(n[k]) or n[k] != round(n[k]):
             raise PatchError("node position must be a finite integer")
+    for k in ("width", "height"):
+        if k in n and (n["kind"] != "subflow" or isinstance(n[k], bool) or not isinstance(n[k], int) or not 40 <= n[k] <= 5000):
+            raise PatchError("width/height are positive integers for subflow nodes only")
     if n.get("parentId") and existing.get(n["parentId"], {}).get("kind") != "subflow":
         raise PatchError("parent must be an existing subflow")
     return n
@@ -177,7 +182,8 @@ def native_flow(flow: dict[str, Any]) -> dict[str, Any]:
     return {**flow, "nodes": [
         {"id": n["id"], **({"parentId": n["parentId"]} if n.get("parentId") else {}),
          "position": {"x": n["x"], "y": n["y"]},
-         "data": {k:v for k,v in n.items() if k not in {"id", "parentId", "x", "y"}}}
+         **{k: n[k] for k in ("width", "height") if k in n},
+         "data": {k:v for k,v in n.items() if k not in {"id", "parentId", "x", "y", "width", "height"}}}
         for n in flow["nodes"]]}
 
 
@@ -188,6 +194,7 @@ def plan_patch(snap: dict[str, Any], ops: list[dict[str, Any]]) -> dict[str, Any
       {"op": "update_node", "id": "...", "patch": {"description": "..."}}
       {"op": "add_edge", "source": "...", "target": "...", "replace": false}
       {"op": "remove_edge", "id": "..."}  または  {"op": "remove_edge", "source": "...", "target": "..."}
+      {"op": "update_flow", "patch": {"name": "...", "description": "..."}}   # フロー名・説明だけ
     """
     if not isinstance(ops, list) or not ops:
         raise PatchError("操作が空です")
@@ -198,6 +205,7 @@ def plan_patch(snap: dict[str, Any], ops: list[dict[str, Any]]) -> dict[str, Any
     work = {
         "nodes": [dict(n) for n in snap.get("nodes", [])],
         "edges": [dict(e) for e in snap.get("edges", [])],
+        **{k: snap[k] for k in FLOW_KEYS if k in snap},
     }
     steps: list[dict[str, Any]] = []
     notes: list[str] = []
@@ -206,7 +214,18 @@ def plan_patch(snap: dict[str, Any], ops: list[dict[str, Any]]) -> dict[str, Any
     for i, op in enumerate(ops, 1):
         kind = op.get("op") if isinstance(op, dict) else None
         nodes = node_map(work)
-        if kind == "add_node":
+        if kind == "update_flow":
+            patch = op.get("patch")
+            if not isinstance(patch, dict) or not patch or set(patch) - set(FLOW_KEYS):
+                raise PatchError(f"{i}件目: update_flow の patch は name / description だけです")
+            for k, v in patch.items():
+                if not isinstance(v, str) or len(v) > MAX_TEXT:
+                    raise PatchError(f"{i}件目: {k} は {MAX_TEXT} 文字までの文字列で指定してください")
+            if "name" in patch and not patch["name"].strip():
+                raise PatchError(f"{i}件目: name を空にはできません")
+            work.update(patch)
+            steps.append({"op": "update_flow", "patch": dict(patch)})
+        elif kind == "add_node":
             n = validate_node(op.get("node"), nodes)
             work["nodes"].append(n)
             steps.append({"op": "add_node", "node": n})
@@ -289,7 +308,7 @@ def plan_patch(snap: dict[str, Any], ops: list[dict[str, Any]]) -> dict[str, Any
             steps.append({"op": "remove_edge", "id": hit[0]["id"]})
 
         else:
-            raise PatchError(f"{i}件目: 知らない操作です（{kind}）。使えるのは update_node / add_edge / remove_edge")
+            raise PatchError(f"{i}件目: 知らない操作です（{kind}）。使えるのは update_node / add_node / remove_node / add_edge / remove_edge / update_flow")
 
     if not steps:
         raise PatchError("実行する操作がありません（" + " / ".join(notes) + "）" if notes else "実行する操作がありません")
@@ -305,6 +324,9 @@ def _edge_pairs(snap: dict[str, Any]) -> list[tuple[str, str]]:
 def compare_to_expected(expected: dict[str, Any], actual: dict[str, Any]) -> list[str]:
     """実行後の状態が計画どおりか。違いを日本語で返す（空なら一致）。"""
     diffs: list[str] = []
+    for k in FLOW_KEYS:
+        if k in expected and k in actual and (expected[k] or "") != (actual[k] or ""):
+            diffs.append(f"フローの {k} が計画と違う")
     exp_nodes, act_nodes = node_map(expected), node_map(actual)
     for nid in exp_nodes.keys() - act_nodes.keys():
         diffs.append(f"ノードが消えた: {title_of(expected, nid)}")
@@ -350,6 +372,7 @@ def summarize_change(before: dict[str, Any], after: dict[str, Any]) -> dict[str,
         if keys:
             changed.append({"node": title_of(after, nid), "id": nid, "fields": keys})
     return {
+        "flow_fields_changed": [k for k in FLOW_KEYS if k in before and k in after and before[k] != after[k]],
         "nodes_before": len(bn),
         "nodes_after": len(an),
         "nodes_changed": changed,
@@ -432,12 +455,16 @@ def js_apply(fid: str, steps: list[dict[str, Any]], label: str) -> str:
         "if(st.op==='update_node'){ s.updateNodeData(fid,st.id,st.patch); }"
         "else if(st.op==='add_node'){ var f=JSON.parse(JSON.stringify(s.flows[fid])); var n=st.node;"
         "if(f.nodes.some(function(v){return v.id===n.id;})) throw new Error('node_exists');"
-        "var data={}; Object.keys(n).forEach(function(k){if(['id','parentId','x','y'].indexOf(k)<0)data[k]=n[k];});"
-        "f.nodes.push({id:n.id,parentId:n.parentId||undefined,position:{x:n.x,y:n.y},data:data});"
+        "var data={}; Object.keys(n).forEach(function(k){if(['id','parentId','x','y','width','height'].indexOf(k)<0)data[k]=n[k];});"
+        "if(n.kind==='subflow'&&!data.label)data.label=n.title;"
+        "var nn={id:n.id,parentId:n.parentId||undefined,position:{x:n.x,y:n.y},data:data};"
+        "if(n.width)nn.width=n.width; if(n.height)nn.height=n.height; f.nodes.push(nn);"
         "f.updatedAt=new Date().toISOString();s.loadFlow(f); }"
         "else if(st.op==='remove_node'){var f=JSON.parse(JSON.stringify(s.flows[fid]));"
         "if(f.nodes.some(function(n){return n.parentId===st.id;})||f.edges.some(function(e){return e.source===st.id||e.target===st.id;}))throw new Error('node_has_links');"
         "f.nodes=f.nodes.filter(function(n){return n.id!==st.id;});f.updatedAt=new Date().toISOString();s.loadFlow(f); }"
+        "else if(st.op==='update_flow'){var f=JSON.parse(JSON.stringify(s.flows[fid]));"
+        "Object.keys(st.patch).forEach(function(k){f[k]=st.patch[k];});f.updatedAt=new Date().toISOString();s.loadFlow(f); }"
         "else if(st.op==='add_edge'){ s.addEdge(fid,{source:st.source,target:st.target}); }"
         "else if(st.op==='remove_edge'){ s.removeEdge(fid,st.id); }"
         "else { throw new Error('unknown op '+st.op); } done++; } }catch(e){ err=String(e); }"

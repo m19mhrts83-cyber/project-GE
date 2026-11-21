@@ -32,14 +32,16 @@ AppleScript 経由で JavaScript を実行して入力欄へ文を入れる。
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -52,8 +54,55 @@ REPLY_WAIT_SEC = 120
 WATCH_POLL_SEC = 5
 QUEUE_EXPIRE_MIN = 60  # 置かれてからこの時間を過ぎた依頼は送らない（了承が古い）
 QUEUE_STUCK_MIN = 10
+MANUAL_LOCK_WAIT_SEC = 600
 # フローの置き場にしている Chrome のプロフィール（既定プロフィール＝Default）
 CHROME_PROFILE = os.environ.get("FLOWFORGE_CHROME_PROFILE", "Default")
+# 編集の共通ロック（2026-11-22）。待ち箱の常駐・手元の編集・新規作成（jarvis_flowforge_create_flow.py）で共有する。
+# worktree が違っても同じ場所を見るよう、~/git-repos 側の .jarvis_state（Git 対象外）に置く
+EDIT_LOCK_PATH = Path(
+    os.environ.get("FLOWFORGE_EDIT_LOCK")
+    or Path.home() / "git-repos" / ".jarvis_state" / "flowforge" / "edit.lock"
+)
+
+
+@contextmanager
+def edit_lock(wait_sec: float = 0.0, holder: str = "") -> Iterator[bool]:
+    """FlowForge を編集する処理を同時に1つにする（flock。落ちたら OS が外す）。
+
+    取れたら True を渡す。wait_sec 秒待っても取れなければ False（何もしないで戻ること）。
+    ファイルには持ち主の pid・用途・時刻だけを書く（秘密は書かない）。
+    """
+    EDIT_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd = os.open(EDIT_LOCK_PATH, os.O_RDWR | os.O_CREAT, 0o600)
+    got = False
+    try:
+        deadline = time.time() + max(0.0, wait_sec)
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                got = True
+                break
+            except BlockingIOError:
+                if time.time() >= deadline:
+                    break
+                time.sleep(2)
+        if got:
+            os.ftruncate(fd, 0)
+            os.write(fd, json.dumps({"pid": os.getpid(), "holder": holder,
+                                     "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}).encode())
+        yield got
+    finally:
+        if got:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def edit_lock_holder() -> dict[str, Any]:
+    """いまロックを持っている処理（表示用。読めなければ空）。"""
+    try:
+        return json.loads(EDIT_LOCK_PATH.read_text() or "{}")
+    except Exception:
+        return {}
 
 
 def flow_id_for_agent(agent_id: str) -> str:
@@ -610,13 +659,21 @@ def direct_create(flow: dict[str, Any], dry_run: bool = False) -> dict[str, Any]
             "unexpected": diffs, "rolled_back": rolled}
 
 
-def direct_patch(fid: str, ops: list[dict[str, Any]], dry_run: bool = False) -> dict[str, Any]:
+def direct_patch(fid: str, ops: list[dict[str, Any]], dry_run: bool = False,
+                 tab: tuple[int, int] | None = None) -> dict[str, Any]:
     """ノード ID・矢印 ID を指定した直接編集。計画 → 実行 → 検証 → 違えば1手戻す。
 
     戻り値の verified が True なら、計画どおりの変更だけが入っている。
     計画の段階で問題があれば dp.PatchError（何も適用していない）。
+    tab: 呼び出し側がすでに持ち主の編集タブ（window id, tab id）を持っている時に渡す
+    （新規作成の CLI。別のタブを開かず、そのタブの鮮度だけ確かめ直す）。
     """
-    tab, _ = prepare(fid, need_assistant=False)
+    if tab is None:
+        tab, _ = prepare(fid, need_assistant=False)
+    else:
+        tab = ensure_fresh_tab(tab, fid)
+        if json.loads(run_js(*tab, JS_STATE)).get("syncFailed"):
+            raise PasteStop(3, "画面に「同期失敗」が出ています。止めます。")
     before = read_store(tab, fid)
     plan = dp.plan_patch(before, ops)  # ここで PatchError なら何も変えていない
     out: dict[str, Any] = {
@@ -762,6 +819,16 @@ def queue_watch() -> int:
 
 
 def queue_once(sb: Any = None, quiet_when_empty: bool = False) -> int:
+    """1件拾って処理する。編集の共通ロックが他の処理（新規作成など）に取られていれば、拾わずに戻る。"""
+    with edit_lock(0, "queue") as got:
+        if not got:
+            if not quiet_when_empty:
+                print("他の FlowForge 編集が処理中なので、今回は拾いません:", edit_lock_holder().get("holder"))
+            return 0
+        return _queue_once_locked(sb, quiet_when_empty)
+
+
+def _queue_once_locked(sb: Any = None, quiet_when_empty: bool = False) -> int:
     sb = sb or queue_client()
     queue_housekeeping(sb)
     rows = (
@@ -876,6 +943,15 @@ def main() -> int:
     if args.queue_watch:
         return queue_watch()
 
+    # 手元の編集も、待ち箱の常駐・新規作成と同じロックの中で行う（同時に1つ）
+    with edit_lock(MANUAL_LOCK_WAIT_SEC, "manual") as got:
+        if not got:
+            print("他の FlowForge 編集が処理中です（" + str(edit_lock_holder().get("holder")) + "）。終わってからやり直してください")
+            return 15
+        return _manual(args, ap)
+
+
+def _manual(args: argparse.Namespace, ap: argparse.ArgumentParser) -> int:
     if args.create_file:
         try:
             result = direct_create(json.loads(Path(args.create_file).read_text()), dry_run=args.dry_run)
