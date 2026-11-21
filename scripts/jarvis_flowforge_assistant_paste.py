@@ -19,6 +19,7 @@ AppleScript 経由で JavaScript を実行して入力欄へ文を入れる。
   python scripts/jarvis_flowforge_assistant_paste.py --agent 311 --check
   python scripts/jarvis_flowforge_assistant_paste.py --agent 311 --text-file 修正文.txt
   python scripts/jarvis_flowforge_assistant_paste.py --agent 311 --text-file 修正文.txt --send
+  python scripts/jarvis_flowforge_assistant_paste.py --agent 311 --undo 1      # 「元に戻す」を1回
 
 待ち箱（ChatGPT が MCP の queue_flowforge_edit で置いた、本人了承済みの修正文）:
   python scripts/jarvis_flowforge_assistant_paste.py --queue-list
@@ -114,8 +115,11 @@ JS_OWNS = """
   var raw=JSON.parse(localStorage.getItem('flowforge:flows')||'null');
   var fl=raw&&raw.state&&raw.state.flows||{};
   var f=fl[%(fid)s];
+  var t={}; if(f){(f.nodes||[]).forEach(function(n){t[n.id]=(n.data||{}).title||n.id;});}
   return JSON.stringify({ok:true,count:Object.keys(fl).length,has:!!f,
-    nodes:f?(f.nodes||[]).length:0,name:f?f.name:null,updatedAt:f?f.updatedAt:null});
+    nodes:f?(f.nodes||[]).length:0,name:f?f.name:null,updatedAt:f?f.updatedAt:null,
+    edges:f?(f.edges||[]).map(function(e){return t[e.source]+' → '+t[e.target];}):[],
+    titles:f?(f.nodes||[]).map(function(n){return t[n.id];}):[]});
 }catch(e){return JSON.stringify({ok:false,error:String(e)});}})()
 """
 
@@ -152,6 +156,19 @@ JS_SEND = """
 })()
 """
 
+
+JS_UNDO = """
+(function(){
+  var b=[].slice.call(document.querySelectorAll('button')).filter(function(b){
+    return ((b.innerText||'')+(b.getAttribute('aria-label')||'')).indexOf('元に戻す')>=0;})[0];
+  if(!b) return 'no_button';
+  if(b.disabled) return 'disabled';
+  b.click();
+  return 'clicked';
+})()
+"""
+
+UNDO_MAX_PRESSES = 6
 
 JS_SNAPSHOT = """
 (function(){
@@ -263,12 +280,58 @@ def send_and_wait(tab: tuple[int, int], fid: str, before: dict[str, Any]) -> dic
         "reply": snap.get("reply", ""),
         "reply_settled": stable >= 2,
         "sync_failed": bool(snap.get("syncFailed")),
+        **diff_states(before, after),
+    }
+
+
+def list_diff(before: list[str], after: list[str]) -> tuple[list[str], list[str]]:
+    """（増えたもの, 消えたもの）。同じ名前が複数あっても数で比べる。"""
+    b, a = list(before), list(after)
+    for x in list(a):
+        if x in b:
+            b.remove(x)
+            a.remove(x)
+    return a, b
+
+
+def diff_states(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    """送信の前後で、増えた／消えた矢印とノードを出す（頼んでいない変更に気づくため）。"""
+    e_add, e_del = list_diff(before.get("edges") or [], after.get("edges") or [])
+    n_add, n_del = list_diff(before.get("titles") or [], after.get("titles") or [])
+    return {
         "nodes_before": before.get("nodes"),
         "nodes_after": after.get("nodes"),
         "updatedAt_before": before.get("updatedAt"),
         "updatedAt_after": after.get("updatedAt"),
         "changed": before.get("updatedAt") != after.get("updatedAt"),
+        "edges_added": e_add,
+        "edges_removed": e_del,
+        "nodes_added": n_add,
+        "nodes_removed": n_del,
     }
+
+
+def undo_to(tab: tuple[int, int], fid: str, target_updated_at: str | None, presses: int | None) -> dict[str, Any]:
+    """「元に戻す」を押す。target_updated_at があれば、その更新日時に戻るまで（最大 UNDO_MAX_PRESSES 回）。"""
+    before = flow_counts(tab, fid)
+    cur, pressed, stopped = before, 0, ""
+    limit = presses if presses else UNDO_MAX_PRESSES
+    while pressed < limit:
+        if target_updated_at and cur.get("updatedAt") == target_updated_at:
+            break
+        res = run_js(*tab, JS_UNDO)
+        if res != "clicked":
+            stopped = res
+            break
+        pressed += 1
+        time.sleep(1.5)
+        cur = flow_counts(tab, fid)
+    out = diff_states(before, cur)
+    out["undo_presses"] = pressed
+    out["reached_target"] = (cur.get("updatedAt") == target_updated_at) if target_updated_at else None
+    if stopped:
+        out["undo_stopped"] = stopped
+    return out
 
 
 # ---------- 待ち箱 ----------
@@ -356,11 +419,26 @@ def queue_once() -> int:
         # registry の今の ID を正とする（待ち箱に入った後で付け替わっていても古い方へ送らない）
         fid = flow_id_for_agent(str(row["agent_id"]))
         text = str(row["instructions"]).strip()
-        if not text or len(text) > MAX_CHARS:
+        if str(row.get("kind") or "edit") != "undo" and (not text or len(text) > MAX_CHARS):
             raise PasteStop(7, "修正文が空か長すぎます")
-        tab, owns = prepare(fid)
-        fill(tab, text)
-        result = send_and_wait(tab, fid, owns)
+        if str(row.get("kind") or "edit") == "undo":
+            ref = (
+                sb.table(QUEUE_TABLE).select("result, status, flow_id").eq("id", row.get("ref_id")).limit(1).execute().data
+                or []
+            )
+            if not ref or ref[0].get("status") != "sent" or not ref[0].get("result"):
+                raise PasteStop(7, "取り消す対象の送信記録が見つかりません")
+            if ref[0].get("flow_id") != fid:
+                raise PasteStop(7, "取り消す対象のフローが今の登録と違います")
+            target = json.loads(ref[0]["result"]).get("updatedAt_before")
+            if not target:
+                raise PasteStop(7, "送信前の更新日時が記録にありません")
+            tab, _ = prepare(fid)
+            result = undo_to(tab, fid, target, None)
+        else:
+            tab, owns = prepare(fid)
+            fill(tab, text)
+            result = send_and_wait(tab, fid, owns)
     except PasteStop as e:
         print(str(e))
         finish("error", error=str(e)[:500])
@@ -384,6 +462,7 @@ def main() -> int:
     ap.add_argument("--text-file", help="修正文のファイル（UTF-8）")
     ap.add_argument("--check", action="store_true", help="持ち主かどうかと画面の状態だけ確かめる")
     ap.add_argument("--send", action="store_true", help="入力後に送信まで行う（既定は入力だけ）")
+    ap.add_argument("--undo", type=int, metavar="N", help="「元に戻す」を N 回押す（1〜6）")
     args = ap.parse_args()
 
     if args.queue_list:
@@ -393,6 +472,17 @@ def main() -> int:
 
     fid = args.flow_id or flow_id_for_agent(args.agent)
     text = ""
+    if args.undo:
+        if not 1 <= args.undo <= UNDO_MAX_PRESSES:
+            ap.error(f"--undo は 1〜{UNDO_MAX_PRESSES}")
+        try:
+            tab, _ = prepare(fid)
+            result = undo_to(tab, fid, None, args.undo)
+        except PasteStop as e:
+            print(str(e))
+            return e.code
+        print("結果:", result)
+        return 0
     if not args.check:
         if not args.text_file:
             ap.error("--text-file が必要です（確認だけなら --check）")

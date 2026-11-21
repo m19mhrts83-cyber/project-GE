@@ -12,12 +12,16 @@ import {
   summarizeFlowPayload,
 } from "@/lib/flowforgeShareProxy";
 import { editViewFlowPayload } from "@/lib/flowforgeEditView";
-import { getFlowforgeEditStatus, queueFlowforgeEdit } from "@/lib/flowforgeEditQueue";
+import {
+  getFlowforgeEditStatus,
+  queueFlowforgeEdit,
+  queueFlowforgeUndo,
+} from "@/lib/flowforgeEditQueue";
 
 export const FLOWFORGE_MCP_PROTOCOL = "2024-11-05";
 export const FLOWFORGE_MCP_SERVER_INFO = {
   name: "jarvis-flowforge-read",
-  version: "1.1.0",
+  version: "1.2.0",
 };
 
 type JsonRpcId = string | number | null;
@@ -98,11 +102,25 @@ const TOOLS = [
   {
     name: "get_flowforge_edit_status",
     description:
-      "Read the state of a queued edit (queued / running / sent / error) and the FlowForge AI assistant's reply. After status=sent, re-read the flow with resolve_flowforge_flow view=edit to verify the change.",
+      "Read the state of a queued edit (queued / running / sent / error), the FlowForge AI assistant's reply, and what actually changed: edges_added / edges_removed / nodes_added / nodes_removed. FlowForge sometimes makes changes that were not asked for (it may drop an existing arrow or auto-connect isolated nodes), so always compare these lists with the request and tell the user about anything extra. If something extra happened, offer undo_flowforge_edit.",
     inputSchema: {
       type: "object",
       properties: { id: { type: "string", description: "id returned by queue_flowforge_edit" } },
       required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "undo_flowforge_edit",
+    description:
+      "Undo one sent edit: the Mac program presses FlowForge's own Undo until the flow is back to the state just before that edit. Use right after an edit whose result had unrequested changes. Call only after the user said to undo it (confirmedByUser=true). Check the outcome with get_flowforge_edit_status on the returned id (reached_target=true means fully restored).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "id of the sent edit to undo" },
+        confirmedByUser: { type: "boolean", description: "true only if the user asked to undo" },
+      },
+      required: ["id", "confirmedByUser"],
       additionalProperties: false,
     },
   },
@@ -218,11 +236,17 @@ export async function handleFlowforgeMcpRequest(
       params.arguments && typeof params.arguments === "object"
         ? (params.arguments as Record<string, unknown>)
         : {};
-    if (name === "queue_flowforge_edit" || name === "get_flowforge_edit_status") {
+    if (
+      name === "queue_flowforge_edit" ||
+      name === "get_flowforge_edit_status" ||
+      name === "undo_flowforge_edit"
+    ) {
       const res =
         name === "queue_flowforge_edit"
           ? await queueFlowforgeEdit(args)
-          : await getFlowforgeEditStatus(args);
+          : name === "undo_flowforge_edit"
+            ? await queueFlowforgeUndo(args)
+            : await getFlowforgeEditStatus(args);
       return rpcResult(id, {
         content: [{ type: "text", text: JSON.stringify(res, null, 2) }],
         isError: !res.ok,

@@ -52,6 +52,36 @@ export async function queueFlowforgeEdit(args: Record<string, unknown>): Promise
   };
 }
 
+/**
+ * 送信済みの修正を取り消す依頼を置く。Mac のプログラムが FlowForge の「元に戻す」を、
+ * その修正の直前の状態に戻るまで押す。直後の取り消し向け（間に別の編集があると戻りきれない）。
+ */
+export async function queueFlowforgeUndo(args: Record<string, unknown>): Promise<QueueResult> {
+  const id = typeof args.id === "string" ? args.id.trim() : "";
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, error: "id_required" };
+  if (args.confirmedByUser !== true) return { ok: false, error: "user_confirmation_required" };
+  const sb = createServiceClient();
+  if (!sb) return { ok: false, error: "queue_storage_not_configured" };
+  const ref = await sb.from(TABLE).select("id, agent_id, flow_id, status, kind").eq("id", id).maybeSingle();
+  if (ref.error) return { ok: false, error: "queue_read_failed" };
+  if (!ref.data) return { ok: false, error: "not_found" };
+  if (ref.data.kind === "undo") return { ok: false, error: "cannot_undo_an_undo" };
+  if (ref.data.status !== "sent") return { ok: false, error: "only_sent_edits_can_be_undone" };
+  const ins = await sb
+    .from(TABLE)
+    .insert({
+      agent_id: ref.data.agent_id,
+      flow_id: ref.data.flow_id,
+      instructions: "（元に戻す）",
+      kind: "undo",
+      ref_id: ref.data.id,
+    })
+    .select("id, agent_id, flow_id, kind, ref_id, status, created_at")
+    .single();
+  if (ins.error || !ins.data) return { ok: false, error: "queue_insert_failed" };
+  return { ok: true, data: ins.data };
+}
+
 export async function getFlowforgeEditStatus(args: Record<string, unknown>): Promise<QueueResult> {
   const id = typeof args.id === "string" ? args.id.trim() : "";
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, error: "id_required" };
@@ -59,7 +89,7 @@ export async function getFlowforgeEditStatus(args: Record<string, unknown>): Pro
   if (!sb) return { ok: false, error: "queue_storage_not_configured" };
   const row = await sb
     .from(TABLE)
-    .select("id, agent_id, flow_id, status, result, error, created_at, started_at, finished_at")
+    .select("id, agent_id, flow_id, kind, ref_id, status, result, error, created_at, started_at, finished_at")
     .eq("id", id)
     .maybeSingle();
   if (row.error) return { ok: false, error: "queue_read_failed" };
