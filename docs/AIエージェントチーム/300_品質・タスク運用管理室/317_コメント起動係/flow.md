@@ -1,6 +1,6 @@
 # フロー — コメント起動係（317）素案
 
-- FlowForge（閲覧／編集）: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi
+- FlowForge（閲覧／編集）: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_xSUdJZJb541Dn4FPzRlJ_m22
 - FlowForge（閲覧専用 share）: https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH（317 反映済）
@@ -52,7 +52,7 @@ flowchart TD
 
 ## FlowForge 作り込みメモ（別チャットへ渡す用）
 
-- [x] トリガー → L0/L1/L2 → Slack 合流（AI初版 `flow_8mwIkbI0S9kV2u5kSwl2I-Oi`）
+- [x] トリガー → L0/L1/L2 → Slack 合流（AI初版 `flow_xSUdJZJb541Dn4FPzRlJ_m22`）
 - [x] 共有URL: `share/qbbUffZBcoAq1lKG`
 - [x] registry／本ファイル先頭リンク更新 → status sync
 - [ ] ノード磨き（kintone混入があれば差し替え・停止ガード明示）

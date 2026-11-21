@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-22T00:15:01+09:00",
+  "updated": "2026-11-22T00:23:43+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -2868,10 +2868,10 @@
       "builder_tag": "",
       "mixup_kind": "",
       "grok_counterpart": "",
-      "flowforge_id": "flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
-      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
-      "flowforge_share_url": "",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_8mwIkbI0S9kV2u5kSwl2I-Oi",
+      "flowforge_id": "flow_xSUdJZJb541Dn4FPzRlJ_m22",
+      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_xSUdJZJb541Dn4FPzRlJ_m22",
+      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/i4ebHaVsHvIVAfwi",
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_xSUdJZJb541Dn4FPzRlJ_m22",
       "permissions": {
         "can_do": "Slack FB／Todoistコメントの常駐拾い・Ack・許可リスト内AI処置（対外・金は人）。冗長はGHA L1／Cloud L2",
         "methods": [
@@ -3002,7 +3002,7 @@
           {
             "title": "FlowForge（作業フロー）",
             "path": "",
-            "url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/i4ebHaVsHvIVAfwi",
             "kind": "flowforge"
           },
           {

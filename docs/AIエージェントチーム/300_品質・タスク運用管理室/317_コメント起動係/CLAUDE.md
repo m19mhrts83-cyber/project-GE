@@ -7,7 +7,7 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 
 ## AIオートメーション（作業フロー）
 
-- **FlowForge（開く）**: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_8mwIkbI0S9kV2u5kSwl2I-Oi
+- **FlowForge（開く）**: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_xSUdJZJb541Dn4FPzRlJ_m22
 - **FlowForge（閲覧 share）**: https://flowforge-259747770348.asia-northeast1.run.app/share/qbbUffZBcoAq1lKG
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
 - 設計の流れ図: [`flow.md`](./flow.md)
