@@ -9,7 +9,7 @@
  */
 import { getAgentById } from "@/lib/agentTeam";
 import { createServiceClient } from "@/lib/supabase/admin";
-import { checkEditRequest, EDIT_QUEUE_MAX_WAITING } from "@/lib/flowforgeEditView";
+import { checkEditRequest, checkPatchRequest, EDIT_QUEUE_MAX_WAITING } from "@/lib/flowforgeEditView";
 
 const TABLE = "flowforge_edit_queue";
 
@@ -39,6 +39,8 @@ export async function queueFlowforgeEdit(args: Record<string, unknown>): Promise
       flow_id: agent.flowforge_id,
       instructions: checked.instructions,
       note: typeof args.note === "string" ? args.note.slice(0, 300) : null,
+      // lockStructure: ノードと矢印が増減したら、Mac 側が送信前の状態まで自動で戻す
+      ops: args.lockStructure === true ? { lockStructure: true } : null,
     })
     .select("id, agent_id, flow_id, status, created_at")
     .single();
@@ -50,6 +52,40 @@ export async function queueFlowforgeEdit(args: Record<string, unknown>): Promise
       next: "Mac のプログラムが拾って FlowForge の AIアシスタントへ送ります。get_flowforge_edit_status で結果を確かめてください。",
     },
   };
+}
+
+/**
+ * 直接編集（AIアシスタントを通さない）の依頼を置く。
+ * Mac のプログラムが、画面の保存部品の操作をノード ID・矢印 ID の指定で呼ぶ。
+ * 実行の直前に「何が変わるはずか」を計算し、実行後に一致を確かめ、違えば1手戻す。
+ */
+export async function queueFlowforgePatch(args: Record<string, unknown>): Promise<QueueResult> {
+  const checked = checkPatchRequest(args);
+  if (!checked.ok) return checked;
+  const agent = getAgentById(checked.agentId);
+  if (!agent?.flowforge_id) return { ok: false, error: "flow_not_registered_for_agent" };
+  const sb = createServiceClient();
+  if (!sb) return { ok: false, error: "queue_storage_not_configured" };
+  const waiting = await sb
+    .from(TABLE)
+    .select("id", { count: "exact", head: true })
+    .in("status", ["queued", "running"]);
+  if (waiting.error) return { ok: false, error: "queue_read_failed" };
+  if ((waiting.count || 0) >= EDIT_QUEUE_MAX_WAITING) return { ok: false, error: "queue_full_wait_for_mac" };
+  const ins = await sb
+    .from(TABLE)
+    .insert({
+      agent_id: checked.agentId,
+      flow_id: agent.flowforge_id,
+      instructions: `（直接編集 ${checked.operations.length}件）`,
+      kind: "patch",
+      ops: { operations: checked.operations },
+      note: typeof args.note === "string" ? args.note.slice(0, 300) : null,
+    })
+    .select("id, agent_id, flow_id, kind, status, created_at")
+    .single();
+  if (ins.error || !ins.data) return { ok: false, error: "queue_insert_failed" };
+  return { ok: true, data: ins.data };
 }
 
 /**

@@ -15,13 +15,14 @@ import { editViewFlowPayload } from "@/lib/flowforgeEditView";
 import {
   getFlowforgeEditStatus,
   queueFlowforgeEdit,
+  queueFlowforgePatch,
   queueFlowforgeUndo,
 } from "@/lib/flowforgeEditQueue";
 
 export const FLOWFORGE_MCP_PROTOCOL = "2024-11-05";
 export const FLOWFORGE_MCP_SERVER_INFO = {
   name: "jarvis-flowforge-read",
-  version: "1.2.0",
+  version: "1.3.0",
 };
 
 type JsonRpcId = string | number | null;
@@ -80,7 +81,7 @@ const TOOLS = [
   {
     name: "queue_flowforge_edit",
     description:
-      "Put edit instructions for one agent's FlowForge flow into a waiting box. A program on the owner's Mac types them into FlowForge's own AI assistant in the owner's browser. Call ONLY after the user has read the exact instruction text in this chat and said to apply it; set confirmedByUser=true only then. Keep each request small (up to about 4 changes, max 6 list items, 2000 chars), one operation per line, refer to nodes by their exact current titles, and do not delete nodes unless the user asked. Does not write to FlowForge directly; the Mac must be awake.",
+      "Natural-language edit through FlowForge's own AI assistant. Use ONLY for what patch_flowforge_flow cannot do (adding or deleting nodes, restructuring). WARNING: after every assistant turn FlowForge auto-connects isolated nodes, enforces one-in/one-out arrows and re-layouts, so changes you did not ask for can happen and wording cannot prevent it; for text or single-arrow changes use patch_flowforge_flow. Put edit instructions for one agent's FlowForge flow into a waiting box. A program on the owner's Mac types them into FlowForge's own AI assistant in the owner's browser. Call ONLY after the user has read the exact instruction text in this chat and said to apply it; set confirmedByUser=true only then. Keep each request small (up to about 4 changes, max 6 list items, 2000 chars), one operation per line, refer to nodes by their exact current titles, and do not delete nodes unless the user asked. Does not write to FlowForge directly; the Mac must be awake.",
     inputSchema: {
       type: "object",
       properties: {
@@ -94,8 +95,61 @@ const TOOLS = [
           description: "true only if the user approved this exact text in the chat",
         },
         note: { type: "string", description: "Optional short memo (why)" },
+        lockStructure: {
+          type: "boolean",
+          description:
+            "true = if any node or arrow is added or removed by this edit, the Mac program automatically restores the state from before the edit and reports an error. Use when the request must not change the structure.",
+        },
       },
       required: ["agentId", "instructions", "confirmedByUser"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "patch_flowforge_flow",
+    description:
+      "PREFERRED way to change an existing flow: exact edits by node id / edge id, without FlowForge's AI assistant. Nothing else changes: no auto-connection of isolated nodes, no re-layout. Get ids from resolve_flowforge_flow view=edit. Operations: update_node {id, patch:{title|description|meta|toolName}} ; add_edge {source, target, replace?} ; remove_edge {id} or {source, target}. FlowForge allows only ONE incoming and ONE outgoing arrow per node (inside a subflow: per node within it; arrows crossing a subflow attach to the subflow itself). An add_edge that would displace an existing arrow is refused unless replace=true, so merges/branches cannot be drawn: describe alternatives in a node description instead. The whole request is planned first; if any operation is invalid nothing is applied. After applying, the result is checked against the plan and rolled back automatically on any mismatch. Adding or deleting nodes is not supported here: use queue_flowforge_edit for that. Call only after the user approved the exact operations (confirmedByUser=true). Check the outcome with get_flowforge_edit_status (verified=true means only the planned changes were made).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        agentId: { type: "string", description: "Agent team id such as 311" },
+        operations: {
+          type: "array",
+          description: "1 to 12 operations, applied in order as one undo step",
+          items: {
+            type: "object",
+            properties: {
+              op: { type: "string", enum: ["update_node", "add_edge", "remove_edge"] },
+              id: { type: "string", description: "node id (update_node) or edge id (remove_edge)" },
+              patch: {
+                type: "object",
+                description: "update_node: fields to set",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  meta: { type: "string" },
+                  toolName: { type: "string" },
+                },
+                additionalProperties: false,
+              },
+              source: { type: "string", description: "node id the arrow starts from" },
+              target: { type: "string", description: "node id the arrow goes to" },
+              replace: {
+                type: "boolean",
+                description: "add_edge: true only if the user agreed that the conflicting existing arrow is removed",
+              },
+            },
+            required: ["op"],
+            additionalProperties: false,
+          },
+        },
+        confirmedByUser: {
+          type: "boolean",
+          description: "true only if the user approved these exact operations in the chat",
+        },
+        note: { type: "string", description: "Optional short memo (why)" },
+      },
+      required: ["agentId", "operations", "confirmedByUser"],
       additionalProperties: false,
     },
   },
@@ -238,13 +292,16 @@ export async function handleFlowforgeMcpRequest(
         : {};
     if (
       name === "queue_flowforge_edit" ||
+      name === "patch_flowforge_flow" ||
       name === "get_flowforge_edit_status" ||
       name === "undo_flowforge_edit"
     ) {
       const res =
         name === "queue_flowforge_edit"
           ? await queueFlowforgeEdit(args)
-          : name === "undo_flowforge_edit"
+          : name === "patch_flowforge_flow"
+            ? await queueFlowforgePatch(args)
+            : name === "undo_flowforge_edit"
             ? await queueFlowforgeUndo(args)
             : await getFlowforgeEditStatus(args);
       return rpcResult(id, {
