@@ -1,0 +1,45 @@
+#!/bin/zsh
+# install: FlowForge 修正文の待ち箱の見張り（KeepAlive 常駐・5 秒ごとに flowforge_edit_queue を見る）
+# 初回は macOS が「Google Chrome の制御を許可しますか」と聞くので、許可する。
+# 止める: launchctl bootout "gui/$(id -u)/com.matsunoma.jarvis.flowforge-edit-queue"
+set -euo pipefail
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+LABEL="com.matsunoma.jarvis.flowforge-edit-queue"
+PLIST="${HOME}/Library/LaunchAgents/${LABEL}.plist"
+RUNNER="${REPO_DIR}/launchd/flowforge_edit_queue_runner.sh"
+LOG_DIR="${HOME}/Library/Logs/jarvis_flowforge_edit_queue"
+mkdir -p "$LOG_DIR"
+chmod +x "$RUNNER"
+
+cat >"$PLIST" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${RUNNER}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>${LOG_DIR}/watch.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>${LOG_DIR}/watch.err.log</string>
+</dict>
+</plist>
+PLIST_EOF
+
+launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
+sleep 1
+launchctl bootstrap "gui/$(id -u)" "$PLIST"
+launchctl enable "gui/$(id -u)/${LABEL}"
+launchctl kickstart -k "gui/$(id -u)/${LABEL}" 2>/dev/null || true
+echo "installed ${LABEL} → ${PLIST}"
+echo "logs: ${LOG_DIR}/watch.*.log"
