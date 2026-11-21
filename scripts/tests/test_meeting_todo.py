@@ -9,6 +9,18 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import jarvis_meeting_todo as m
 import jarvis_meeting_minutes_curate as curate
 
+# Do not read a developer's private aliases in any test/CI process.
+_policy_patch = None
+def setUpModule():
+    global _policy_patch
+    _policy_patch = patch.object(m,'load_owner_policy',return_value={
+        'version':1,'configured':True,'owner_aliases':['owner-alias','owner-alt'],
+        'other_aliases':[],'meetings':{}})
+    _policy_patch.start()
+
+def tearDownModule():
+    _policy_patch.stop()
+
 class Store:
     def __init__(self):self.rows={}
     def get(self,k):return self.rows.get(k)
@@ -17,16 +29,16 @@ class Store:
         if self.rows.get(k)!=old:return False
         self.rows[k]=json.dumps(v,ensure_ascii=False);return True
 
-def artifact(mid='meeting-A',assignee='matsuno',todo='Check synthetic input'):
+def artifact(mid='meeting-A',assignee='owner-alias',todo='Check synthetic input'):
     return m.prepared({'meeting_id':mid,'extracted':True,'body':'# Title\n## ひとことで\na\n## 決まったこと\nb\n## ToDo\nc\n## 次回\nd',
         'candidates':[{'todo':todo,'assignee':assignee,'evidence':'explicit action assignment'}]},mid)
 
 class CandidateTests(unittest.TestCase):
     def test_stable_id_before_truncation(self):
-        a=m.candidate('m',{'todo':'Check  input','assignee':'matsuno','evidence':'x'})
-        b=m.candidate('m',{'todo':'Check input','assignee':'マサハル','evidence':'y'})
+        a=m.candidate('m',{'todo':'Check  input','assignee':'owner-alias','evidence':'x'})
+        b=m.candidate('m',{'todo':'Check input','assignee':'owner-alt','evidence':'y'})
         self.assertEqual(a['candidate_id'],b['candidate_id'])
-        self.assertNotEqual(a['candidate_id'],m.candidate('other',{'todo':'Check input','assignee':'matsuno','evidence':'x'})['candidate_id'])
+        self.assertNotEqual(a['candidate_id'],m.candidate('other',{'todo':'Check input','assignee':'owner-alias','evidence':'x'})['candidate_id'])
         self.assertNotEqual(m.candidate('m',{'todo':'a'*210+'b','evidence':'x'})['candidate_id'],m.candidate('m',{'todo':'a'*210+'c','evidence':'x'})['candidate_id'])
     def test_unknown_owner_and_dates(self):
         c=m.candidate('m',{'todo':'task','assignee':'','evidence':'x','due_raw':'tomorrow','due_date':'2026-11-23'})
@@ -37,14 +49,14 @@ class CandidateTests(unittest.TestCase):
         self.assertEqual(m.prepared(a,'meeting-A')['candidates'],[])
         with self.assertRaises(ValueError):m.prepared({'meeting_id':'x'},'x')
     def test_localized_action_section(self):
-        rows=m.extract_only({'id':'m','summary':'## 5. アクションアイテム\n- **matsuno**: Check input\n- **other**: Another task\n## Next\n- irrelevant'})
+        rows=m.extract_only({'id':'m','summary':'## 5. アクションアイテム\n- **owner-alias**: Check input\n- **other**: Another task\n## Next\n- irrelevant'})
         self.assertEqual(len(rows),2);self.assertEqual(sum(c['owner_confirmed'] for c in rows),1)
 
 class HandoffTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.path=Path(self.tmp.name)/'outbox.json';self.store=Store();self.posts=[]
     def tearDown(self):self.tmp.cleanup()
-    def queue(self,mid='meeting-A',assignee='matsuno'):
+    def queue(self,mid='meeting-A',assignee='owner-alias'):
         m.enqueue(artifact(mid,assignee),{'page_id':'page','notion_url':'https://example.test/note'},self.path)
     def test_unsaved_is_never_enqueued(self):
         with self.assertRaises(ValueError):m.enqueue(artifact(),{},self.path)

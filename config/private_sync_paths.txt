@@ -52,3 +52,6 @@ apps/jarvis-dashboard/config/partner_contacts.private.json
 .jarvis_state/meeting_minutes_curate.json
 .jarvis_state/meeting_minutes_prepared/
 .jarvis_state/meeting_todo_outbox.json
+
+# 714 owner aliases and confirmed per-meeting speaker mappings
+config/meeting_owner.private.json

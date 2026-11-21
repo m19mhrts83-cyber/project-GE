@@ -19,7 +19,8 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[1]
 OUTBOX = REPO / '.jarvis_state' / 'meeting_todo_outbox.json'
 PREFIX = 'meeting_todo:v1:'
-OWNER = re.compile(r'^(?:松野(?:さん|様)?|マサハル|matsuno(?: masaharu)?|masaharu(?: matsuno)?)$', re.I)
+from jarvis_meeting_owner import load_owner_policy, resolve_assignee
+
 
 
 def now():
@@ -54,7 +55,8 @@ def candidate(meeting_id: str, item: dict):
     evidence = str(item.get('evidence') or '').strip()
     if not todo or not evidence or not meeting_id:
         raise ValueError('meeting_id/todo/evidence required')
-    mine = bool(OWNER.fullmatch(assignee))
+    resolution = resolve_assignee(meeting_id, assignee, load_owner_policy())
+    mine = resolution["identity"] == "owner"
     identity = 'owner' if mine else normalize(assignee or 'unknown')
     cid = hashlib.sha256(('v1\0'+meeting_id+'\0'+normalize(todo)+'\0'+identity).encode()).hexdigest()
     due = item.get('due_date') or None
@@ -65,10 +67,10 @@ def candidate(meeting_id: str, item: dict):
             if item.get('due_confirmed') is not True:
                 due = None
     return {'candidate_id':cid,'meeting_id':meeting_id,'todo':todo,'title':todo[:200],
-            'assignee':assignee,'owner_confirmed':mine,'evidence':evidence,
+            'assignee':assignee,'owner_confirmed':mine,'owner_resolution':resolution,'evidence':evidence,
             'due_raw':str(item.get('due_raw') or ''),'due_date':due,'due_confirmed':item.get('due_confirmed') is True,
             'level': 'L2' if due else 'L1','lane':str(item.get('lane') or 'ai_raimo'),
-            'status':'queued' if mine else 'held'}
+            'status':'queued' if mine else 'excluded' if resolution['identity']=='other' else 'held'}
 
 
 def prepared(data: dict, meeting_id: str):
@@ -132,6 +134,17 @@ def dispatch(store=None, poster=None, path: Path=OUTBOX, limit=3):
     if os.getenv('JARVIS_MEETING_TODO_DISABLE','').lower() in {'1','true','yes'}:
         return {'posted':0,'disabled':True}
     state=load_json(path)
+    # Re-check queued owners against the current private policy before any cloud write.
+    policy=load_owner_policy()
+    changed=False
+    for c in state.values():
+        if c.get('status')!='queued':continue
+        resolution=resolve_assignee(c['meeting_id'],c.get('assignee',''),policy)
+        if resolution['identity']!='owner':
+            c.update(owner_confirmed=False,owner_resolution=resolution,
+                     status='excluded' if resolution['identity']=='other' else 'held')
+            changed=True
+    if changed:atomic_json(path,state)
     if not any(c.get('status')=='queued' for c in state.values()): return {'posted':0,'held':sum(c['status']=='held' for c in state.values())}
     if poster is None:
         if not _action_secret(): raise RuntimeError('312 signing key missing; no proposal posted')

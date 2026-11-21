@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "owner_aliases": [],
+  "other_aliases": [],
+  "meetings": {},
+  "pending_aliases": [],
+  "note": "Copy to meeting_owner.private.json; populate only confirmed aliases. First person, roles and speaker IDs belong to confirmed per-meeting mappings, never global aliases."
+}
