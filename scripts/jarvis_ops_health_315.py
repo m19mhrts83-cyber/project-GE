@@ -24,6 +24,8 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from jarvis_ops_health_315_sources import collect, collection_result
+
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 PYTHON_MAC = Path("/Users/matsunomasaharu2/selenium_env/venv/bin/python")
@@ -147,14 +149,14 @@ def gmail_token_snapshot(
     raw = (out or "").strip()
     try:
         # 末尾から JSON オブジェクトを探す
-        idx = raw.rfind("{")
+        idx = raw.find("{")
         if idx >= 0:
             payload = json.loads(raw[idx:])
     except json.JSONDecodeError:
         payload = {}
 
-    if not payload and code != 0:
-        return "要フォロー", [f"Gmail token: 点検失敗 rc={code}"], ["health_fail"]
+    if code != 0 or not isinstance(payload, dict) or "issues" not in payload:
+        return "確認不能", [f"Gmail token: 点検失敗 rc={code}"], ["health_fail"]
 
     issues = [str(x) for x in (payload.get("issues") or [])]
     estate_send = bool(payload.get("estate_send_missing"))
@@ -544,11 +546,11 @@ def build_message(
     return "\n".join(lines)
 
 
-# 315 の判定・投稿を最後に変えた日。判定や投稿の中身を変えたら更新する（7日間は🟢も出る）
-QUIET_GREEN_SINCE = "2026-10-27"
-
-
 def post_slack(channel: str, text: str) -> int:
+    # The shared poster falls back to #report, forbidden for 315-A.
+    if not os.environ.get(f"SLACK_WEBHOOK_AI_TEAM_{channel.upper()}", "").strip():
+        print(f"315: #{channel}専用Webhook未設定（未投稿・他chへ転送しない）", file=sys.stderr)
+        return 2
     py = _python()
     code, out = _run(
         [
@@ -560,9 +562,6 @@ def post_slack(channel: str, text: str) -> int:
             "315 連携健全性",
             "--text",
             text,
-            # 便りがないのが良い便り（2026-11-10 松野さん）。最終変更から7日を過ぎた🟢は出さない
-            "--quiet-green-after",
-            QUIET_GREEN_SINCE,
         ],
         timeout=60,
     )
@@ -603,11 +602,11 @@ def main() -> int:
         print("⚠ --remediate-once は --cloud と併用不可（Mac専用）。cloudのみで続行。", file=sys.stderr)
         args.remediate_once = False
 
-    w_line, w_block = westudy_block(mark_checked=args.mark_checked)
+    w_line, w_block = westudy_block(mark_checked=args.mark_checked and not args.dry_run)
     oc_level, oc_lines = openchat_snapshot(cloud=args.cloud)
     g_level, g_lines, _g_issues = gmail_token_snapshot(
         cloud=args.cloud,
-        mark_prompted=bool(args.mark_checked),
+        mark_prompted=bool(args.mark_checked and not args.dry_run),
     )
 
     remediate_meta: dict[str, str] | None = None
@@ -653,6 +652,21 @@ def main() -> int:
                 else:
                     remediate_meta["need_consult"] = "yes"
 
+    sources = collect(_run, cloud=args.cloud)
+
+    # Extra sources do not start new remediation; existing Mac path stays intact.
+    sources_bad = any(level not in ("OK", "スキップ(cloud)") for level, _ in sources.values())
+    if sources_bad:
+        overall_override = "未解決" if args.remediate_once else "要フォロー"
+    health = overall_override or overall_status(w_line, oc_level, g_level)
+    collection = collection_result([
+        "確認不能" if _westudy_unknown(w_line) or "確認失敗" in w_line else "OK",
+        oc_level, g_level, *(level for level, _ in sources.values()),
+    ])
+    source_report = "\n".join(
+        f"{name}: {level} — {detail}" for name, (level, detail) in sources.items()
+    )
+
     msg = build_message(
         w_line,
         w_block,
@@ -664,6 +678,8 @@ def main() -> int:
         remediate_meta=remediate_meta,
         overall_override=overall_override,
     )
+
+    msg += f"\n\n点検実行: {collection}\n\n" + source_report.replace("\n", "\n\n")
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(JST).strftime("%Y%m%d_%H%M%S")
@@ -679,7 +695,7 @@ def main() -> int:
         remediate_meta=remediate_meta,
         overall_override=overall_override,
     )
-    log_path.write_text(detail + "\n", encoding="utf-8")
+    log_path.write_text(detail + f"\n\n点検実行: {collection}\n{source_report}\n", encoding="utf-8")
     print(msg)
     print(f"\n📎 log: {log_path}")
 
@@ -689,20 +705,14 @@ def main() -> int:
         return 0
 
     rc = post_ops(msg)
-    if (
-        remediate_meta
-        and remediate_meta.get("need_consult") == "yes"
-        and (overall_override or "") in ("未解決", "要フォロー")
-    ):
+    if health in ("未解決", "要フォロー"):
         consult = (
             "【相談】315 連携健全性\n"
-            "1回トライしても直りませんでした\n"
-            "\n"
-            "決めてほしいこと: QR再ログイン／WeStudy再実行／Gmail再同意をやるか\n"
-            "\n"
+            "未解決／確認不能の点検があります（詳細は #ops）\n\n"
+            "決めてほしいこと: 保存済み結果の確認／QR再ログイン／WeStudy再実行／Gmail再同意の要否\n\n"
             "次: 人判断のみ\n"
-            "\n"
-            "詳細: #ops の 315 点検"
+            "担当メモ: #ops の315点検とログを確認\n"
+            "橋渡し: 松野が了承したら、担当へ一声"
         )
         crc = post_slack("consult", consult)
         if crc != 0 and rc == 0:

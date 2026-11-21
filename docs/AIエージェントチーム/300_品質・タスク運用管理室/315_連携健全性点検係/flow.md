@@ -76,3 +76,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-11 | Mac 21:45 `--remediate-once`（検知→1回トライ→結果） |
 | 2026-10-15 | Gmail token ヘルスを Mac 点検に追加（cloud はスキップ） |
 | 2026-10-15 | `docs/flow-overview.html` で3系統を可視化 |
+
+## 315-A 実装照合（2026-11-22）
+
+確定FlowForge（9ノード）の工程対応と差分は [315a-alignment](docs/315a-alignment.md)。GHA履歴→保存済みSquare→CHRLINE healthの順で収集する。Macの既知復旧1回とGmail点検を維持し、点検後の状態を報告する。途中の人の承認ノードは置かず、未解決事項の#consult連携を維持する。

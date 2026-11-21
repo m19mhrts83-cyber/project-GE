@@ -25,3 +25,9 @@
 - トークン破壊の自動復旧・**Gmail 無人ブラウザ再同意**・QR無人完了・YAML大量無確認追記・WeStudy自動再実行
 - 状態を無言で `運用` に上げる（schedule成功確認後の sync は了承済み）
 - `#report`／チャットへの定時報告
+
+## 315-A 差分実装（2026-11-22）
+
+- 確定FlowForge読取・既存運用照合、専用worktreeで実装。工程差分と検証は [315a-alignment](docs/315a-alignment.md)。
+- 315自身の完了GHA履歴・保存済みSquare・CHRLINE healthを接続。正常週次#ops抑止を解除、dry-run mark無効化、専用Webhook以外への転送防止。
+- マージ・本番適用は未実施。schedule/plist/既存復旧1回を維持。状態の格上げなし。

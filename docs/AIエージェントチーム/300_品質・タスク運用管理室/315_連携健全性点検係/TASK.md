@@ -53,3 +53,10 @@
 - 検証: Dashboard npm test 134件・Python unittest 23件・tsc --noEmit・Next build成功。ローカルMCPのresolve(view=edit)は315-B→flow_ZQIfYZY4GJF2XspXY8i0sGWD、315→flow_S5g_i7CCiE0P6RKIp2_MkMTA。共有APIの読取のみで確認。
 - 差分: agentTeam.jsonはupdatedと315.extra_flows以外同一。同期で日付だけ変わった31ファイルは復元。patch待ち箱の実関数をメモリ内の保存先で実行し、315-B/315のflow_idを検証（本番書込なし）。
 - マージ後: Vercelデプロイ成功と本番resolveを確認し、Macのmainを追従。今回のデータ変更に見張り再起動は不要（1件ごとにJSON読取）。切替前の待ち箱が残っていれば内容と新フローのノードIDの適合を確認してから扱う。
+
+## 2026-11-22 315-A 確定工程への差分実装
+
+- task_id: task_74a1ee3381cf / executor: codex / status: done（実装・ローカル検証完了、PRチェック確認）
+- 依頼: 315-Aのみ、既存週次運用と確定FlowForgeを照合し最小差分を実装する。
+- 完了条件: GHA履歴・保存済みSquare probe・CHRLINE healthを突合、成功/部分成功/失敗を区別、dry-runで投稿/mark/復旧なし、テストとpublic guard成功、PR確認。マージ/デプロイなし。
+- 方針: Square liveはtoken削除/更新を伴うため呼ばない。保存済み結果だけ参照する（調整担当了承済み）。

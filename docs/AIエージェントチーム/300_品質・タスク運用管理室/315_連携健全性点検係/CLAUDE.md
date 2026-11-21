@@ -20,8 +20,8 @@ WeStudy／GitHub Actions の失敗、LINE オープンチャット取込、**Gma
 | FF上のステップ | 実装の正 |
 |---|---|
 | 開始トリガー 日曜21:00 | GHA `ops-health-315.yml`（cron UTC 日曜12:00） |
-| GHA実行結果取得 | 本線CLI内で `jarvis_westudy_weekly_check.py`（週次workflowの成否） |
-| Square probe / CHRLINE health | **GHA（`--cloud`）ではスキップ**。Mac 日曜21:45 `--remediate-once` |
+| GHA実行結果取得 | 315自身のmain完了履歴＋既存 `jarvis_westudy_weekly_check.py` |
+| Square probe / CHRLINE health | **GHAではスキップ**。Mac日曜21:45に保存済みSquare結果（liveなし）とCHRLINE health（baseline保存なし）を参照 |
 | Gmail token ヘルス | **GHAではスキップ**。Mac: `jarvis_gmail_token_health`（send欠落・refresh欠如を検知） |
 | 健全性レポート | `jarvis_ops_health_315.py` が本文生成 → `#ops` |
 | 1回トライ | Mac: オプチャ health push → recover_worker／watch resume。**Gmail・WeStudyは自動復旧しない** |
@@ -129,3 +129,10 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-11 | **検知→1回トライ→結果**: `--remediate-once`＋launchd 日曜21:45。パートナー確認依存をやめる |
 | 2026-10-15 | **Gmail token モニター**を役割に追加（Mac 点検・`#ops`／欠落時 `#consult`。自動再同意なし） |
 | 2026-10-24 | **鮮度監視（デッドマンスイッチ）**を追加。エラー検知では拾えない「止まって何も出ない」失敗（オプチャ【スレッド】が 9/30〜10/24 の 3 週間 0 件）を、成果物の最終成功時刻で検知。通知は状態が変わったときだけ・担当と最初の一手つき |
+
+## 315-A 確定工程への整合（2026-11-22）
+
+- 実装計画・工程別照合・安全境界・検証は [`docs/315a-alignment.md`](docs/315a-alignment.md)。315-Bの日次監視とは独立。
+- 正常時も週次 #ops 報告を通す（確定FlowForgeの終了工程に合わせ quiet-green 抑止を外す）。専用Webhook欠落時は未投稿エラーとし、#reportへ転送しない。
+- 「点検実行」の成功／部分成功／失敗と、健全性OK／要フォロー／未解決は別に表示する。cloudのMac委譲は部分成功。
+- 保存済みSquareは174時間以内（週次168時間＋遅延余裕6時間）。未取得・古い・不正は確認不能として#ops／#consult。途中承認・AI分析・新規復旧は足さない。
