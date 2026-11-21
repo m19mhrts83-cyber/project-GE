@@ -4,7 +4,7 @@ DXデモ用に **変更前フローは残す**。本線は改訂版。入口は 
 
 | 版 | FlowForge | 開始トリガー |
 |---|---|---|
-| **改訂版（本線）** | [flow_x4Sw8mVvuGVme1fXz9JGfs3v](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_x4Sw8mVvuGVme1fXz9JGfs3v) | **イベント／都度起動** — 下書きパス受領（入口 A／B） |
+| **改訂版（本線）** | [flow_jTD-Wasy2tAaUlkDk_1EFdTk](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_jTD-Wasy2tAaUlkDk_1EFdTk) | **イベント／都度起動** — 下書きパス受領（入口 A／B） |
 | 変更前（デモ） | [flow_AKQv6lgUEtudWlE5fQUhQnh2](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AKQv6lgUEtudWlE5fQUhQnh2) | 定期 毎日18:00（捨てた設計） |
 
 ## 型（改訂版・2026-10-17）
