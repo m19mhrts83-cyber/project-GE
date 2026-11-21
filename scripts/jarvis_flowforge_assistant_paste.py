@@ -244,6 +244,61 @@ class PasteStop(Exception):
         self.code = code
 
 
+def tab_freshness(tab: tuple[int, int]) -> list[str]:
+    """このタブのメモリが、ブラウザの保存内容より古くないか。食い違いの一覧（空なら最新）。"""
+    raw = run_main(*tab, dp.js_freshness())
+    try:
+        got = json.loads(raw)
+    except Exception:
+        raise PasteStop(10, f"画面の保存部品を読めませんでした（{raw[:120]}）")
+    if not got.get("ok"):
+        raise PasteStop(10, f"画面の保存部品を読めませんでした（{got.get('error')}）")
+    return dp.stale_reasons(got["memory"], got["stored"])
+
+
+def ensure_fresh_tab(tab: tuple[int, int], fid: str) -> tuple[int, int]:
+    """古いタブなら読み込み直す。直らなければ止める（古い内容で他のフローを上書きしないため）。"""
+    reasons = tab_freshness(tab)
+    if not reasons:
+        return tab
+    print("このタブは古い内容を持っています。読み込み直します:", reasons[:3], flush=True)
+    osa(f'tell application "Google Chrome" to reload tab {tab[1]} of window {tab[0]}')
+    time.sleep(6)
+    again = next((t for t in find_tabs(f"/flows/{fid}") if t[0] == tab[0]), None)
+    if again is None:
+        raise PasteStop(6, "読み込み直した後、編集画面のタブが見つかりません")
+    reasons = tab_freshness(again)
+    if reasons:
+        raise PasteStop(14, "タブを読み込み直しても、保存内容と食い違っています。別のタブが同時に書いている可能性があります: " + " / ".join(reasons[:3]))
+    return again
+
+
+def reload_other_editor_tabs(tab: tuple[int, int], fid: str) -> int:
+    """編集の後、同じブラウザの他の FlowForge 編集タブを読み込み直す。
+
+    他のタブは編集前の内容をメモリに持ったままなので、そのまま編集されると今回の変更が上書きで消える。
+    同じ保存内容を持つタブ（＝同じプロフィール）だけを対象にする。
+    """
+    n = 0
+    for other in find_tabs(BASE + "/flows/"):
+        if other == tab:
+            continue
+        try:
+            owns = json.loads(run_js(*other, JS_OWNS % {"fid": json.dumps(fid)}))
+        except Exception:
+            continue  # 別プロフィール（読めない）
+        if not owns.get("has"):
+            continue
+        try:
+            osa(f'tell application "Google Chrome" to reload tab {other[1]} of window {other[0]}')
+            n += 1
+        except Exception:
+            pass
+    if n:
+        print(f"他の FlowForge 編集タブを {n} 個読み込み直しました", flush=True)
+    return n
+
+
 def flow_counts(tab: tuple[int, int], fid: str) -> dict[str, Any]:
     return json.loads(run_js(*tab, JS_OWNS % {"fid": json.dumps(fid)}))
 
@@ -299,6 +354,8 @@ def prepare(fid: str, need_assistant: bool = True) -> tuple[tuple[int, int], dic
         tab = next((t for t in find_tabs(edit_part) if t[0] == owner_tab[0]), None)
     if tab is None:
         raise PasteStop(6, "編集画面のタブが見つかりません")
+    tab = ensure_fresh_tab(tab, fid)
+    owns = flow_counts(tab, fid)  # 読み込み直した場合に備えて取り直す
     state = json.loads(run_js(*tab, JS_STATE))
     print("画面の状態:", state)
     if state.get("syncFailed"):
@@ -396,6 +453,8 @@ def undo_to(tab: tuple[int, int], fid: str, target_updated_at: str | None, press
         time.sleep(1.5)
         cur = flow_counts(tab, fid)
     out = diff_states(before, cur)
+    if pressed:
+        out["other_tabs_reloaded"] = reload_other_editor_tabs(tab, fid)
     out["undo_presses"] = pressed
     out["reached_target"] = (cur.get("updatedAt") == target_updated_at) if target_updated_at else None
     if stopped:
@@ -416,6 +475,7 @@ def assistant_edit(fid: str, text: str, lock_structure: bool = False) -> dict[st
         back = undo_to(tab, fid, owns.get("updatedAt"), None)
         result["rolled_back"] = bool(back.get("reached_target"))
         result["rollback"] = {k: back.get(k) for k in ("undo_presses", "reached_target", "undo_stopped")}
+    result["other_tabs_reloaded"] = reload_other_editor_tabs(tab, fid)
     return result
 
 
@@ -481,6 +541,7 @@ def direct_patch(fid: str, ops: list[dict[str, Any]], dry_run: bool = False) -> 
         out["changed"] = before.get("updatedAt") != after.get("updatedAt")
         out["sync"] = wait_sync(tab)
         out["sync_failed"] = "同期失敗" in out["sync"]
+        out["other_tabs_reloaded"] = reload_other_editor_tabs(tab, fid)
         return out
 
     # 計画と違う。直接編集は履歴1件なので、1手戻せば実行前になる。
@@ -497,6 +558,7 @@ def direct_patch(fid: str, ops: list[dict[str, Any]], dry_run: bool = False) -> 
         )
     out["rolled_back"] = rolled
     out["sync"] = wait_sync(tab)
+    out["other_tabs_reloaded"] = reload_other_editor_tabs(tab, fid)
     if not rolled:
         out["needs_attention"] = "自動では元に戻せませんでした。FlowForge の画面で状態を確かめてください"
     return out
