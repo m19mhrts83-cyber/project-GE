@@ -20,6 +20,8 @@ AppleScript 経由で JavaScript を実行して入力欄へ文を入れる。
   python scripts/jarvis_flowforge_assistant_paste.py --agent 311 --text-file 修正文.txt
   python scripts/jarvis_flowforge_assistant_paste.py --agent 311 --text-file 修正文.txt --send
   python scripts/jarvis_flowforge_assistant_paste.py --agent 311 --undo 1      # 「元に戻す」を1回
+  python scripts/jarvis_flowforge_assistant_paste.py --agent 311 --patch-file ops.json --dry-run   # 直接編集の計画だけ
+  python scripts/jarvis_flowforge_assistant_paste.py --agent 311 --patch-file ops.json             # 直接編集（AIを通さない）
 
 待ち箱（ChatGPT が MCP の queue_flowforge_edit で置いた、本人了承済みの修正文）:
   python scripts/jarvis_flowforge_assistant_paste.py --queue-list
@@ -40,6 +42,8 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jarvis_flowforge_direct_patch as dp  # noqa: E402
 BASE = "https://flowforge-259747770348.asia-northeast1.run.app"
 TEAM_JSON = REPO / "apps" / "jarvis-dashboard" / "data" / "agentTeam.json"
 MAX_CHARS = 2000
@@ -105,6 +109,26 @@ def run_js(win: int, tab: int, js: str) -> str:
         'tell application "Google Chrome" to execute '
         f"tab {tab} of window {win} javascript {as_str(js)}"
     )
+
+
+def run_main(win: int, tab: int, expr: str) -> str:
+    """ページ本体の世界（main world）で JS の式を実行し、文字列の結果を受け取る。
+
+    AppleScript の execute javascript は隔離された世界で動き、画面の内部（React）に届かない。
+    FlowForge は inline script を許している（eval は不可）ので、script 要素で式を入れ、結果を属性で受け取る。
+    """
+    inner = (
+        "try{document.documentElement.setAttribute('data-ffmw',String(" + expr.strip() + "))}"
+        "catch(e){document.documentElement.setAttribute('data-ffmw','ERR:'+e)}"
+    )
+    outer = (
+        "(function(){document.documentElement.removeAttribute('data-ffmw');"
+        "var s=document.createElement('script');s.textContent=" + json.dumps(inner, ensure_ascii=False) + ";"
+        "document.documentElement.appendChild(s);s.remove();"
+        "var r=document.documentElement.getAttribute('data-ffmw');"
+        "document.documentElement.removeAttribute('data-ffmw');return r||'NO_RESULT';})()"
+    )
+    return run_js(win, tab, outer)
 
 
 def open_tab(url: str) -> None:
@@ -379,6 +403,105 @@ def undo_to(tab: tuple[int, int], fid: str, target_updated_at: str | None, press
     return out
 
 
+def assistant_edit(fid: str, text: str, lock_structure: bool = False) -> dict[str, Any]:
+    """AIアシスタントへ修正文を送る。lock_structure なら、ノードか矢印が増減した時に送信前まで戻す。
+
+    戻したかどうかは結果の rolled_back に入る（キーが無ければ、戻す必要が無かった）。
+    """
+    tab, owns = prepare(fid)
+    fill(tab, text)
+    result = send_and_wait(tab, fid, owns)
+    structure_changed = any(result.get(k) for k in ("edges_added", "edges_removed", "nodes_added", "nodes_removed"))
+    if lock_structure and structure_changed:
+        back = undo_to(tab, fid, owns.get("updatedAt"), None)
+        result["rolled_back"] = bool(back.get("reached_target"))
+        result["rollback"] = {k: back.get(k) for k in ("undo_presses", "reached_target", "undo_stopped")}
+    return result
+
+
+# ---------- 直接編集（AIアシスタントを通さない） ----------
+
+JS_SYNC_TEXT = """
+(function(){var m=(document.body.innerText||'').match(/クラウド同期済|クラウド同期中[^\\n]*|ローカル保存済|同期失敗[^\\n]*/);return m?m[0]:'';})()
+"""
+
+
+def read_store(tab: tuple[int, int], fid: str) -> dict[str, Any]:
+    raw = run_main(*tab, dp.js_snapshot(fid))
+    try:
+        got = json.loads(raw)
+    except Exception:
+        raise PasteStop(10, f"画面の保存部品を読めませんでした（{raw[:120]}）")
+    if not got.get("ok"):
+        raise PasteStop(10, f"画面の保存部品を読めませんでした（{got.get('error')}）。FlowForge の画面の作りが変わった可能性があります。")
+    return got["snap"]
+
+
+def wait_sync(tab: tuple[int, int], timeout: float = 20.0) -> str:
+    text, deadline = "", time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(1.5)
+        text = run_js(*tab, JS_SYNC_TEXT)
+        if "同期済" in text or "同期失敗" in text:
+            break
+    return text
+
+
+def direct_patch(fid: str, ops: list[dict[str, Any]], dry_run: bool = False) -> dict[str, Any]:
+    """ノード ID・矢印 ID を指定した直接編集。計画 → 実行 → 検証 → 違えば1手戻す。
+
+    戻り値の verified が True なら、計画どおりの変更だけが入っている。
+    計画の段階で問題があれば dp.PatchError（何も適用していない）。
+    """
+    tab, _ = prepare(fid, need_assistant=False)
+    before = read_store(tab, fid)
+    plan = dp.plan_patch(before, ops)  # ここで PatchError なら何も変えていない
+    out: dict[str, Any] = {
+        "mode": "direct_patch",
+        "steps": len(plan["steps"]),
+        "notes": plan["notes"],
+        "updatedAt_before": before.get("updatedAt"),
+        "planned": dp.summarize_change(before, plan["expected"]),
+    }
+    if dry_run:
+        out["dry_run"] = True
+        return out
+
+    raw = run_main(*tab, dp.js_apply(fid, plan["steps"], dp.HISTORY_LABEL))
+    try:
+        res = json.loads(raw)
+    except Exception:
+        res = {"ok": False, "error": raw[:200], "snap": None}
+    after = res.get("snap") or read_store(tab, fid)
+    diffs = dp.compare_to_expected(plan["expected"], after)
+    if res.get("ok") and not diffs:
+        out.update(dp.summarize_change(before, after))
+        out["verified"] = True
+        out["updatedAt_after"] = after.get("updatedAt")
+        out["changed"] = before.get("updatedAt") != after.get("updatedAt")
+        out["sync"] = wait_sync(tab)
+        out["sync_failed"] = "同期失敗" in out["sync"]
+        return out
+
+    # 計画と違う。直接編集は履歴1件なので、1手戻せば実行前になる。
+    # いちばん上の履歴が自分の入れたものである時だけ戻し、戻せたかも確かめる
+    # （履歴は件数に上限があるので、件数ではなく名前で確かめる）
+    out["verified"] = False
+    out["apply_error"] = res.get("error")
+    out["unexpected"] = diffs[:20]
+    rolled = False
+    if after.get("historyTop") == dp.HISTORY_LABEL:
+        back = json.loads(run_main(*tab, dp.js_undo_once(fid)))
+        rolled = bool(back.get("snap")) and dp.same_state(
+            {k: before[k] for k in ("nodes", "edges")}, {k: back["snap"][k] for k in ("nodes", "edges")}
+        )
+    out["rolled_back"] = rolled
+    out["sync"] = wait_sync(tab)
+    if not rolled:
+        out["needs_attention"] = "自動では元に戻せませんでした。FlowForge の画面で状態を確かめてください"
+    return out
+
+
 # ---------- 待ち箱 ----------
 
 def load_env() -> None:
@@ -500,7 +623,7 @@ def queue_once(sb: Any = None, quiet_when_empty: bool = False) -> int:
         # registry の今の ID を正とする（待ち箱に入った後で付け替わっていても古い方へ送らない）
         fid = flow_id_for_agent(str(row["agent_id"]))
         text = str(row["instructions"]).strip()
-        if str(row.get("kind") or "edit") != "undo" and (not text or len(text) > MAX_CHARS):
+        if str(row.get("kind") or "edit") == "edit" and (not text or len(text) > MAX_CHARS):
             raise PasteStop(7, "修正文が空か長すぎます")
         if str(row.get("kind") or "edit") == "undo":
             ref = (
@@ -516,10 +639,34 @@ def queue_once(sb: Any = None, quiet_when_empty: bool = False) -> int:
                 raise PasteStop(7, "送信前の更新日時が記録にありません")
             tab, _ = prepare(fid, need_assistant=False)
             result = undo_to(tab, fid, target, None)
+        elif str(row.get("kind") or "edit") == "patch":
+            ops = (row.get("ops") or {}).get("operations")
+            result = direct_patch(fid, ops)
+            if not result.get("verified"):
+                print("結果:", result, flush=True)
+                finish(
+                    "error",
+                    error=("計画と違う変更が起きたため元に戻しました" if result.get("rolled_back")
+                           else "計画と違う変更が起き、自動では戻せませんでした。画面で確かめてください"),
+                    result=json.dumps(result, ensure_ascii=False)[:4000],
+                )
+                return 11
         else:
-            tab, owns = prepare(fid)
-            fill(tab, text)
-            result = send_and_wait(tab, fid, owns)
+            lock = bool((row.get("ops") or {}).get("lockStructure"))
+            result = assistant_edit(fid, text, lock)
+            if "rolled_back" in result:
+                print("結果:", {k: v for k, v in result.items() if k != "reply"}, flush=True)
+                finish(
+                    "error",
+                    error=("ノードか矢印が変わったため元に戻しました（lockStructure）" if result["rolled_back"]
+                           else "ノードか矢印が変わり、自動では戻しきれませんでした。画面で確かめてください"),
+                    result=json.dumps(result, ensure_ascii=False)[:4000],
+                )
+                return 12
+    except dp.PatchError as e:
+        print("計画の段階で止めました（何も変えていません）:", str(e))
+        finish("error", error=("何も変えていません: " + str(e))[:500])
+        return 13
     except PasteStop as e:
         print(str(e))
         finish("error", error=str(e)[:500])
@@ -545,6 +692,8 @@ def main() -> int:
     ap.add_argument("--check", action="store_true", help="持ち主かどうかと画面の状態だけ確かめる")
     ap.add_argument("--send", action="store_true", help="入力後に送信まで行う（既定は入力だけ）")
     ap.add_argument("--undo", type=int, metavar="N", help="「元に戻す」を N 回押す（1〜6）")
+    ap.add_argument("--patch-file", help="直接編集の操作（JSON の配列）。AIアシスタントを通さない")
+    ap.add_argument("--dry-run", action="store_true", help="--patch-file と併用: 計画だけ出して適用しない")
     args = ap.parse_args()
 
     if args.queue_list:
@@ -556,6 +705,18 @@ def main() -> int:
 
     fid = args.flow_id or flow_id_for_agent(args.agent)
     text = ""
+    if args.patch_file:
+        ops = json.loads(Path(args.patch_file).read_text(encoding="utf-8"))
+        try:
+            result = direct_patch(fid, ops, dry_run=args.dry_run)
+        except dp.PatchError as e:
+            print("計画の段階で止めました（何も変えていません）:", str(e))
+            return 13
+        except PasteStop as e:
+            print(str(e))
+            return e.code
+        print("結果:", json.dumps(result, ensure_ascii=False, indent=1))
+        return 0 if result.get("verified") or result.get("dry_run") else 11
     if args.undo:
         if not 1 <= args.undo <= UNDO_MAX_PRESSES:
             ap.error(f"--undo は 1〜{UNDO_MAX_PRESSES}")
