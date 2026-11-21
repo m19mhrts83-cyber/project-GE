@@ -142,8 +142,22 @@ JS_STATE = """
   var ta=document.querySelector('textarea[placeholder*="AI Assistant"]');
   var btn=[].slice.call(document.querySelectorAll('button')).filter(function(b){
     return (b.innerText||'').replace(/\\s/g,'').indexOf('送信')===0;})[0];
+  var txt=document.body.innerText||'';
   return JSON.stringify({textarea:!!ta,send:!!btn,sendDisabled:btn?btn.disabled:null,
-    syncFailed:document.body.innerText.indexOf('同期失敗')>=0});
+    syncFailed:txt.indexOf('同期失敗')>=0,
+    turnLimit:txt.indexOf('ターンに達しました')>=0});
+})()
+"""
+
+# AIアシスタントの会話は 10 ターンで打ち切られる。「新しい会話」を押すと続けられる（フローはそのまま）
+JS_NEW_CHAT = """
+(function(){
+  var b=[].slice.call(document.querySelectorAll('button')).filter(function(b){
+    return (b.innerText||'').replace(/\\s/g,'').indexOf('新しい会話')>=0;})[0];
+  if(!b) return 'no_button';
+  if(b.disabled) return 'disabled';
+  b.click();
+  return 'clicked';
 })()
 """
 
@@ -210,7 +224,7 @@ def flow_counts(tab: tuple[int, int], fid: str) -> dict[str, Any]:
     return json.loads(run_js(*tab, JS_OWNS % {"fid": json.dumps(fid)}))
 
 
-def prepare(fid: str) -> tuple[tuple[int, int], dict[str, Any]]:
+def prepare(fid: str, need_assistant: bool = True) -> tuple[tuple[int, int], dict[str, Any]]:
     """持ち主の確認 → 編集画面のタブを返す。持ち主でなければ編集画面を開かない。"""
     edit_part = f"/flows/{fid}"
     # FlowForge のタブは複数のプロフィールにありうる。対象フローを持つタブ（＝持ち主）を探す。
@@ -265,6 +279,16 @@ def prepare(fid: str) -> tuple[tuple[int, int], dict[str, Any]]:
     print("画面の状態:", state)
     if state.get("syncFailed"):
         raise PasteStop(3, "画面に「同期失敗」が出ています。止めます。")
+    if not need_assistant:
+        return tab, owns  # 取り消しは AIアシスタントの入力欄を使わない
+    if state.get("turnLimit"):
+        res = run_js(*tab, JS_NEW_CHAT)
+        print("会話が上限に達していたので、新しい会話を始めます:", res)
+        time.sleep(2)
+        state = json.loads(run_js(*tab, JS_STATE))
+        print("画面の状態:", state)
+        if state.get("turnLimit") or not state.get("textarea"):
+            raise PasteStop(9, "AIアシスタントの会話が上限に達していて、新しい会話を始められませんでした。")
     if not state.get("textarea") or not state.get("send"):
         raise PasteStop(4, "AIアシスタントの入力欄か送信ボタンが見つかりません。画面の作りが変わった可能性があります。")
     return tab, owns
@@ -490,7 +514,7 @@ def queue_once(sb: Any = None, quiet_when_empty: bool = False) -> int:
             target = json.loads(ref[0]["result"]).get("updatedAt_before")
             if not target:
                 raise PasteStop(7, "送信前の更新日時が記録にありません")
-            tab, _ = prepare(fid)
+            tab, _ = prepare(fid, need_assistant=False)
             result = undo_to(tab, fid, target, None)
         else:
             tab, owns = prepare(fid)
@@ -536,7 +560,7 @@ def main() -> int:
         if not 1 <= args.undo <= UNDO_MAX_PRESSES:
             ap.error(f"--undo は 1〜{UNDO_MAX_PRESSES}")
         try:
-            tab, _ = prepare(fid)
+            tab, _ = prepare(fid, need_assistant=False)
             result = undo_to(tab, fid, None, args.undo)
         except PasteStop as e:
             print(str(e))
