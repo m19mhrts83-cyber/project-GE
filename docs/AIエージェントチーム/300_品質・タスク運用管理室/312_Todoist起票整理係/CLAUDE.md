@@ -165,3 +165,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-21 | 運用格上げ確定: A今／B 10-22ソフト／C 初回apply翌日or10-28／D 1.5bはC安定1週後（PROGRESS正本） |
 | 2026-10-22 | Phase2: Slack起票／見送りボタン（#127）。GAS #118 クローズ。問合せ Vercel failover（`45_`） |
 | 2026-11-10 | 入口に台帳（comm_items）を足す。Slack はそのまま、水曜だけ最大 `JARVIS_312_COMM_MAX` 件。#consult は「Slack N件・メール等 M件」 |
+
+## 714の保存済み候補（2026-11-22承認）
+
+714で抽出済みなら再抽出しない。本人根拠・Notion保存済み・安定候補IDを必須にする。会議候補はL1/L2ともSlackで1件ずつ起票／見送り。見送り・登録済みは永久に再提案しない。同期・排他は既存sync_meta、判断はowner_decisions。照合障害・応答不明は再送せず#ops。従来の他入口とcollect/reflectは維持。契約・停止・復旧・適用境界は [714→312](../../700_コーチング支援室/714_議事録整理係/docs/saved-minutes-to-todo.md)。

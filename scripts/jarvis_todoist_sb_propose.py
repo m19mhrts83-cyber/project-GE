@@ -372,6 +372,15 @@ def cmd_propose(args: argparse.Namespace) -> int:
         if args.keyword and not args.latest and len(notes) > 1:
             print(f"# search hits={len(notes)} → 先頭を使用: {meeting_id}", file=sys.stderr)
 
+    import jarvis_meeting_minutes_curate as curate
+    if curate._prepared_path(meeting_id).exists():
+        # A prepared meeting belongs to the saved-only 714 outbox. Do not re-extract or
+        # overwrite legacy proposal state; the source still needs its own Notion approval.
+        if args.json:
+            print(json.dumps({"meeting":{"id":meeting_id},"candidates":[],"handoff":"714_outbox","extracted":True}))
+        else:
+            print("714 prepared: use saved-only outbox; no re-extraction")
+        return 0
     meeting = _fetch_meeting_summary(meeting_id)
     cands = _build_candidates(meeting, signals, mine_first=True)
     if args.mine_only:

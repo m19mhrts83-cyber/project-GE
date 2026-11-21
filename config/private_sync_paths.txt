@@ -47,3 +47,8 @@ docs/AIエージェントチーム/600_リソース・家計室/618_資産記録
 
 # Dashboard 連絡先のうち公開しない宛先（事務局アドレスなど。見本 *.example.json は公開。2026-11-21）
 apps/jarvis-dashboard/config/partner_contacts.private.json
+
+# 714 curated artifacts and durable 714->312 local outbox (private meeting data)
+.jarvis_state/meeting_minutes_curate.json
+.jarvis_state/meeting_minutes_prepared/
+.jarvis_state/meeting_todo_outbox.json

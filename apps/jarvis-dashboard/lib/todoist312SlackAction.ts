@@ -6,6 +6,8 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { logOwnerDecision } from "@/lib/ownerDecisionLog";
+import { applyMeetingTodo } from "@/lib/meetingTodoAction";
+import { meetingTodoDeps } from "@/lib/meetingTodoDeps";
 import { createTodoistTask } from "@/lib/todoistTasks";
 
 export type Todoist312Action = "create" | "dismiss";
@@ -16,6 +18,7 @@ export const T312_ACTION_IDS = {
 } as const;
 
 export type T312Proposal = {
+  candidate_id?: string;
   n: number;
   lane: string;
   title: string;
@@ -73,6 +76,7 @@ export function encodeT312Proposal(p: T312Proposal): string {
     lane: String(p.lane || "ai_raimo").slice(0, 40),
     title: String(p.title || "").slice(0, 200),
   };
+  if (p.candidate_id) compact.candidate_id = p.candidate_id;
   if (p.summary) compact.summary = String(p.summary).slice(0, 240);
   if (p.origin) compact.origin = String(p.origin).slice(0, 40);
   if (p.project_url) compact.project_url = String(p.project_url).slice(0, 300);
@@ -91,7 +95,9 @@ export function decodeT312Proposal(b64: string): T312Proposal | null {
     const title = String(j.title || "").trim();
     const lane = String(j.lane || "").trim() || "ai_raimo";
     if (!title || title.length < 2) return null;
+    if (j.candidate_id && !/^[a-f0-9]{64}$/.test(j.candidate_id)) return null;
     return {
+      candidate_id: j.candidate_id,
       n: Number(j.n) || 0,
       lane,
       title: title.slice(0, 200),
@@ -268,6 +274,12 @@ export async function applyT312Action(opts: {
   source: "slack_button" | "slack_link";
 }): Promise<{ ok: boolean; message: string }> {
   const p = opts.proposal;
+  if (p.candidate_id) {
+    if (["1","true","yes"].includes((process.env.JARVIS_MEETING_TODO_DISABLE || "").toLowerCase())) {
+      return {ok:false,message:"会議候補の処理は停止中です"};
+    }
+    return applyMeetingTodo(p.candidate_id, opts.action, meetingTodoDeps(opts.source));
+  }
   const markN = p.n ? String(p.n) : "";
   const author =
     (process.env.TODOIST_312_AUTHOR || "").trim() || "FRIDAY";

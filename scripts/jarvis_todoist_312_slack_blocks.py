@@ -84,6 +84,8 @@ def encode_proposal(it: dict[str, Any]) -> str:
         compact["origin"] = origin[:40]
     if it.get("project_url"):
         compact["project_url"] = str(it.get("project_url"))[:300]
+    if it.get("candidate_id"):
+        compact["candidate_id"] = str(it["candidate_id"])
     compact["labels"] = labels
     raw = json.dumps(compact, ensure_ascii=False, separators=(",", ":"))
     return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii").rstrip("=")
@@ -173,6 +175,8 @@ def build_create_blocks(
             },
         },
     ]
+    if any(it.get("candidate_id") for it in items):
+        blocks[1]["text"]["text"] = "Notion保存済みの本人担当候補です。1件ずつ起票／見送り。\n見送り・登録済みは再提案しません。期限未定は日付を作りません。"
     for it in items:
         n = int(it.get("n") or 0)
         title = str(it.get("title") or "")[:80]
@@ -222,6 +226,11 @@ def build_create_blocks(
             ],
         }
     )
+    if any(it.get("candidate_id") for it in items):
+        blocks[-1]["elements"][0]["text"] = (
+            "312 · 1候補ずつボタンで判断\n"
+            "次: 人判断のみ\n担当メモ: この候補の起票／見送りを選択\n橋渡し: ボタン了承後に312が実行"
+        )
     return {
         "text": fallback_text,
         "blocks": blocks,

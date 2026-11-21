@@ -24,6 +24,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+import jarvis_meeting_todo as mt
 
 REPO = Path(__file__).resolve().parents[1]
 PY = Path("/Users/matsunomasaharu2/selenium_env/venv/bin/python")
@@ -87,15 +88,12 @@ def _load_state() -> dict[str, Any]:
         }
     try:
         return json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        return {"proposals": [], "saved": {}, "last_prompted_at": None}
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("714 state is unreadable; stopping to preserve saved history") from exc
 
 
 def _save_state(state: dict[str, Any]) -> None:
-    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    STATE_PATH.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    mt.atomic_json(STATE_PATH, state)
 
 
 def _load_yaml() -> dict[str, Any]:
@@ -156,22 +154,20 @@ def _notion_req(
 
 
 def _list_meetings(page_size: int = 15) -> list[dict[str, Any]]:
-    cmd = [
-        str(PY),
-        str(FETCH),
-        "list",
-        "--page-size",
-        str(page_size),
-        "--json",
-        "--shaped",
-    ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(REPO))
-    if proc.returncode != 0:
-        raise SystemExit(
-            f"genspark list 失敗: {(proc.stderr or proc.stdout or '')[:500]}"
-        )
-    data = json.loads(proc.stdout)
-    return list(data.get("notes") or [])
+    notes = []
+    continuation = None
+    for _ in range(100):
+        cmd=[str(PY),str(FETCH),"list","--page-size",str(page_size),"--json","--shaped"]
+        if continuation: cmd.extend(["--continuation-token",continuation])
+        proc=subprocess.run(cmd,capture_output=True,text=True,cwd=str(REPO))
+        if proc.returncode: raise RuntimeError("Genspark list failed")
+        data=json.loads(proc.stdout)
+        notes.extend(data.get("notes") or [])
+        if not data.get("has_more"): return notes
+        token=data.get("continuation_token")
+        if not token or token==continuation: raise RuntimeError("Genspark pagination incomplete")
+        continuation=token
+    raise RuntimeError("Genspark pagination limit exceeded")
 
 
 def _get_summary(meeting_id: str) -> dict[str, Any]:
@@ -259,7 +255,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
     proposals: list[dict[str, Any]] = []
     for note in notes:
         mid = _meeting_id(note)
-        if not mid:
+        if not mid or mid in (state.get("saved") or {}):
             continue
         summary = _get_summary(mid)
         score, reasons = _score_candidate(note, summary, state)
@@ -319,21 +315,18 @@ def _create_notion_page(
     if not parent:
         raise SystemExit("config/notion_phone_meeting.yaml の inbox_page_id が空")
     children: list[dict[str, Any]] = []
-    meta = f"meeting_id: {meeting_id}"
-    if project_url:
-        meta += f"\nurl: {project_url}"
-    for chunk in (meta, body or "(要約なし)"):
-        children.append(
-            {
-                "object": "block",
-                "type": "paragraph",
-                "paragraph": {
-                    "rich_text": [
-                        {"type": "text", "text": {"content": chunk[:1900]}}
-                    ]
-                },
-            }
-        )
+    # Keep all approved content; Notion rich text has a 2000-character limit per item.
+    meta = f"meeting_id: {meeting_id}" + (f"\nurl: {project_url}" if project_url else "")
+    for line in [meta, *body.splitlines()]:
+        if not line.strip(): continue
+        heading = re.match(r"^(#{1,3})\s+(.+)$", line)
+        kind = f"heading_{len(heading[1])}" if heading else "paragraph"
+        text = heading[2] if heading else line
+        for offset in range(0,len(text),1900):
+            children.append({"object":"block","type":kind,
+                kind:{"rich_text":[{"type":"text","text":{"content":text[offset:offset+1900]}}]}})
+    if len(children)>100:
+        raise ValueError("approved minutes exceed 100 blocks; reduce before saving")
     page = _notion_req(
         "POST",
         "/pages",
@@ -366,6 +359,34 @@ def _append_obsidian_index(line: str) -> Path | None:
         return None
 
 
+def _prepared_path(mid: str) -> Path:
+    import hashlib
+    return REPO / ".jarvis_state" / "meeting_minutes_prepared" / (hashlib.sha256(mid.encode()).hexdigest()+".json")
+
+
+def cmd_prepare(args: argparse.Namespace) -> int:
+    data = json.loads(Path(args.file).read_text())
+    artifact = mt.prepared(data, str(data.get("meeting_id") or ""))
+    if artifact["meeting_id"] in (_load_state().get("saved") or {}):
+        raise ValueError("already saved: do not change the source artifact; use extraction-only backtest")
+    mt.atomic_json(_prepared_path(artifact["meeting_id"]),artifact)
+    print(f"714 prepared candidates={len(artifact['candidates'])}; Notion approval is still required")
+    return 0
+
+
+def cmd_recover(args: argparse.Namespace) -> int:
+    state = _load_state()
+    if _disabled(state): return 0
+    # Only saved meetings with a prepared artifact: never backfill historical six automatically.
+    for mid,saved in (state.get("saved") or {}).items():
+        if not saved.get("prepared"): continue
+        artifact = mt.prepared(mt.load_json(_prepared_path(mid)),mid)
+        mt.enqueue(artifact,saved)
+    result=mt.dispatch(limit=3)
+    print("714->312 recover",result)
+    return 0
+
+
 def cmd_apply(args: argparse.Namespace) -> int:
     state = _load_state()
     if _disabled(state):
@@ -394,6 +415,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
     cfg = _load_yaml()
     saved = dict(state.get("saved") or {})
     created: list[dict[str, Any]] = []
+    attempts = state.setdefault("notion_attempts", {})
 
     for i in indices:
         p = proposals[i]
@@ -401,13 +423,17 @@ def cmd_apply(args: argparse.Namespace) -> int:
         if mid in saved:
             print(f"skip already saved: {mid}")
             continue
-        summary = _get_summary(mid)
-        body = str(summary.get("summary") or summary.get("text") or p.get("summary_preview") or "")
+        artifact = mt.prepared(mt.load_json(_prepared_path(mid)),mid)
+        body = artifact["body"]
         day = (p.get("created") or _now_iso())[:10]
         title = f"[SB] {day} {p['title']}"[:200]
         if args.dry_run:
             print(f"DRY-RUN would create: {title}")
             continue
+        if mid in attempts:
+            raise RuntimeError("prior Notion attempt unresolved; reconcile page_id before retry (no automatic re-create)")
+        attempts[mid] = {"at":_now_iso(),"status":"saving"}
+        _save_state(state)
         page = _create_notion_page(
             title=title,
             body=body,
@@ -421,20 +447,21 @@ def cmd_apply(args: argparse.Namespace) -> int:
             "page_id": page.get("id"),
             "title": title,
             "at": _now_iso(),
+            "prepared": True,
         }
+        state["saved"] = saved
+        attempts[mid] = {"status":"saved","page_id":page.get("id")}
+        _save_state(state)  # per-meeting durability before any downstream operation
+        mt.enqueue(artifact,saved[mid])
         idx = _append_obsidian_index(f"{title} — {url} (id={mid})")
         created.append({"title": title, "url": url, "index": str(idx) if idx else ""})
         print(f"✅ Notion: {title}\n   {url}")
-        if args.with_todoist and SB_PROPOSE.is_file():
-            subprocess.run(
-                [
-                    str(PY),
-                    str(SB_PROPOSE),
-                    "--meeting-id",
-                    mid,
-                ],
-                cwd=str(REPO),
-            )
+        # Dispatch is now mandatory after a saved prepared meeting. A failure leaves the outbox.
+        try:
+            mt.dispatch(limit=3)
+        except Exception:
+            print("714 saved; 312 handoff pending (recover will retry known-unsent records)",file=sys.stderr)
+            raise
 
     if not args.dry_run:
         state["saved"] = saved
@@ -470,7 +497,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
     return 0
 
 
-def main() -> int:
+def _main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
@@ -484,15 +511,34 @@ def main() -> int:
     ap_apply.add_argument(
         "--with-todoist",
         action="store_true",
-        help="作成後に sb_propose を呼ぶ（起票は別途了承）",
+        help="互換オプション（保存済み構造化候補は常に312へ渡す。起票は別途個別了承）",
     )
 
+    prep = sub.add_parser("prepare", help="stage AI-curated 52_ minutes and extracted candidates; no external write")
+    prep.add_argument("--file", required=True)
+    sub.add_parser("recover", help="recover saved prepared meetings and post known-unsent candidates")
     args = ap.parse_args()
+    if args.cmd == "prepare": return cmd_prepare(args)
+    if args.cmd == "recover": return cmd_recover(args)
     if args.cmd == "scan":
         return cmd_scan(args)
     if args.cmd == "apply":
         return cmd_apply(args)
     return 2
+
+
+def main() -> int:
+    import fcntl
+    lock = REPO / ".jarvis_state" / "meeting_minutes_curate.lock"
+    lock.parent.mkdir(parents=True,exist_ok=True)
+    with lock.open("a") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        try:
+            return _main()
+        except (Exception, SystemExit):
+            if len(sys.argv)>1 and sys.argv[1] in {"apply","recover"}:
+                mt.notify_ops()
+            raise
 
 
 if __name__ == "__main__":

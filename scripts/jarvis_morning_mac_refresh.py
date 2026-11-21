@@ -1342,6 +1342,12 @@ def main() -> int:
     else:
         results["steps"]["meeting_minutes_curate"] = "skipped"
 
+    # 714 saved-only outbox recovery is independent of new-meeting scan success.
+    if MEETING_MINUTES_CURATE.is_file():
+        results["steps"]["meeting_todo_recover"] = run_step(
+            "meeting_todo_recover", [exe,str(MEETING_MINUTES_CURATE),"recover"],
+            timeout=180,dry_run=args.dry_run)
+
     # 3–4. 状況ウォッチ再集約込みの投影 push（push 内で situation_watch 実行）
     if not args.skip_push:
         rc = run_step(

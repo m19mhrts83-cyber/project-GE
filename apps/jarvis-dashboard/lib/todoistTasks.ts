@@ -61,7 +61,7 @@ type TodoistTaskRow = {
 
 async function fetchProjectTasks(
   projectId: string,
-  opts?: { fresh?: boolean },
+  opts?: { fresh?: boolean; requireComplete?: boolean },
 ): Promise<TodoistTaskRow[]> {
   const out: TodoistTaskRow[] = [];
   let cursor: string | undefined;
@@ -84,10 +84,12 @@ async function fetchProjectTasks(
       out.push(...data);
       break;
     }
+    if (opts?.requireComplete && !Array.isArray(data.results)) throw new Error("Todoist task scan malformed");
     out.push(...(data.results || []));
     cursor = data.next_cursor || undefined;
     pages += 1;
   } while (cursor && pages < 8);
+  if (cursor && opts?.requireComplete) throw new Error("Todoist task scan incomplete");
   return out;
 }
 
@@ -225,6 +227,7 @@ export async function createTodoistTask(
     labels?: string[];
     /** 件名の印。既定は AI の判断（🤖）。松野さんがボタンで頼んだら requested（🦾依頼） */
     mark?: TodoistMark;
+    strictDedupe?: boolean;
   },
 ): Promise<
   { ok: true; url: string; id: string; duplicate?: boolean } | { ok: false; error: string }
@@ -256,13 +259,13 @@ export async function createTodoistTask(
   }
 
   // Slack ボタンの再押下・同じメールの再投稿で同じタスクを量産しない
-  // （2026-10-20〜21 に [メール要対応] が 3〜4 件ずつ重複）。確認に失敗しても作成は止めない
+  // Legacy callers retain their fallback; saved meeting candidates require complete dedupe.
   try {
-    const open = await fetchProjectTasks(cfg.projectId, { fresh: true });
+    const open = await fetchProjectTasks(cfg.projectId, { fresh: true, requireComplete: input.strictDedupe });
     const dup = findOpenDuplicate(open, input.title, input.due);
     if (dup) return { ok: true, id: dup.id, url: dup.url, duplicate: true };
   } catch {
-    // noop
+    if (input.strictDedupe) return { ok: false, error: "Todoist duplicate check unavailable" };
   }
 
   const res = await fetch(`${API}/tasks`, {
