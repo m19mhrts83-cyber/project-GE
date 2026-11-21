@@ -1,6 +1,6 @@
 # 【運用確認】タスク処置係 — 一目でわかる1枚
 
-- **AIオートメーション（FlowForge）**: [flow_6s1nyBIKzluSsdgR-hs9IolD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_6s1nyBIKzluSsdgR-hs9IolD)
+- **AIオートメーション（FlowForge）**: [flow_HyQRXkqw8SMz_Jg1ipPsQVcp](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_HyQRXkqw8SMz_Jg1ipPsQVcp)
 - **人の依頼**: Cursor `/todoist-batch`（掃除）／入口は `/todoist`／「閉じて N」
 - **続き**: [PROGRESS.md](./PROGRESS.md)
 
