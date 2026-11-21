@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-21T00:35:13+09:00",
+  "updated": "2026-11-21T17:30:56+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -1684,10 +1684,10 @@
       "builder_tag": "",
       "mixup_kind": "",
       "grok_counterpart": "",
-      "flowforge_id": "flow_x4Sw8mVvuGVme1fXz9JGfs3v",
-      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_x4Sw8mVvuGVme1fXz9JGfs3v",
-      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/LAPAAYJTXS-4Opu8",
-      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_x4Sw8mVvuGVme1fXz9JGfs3v",
+      "flowforge_id": "flow_jTD-Wasy2tAaUlkDk_1EFdTk",
+      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_jTD-Wasy2tAaUlkDk_1EFdTk",
+      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/tzFi37vNihjDMlGW",
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_jTD-Wasy2tAaUlkDk_1EFdTk",
       "permissions": {
         "can_do": "送信前の文面・添付チェック（送信クリックは人）",
         "methods": [
@@ -1775,7 +1775,7 @@
             ]
           },
           {
-            "kind": "NG・要判断",
+            "kind": "NG・要確認・要判断",
             "destination": "Slack `#consult`",
             "channels": [
               "consult"
@@ -1811,7 +1811,7 @@
           {
             "title": "FlowForge（作業フロー）",
             "path": "",
-            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/LAPAAYJTXS-4Opu8",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/tzFi37vNihjDMlGW",
             "kind": "flowforge"
           },
           {

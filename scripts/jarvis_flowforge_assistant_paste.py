@@ -65,26 +65,32 @@ def as_str(s: str) -> str:
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def find_tab(url_part: str) -> tuple[int, int] | None:
+def find_tabs(url_part: str) -> list[tuple[int, int]]:
+    """URL に url_part を含むタブをすべて返す（Chrome の全ウィンドウ・全プロフィール）。"""
     out = osa(
         'tell application "Google Chrome"\n'
-        "  set hit to \"\"\n"
+        '  set hits to ""\n'
         "  repeat with wi from 1 to (count of windows)\n"
         "    repeat with ti from 1 to (count of tabs of window wi)\n"
         f"      if (URL of tab ti of window wi) contains {as_str(url_part)} then\n"
-        '        set hit to (wi as text) & "," & (ti as text)\n'
-        "        exit repeat\n"
+        '        set hits to hits & (wi as text) & "," & (ti as text) & ";"\n'
         "      end if\n"
         "    end repeat\n"
-        '    if hit is not "" then exit repeat\n'
         "  end repeat\n"
-        "  return hit\n"
+        "  return hits\n"
         "end tell"
     )
-    if not out:
-        return None
-    w, t = out.split(",")
-    return int(w), int(t)
+    tabs = []
+    for part in out.split(";"):
+        if part.strip():
+            w, t = part.split(",")
+            tabs.append((int(w), int(t)))
+    return tabs
+
+
+def find_tab(url_part: str) -> tuple[int, int] | None:
+    tabs = find_tabs(url_part)
+    return tabs[0] if tabs else None
 
 
 def run_js(win: int, tab: int, js: str) -> str:
@@ -176,22 +182,45 @@ def flow_counts(tab: tuple[int, int], fid: str) -> dict[str, Any]:
 def prepare(fid: str) -> tuple[tuple[int, int], dict[str, Any]]:
     """持ち主の確認 → 編集画面のタブを返す。持ち主でなければ編集画面を開かない。"""
     edit_part = f"/flows/{fid}"
-    tab = find_tab(edit_part)
-    probe = tab or find_tab(BASE)
-    if probe is None:
+    # FlowForge のタブは複数のプロフィールにありうる。対象フローを持つタブ（＝持ち主）を探す。
+    # 許可設定がオフのプロフィールのタブは読めないので飛ばす。
+    candidates = find_tabs(BASE)
+    if not candidates:
         open_tab(BASE + "/")
         time.sleep(4)
-        probe = find_tab(BASE)
-    if probe is None:
+        candidates = find_tabs(BASE)
+    if not candidates:
         raise PasteStop(6, "FlowForge のタブを開けませんでした")
-    owns = json.loads(run_js(*probe, JS_OWNS % {"fid": json.dumps(fid)}))
-    print("持ち主確認:", {k: owns.get(k) for k in ("ok", "count", "has", "nodes", "updatedAt")})
-    if not owns.get("ok") or not owns.get("has") or owns.get("nodes", 0) <= 2:
-        raise PasteStop(2, "このブラウザは対象フローの持ち主ではありません。編集画面は開かずに止めます。")
+    owner_tab, owns, unreadable = None, {}, 0
+    for cand in candidates:
+        try:
+            got = json.loads(run_js(*cand, JS_OWNS % {"fid": json.dumps(fid)}))
+        except Exception:
+            unreadable += 1
+            continue
+        if got.get("ok") and got.get("has") and got.get("nodes", 0) > 2:
+            owner_tab, owns = cand, got
+            break
+        owns = owns or got
+    print("持ち主確認:", {k: owns.get(k) for k in ("ok", "count", "has", "nodes", "updatedAt")},
+          f"（見たタブ {len(candidates)}・読めないタブ {unreadable}）")
+    if owner_tab is None:
+        if unreadable == len(candidates):
+            raise PasteStop(8, "FlowForge のタブを読めません。置き場の Chrome で「Apple Events からの JavaScript を許可」がオンか確かめてください。")
+        raise PasteStop(2, "対象フローの持ち主のタブが見つかりません。編集画面は開かずに止めます。")
+    tab = next((t for t in find_tabs(edit_part) if t[0] == owner_tab[0]), None)
+    if tab is None and edit_part in osa(
+        f'tell application "Google Chrome" to return URL of tab {owner_tab[1]} of window {owner_tab[0]}'
+    ):
+        tab = owner_tab
     if tab is None:
-        open_tab(BASE + edit_part)
+        # 持ち主のウィンドウの中で開く（別プロフィールで開くと空のフローができる）
+        osa(
+            'tell application "Google Chrome" to tell window '
+            f"{owner_tab[0]} to make new tab with properties {{URL:{as_str(BASE + edit_part)}}}"
+        )
         time.sleep(5)
-        tab = find_tab(edit_part)
+        tab = next((t for t in find_tabs(edit_part) if t[0] == owner_tab[0]), None)
     if tab is None:
         raise PasteStop(6, "編集画面のタブが見つかりません")
     state = json.loads(run_js(*tab, JS_STATE))

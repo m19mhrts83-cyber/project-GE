@@ -6,7 +6,7 @@ DX向けデモのため、**変更前フローは上書きせず残す**。本�
 
 | 版 | 用途 | リンク |
 |---|---|---|
-| **改訂版（本線）** | きっかけ起動・3点ゲート | [flow_x4Sw8mVvuGVme1fXz9JGfs3v を開く](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_x4Sw8mVvuGVme1fXz9JGfs3v) |
+| **改訂版（本線）** | きっかけ起動・3点ゲート | [flow_jTD-Wasy2tAaUlkDk_1EFdTk を開く](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_jTD-Wasy2tAaUlkDk_1EFdTk) |
 | **変更前（デモ用）** | 紹介・比較用。触らない | [flow_AKQv6lgUEtudWlE5fQUhQnh2 を開く](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AKQv6lgUEtudWlE5fQUhQnh2) |
 
 | 項目 | 内容 |

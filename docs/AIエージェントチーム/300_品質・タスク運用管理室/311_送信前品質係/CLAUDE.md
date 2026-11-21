@@ -25,7 +25,7 @@ ID: **311**（旧フォルダ `10_` → 3桁化）。
 
 ## AIオートメーション（作業フロー）
 
-- **FlowForge 改訂版（本線）**: [flow_x4Sw8mVvuGVme1fXz9JGfs3v](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_x4Sw8mVvuGVme1fXz9JGfs3v)（きっかけ起動）
+- **FlowForge 改訂版（本線）**: [flow_jTD-Wasy2tAaUlkDk_1EFdTk](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_jTD-Wasy2tAaUlkDk_1EFdTk)（きっかけ起動）
 - **FlowForge 変更前（デモ・触らない）**: [flow_AKQv6lgUEtudWlE5fQUhQnh2](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_AKQv6lgUEtudWlE5fQUhQnh2)
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
 - 設計メモ: [`flow.md`](./flow.md)／人向け1枚: [`README.md`](./README.md)
