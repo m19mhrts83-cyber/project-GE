@@ -97,6 +97,22 @@ class InferenceTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):todo.dispatch(path=path)
             self.assertEqual(todo.load_json(path)[c['candidate_id']]['status'],'queued')
 
+class MappingRecordTests(unittest.TestCase):
+    def test_record_mapping_validates_atomically_and_exposes_cues(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'owner.json'
+            owner.add_meeting_mapping(path,'m1','Speaker 1','owner','owner agreed from the speaker context','content_inference',['cue one'])
+            self.assertEqual(path.stat().st_mode&0o777,0o600)
+            pol=owner.load_owner_policy(path)
+            r=owner.resolve_assignee('m1','Speaker 1',pol)
+            self.assertEqual((r['identity'],r['basis']),('owner','content_inference'))
+            self.assertEqual(owner.resolve_assignee('m2','Speaker 1',pol)['identity'],'held')
+            self.assertEqual(owner.owner_hints(pol),['cue one'])
+            before=path.read_text()
+            with self.assertRaises(ValueError):owner.add_meeting_mapping(path,'m1','Speaker 2','owner',' ')
+            with self.assertRaises(ValueError):owner.add_meeting_mapping(path,'m1','Speaker 2','owner','x','guess')
+            self.assertEqual(path.read_text(),before)
+
 class RecheckTests(unittest.TestCase):
     def test_revoked_or_missing_policy_blocks_queued_old_owner(self):
         with tempfile.TemporaryDirectory() as tmp:

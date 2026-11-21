@@ -74,7 +74,7 @@ Notion保存済みで配送だけ失敗した会議は朝recoverで回収する�
 - meetings: 会議IDごとの担当表記→identity(owner/other)、confirmed=true、evidence(確認根拠)。確認済みの会議だけに適用。
 - 私・自分などの一人称、役職、Speaker番号を全会議共通のaliasには登録できない。会議別の明示対応がなければ保留。複数担当は自動で本人だけを切り出さない。
 - 内容からの本人推測（2026-11-22本人了承・緩めでよい）: 話者番号・一人称・役職は、整理AIが本文全体から本人と判断でき、根拠の引用があるときだけ候補に `owner_inference: {identity: owner, evidence: 引用}` を付ける。確認済みの会議別対応・他人表記が優先。名前付きの人には使わない。判定結果に basis=content_inference と根拠を残す。推測の本人候補も個別の了承（起票/見送り）は必須。根拠が弱いものは付けず保留。
-- 本人が確認した会議別の対応（例: 会議内で本人の誤記と分かった表記）は meetings に入れる。会議ごとに判断し、他の会議へ広げない。
+- 会議別の対応（話者番号・誤記・他人）は非公開configの meetings に、判定・根拠の一言（evidence）・basis（owner_confirmed/content_inference）・手がかり（cues、最大5）を会議単位で保存する（add_meeting_mapping）。本人が了承した対応だけが対象で、自動では書かない・恒久基準にしない。他の会議へ広げず、次回の抽出では owner_hints（了承済みの本人側cues）を参考にするだけで、判定は会議ごとの対応か根拠付き owner_inference で行う。
 - pending_aliasesなどの候補メモは判定に使わない。設定なしはpolicy_not_configured、破損・矛盾は停止。公開の旧正規表現へフォールバックしない。
 - 判断理由と設定のfingerprintを候補に残す。queuedの本人判定は投稿前に現在設定で再確認。設定変更だけで保留候補を自動昇格・投稿しない。既投稿カードの見直し時は既存停止フラグで操作を止めて照合する。
 

@@ -51,7 +51,11 @@ def validate_policy(raw: Any) -> dict:
             # A meeting override must not contradict a confirmed global identity.
             if (key in result['owner_aliases'] and decision['identity']!='owner') or (key in result['other_aliases'] and decision['identity']!='other'):
                 raise ValueError('meeting mapping conflicts with global identity')
-            converted[key]={'identity':decision['identity'],'evidence':decision['evidence'],'confirmed':True}
+            basis=decision.get('basis','owner_confirmed')
+            cues=decision.get('cues',[])
+            if basis not in {'owner_confirmed','content_inference'} or not isinstance(cues,list) or len(cues)>5 or any(not isinstance(c,str) or not c.strip() for c in cues):
+                raise ValueError('invalid mapping basis/cues')
+            converted[key]={'identity':decision['identity'],'evidence':decision['evidence'],'confirmed':True,'basis':basis,'cues':cues}
         result['meetings'][mid]=converted
     # Pending suggestions are audit data only; never read by the resolver.
     result['configured']=True
@@ -82,7 +86,7 @@ def resolve_assignee(meeting_id: str, assignee: str, policy: dict, inference: An
     if MULTIPLE.search(value):return answer('held','multiple_assignees')
     mapping=policy.get('meetings',{}).get(meeting_id,{}).get(value)
     if mapping and mapping.get('confirmed') is True:
-        return answer(mapping['identity'],'confirmed_meeting_mapping')
+        return {**answer(mapping['identity'],'confirmed_meeting_mapping'),'basis':mapping.get('basis','owner_confirmed'),'mapping_evidence':mapping['evidence'][:300]}
     generic=value in FIRST_PERSON or value in ROLES or bool(SPEAKER.fullmatch(value))
     if generic and isinstance(inference,dict) and inference.get('identity')=='owner' \
             and isinstance(inference.get('evidence'),str) and inference['evidence'].strip():
@@ -91,3 +95,31 @@ def resolve_assignee(meeting_id: str, assignee: str, policy: dict, inference: An
     if SPEAKER.fullmatch(value):return answer('held','speaker_mapping_missing')
     if value in ROLES:return answer('held','role_mapping_missing')
     return answer('held','unconfirmed_name')
+
+
+def add_meeting_mapping(path: Path, meeting_id: str, label: str, identity: str, evidence: str,
+                        basis: str = 'owner_confirmed', cues: list | None = None) -> None:
+    """Persist one per-meeting speaker mapping after the owner has agreed to it.
+
+    Nothing calls this automatically: it records a mapping the owner confirmed (or accepted as a
+    content-based inference) together with the one-line reason. The result is validated as a whole
+    before an atomic, owner-only write, so a bad entry never replaces a working config.
+    """
+    raw=json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {'version':1,'owner_aliases':[],'other_aliases':[],'meetings':{}}
+    raw.setdefault('meetings',{}).setdefault(meeting_id,{})[label]={'identity':identity,'confirmed':True,'evidence':evidence,'basis':basis,'cues':cues or []}
+    validate_policy(raw)
+    tmp=path.with_name(path.name+'.tmp')
+    fd=os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
+    with os.fdopen(fd,'w',encoding='utf-8') as f:
+        json.dump(raw,f,ensure_ascii=False,indent=2)
+    os.replace(tmp,path)
+
+
+def owner_hints(policy: dict) -> list[str]:
+    """Cues from owner-agreed owner mappings, for the next extraction; nothing here becomes a rule."""
+    hints=[]
+    for mapping in policy.get('meetings',{}).values():
+        for decision in mapping.values():
+            if decision.get('identity')=='owner':
+                hints.extend(decision.get('cues',[]))
+    return sorted(set(hints))
