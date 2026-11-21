@@ -1,9 +1,9 @@
 /**
  * パートナー宛先解決（連絡先一覧のミラー）。
  * 正本は OneDrive 連絡先一覧.yaml。ミラー: config/partner_contacts.json
- * 公開リポに置けない宛先（emails_private: true の行）は、サーバーの環境変数
+ * 公開側にはメール・電話を置かない（2026-11-21）。実値はサーバーの環境変数
  * PARTNER_CONTACTS_PRIVATE_JSON（見本: config/partner_contacts.private.example.json）から足す。
- * 未設定なら空のまま（受信メールの from_email があればそちらが使われる）。
+ * ローカルでは .env.local に同じ JSON（1行）を入れる。未設定なら空のまま（受信メールの from_email があればそちらが使われる）。
  */
 import contacts from "@/config/partner_contacts.json";
 import { mergePrivateContacts } from "@/lib/privateContacts";
@@ -15,6 +15,7 @@ export type PartnerContact = {
   phones: string[];
   via_ambiguous: boolean;
   emails_private?: boolean;
+  phones_private?: boolean;
 };
 
 export type ContactsFile = {
