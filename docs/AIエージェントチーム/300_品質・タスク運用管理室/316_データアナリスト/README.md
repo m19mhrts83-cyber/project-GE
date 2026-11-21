@@ -1,6 +1,6 @@
 # データアナリスト — 一目でわかる1枚
 
-- **AIオートメーション（FlowForge）**: [flow_4UWa-0dMnQxDDf3ZFZXlPSd7](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_4UWa-0dMnQxDDf3ZFZXlPSd7)
+- **AIオートメーション（FlowForge）**: [flow_TA9fHAyKHFlfTFb8fvpDG6Nh](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_TA9fHAyKHFlfTFb8fvpDG6Nh)
 
 | 項目 | 内容 |
 |---|---|
