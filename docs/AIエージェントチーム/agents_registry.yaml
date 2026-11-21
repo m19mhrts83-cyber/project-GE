@@ -218,8 +218,8 @@ agents:
     extra_flows:
     - id: 315-B
       label: 300番台 停止・空回り監視（日次）
-      flowforge_id: flow_qJcURKdC36ARzDdSwEfLisvt
-      flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_qJcURKdC36ARzDdSwEfLisvt
+      flowforge_id: flow_ZQIfYZY4GJF2XspXY8i0sGWD
+      flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_ZQIfYZY4GJF2XspXY8i0sGWD
   '316':
     name: データアナリスト
     path: 300_品質・タスク運用管理室/316_データアナリスト

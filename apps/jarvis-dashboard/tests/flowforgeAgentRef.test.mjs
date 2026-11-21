@@ -6,6 +6,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import ts from "typescript";
+import * as editView from "../lib/flowforgeEditView.ts";
 
 import { findFlowRef, findFlowRefByFlowId } from "../lib/flowforgeAgentRef.ts";
 import { AGENT_ID_RE, checkEditRequest, checkPatchRequest } from "../lib/flowforgeEditView.ts";
@@ -14,9 +16,11 @@ const team = JSON.parse(readFileSync(new URL("../data/agentTeam.json", import.me
 const shareCfg = JSON.parse(readFileSync(new URL("../../../config/flowforge_share_urls.json", import.meta.url), "utf8"));
 
 const FLOW_A = "flow_S5g_i7CCiE0P6RKIp2_MkMTA";
-const FLOW_B = "flow_qJcURKdC36ARzDdSwEfLisvt";
+const FLOW_B = "flow_ZQIfYZY4GJF2XspXY8i0sGWD";
+const OLD_FLOW_B = "flow_qJcURKdC36ARzDdSwEfLisvt";
+const OLD_SHARE_B = "oHjDFZowlMMaxtkb";
 const SHARE_A = "2bg4-Vc8WOFzjEGe";
-const SHARE_B = "oHjDFZowlMMaxtkb";
+const SHARE_B = "smnVr23mbD8pb2sT";
 
 test("315 is 315-A and 315-B is 315-B (never swapped)", () => {
   assert.equal(findFlowRef(team.agents, "315").flowforge_id, FLOW_A);
@@ -54,6 +58,9 @@ test("the 315 row is still 315 (not replaced by 315-B)", () => {
 test("share config and registry agree for 315 / 315-B", () => {
   assert.ok(shareCfg.by_agent_id["315"].endsWith(SHARE_A));
   assert.ok(shareCfg.by_agent_id["315-B"].endsWith(SHARE_B));
+  assert.ok(shareCfg.by_flow_id[FLOW_B].endsWith(SHARE_B));
+  assert.ok(shareCfg.by_flow_id[OLD_FLOW_B].endsWith(OLD_SHARE_B));
+  assert.equal(findFlowRefByFlowId(team.agents, OLD_FLOW_B), undefined);
 });
 
 test("agentId format: 3 digits, or 3 digits + -capital letter", () => {
@@ -76,7 +83,7 @@ test("MCP input check: edit and patch requests accept 315-B and keep the agentId
   assert.equal(p.ok, true);
   assert.equal(p.agentId, "315-B");
   // 書き込み先 flowId は検査済みの agentId から決まる
-  assert.equal(findFlowRef(team.agents, "315-B").flowforge_id, FLOW_B);
+  assert.equal(findFlowRef(team.agents, p.agentId).flowforge_id, FLOW_B);
 });
 
 test("write routes resolve the target via getFlowRefById (queue / patch / share)", () => {
@@ -85,4 +92,36 @@ test("write routes resolve the target via getFlowRefById (queue / patch / share)
   assert.equal((q.match(/getFlowRefById\(checked\.agentId\)/g) || []).length, 2);
   assert.ok(!q.includes("getAgentById"));
   assert.ok(read("flowforgeShareProxy.ts").includes("getFlowRefById(agentId)"));
+});
+
+// Execute the actual queue function with an in-memory Supabase boundary.
+// No network or production writes; inspect the payload that would be inserted.
+test("patch queue inserts the rebuilt 315-B flowId and preserves 315-A", async () => {
+  const source = readFileSync(new URL("../lib/flowforgeEditQueue.ts", import.meta.url), "utf8");
+  const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  let inserted;
+  const sb = { from() { return {
+    select() { return { in: async () => ({ count: 0 }) }; },
+    insert(row) { inserted = row; return { select() { return { single: async () => ({ data: row }) }; } }; },
+  }; } };
+  const exports = {};
+  const dependencies = {
+    "@/lib/agentTeam": { getFlowRefById: (id) => findFlowRef(team.agents, id) },
+    "@/lib/supabase/admin": { createServiceClient: () => sb },
+    "@/lib/flowforgeEditView": editView,
+  };
+  new Function("require", "exports", js)((id) => {
+    assert.ok(Object.hasOwn(dependencies, id), `unexpected dependency: ${id}`);
+    return dependencies[id];
+  }, exports);
+  for (const [agentId, flowId] of [["315-B", FLOW_B], ["315", FLOW_A]]) {
+    const result = await exports.queueFlowforgePatch({
+      agentId, confirmedByUser: true,
+      operations: [{ op: "update_node", id: "n1", patch: { description: "test only" } }],
+    });
+    assert.equal(result.ok, true);
+    assert.equal(inserted.agent_id, agentId);
+    assert.equal(inserted.flow_id, flowId);
+    assert.equal(inserted.kind, "patch");
+  }
 });
