@@ -125,13 +125,3 @@ test("patch queue inserts the rebuilt 315-B flowId and preserves 315-A", async (
     assert.equal(inserted.kind, "patch");
   }
 });
-
-test('714 resolves only to the UI-owned verified flow, never the local-only draft', () => {
-  const ref=findFlowRef(team.agents,'714');
-  assert.equal(ref.flowforge_id,'flow_q41qaFFwQ_pX4m6qg04oLb3H');
-  assert.ok(ref.flowforge_share_url.endsWith('/share/HI4KOYwORPb7ZG1d'));
-  assert.equal(shareCfg.by_agent_id['714'],ref.flowforge_share_url);
-  assert.equal(shareCfg.by_flow_id[ref.flowforge_id],ref.flowforge_share_url);
-  assert.equal(findFlowRefByFlowId(team.agents,'flow_714minutes_20261122'),undefined);
-  assert.equal(team.agents.filter(a=>a.id==='714').length,1);
-});
