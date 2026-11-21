@@ -3,7 +3,7 @@
 第2段階の作業フロー正本（312と同型コンセプト・2026-10-21）。  
 作り方: [`06_社員の作り方_二段階_20261009.md`](../../06_社員の作り方_二段階_20261009.md)
 
-- FlowForge（閲覧／編集）: [flow_6s1nyBIKzluSsdgR-hs9IolD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_6s1nyBIKzluSsdgR-hs9IolD)
+- FlowForge（閲覧／編集）: [flow_HyQRXkqw8SMz_Jg1ipPsQVcp](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_HyQRXkqw8SMz_Jg1ipPsQVcp)
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - 更新: 2026-10-21（**毎日20:00のL1ダイジェストを本線化**／完了動線・塩梅・運用格上げ／FlowForgeキャンバスを実装同型に同期）
 

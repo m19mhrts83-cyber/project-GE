@@ -16,7 +16,7 @@
 
 ## AIオートメーション（作業フロー）
 
-- **FlowForge（開く）**: [flow_6s1nyBIKzluSsdgR-hs9IolD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_6s1nyBIKzluSsdgR-hs9IolD)
+- **FlowForge（開く）**: [flow_HyQRXkqw8SMz_Jg1ipPsQVcp](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_HyQRXkqw8SMz_Jg1ipPsQVcp)
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
 - 設計の流れ図: [`flow.md`](./flow.md)（微修正はここを見て人が直す）
 - Phase1: [`docs/phase1-l1-digest.md`](./docs/phase1-l1-digest.md)
