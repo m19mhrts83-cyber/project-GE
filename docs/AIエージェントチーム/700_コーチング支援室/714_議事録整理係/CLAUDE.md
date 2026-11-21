@@ -4,7 +4,7 @@ ID: **714**。コーチング支援室。
 
 ## AIオートメーション（作業フロー）
 
-- **FlowForge（開く）**: 未作成（[`flow.md`](./flow.md) が当面の正）
+- **FlowForge（開く）**: [共有](https://flowforge-259747770348.asia-northeast1.run.app/share/HI4KOYwORPb7ZG1d)（flow_q41qaFFwQ_pX4m6qg04oLb3H）
 
 ## 1. 役割
 

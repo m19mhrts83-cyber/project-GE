@@ -3,7 +3,7 @@
 第2段階（動きの作り込み）のたたき。編成は第1段階（ビルダー）で追加済。  
 作り方: [`06_社員の作り方_二段階_20261009.md`](../../06_社員の作り方_二段階_20261009.md)
 
-- FlowForge（閲覧／編集）: **未作成**（作り込み待ち。本 MD が当面の正）
+- FlowForge（閲覧／編集）: [共有](https://flowforge-259747770348.asia-northeast1.run.app/share/HI4KOYwORPb7ZG1d)（flow_q41qaFFwQ_pX4m6qg04oLb3H。現在の定義は共有側。以下は旧素案）
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
 - 動きの例（型参考）: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_uGZ3apXgbHVdZJfnuqYA8_QZ
 - ビルダー共有: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH （コーチ・俯瞰室）
