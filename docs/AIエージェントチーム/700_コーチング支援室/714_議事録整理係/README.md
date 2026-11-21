@@ -13,3 +13,5 @@ Genspark／JPR の録音から「Notion に残す価値あり」を提案し、�
 | 作業フロー素案 | [`flow.md`](./flow.md)（FlowForge 未作成） |
 | 指示書 | [`CLAUDE.md`](./CLAUDE.md) |
 | 停止 | `JARVIS_MEETING_MINUTES_CURATE_DISABLE=1` |
+
+FlowForge共有（2026-11-22登録）: [flow_q41qaFFwQ_pX4m6qg04oLb3H](https://flowforge-259747770348.asia-northeast1.run.app/share/HI4KOYwORPb7ZG1d)。

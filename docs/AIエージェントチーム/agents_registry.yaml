@@ -570,8 +570,8 @@ agents:
   '714':
     name: 議事録整理係
     path: 700_コーチング支援室/714_議事録整理係
-    flowforge_id: ''
-    flowforge_url: ''
+    flowforge_id: flow_q41qaFFwQ_pX4m6qg04oLb3H
+    flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_q41qaFFwQ_pX4m6qg04oLb3H
     status: 設計中
     report: report
     mixup_kind: none

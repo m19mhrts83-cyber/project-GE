@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-22T00:23:43+09:00",
+  "updated": "2026-11-22T01:33:18+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -7038,10 +7038,10 @@
       "builder_tag": "",
       "mixup_kind": "none",
       "grok_counterpart": "",
-      "flowforge_id": "",
-      "flowforge_url": "",
-      "flowforge_share_url": "",
-      "flowforge_edit_url": "",
+      "flowforge_id": "flow_q41qaFFwQ_pX4m6qg04oLb3H",
+      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_q41qaFFwQ_pX4m6qg04oLb3H",
+      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/HI4KOYwORPb7ZG1d",
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_q41qaFFwQ_pX4m6qg04oLb3H",
       "permissions": {
         "can_do": "Genspark／JPR 議事録の Notion 電話面談 Inbox 候補提案（了承後のみ作成。家族会議除外）",
         "methods": [
@@ -7171,6 +7171,12 @@
         ],
         "procedures": [
           {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/HI4KOYwORPb7ZG1d",
+            "kind": "flowforge"
+          },
+          {
             "title": "CLAUDE.md",
             "path": "docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/CLAUDE.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/CLAUDE.md",
@@ -7201,7 +7207,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 5,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
