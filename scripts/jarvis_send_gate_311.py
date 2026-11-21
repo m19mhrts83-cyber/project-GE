@@ -84,6 +84,12 @@ UNVERIFIED_MARKERS = ("照合スキップ", "照合はスキップ", "紐づけ�
 # jarvis_kurashift_re_inquiry.py は template の from_account（estate／admin＝どちらも本人のアカウント）の
 # トークンで送る。いずれも本人のアカウントからしか送れないので、From 行が無くても名義は確か。
 # 下書き（4.送信下書き.txt）を yoritoori で送る source: manual／211／s9／hawk／s2。
+# 物件問合せ（kurashift_inquiry）の宛先は物件情報から機械で決まり、物件進行ゲートで本人が Yes を
+# 押してから送る（2026-11-21 松野さん判断）。パートナー照合なしでも宛先は ok にする。
+# 禁止宛先（noreply・運営宛）・From 本人外は従来どおり ng。
+APPROVED_DEST_SOURCES = frozenset({"kurashift_inquiry"})
+DEST_APPROVED_NOTE = "物件ゲートで本人承認済み（物件情報から決まった宛先のため照合なし）"
+
 OWN_ACCOUNT_ROUTES = {
     "manual": "yoritoori_send（本人の個人Gmailトークンのみ）",
     "211": "yoritoori_send（本人の個人Gmailトークンのみ）",
@@ -132,6 +138,12 @@ def legacy_status(ok: bool, detail: str, code: str = "", source: str = "") -> st
         return ST_NG
     if code == "sender" and "想定" in detail:
         return ST_OK if (source or "").strip().lower() in OWN_ACCOUNT_ROUTES else ST_UNVERIFIED
+    if (
+        code == "dest"
+        and (source or "").strip().lower() in APPROVED_DEST_SOURCES
+        and ("照合はスキップ" in detail or "照合スキップ" in detail or "紐づけのみ" in detail)
+    ):
+        return ST_OK
     return ST_UNVERIFIED if any(m in detail for m in UNVERIFIED_MARKERS) else ST_OK
 
 
@@ -410,6 +422,7 @@ def run_checks(
     if m_line:
         line_dest = m_line.group(1).strip()
 
+    dest_pre_approved = (source or "").strip().lower() in APPROVED_DEST_SOURCES
     to_header_blank = any(
         not m.group(1).strip() for m in HEADER_TO_ONLY.finditer(body)
     ) and not to_lines
@@ -475,19 +488,25 @@ def run_checks(
             checks.append(CheckResult(True, "dest", "本文中アドレスはパートナー／本人範囲"))
     elif partner:
         # メール下書きで To 明示なし → Phase1は「要確認」ではなくパス（パートナー紐づけのみ）
-        checks.append(
-            unverified(
-                "dest",
-                f"パートナー紐づけのみ確認（{partner_folder or partner_name}）。To明示なし",
+        if dest_pre_approved:
+            checks.append(CheckResult(True, "dest", DEST_APPROVED_NOTE))
+        else:
+            checks.append(
+                unverified(
+                    "dest",
+                    f"パートナー紐づけのみ確認（{partner_folder or partner_name}）。To明示なし",
+                )
             )
-        )
     else:
-        checks.append(
-            unverified(
-                "dest",
-                "パートナー未特定のため宛先照合はスキップ（パスに三桁フォルダ推奨）",
+        if dest_pre_approved:
+            checks.append(CheckResult(True, "dest", DEST_APPROVED_NOTE))
+        else:
+            checks.append(
+                unverified(
+                    "dest",
+                    "パートナー未特定のため宛先照合はスキップ（パスに三桁フォルダ推奨）",
+                )
             )
-        )
 
     # --- 点検1b: 本文宛名 ↔ 実To（送信直前プレビューがあるとき）---
     # 教訓 2026-10-18: 日本総険・本文「清水様」なのに Reply-All で To=和久・清水はCc

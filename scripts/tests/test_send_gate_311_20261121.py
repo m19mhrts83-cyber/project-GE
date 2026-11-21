@@ -84,6 +84,35 @@ class ThreeStateTest(unittest.TestCase):
         r = run("From: me@example.com\n\n本文", partner=None)
         self.assertEqual(r.overall, "REVIEW")
 
+    def test_kurashift_dest_without_check_is_ok(self) -> None:
+        r = run("To: broker@example.net\n\n本文", partner=None, source="kurashift_inquiry")
+        dest = [c for c in r.checks if c.code == "dest"][0]
+        self.assertEqual(dest.status, "ok")
+        self.assertIn("物件ゲートで本人承認済み", dest.detail)
+        self.assertEqual(r.overall, "OK")
+        self.assertEqual(gate.exit_code_of(r.overall), 0)
+
+    def test_kurashift_banned_dest_is_still_ng(self) -> None:
+        r = run("To: noreply@example.net\n\n本文", partner=None, source="kurashift_inquiry")
+        self.assertEqual(r.overall, "NG")
+
+    def test_kurashift_foreign_from_is_still_ng(self) -> None:
+        r = run("From: someone@example.org\nTo: broker@example.net\n\n本文", partner=None,
+                source="kurashift_inquiry")
+        self.assertEqual(r.overall, "NG")
+
+    def test_other_source_dest_skip_stays_review(self) -> None:
+        for src in ("manual", "211", "s9", "hawk", "s2"):
+            r = run("To: broker@example.net\n\n本文", partner=None, source=src)
+            self.assertEqual(r.overall, "REVIEW", src)
+            r2 = run("本文", partner=PARTNER, source=src)  # 紐づけのみ
+            self.assertEqual(r2.overall, "REVIEW", src)
+
+    def test_legacy_kurashift_dest_ok(self) -> None:
+        d = "パートナー未特定のため宛先照合はスキップ（パスに三桁フォルダ推奨）"
+        self.assertEqual(gate.legacy_status(True, d, "dest", "kurashift_inquiry"), "ok")
+        self.assertEqual(gate.legacy_status(True, d, "dest", "manual"), "unverified")
+
     def test_banned_is_ng_over_review(self) -> None:
         r = run("To: noreply@example.net\n\n本文")
         self.assertEqual(r.overall, "NG")
