@@ -65,7 +65,12 @@ def load_owner_policy(path: Path | None = None) -> dict:
     return validate_policy(json.loads(path.read_text(encoding='utf-8')))
 
 
-def resolve_assignee(meeting_id: str, assignee: str, policy: dict) -> dict:
+def resolve_assignee(meeting_id: str, assignee: str, policy: dict, inference: Any = None) -> dict:
+    """`inference` is the extractor's content-based claim that a generic label is the owner.
+
+    It only applies to first-person/role/speaker labels that no confirmed mapping decides, and it
+    needs a nonempty evidence quote. Named people are never inferred. The result records the basis.
+    """
     value=normalized(assignee)
     fingerprint=hashlib.sha256(json.dumps(policy,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
     def answer(identity,reason):
@@ -78,6 +83,10 @@ def resolve_assignee(meeting_id: str, assignee: str, policy: dict) -> dict:
     mapping=policy.get('meetings',{}).get(meeting_id,{}).get(value)
     if mapping and mapping.get('confirmed') is True:
         return answer(mapping['identity'],'confirmed_meeting_mapping')
+    generic=value in FIRST_PERSON or value in ROLES or bool(SPEAKER.fullmatch(value))
+    if generic and isinstance(inference,dict) and inference.get('identity')=='owner' \
+            and isinstance(inference.get('evidence'),str) and inference['evidence'].strip():
+        return {**answer('owner','content_inference'),'basis':'content_inference','inference_evidence':inference['evidence'].strip()[:300]}
     if value in FIRST_PERSON:return answer('held','first_person_unmapped')
     if SPEAKER.fullmatch(value):return answer('held','speaker_mapping_missing')
     if value in ROLES:return answer('held','role_mapping_missing')

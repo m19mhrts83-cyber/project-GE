@@ -55,7 +55,8 @@ def candidate(meeting_id: str, item: dict):
     evidence = str(item.get('evidence') or '').strip()
     if not todo or not evidence or not meeting_id:
         raise ValueError('meeting_id/todo/evidence required')
-    resolution = resolve_assignee(meeting_id, assignee, load_owner_policy())
+    inference = item.get('owner_inference') if isinstance(item.get('owner_inference'), dict) else None
+    resolution = resolve_assignee(meeting_id, assignee, load_owner_policy(), inference)
     mine = resolution["identity"] == "owner"
     identity = 'owner' if mine else normalize(assignee or 'unknown')
     cid = hashlib.sha256(('v1\0'+meeting_id+'\0'+normalize(todo)+'\0'+identity).encode()).hexdigest()
@@ -67,7 +68,7 @@ def candidate(meeting_id: str, item: dict):
             if item.get('due_confirmed') is not True:
                 due = None
     return {'candidate_id':cid,'meeting_id':meeting_id,'todo':todo,'title':todo[:200],
-            'assignee':assignee,'owner_confirmed':mine,'owner_resolution':resolution,'evidence':evidence,
+            'assignee':assignee,'owner_inference':inference,'owner_confirmed':mine,'owner_resolution':resolution,'evidence':evidence,
             'due_raw':str(item.get('due_raw') or ''),'due_date':due,'due_confirmed':item.get('due_confirmed') is True,
             'level': 'L2' if due else 'L1','lane':str(item.get('lane') or 'ai_raimo'),
             'status':'queued' if mine else 'excluded' if resolution['identity']=='other' else 'held'}
@@ -139,7 +140,7 @@ def dispatch(store=None, poster=None, path: Path=OUTBOX, limit=3):
     changed=False
     for c in state.values():
         if c.get('status')!='queued':continue
-        resolution=resolve_assignee(c['meeting_id'],c.get('assignee',''),policy)
+        resolution=resolve_assignee(c['meeting_id'],c.get('assignee',''),policy,c.get('owner_inference'))
         if resolution['identity']!='owner':
             c.update(owner_confirmed=False,owner_resolution=resolution,
                      status='excluded' if resolution['identity']=='other' else 'held')
