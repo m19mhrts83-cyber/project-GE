@@ -58,5 +58,25 @@ class DisplayTests(unittest.TestCase):
         self.assertEqual(r["resets_at_ts"], 1796537629)
 
 
+
+class CursorTokenExpiryTest(unittest.TestCase):
+    @staticmethod
+    def _jwt(exp):
+        import base64
+        b = lambda o: base64.urlsafe_b64encode(json.dumps(o).encode()).decode().rstrip("=")
+        return f"{b({'alg': 'none'})}.{b({'exp': exp})}.sig"
+
+    def test_fresh_token_not_expiring(self):
+        self.assertFalse(c._cursor_token_expiring(self._jwt(2000), now=1000))
+
+    def test_near_expiry_is_expiring(self):
+        self.assertTrue(c._cursor_token_expiring(self._jwt(1100), now=1000))
+
+    def test_expired_is_expiring(self):
+        self.assertTrue(c._cursor_token_expiring(self._jwt(900), now=1000))
+
+    def test_unreadable_token_is_expiring(self):
+        self.assertTrue(c._cursor_token_expiring("opaque-token", now=1000))
+
 if __name__ == "__main__":
     unittest.main()

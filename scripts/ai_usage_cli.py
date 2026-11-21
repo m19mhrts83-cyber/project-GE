@@ -165,17 +165,60 @@ def parse_cursor(d):
             "message": d.get("displayMessage")}
 
 
+def _cursor_token():
+    return subprocess.run(["security", "find-generic-password", "-s", "cursor-access-token", "-a", "cursor-user", "-w"],
+                          capture_output=True, text=True, timeout=20).stdout.strip()
+
+
+def _cursor_token_expiring(tok, now=None, margin_sec=300):
+    """JWT の exp が近い（または読めない）なら True。トークン本体は出力しない。"""
+    import base64
+    try:
+        pl = tok.split(".")[1]
+        pl += "=" * (-len(pl) % 4)
+        exp = json.loads(base64.urlsafe_b64decode(pl)).get("exp")
+    except Exception:
+        return True
+    if not isinstance(exp, (int, float)):
+        return True
+    return exp - (now if now is not None else time.time()) <= margin_sec
+
+
+def _cursor_refresh():
+    """cursor-agent がキーチェーンの refresh token でアクセストークンを更新する（2026-11 時点で約1時間で失効）。"""
+    try:
+        subprocess.run(["cursor-agent", "status"], capture_output=True, text=True, timeout=45)
+    except Exception:
+        pass
+
+
 def read_cursor():
+    import urllib.error
     import urllib.request
-    tok = subprocess.run(["security", "find-generic-password", "-s", "cursor-access-token", "-a", "cursor-user", "-w"],
-                         capture_output=True, text=True, timeout=20).stdout.strip()
+    tok = _cursor_token()
     if not tok:
         raise RuntimeError("キーチェーンに Cursor ログインなし（cursor-agent login が必要）")
-    req = urllib.request.Request(
-        "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage", data=b"{}", method="POST",
-        headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json",
-                 "Connect-Protocol-Version": "1"})
-    return parse_cursor(json.load(urllib.request.urlopen(req, timeout=10)))
+    if _cursor_token_expiring(tok):
+        _cursor_refresh()
+        tok = _cursor_token() or tok
+
+    def call(t):
+        req = urllib.request.Request(
+            "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage", data=b"{}", method="POST",
+            headers={"Authorization": f"Bearer {t}", "Content-Type": "application/json",
+                     "Connect-Protocol-Version": "1"})
+        return parse_cursor(json.load(urllib.request.urlopen(req, timeout=10)))
+
+    try:
+        return call(tok)
+    except urllib.error.HTTPError as e:
+        if e.code != 401:
+            raise
+        _cursor_refresh()
+        tok2 = _cursor_token()
+        if not tok2 or tok2 == tok:
+            raise RuntimeError("Cursor のログインが切れた（cursor-agent login で再ログイン）")
+        return call(tok2)
 
 
 # ---- Antigravity: `agy -p /usage --output-format json` ----
