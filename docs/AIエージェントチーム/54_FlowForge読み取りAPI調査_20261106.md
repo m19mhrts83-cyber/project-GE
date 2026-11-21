@@ -39,7 +39,7 @@ Origin: https://flowforge-259747770348.asia-northeast1.run.app
 検証例（312）:
 
 - share: `tn9-F4fhdIgHVpRl`
-- flow id: `flow_M8SvKC1IDTDi496Vw-DgGjpD`
+- flow id: `flow_k3luzQfsGTzYu7-2q5fibdXd`
 - 応答: `{ "flow": { id, name, description, nodes, edges, createdAt, updatedAt, look } }`
 - ノード種別例: `start` / `tool` / `claude` / `human` / `subflow` / `end`
 - AI 向け指示は主に各ノード `data.description`（長文プロンプトは短い説明レベル）
@@ -60,7 +60,7 @@ Origin: https://flowforge-259747770348.asia-northeast1.run.app
 ```bash
 cd ~/git-repos && /Users/matsunomasaharu2/selenium_env/venv/bin/python \
   scripts/jarvis_flowforge_share_fetch.py --share tn9-F4fhdIgHVpRl
-# または --flow-id flow_M8SvKC1IDTDi496Vw-DgGjpD （share 一覧から解決）
+# または --flow-id flow_k3luzQfsGTzYu7-2q5fibdXd （share 一覧から解決）
 ```
 
 ## 推奨ロードマップ（最小改修）

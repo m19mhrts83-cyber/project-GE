@@ -1,7 +1,7 @@
 # FlowForge「AIエージェントへの指示」貼付全文（312）
 
 - 更新: 2026-10-21
-- フロー: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD
+- フロー: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_k3luzQfsGTzYu7-2q5fibdXd
 - **ハブ正本**: 同フォルダ `flow.md` / `CLAUDE.md` を優先。完了 close は 313。
 
 ---

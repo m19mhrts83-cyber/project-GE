@@ -19,7 +19,7 @@
 
 ## AIオートメーション（作業フロー）
 
-- **FlowForge（開く）**: [flow_M8SvKC1IDTDi496Vw-DgGjpD](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_M8SvKC1IDTDi496Vw-DgGjpD)
+- **FlowForge（開く）**: [flow_k3luzQfsGTzYu7-2q5fibdXd](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_k3luzQfsGTzYu7-2q5fibdXd)
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
 - 設計の流れ図: [`flow.md`](./flow.md)
 - Cursor コマンド: `/todoist`（起票寄り）／掃除は `/todoist-batch`（313）
