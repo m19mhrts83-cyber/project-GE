@@ -174,6 +174,8 @@ https://flowforge-259747770348.asia-northeast1.run.app/share/tn9-F4fhdIgHVpRl
   - 置かれてから60分を過ぎた依頼は送らない（了承が古い）。`cancelled` になる
   - 持ち主のタブが無ければ、置き場のプロフィール（`FLOWFORGE_CHROME_PROFILE`、既定 `Default`）で FlowForge のトップを開いて探し直す
   - 初回は macOS が「Google Chrome の制御を許可しますか」と聞く。許可が要る
+  - AIアシスタントの会話は10ターンで打ち切られる。上限に達していたら、プログラムが「新しい会話」を押してから送る（フローはそのまま。2026-11-21）
+  - 取り消しは AIアシスタントの入力欄を使わないので、上限に達していても動く
   - ログ: `~/Library/Logs/jarvis_flowforge_edit_queue/`。止める: `launchctl bootout "gui/$(id -u)/com.matsunoma.jarvis.flowforge-edit-queue"`
 - 7 の読み直しは共有リンク経由。共有リンクは編集の最新を映す（2026-11-21 確認）
 
