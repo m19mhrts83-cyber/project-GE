@@ -2171,3 +2171,27 @@ main.wk-main { max-width: 600px; }
 .reply-confirm { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--accent); background: var(--accent-soft); }
 .reply-confirm p { margin: 0 0 8px; }
 .reply-note { margin: 0; }
+
+/* 312 お題ゼロ（判断するタスクなし）の祝い表示 */
+.allclear { display: grid; justify-items: center; gap: 4px; padding: 28px 16px 24px; margin-bottom: 14px; text-align: center; animation: acIn 420ms cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+.ac-art { position: relative; width: 84px; height: 84px; margin-bottom: 8px; }
+.ac-ring { overflow: visible; animation: acGlow 2600ms ease-in-out 1100ms infinite; }
+.ac-ring-bg { fill: none; stroke: var(--line); stroke-width: 4; }
+.ac-ring-fg { fill: none; stroke: var(--positive); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 227; stroke-dashoffset: 227; transform: rotate(-90deg); transform-origin: 42px 42px; animation: lcDraw 620ms ease-out 120ms forwards; }
+.ac-check { fill: none; stroke: var(--positive); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 48; stroke-dashoffset: 48; animation: lcDraw 320ms ease-out 640ms forwards; }
+.ac-spark { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; opacity: 0; transform: rotate(var(--a)) translateY(-30px); animation: acSpark 900ms cubic-bezier(0.2, 0.7, 0.4, 1) 860ms forwards; }
+.ac-spark.c0 { background: var(--positive); }
+.ac-spark.c1 { background: var(--accent); }
+.ac-spark.c2 { background: var(--focus); }
+.ac-spark.c3 { background: #7d8cff; }
+.ac-title { font-size: 18px; font-weight: 700; opacity: 0; animation: acText 420ms ease-out 760ms forwards; }
+.ac-sub { font-size: 13px; color: var(--ink-muted); opacity: 0; animation: acText 420ms ease-out 920ms forwards; }
+@keyframes acIn { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes acSpark { 0% { opacity: 1; transform: rotate(var(--a)) translateY(-30px) scale(1.2); } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-62px) scale(0.4); } }
+@keyframes acText { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes acGlow { 0%, 100% { filter: drop-shadow(0 0 0 rgba(79, 224, 166, 0)); } 50% { filter: drop-shadow(0 0 10px rgba(79, 224, 166, 0.55)); } }
+@media (prefers-reduced-motion: reduce) {
+  .allclear, .ac-ring, .ac-title, .ac-sub { animation: none; opacity: 1; }
+  .ac-ring-fg, .ac-check { animation: none; stroke-dashoffset: 0; }
+  .ac-spark { display: none; }
+}

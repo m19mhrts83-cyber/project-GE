@@ -76,3 +76,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - **auto_pass**（物件が条件外）≠ 業者ブロック
 - 物件 PDF 付き返信は `property_mail_match --apply` も併走（morning refresh 内）
 - OneDrive `5.やり取り.md` 追記は **パートナー専用**。業者返信は YAML + triage のみ
+- 業者のメルマガ（一斉配信の読み物）は取り込まない（2026-11-21 松野さん「メルマガ。リアクション不要」）。件名・本文の「メルマガ／配信停止／毎号／今回の記事は／本メールでは…お届け」等で判定（`is_vendor_newsletter`）。Slack にも Dashboard にも出さず、stderr に `# skip newsletter` だけ残す
