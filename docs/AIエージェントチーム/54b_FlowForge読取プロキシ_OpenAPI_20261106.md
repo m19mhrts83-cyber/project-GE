@@ -315,3 +315,24 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 curl -sS -H "Authorization: Bearer $FLOWFORGE_READ_PROXY_KEY" \
   "http://localhost:3001/api/flowforge/resolve?agentId=312&summary=1"
 ```
+
+### ローカルCLIでの新規作成・ノード追加（2026-11-22）
+
+本人が具体的な図を承認した時だけ使用する。AIアシスタントは呼ばない。MCPのpatch/queue契約は変更しない。
+
+- 新規: `python scripts/jarvis_flowforge_assistant_paste.py --create-file approved-flow.json --dry-run` → `--dry-run`を外して作成。
+- JSON: `id: flow_…`, `name`, `description`, `nodes`（id/kind/title/x/y、任意parentId/subtype/description/meta/toolName）、`edges`（id/source/target）。開始・終了各1、各scopeは一本道。位置は整数。
+- 既存ノード追加: ローカル `--patch-file` の操作に `{"op":"add_node","node":{"id":"stable_id","kind":"tool","title":"処理","x":400,"y":170}}`。矢印は追加しないので、remove_edge/add_edgeを明示する。同じ12操作上限。既存ID・不明親・不正種別は拒否。
+- 新規作成は置き場の安全なトップで、ID不存在・タブ鮮度を確認してからstore.loadFlow。未知の編集URLへ先に移動しない。既存フローは従来の所有確認を必須とする。
+- 適用前の全フローの写しを `.jarvis_state/flowforge_backups/` へ権限600で保存。公開しない。差分外変更は直接編集のundo、新規は自分が作った同じ版のみ取り消す。verified=falseは失敗。
+- verifiedはローカル内容の照合。さらに所有確認後の編集タブで同期し、共有を発行・共有API読取でノード/矢印/本文を照合してから実作図成功と報告する。共有発行も本人承認範囲でのみ行う。
+- 新社員を増やさず既存社員に図を付ける場合、registry本体行にflowforge_id/url、共有configのby_agent_id/by_flow_idを登録し、status_sync --no-driveで投影する。過去のID別共有リンクは残す。
+
+
+2026-11-22 実機検証の補足:
+
+- サーバーは新しい任意IDのクラウド所有登録をsyncで受け付けず、HTTP403 flow_owner_mismatchとなった。ローカルstoreに保存できても新規フローの共有発行にはならない。CLIはlocal_verified=trueでもクラウド失敗ならverified=falseを返し、所有チェックを回避しない。人が「新しいフロー」で作成して共有を発行し、その所有フローをCLIで整えるのが確認済みの手順。未同期の下書きは削除了承を得るまで残す。
+- 714の確定7ノードへの整形で明示了承されたノード削除を追加。ローカルpatchのremove_nodeはID指定のみ。開始/終了は削除不可、接続矢印と子は事前に明示して外す必要がある。自動再接続しない。削除も1つの履歴に入り、差分外変更はundoし照合する。MCP側の対応操作は従来どおりで増やしていない。
+- Chromeのウィンドウ/タブはindexではなく永続IDで参照する。新規の所有編集タブは元のactive tabを保って背景に開く。画面が切り替わって別タブを操作する事故を避ける。
+- 対象以外の全フローを写しと比較し、差分外変更があればverifiedにしない。同期は画面と同じsession/sync APIを使用し、クラウド失敗なら既存フローの変更はundo・復元照合。共有APIでの最終照合は別途必要。
+- 714は所有フローを10→7ノード、312は10→11ノードへ変更し、同期と共有APIの一致を確認した。新規任意IDの所有登録と他ブラウザへの移行は保証しない。

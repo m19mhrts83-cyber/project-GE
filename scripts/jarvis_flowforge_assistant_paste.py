@@ -88,7 +88,7 @@ def find_tabs(url_part: str) -> list[tuple[int, int]]:
         "  repeat with wi from 1 to (count of windows)\n"
         "    repeat with ti from 1 to (count of tabs of window wi)\n"
         f"      if (URL of tab ti of window wi) contains {as_str(url_part)} then\n"
-        '        set hits to hits & (wi as text) & "," & (ti as text) & ";"\n'
+        '        set hits to hits & (id of window wi as text) & "," & (id of tab ti of window wi as text) & ";"\n'
         "      end if\n"
         "    end repeat\n"
         "  end repeat\n"
@@ -111,7 +111,7 @@ def find_tab(url_part: str) -> tuple[int, int] | None:
 def run_js(win: int, tab: int, js: str) -> str:
     return osa(
         'tell application "Google Chrome" to execute '
-        f"tab {tab} of window {win} javascript {as_str(js)}"
+        f"tab id {tab} of window id {win} javascript {as_str(js)}"
     )
 
 
@@ -266,7 +266,7 @@ def ensure_fresh_tab(tab: tuple[int, int], fid: str) -> tuple[int, int]:
     if not reasons:
         return tab
     print("このタブは古い内容を持っています。読み込み直します:", reasons[:3], flush=True)
-    osa(f'tell application "Google Chrome" to reload tab {tab[1]} of window {tab[0]}')
+    osa(f'tell application "Google Chrome" to reload tab id {tab[1]} of window id {tab[0]}')
     time.sleep(6)
     again = next((t for t in find_tabs(f"/flows/{fid}") if t[0] == tab[0]), None)
     if again is None:
@@ -294,7 +294,7 @@ def reload_other_editor_tabs(tab: tuple[int, int], fid: str) -> int:
         if not owns.get("has"):
             continue
         try:
-            osa(f'tell application "Google Chrome" to reload tab {other[1]} of window {other[0]}')
+            osa(f'tell application "Google Chrome" to reload tab id {other[1]} of window id {other[0]}')
             n += 1
         except Exception:
             pass
@@ -345,17 +345,25 @@ def prepare(fid: str, need_assistant: bool = True) -> tuple[tuple[int, int], dic
         raise PasteStop(2, "対象フローの持ち主のタブが見つかりません。編集画面は開かずに止めます。")
     tab = next((t for t in find_tabs(edit_part) if t[0] == owner_tab[0]), None)
     if tab is None and edit_part in osa(
-        f'tell application "Google Chrome" to return URL of tab {owner_tab[1]} of window {owner_tab[0]}'
+        f'tell application "Google Chrome" to return URL of tab id {owner_tab[1]} of window id {owner_tab[0]}'
     ):
         tab = owner_tab
     if tab is None:
         # 持ち主のウィンドウの中で開く（別プロフィールで開くと空のフローができる）
-        osa(
-            'tell application "Google Chrome" to tell window '
-            f"{owner_tab[0]} to make new tab with properties {{URL:{as_str(BASE + edit_part)}}}"
+        new_id = osa(
+            'tell application "Google Chrome" to tell window id '
+            f"{owner_tab[0]}\n"
+            "set previousActive to active tab index\n"
+            f"set fresh to make new tab with properties {{URL:{as_str(BASE + edit_part)}}}\n"
+            "set freshId to id of fresh\n"
+            "set active tab index to previousActive\n"
+            "return freshId\nend tell"
         )
+        tab = (owner_tab[0],int(new_id))
         time.sleep(5)
-        tab = next((t for t in find_tabs(edit_part) if t[0] == owner_tab[0]), None)
+        url = osa(f'tell application "Google Chrome" to return URL of tab id {tab[1]} of window id {tab[0]}')
+        if edit_part not in url:
+            raise PasteStop(6,"new background tab did not retain the owned flow URL")
     if tab is None:
         raise PasteStop(6, "編集画面のタブが見つかりません")
     tab = ensure_fresh_tab(tab, fid)
@@ -511,6 +519,97 @@ def wait_sync(tab: tuple[int, int], timeout: float = 20.0) -> str:
     return text
 
 
+def read_all_flows(tab: tuple[int,int]) -> dict[str, Any]:
+    return json.loads(run_main(*tab,"(function(){"+dp.JS_FIND_API+
+        "var a=__ffApi();if(!a)throw new Error('store_not_found');return JSON.stringify(a.getState().flows);})()"))
+
+
+def other_flow_diffs(backup: Path, tab: tuple[int,int], fid: str) -> list[str]:
+    before=json.loads(backup.read_text())["flows"]
+    after=read_all_flows(tab)
+    return ["other flow changed: "+key for key in before.keys() | after.keys()
+            if key != fid and before.get(key) != after.get(key)]
+
+
+def backup_store(tab: tuple[int, int], label: str) -> Path:
+    """Owner-store snapshot outside Git, before any mutation."""
+    from datetime import datetime, timezone
+    import uuid
+    raw = run_main(*tab, "(function(){" + dp.JS_FIND_API +
+        "var a=__ffApi();if(!a)throw new Error('store_not_found');return JSON.stringify(a.getState().flows);})()")
+    flows = json.loads(raw)
+    folder = REPO / ".jarvis_state" / "flowforge_backups"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "_" + uuid.uuid4().hex + ".json")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as stream:
+        json.dump({"label": label, "flows": flows}, stream, ensure_ascii=False)
+    return path
+
+
+def sync_owned(tab: tuple[int,int], fid: str) -> dict[str, Any]:
+    """Same session + sync endpoints as the UI; no AI and no credentials returned."""
+    owns = json.loads(run_js(*tab, JS_OWNS % {"fid": json.dumps(fid)}))
+    if not owns.get("has") or tab_freshness(tab):
+        raise dp.PatchError("owner/freshness check failed before sync")
+    key = "data-jarvis-sync"
+    js = ("(function(){document.documentElement.removeAttribute('"+key+"');"
+          "var raw=JSON.parse(localStorage.getItem('flowforge:flows')||'null');"
+          "var f=raw&&raw.state&&raw.state.flows["+json.dumps(fid)+"];"
+          "var anon=localStorage.getItem('flowforge:anon-id');"
+          "if(!f||!anon)return 'missing_owner';"
+          "(async function(){try{var session=await fetch('/api/session',{method:'POST',credentials:'same-origin',cache:'no-store'});"
+          "if(!session.ok)throw new Error('session_'+session.status);"
+          "var r=await fetch('/api/flows/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({anonId:anon,flow:f})});"
+          "var b=await r.json().catch(function(){return {};});"
+          "document.documentElement.setAttribute('"+key+"',JSON.stringify({ok:r.ok,status:r.status,detail:b.detail||b.error||null}));"
+          "}catch(e){document.documentElement.setAttribute('"+key+"',JSON.stringify({ok:false,detail:String(e)}));}})();return 'started';})()")
+    if run_js(*tab,js) != "started": return {"ok":False,"detail":"missing_owner"}
+    for _ in range(25):
+        time.sleep(0.5)
+        raw=run_js(*tab,"document.documentElement.getAttribute('"+key+"')||''")
+        if raw: return json.loads(raw)
+    return {"ok":False,"detail":"sync_timeout"}
+
+
+def direct_create(flow: dict[str, Any], dry_run: bool = False) -> dict[str, Any]:
+    """Create only an absent ID on the home profile; never open an unknown edit URL."""
+    from datetime import datetime, timezone
+    import jarvis_flowforge_migrate_to_home as mg
+    planned = dp.validate_flow(flow)
+    tab = mg.home_tab()  # only the safe index page if no owner tab exists
+    if any(f["id"] == planned["id"] for f in mg.list_flows(tab)):
+        raise dp.PatchError("flow id already exists; creation refused")
+    reasons = tab_freshness(tab)
+    if reasons:
+        raise dp.PatchError("stale tab: " + "; ".join(reasons))
+    if dry_run:
+        return {"dry_run": True, "flow_id": planned["id"], "nodes": len(planned["nodes"])}
+    backup = backup_store(tab, "before create " + planned["id"])
+    native = dp.native_flow(planned)
+    native["createdAt"] = native["updatedAt"] = datetime.now(timezone.utc).isoformat()
+    js = ("(function(){" + dp.JS_FIND_API + "var api=__ffApi();if(!api)return JSON.stringify({ok:false,error:'store_not_found'});"
+          + "var f=" + json.dumps(native, ensure_ascii=False) + ";"
+          + "if(api.getState().flows[f.id])return JSON.stringify({ok:false,error:'flow_exists'});"
+          + "api.getState().loadFlow(f);return JSON.stringify({ok:true,snap:__ffSnap(api,f.id)});})()")
+    res = json.loads(run_main(*tab, js))
+    actual = res.get("snap") or {}
+    diffs = dp.compare_to_expected(planned, actual)
+    diffs.extend(other_flow_diffs(backup,tab,planned["id"]))
+    ok = (res.get("ok") and not diffs and actual.get("name") == planned["name"]
+          and actual.get("description") == planned["description"])
+    rolled = False
+    if not ok and actual.get("updatedAt"):
+        # Compensate this creation only; never restore unrelated flows over user edits.
+        js = ("(function(){" + dp.JS_FIND_API + "var a=__ffApi(),s=a.getState(),id=" + json.dumps(planned["id"]) + ";"
+              + "if(s.flows[id]&&s.flows[id].updatedAt===" + json.dumps(actual["updatedAt"]) + "){s.deleteFlow(id);return !a.getState().flows[id];}return false;})()")
+        rolled = run_main(*tab, js) == "true"
+    sync = sync_owned(tab,planned["id"]) if ok else {"ok":False}
+    return {"verified": bool(ok and sync.get("ok")), "local_verified":bool(ok),
+            "sync":sync,"flow_id": planned["id"], "backup_path": str(backup),
+            "unexpected": diffs, "rolled_back": rolled}
+
+
 def direct_patch(fid: str, ops: list[dict[str, Any]], dry_run: bool = False) -> dict[str, Any]:
     """ノード ID・矢印 ID を指定した直接編集。計画 → 実行 → 検証 → 違えば1手戻す。
 
@@ -531,6 +630,7 @@ def direct_patch(fid: str, ops: list[dict[str, Any]], dry_run: bool = False) -> 
         out["dry_run"] = True
         return out
 
+    out["backup_path"] = str(backup_store(tab, "before patch " + fid))
     raw = run_main(*tab, dp.js_apply(fid, plan["steps"], dp.HISTORY_LABEL))
     try:
         res = json.loads(raw)
@@ -538,6 +638,12 @@ def direct_patch(fid: str, ops: list[dict[str, Any]], dry_run: bool = False) -> 
         res = {"ok": False, "error": raw[:200], "snap": None}
     after = res.get("snap") or read_store(tab, fid)
     diffs = dp.compare_to_expected(plan["expected"], after)
+    diffs.extend(other_flow_diffs(Path(out["backup_path"]),tab,fid))
+    if res.get("ok") and not diffs:
+        cloud = sync_owned(tab,fid)
+        out["cloud_sync"] = cloud
+        if not cloud.get("ok"):
+            diffs.append("cloud_sync_failed")
     if res.get("ok") and not diffs:
         out.update(dp.summarize_change(before, after))
         out["verified"] = True
@@ -749,6 +855,7 @@ def queue_once(sb: Any = None, quiet_when_empty: bool = False) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description="FlowForge AIアシスタントへ修正文を入力（試作）")
     g = ap.add_mutually_exclusive_group(required=True)
+    g.add_argument("--create-file", help="Approved full-flow JSON; creates only an absent id")
     g.add_argument("--agent", help="社員番号（例: 311）")
     g.add_argument("--flow-id", help="flow_… を直接指定")
     g.add_argument("--queue-once", action="store_true", help="待ち箱から1件拾って送信し、結果を書き戻す")
@@ -769,6 +876,14 @@ def main() -> int:
     if args.queue_watch:
         return queue_watch()
 
+    if args.create_file:
+        try:
+            result = direct_create(json.loads(Path(args.create_file).read_text()), dry_run=args.dry_run)
+        except (dp.PatchError, PasteStop) as e:
+            print(str(e))
+            return 13
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if result.get("verified") or result.get("dry_run") else 11
     fid = args.flow_id or flow_id_for_agent(args.agent)
     text = ""
     if args.patch_file:
