@@ -185,6 +185,10 @@ def build_vpoint(*, outcome: str, reason: str, error: str, note: str, asks_n: in
     elif out == "failed":
         lines.append(f"・結果: 失敗 — {error or '不明'}")
         lines.append("・次: cadence／月次ログ or #ops")
+    elif out == "partial":
+        # Slack は松野さん本人への通知。基準日などの具体値を出してよい（D6・2026-11-23）
+        lines.append(f"・結果: 部分成功（{reason or '付与サマリが完全でない'}）")
+        lines.append("・次: Tサイトの履歴を取り直す（『Tサイト取って』）。月印は付けていません")
     else:
         lines.append("・結果: 定例ウォッチ更新")
     if asks_n is not None:
@@ -302,7 +306,7 @@ def main() -> int:
     ap.add_argument(
         "--outcome",
         default="checked",
-        choices=("checked", "drew", "skipped", "failed", "disabled"),
+        choices=("checked", "drew", "skipped", "failed", "disabled", "partial"),
     )
     ap.add_argument("--from-state", action="store_true")
     ap.add_argument("--tickets", type=int, default=None)
