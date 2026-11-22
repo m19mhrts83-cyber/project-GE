@@ -217,16 +217,15 @@ def aggregate_zaim_transfers(
     needle = str(card_cfg.get("zaim_pay_contains") or "").upper()
     kws = [str(k) for k in (card_cfg.get("zaim_transfer_to_include") or []) if str(k)]
     excl = [str(k) for k in (card_cfg.get("zaim_exclude_keywords") or [])]
-    out = {"usage_yen": 0, "rows": 0, "as_of": ""}
+    out = {"usage_yen": 0, "rows": 0, "as_of": "", "other_rows": 0, "checked": False}
     if not needle or not kws or not csv_path.is_file():
         return out
+    out["checked"] = True
     with csv_path.open(encoding="utf-8-sig", newline="") as f:
         for r in csv.DictReader(f):
             if (r.get("方法") or "") != "transfer":
                 continue
             if needle not in str(r.get("支払元") or "").upper():
-                continue
-            if not any(k in str(r.get("入金先") or "") for k in kws):
                 continue
             ds = str(r.get("日付") or "")[:10].replace("/", "-")
             try:
@@ -235,6 +234,9 @@ def aggregate_zaim_transfers(
                 continue
             if not (period[0] <= dd <= period[1]):
                 continue
+            if not any(k in str(r.get("入金先") or "") for k in kws):
+                out["other_rows"] += 1  # カード→ウォレット等。足さず件数だけ持つ
+                continue
             text = f"{r.get('お店') or ''}{r.get('品目') or ''}"
             if any(k in text for k in excl):
                 continue
@@ -242,8 +244,9 @@ def aggregate_zaim_transfers(
                 amt = int(round(float(r.get("振替") or 0)))
             except ValueError:
                 continue
-            if amt <= 0:
+            if amt == 0:
                 continue
+            # 負の振替は返金（Amazon→カード）。返品・キャンセルは利用額から引かれるので純額で足す
             out["usage_yen"] += amt
             out["rows"] += 1
             out["as_of"] = max(out["as_of"], ds)
@@ -262,11 +265,13 @@ def refresh_bonvoy(state: dict[str, Any], cfg: dict[str, Any], today: date) -> s
     period = period_for(card_cfg, today)
     agg = aggregate_zaim(index, card_cfg, period)
     csv_p = str(index.get("csv") or "")
+    if card_cfg.get("zaim_transfer_to_include") and not csv_p and agg is not None:
+        agg["transfers_checked"] = False
     if csv_p and card_cfg.get("zaim_transfer_to_include"):
         try:
             tr = aggregate_zaim_transfers(Path(csv_p).expanduser(), card_cfg, period)
         except (OSError, csv.Error):
-            tr = {"rows": 0}
+            tr = {"rows": 0, "other_rows": 0, "checked": False}
         if tr["rows"]:
             if agg is None:
                 agg = {"usage_yen": 0, "rows": 0, "as_of": "", "index_updated_at": index.get("updated_at")}
@@ -274,11 +279,22 @@ def refresh_bonvoy(state: dict[str, Any], cfg: dict[str, Any], today: date) -> s
             agg["rows"] += tr["rows"]
             agg["as_of"] = max(agg["as_of"], tr["as_of"])
             agg["transfer_rows"] = tr["rows"]
+        if agg is not None:
+            # 読めなかった時に黙って過少のままにしない（短報・画面で警告する）
+            agg["other_transfer_rows"] = tr.get("other_rows", 0)
+            agg["transfers_checked"] = bool(tr.get("checked"))
     if agg is None:
         return "期間内の該当行なし"
     agg["computed_at"] = datetime.now(JST).isoformat(timespec="seconds")
     state.setdefault("bonvoy", {})["zaim"] = agg
-    return f"Zaim 該当 {agg['rows']} 行（基準日 {agg['as_of']}）"
+    note = ""
+    if card_cfg.get("zaim_transfer_to_include"):
+        note = (
+            f"・振替 {agg.get('transfer_rows', 0)} 件を加算（未算入の振替 {agg.get('other_transfer_rows', 0)} 件）"
+            if agg.get("transfers_checked")
+            else "・振替行は読めず未加算（Zaim CSV を確認）"
+        )
+    return f"Zaim 該当 {agg['rows']} 行（基準日 {agg['as_of']}）{note}"
 
 
 # ---------------------------------------------------------------- 計算
@@ -301,11 +317,15 @@ def _latest_usage(card_cfg: dict[str, Any], state: dict[str, Any]) -> dict[str, 
         }
     z = (state.get("bonvoy") or {}).get("zaim")
     if isinstance(z, dict) and z.get("usage_yen") is not None and z.get("as_of"):
+        tr = int(z.get("transfer_rows") or 0)
         return {
             "usage_yen": int(z["usage_yen"]),
             "as_of": z["as_of"],
             "kind": "estimate",
-            "source_label": "Zaim 取込行の概算",
+            "source_label": "Zaim 取込行の概算（振替含む）" if tr else "Zaim 取込行の概算",
+            "transfer_rows": tr,
+            "other_transfer_rows": int(z.get("other_transfer_rows") or 0),
+            "transfers_checked": bool(z.get("transfers_checked")),
         }
     return None
 
@@ -367,6 +387,10 @@ def compute_card(
     )
     if usage["kind"] == "estimate":
         out["usage_caveat"] = str(cfg.get("zaim_note") or "概算")
+        out["usage_transfers_expected"] = bool(c.get("zaim_transfer_to_include"))
+        out["usage_transfer_rows"] = usage.get("transfer_rows", 0)
+        out["usage_other_transfer_rows"] = usage.get("other_transfer_rows", 0)
+        out["usage_transfers_checked"] = usage.get("transfers_checked", False)
         out["usage_stale"] = (today - as_of).days > int(cfg.get("zaim_stale_days", 10))
     else:
         out["usage_stale"] = (today - as_of).days > int(c.get("stale_days", 45))
@@ -567,6 +591,14 @@ def build_slack_text(result: dict[str, Any], *, header: str, dash_url: str, mask
             f"   あと{fmt_man(t['remaining_yen'], mask)}・月{fmt_man(t['need_per_month_yen'], mask)}"
             f"必要→{t['verdict']}"
         )
+    # 概算に足した振替の件数（実額は書かない）。振替を読めていない時は黙って過少にせず警告する
+    for c in result["cards"]:
+        if c.get("usage_kind") != "estimate" or not c.get("usage_transfers_expected"):
+            continue
+        if not c.get("usage_transfers_checked"):
+            lines.append(f"・{c['short']}の振替は未加算（要再取込）")
+        elif c.get("usage_transfer_rows"):
+            lines.append(f"・{c['short']}は振替{c['usage_transfer_rows']}件を含む概算")
     # 概算元（Zaim）が古いときは必ず知らせる
     for c in result["cards"]:
         if not c.get("usage_stale"):
