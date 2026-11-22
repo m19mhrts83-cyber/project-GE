@@ -275,12 +275,15 @@ def hub_report_text(run: dict[str, Any]) -> str:
     c = run["counts"]
     sig = {"success": "🟢", "partial": "🟡", "failed": "🔴", "stopped": "⏸"}.get(run["result"], "")
     lines = [
-        f"【報告】318 Todoist消化・{'手動' if run.get('trigger') == 'manual' else '定時'}",
+        f"【報告】318 Todoist消化・{'定時' if run.get('trigger') == 'schedule' else '手動'}",
         f"{sig} {run['result']}" + (f"（{run['stop_reason']}）" if run.get("stop_reason") else ""),
         f"確認 {c['examined']}／変化なし {c['skipped_unchanged']}／回答取込 {c.get('answered', 0)}",
         f"①{c['cat1']} ②{c['cat2']} ③{c['cat3']}／繰越 {c['carried_over']}",
         f"/313/bulk 待ち {c.get('queued', 0)}／週次へ {c.get('handoff', 0)}",
     ]
+    cmt = run.get("comments") or {}
+    if cmt.get("enabled"):
+        lines.append(f"【318】コメント {cmt.get('posted', 0)}件／照合待ち {cmt.get('unknown', 0)}")
     if run.get("errors"):
         lines.append(f"要確認 {len(run['errors'])}件")
     return "\n".join(lines)

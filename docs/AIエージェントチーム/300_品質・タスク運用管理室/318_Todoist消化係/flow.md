@@ -23,20 +23,20 @@ flowchart LR
 
 | FlowForge ノード | 主体 | Phase 1 の実装 | 状態 |
 |---|---|---|---|
-| start 毎朝の定時実行で起動 | プログラム | `run`（手動だけ）。停止スイッチ・ロック・313 重なり・接続・本人権限・60分・5件 | 実装（定時登録はしない） |
+| start 毎朝の定時実行で起動 | プログラム | `run`（手動）／`run --trigger schedule`（朝枠の担当が 318 の時だけ）。停止スイッチ・朝枠の排他・ロック・313 重なり・接続・本人権限・60分・5件 | 実装（launchd は未登録の雛形。移管は `移管手順_10時30分.md`） |
 | node_YopbrZa4 採用済み基準・判断履歴の読込 | プログラム | `load_basis`（基準 YAML の adopted／313 `todoist_313_judgments.json`／318 `history.json`） | 実装 |
 | node_fetch 対象タスクの抽出 | プログラム | `candidate_filter`＋`rank`（313 overdue の順位付けを直して再利用） | 実装 |
 | node_5cc62if9 前回から変化なしの除外 | プログラム | `snapshot`／`detect_change` | 実装 |
 | node_classify タスクの3分類判定 | AI（この実行の Claude Code）＋プログラム | `classify`（ルール）→ `--ai-answers`（AI の見直し） | 実装 |
-| sub_execute／node_run_a／node_halt_check | AI | — | 未実装（① の自律実行は松野さんが決めてから） |
+| sub_execute／node_run_a／node_halt_check | AI | ① の `planned_action`（やる予定の内容・executed=false）を内部ログへ | 未実装（記録だけ。① の自律実行は松野さんが決めてから） |
 | node_znkxTG8H #consult へ通知 | 外部サービス | `handoff.consult_text`→`drafts/`。送るのは `--send-slack`＋`--publish` の時だけ | 実装（既定は案の保存） |
 | node_human_review /313/bulk で判断 | 人間 | `sync_meta.todoist_318_bulk_queue` → `jarvis_todoist_cleanup_bulk.py` が画面へ。回答は owner_decisions → `fetch_owner_answers` で読み戻し | 実装（載せるのは `--publish` の時だけ） |
 | （③の渡し先）312 今週の9件 | プログラム | `sync_meta.todoist_318_weekly_handoff` → `jarvis_todoist_weekly_pick.py` の候補 | 実装（載せるのは `--publish` の時だけ） |
-| node_format_log 判断履歴の整形 | プログラム | 内部ログ部分だけ（`runs/<run_id>.json`） | 一部 |
-| node_comment Todoist コメント反映 | 外部サービス | — | Phase 3 |
+| node_format_log 判断履歴の整形 | プログラム | 内部ログ（`runs/<run_id>.json`）＋【318】コメントの下書き `comment_draft`（`jarvis_todoist_318_comment.format_comment`） | 実装 |
+| node_comment Todoist コメント反映 | 外部サービス | `jarvis_todoist_318_comment.write_comments`（保存後・変化のある件だけ・重複確認・応答不明は照合待ち・317 除外の確認） | 実装（書くのは `--write-comments` の時だけ） |
 | end 日次結果判定・報告 | プログラム | success／partial／failed／stopped の判定、`#ai-hub` 報告案の保存（送るのは `--send-slack` の時だけ） | 実装 |
 
-## やらないこと（Phase 2 まで）
+## やらないこと（Phase 3 準備まで）
 
-Todoist へのコメント書き込み（Phase 3）・①の実行・定期起動の登録・313 の 0.5 の移管・他エージェントへの依頼。
+①の実行・定期起動の登録・313 の 0.5 の移管・他エージェントへの依頼。Todoist へのコメントは仕組みとテストまで（`--write-comments` は松野さんの了承後）。
 Slack 送信と /313/bulk・週次への掲載は、仕組みとテストまで。実際に載せる・送るのは松野さんの了承後に `--publish`／`--send-slack` を付けて動かす。

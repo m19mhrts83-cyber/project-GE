@@ -6,6 +6,7 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import urllib.error
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -88,6 +89,10 @@ class Base(unittest.TestCase):
         self.state = Path(self.tmp.name)
         self.paths = tr.Paths(self.state)
         (self.state / "todoist_313_judgments.json").write_text(json.dumps({"keep": {}, "streak": {}}), encoding="utf-8")
+        # 313 0.5 の作業ファイル（/tmp）が実機にあっても結果が変わらないように、無い場所を指す
+        _p = mock.patch.object(tr.ms, "T313_PENDING", self.state / "no_t313_pending.json")
+        _p.start()
+        self.addCleanup(_p.stop)
         self.env = {"TODOIST_API_TOKEN_OWNER": "dummy"}
         self.sb = FakeSb()
         self.posts: list[tuple[str, str]] = []

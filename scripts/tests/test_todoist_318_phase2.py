@@ -32,6 +32,10 @@ class P2Base(unittest.TestCase):
         self.state = Path(self.tmp.name)
         self.paths = tr.Paths(self.state)
         (self.state / "todoist_313_judgments.json").write_text(json.dumps({"keep": {}}), encoding="utf-8")
+        # 313 0.5 の作業ファイル（/tmp）が実機にあっても結果が変わらないように、無い場所を指す
+        _p = mock.patch.object(tr.ms, "T313_PENDING", self.state / "no_t313_pending.json")
+        _p.start()
+        self.addCleanup(_p.stop)
         self.env = {"TODOIST_API_TOKEN_OWNER": "dummy"}
         self.sb = FakeSb()
         self.posts: list[tuple[str, str]] = []
@@ -136,7 +140,7 @@ class RouteTest(P2Base):
         run = self.run_once([task("a", content="どうするか決める")], dry=True, publish=True, send_slack=True)
         self.assertEqual(self.sb.writes, [])
         self.assertEqual(self.posts, [])
-        self.assertEqual(run["flags"], {"publish": False, "send_slack": False})
+        self.assertEqual(run["flags"], {"publish": False, "send_slack": False, "write_comments": False})
 
     def test_asked_by_313_is_not_queued(self):
         (self.state / "todoist_313_cleanup.json").write_text(
