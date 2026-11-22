@@ -6109,11 +6109,11 @@ const App = {
     const zq = (kw.zero_queries || []).slice(0, 5);
     const kwRankCard =
       '<div class="ab-card ab-ranking ab-ranking-kw"><h4 class="ab-h"><i class="fa-solid fa-magnifying-glass"></i> キーワード検索ランキング</h4>' +
-      '<p class="ab-muted ab-rank-note">「キーワード検索（全データ）」に入れた言葉。多い順・上位10。▼の付いた言葉は押すと全文が出ます</p>' + kwRanking +
+      '<p class="ab-muted ab-rank-note">「キーワード検索（全データ）」に入れた言葉。多い順・上位10。▼の付いた言葉は押すと全文が出ます。「平均○件ヒット」は、その言葉で1回検索したときに見つかった件数（コメント・動画・講座ページ・LINEオプチャの合計）の平均です</p>' + kwRanking +
       (zq.length ? '<div class="ab-zero"><b><i class="fa-solid fa-circle-exclamation"></i> 見つからなかった言葉</b>（言い換えやデータを足す候補）<div>' +
         zq.map((q) => '<span>' + esc(q.query) + '<small>' + fmt(q.count) + '回</small></span>').join('') + '</div></div>' : '') + '</div>';
 
-    // 7) チャットとキーワード検索の比べ（回数・人数・1人あたり・前半/後半・日ごと）と、次の手のヒント
+    // 7) チャットとキーワード検索の比較（回数・人数・1人あたり・前半/後半・日ごと）と、次の手のヒント
     const kwDaily = {};
     (kw.daily || []).forEach((d) => { kwDaily[String(d.day || '')] = d; });
     const allDays = Array.from(new Set(daily.map((d) => d.day).concat(Object.keys(kwDaily)))).sort();
@@ -6162,15 +6162,18 @@ const App = {
         '<span class="ab-pair-bars"><i class="ab-k1" style="height:' + ((d.chat / pMax) * 100).toFixed(1) + '%"></i><i class="ab-k2" style="height:' + ((d.kw / pMax) * 100).toFixed(1) + '%"></i></span>' +
         '<span class="ab-xlab">' + (i % pEvery === 0 || i === pairs.length - 1 ? esc(dayLabel(d.day, false)) : '') + '</span></button>').join('') + '</div>';
     const compareCard =
-      '<div class="ab-card ab-compare"><h4 class="ab-h"><i class="fa-solid fa-scale-balanced"></i> チャットの質問とキーワード検索の比べ</h4>' +
+      '<div class="ab-card ab-compare"><h4 class="ab-h"><i class="fa-solid fa-scale-balanced"></i> チャットの質問とキーワード検索の比較</h4>' +
       '<div class="ab-vs">' +
         side('ab-vs-chat', 'fa-comments', 'Q&Aチャットの質問', total, chatUsers, '', halfOf('chat')) +
         side('ab-vs-kw', 'fa-magnifying-glass', 'キーワード検索', kwTotal, kwUsers,
           kwOn ? '<div class="ab-vs-sub ab-vs-zero"><span>見つからなかった <b>' + fmt(kwZero) + '</b>回</span></div>' : '<div class="ab-vs-sub">記録の準備中</div>', halfOf('kw')) +
       '</div>' +
       (both > 0 ? '<div class="ab-share" role="img" aria-label="使われた割合 チャット' + chatPct + '% キーワード検索' + (100 - chatPct) + '%">' +
-        '<i class="ab-k1" style="width:' + chatPct + '%"><span>' + (chatPct >= 12 ? 'チャット ' + chatPct + '%' : '') + '</span></i>' +
-        '<i class="ab-k2" style="width:' + (100 - chatPct) + '%"><span>' + (100 - chatPct >= 12 ? 'キーワード ' + (100 - chatPct) + '%' : '') + '</span></i></div>' : '') +
+        '<i class="ab-k1" style="width:' + chatPct + '%"></i>' +
+        '<i class="ab-k2" style="width:' + (100 - chatPct) + '%"></i></div>' +
+        // 割合の文字は棒の中だと幅が足りず切れるので、棒の下に出す（2026-11-22 松野さん）
+        '<div class="ab-share-labels"><span><span class="ab-swatch ab-k1"></span>チャット <b>' + chatPct + '%</b></span>' +
+        '<span><span class="ab-swatch ab-k2"></span>キーワード検索 <b>' + (100 - chatPct) + '%</b></span></div>' : '') +
       pairChart +
       (pairs.length ? '<ul class="ab-legend ab-legend-row"><li><span class="ab-swatch ab-k1"></span>Q&Aチャットの質問</li><li><span class="ab-swatch ab-k2"></span>キーワード検索</li></ul>' : '') +
       '<div class="ab-hints"><b><i class="fa-solid fa-lightbulb"></i> 読み取りと次の手</b><ul>' + hints.map((h) => '<li>' + h + '</li>').join('') + '</ul></div>' +
