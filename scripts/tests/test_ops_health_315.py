@@ -16,17 +16,30 @@ import jarvis_ops_health_315_sources as sources
 
 
 class SourcesTest(unittest.TestCase):
-    def test_square_missing_old_invalid_and_failure(self):
+    def test_square_from_watch_status(self):
+        now = datetime(2026, 11, 22, 13, 0, tzinfo=timezone.utc)
+        def beat(hours):
+            return (now - timedelta(hours=hours)).astimezone(timezone(timedelta(hours=9))).isoformat()
         with tempfile.TemporaryDirectory() as tmp:
-            p = Path(tmp) / 'probe.json'
-            self.assertEqual(sources.square_snapshot(p)[0], '確認不能')
-            for age, ok, expected in [(175, True, '確認不能'), (-1, True, '確認不能'), (1, None, '確認不能'), (1, False, '異常'), (1, True, 'OK')]:
-                p.write_text(json.dumps({'last_probe_at': (datetime.now(timezone.utc)-timedelta(hours=age)).isoformat(), 'last_probe': {'ok': ok}}))
+            p = Path(tmp) / 'watch.json'
+            self.assertEqual(sources.square_snapshot(p, now)[0], '確認不能')
+            cases = [
+                ({'state': 'running', 'heartbeat_at': beat(0.1)}, 'OK'),
+                ({'state': 'running', 'heartbeat_at': beat(25)}, '確認不能'),
+                ({'state': 'running', 'heartbeat_at': beat(-2)}, '確認不能'),
+                ({'state': 'running'}, '確認不能'),
+                ({'state': 'running', 'heartbeat_at': '2026-11-22T20:00:00'}, '確認不能'),
+                ({'state': 'stopped', 'heartbeat_at': beat(1)}, '異常'),
+                ({'state': 'running', 'heartbeat_at': beat(1), 'last_write_error': 'x'}, '異常'),
+            ]
+            for data, expected in cases:
+                p.write_text(json.dumps(data))
                 before = p.read_bytes()
-                self.assertEqual(sources.square_snapshot(p)[0], expected)
+                self.assertEqual(sources.square_snapshot(p, now)[0], expected, data)
                 self.assertEqual(p.read_bytes(), before)
-            p.write_text('[]')
-            self.assertEqual(sources.square_snapshot(p)[0], '確認不能')
+            for bad in ('[]', '{broken'):
+                p.write_text(bad)
+                self.assertEqual(sources.square_snapshot(p, now)[0], '確認不能')
 
     def test_gha_completed_main_and_failure(self):
         for rc, payload, level in [(1, '', '確認不能'), (0, '[]', '確認不能'), (0, json.dumps([{'updatedAt': datetime.now(timezone.utc).isoformat(), 'conclusion': 'failure'}]), '異常')]:
@@ -50,7 +63,7 @@ class SourcesTest(unittest.TestCase):
             order.clear()
             result = sources.collect(None, cloud=True)
             self.assertEqual(order, ['gha'])
-            self.assertEqual(result['Square probe'][0], 'スキップ(cloud)')
+            self.assertEqual(result['Square（オプチャ常駐）'][0], 'スキップ(cloud)')
 
     def test_collection_separate_from_health(self):
         for levels, result in [(['OK', '異常'], '成功'), (['OK', '確認不能'], '部分成功'), (['確認不能'], '失敗'), (['OK', 'スキップ(cloud)'], '部分成功')]:
@@ -63,10 +76,39 @@ class SourcesTest(unittest.TestCase):
         module = SimpleNamespace(load_previous_health=lambda: {}, run_line_health_routine=run,
             build_health_snapshot=lambda inv: {'decode_seen': 25}, evaluate_alerts=lambda cur, prev: ['private'])
         with patch.dict(sys.modules, {'chrline_line_health': module}):
-            result = sources.chrline_snapshot()
+            result = sources.chrline_child()
         run.assert_called_once_with(save_baseline=False)
         self.assertEqual(result[0], '異常')
         self.assertNotIn('private', result[1])
+
+
+class ChrlineSubprocessTest(unittest.TestCase):
+    def snap(self, code, timeout=20):
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / 'py'
+            fake.write_text('#!/bin/sh\n' + code + '\n')
+            fake.chmod(0o755)
+            return sources.chrline_snapshot(fake, timeout)
+
+    def test_ok_result_is_passed_through(self):
+        r = self.snap('echo "noise /private/path"; echo \'@@["OK","detail"]\'')
+        self.assertEqual(r, ('OK', 'detail'))
+
+    def test_missing_venv(self):
+        r = sources.chrline_snapshot(Path('/nonexistent/py'))
+        self.assertEqual(r[0], '確認不能')
+        self.assertIn('venvなし', r[1])
+
+    def test_child_failure_hides_output(self):
+        r = self.snap('echo secret-path >&2; exit 3')
+        self.assertEqual(r[0], '確認不能')
+        self.assertIn('code=3', r[1])
+        self.assertNotIn('secret', r[1])
+
+    def test_timeout(self):
+        r = self.snap('sleep 5', timeout=1)
+        self.assertEqual(r[0], '確認不能')
+        self.assertIn('タイムアウト', r[1])
 
 
 class PipelineTest(unittest.TestCase):

@@ -59,7 +59,9 @@
 - task_id: task_74a1ee3381cf / executor: codex / status: done（実装・ローカル検証完了、PRチェック確認）
 - 依頼: 315-Aのみ、既存週次運用と確定FlowForgeを照合し最小差分を実装する。
 - 完了条件: GHA履歴・保存済みSquare probe・CHRLINE healthを突合、成功/部分成功/失敗を区別、dry-runで投稿/mark/復旧なし、テストとpublic guard成功、PR確認。マージ/デプロイなし。
-- 方針: Square liveはtoken削除/更新を伴うため呼ばない。保存済み結果だけ参照する（調整担当了承済み）。
+- 追記(11/22): CHRLINE healthは315本体のvenvにCHRLINE/geventが無く常に「取得できない」になっていたため、`line_unofficial_poc/.venv` のpythonを子プロセスで呼ぶ方式に変更（読取専用・save_baseline=False維持）。失敗理由は確認不能の説明に出す。Square保存側（定期実行なし）は別件で未対応。
+- 方針: Square liveはtoken削除/更新を伴うため呼ばない。
+- 変更(11/22・松野さん了承): Square判定を手動probe保存ではなく常駐watchの状態ファイル（heartbeat・state・書込エラー）の自動判定へ。上限24h、probeは外す。読取専用。
 
 ## 2026-11-22 315-B 停止・空回り監視の実装
 
