@@ -31,6 +31,8 @@ from jarvis_todoist_313_slack_blocks import (  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
 STATE = REPO / ".jarvis_state" / "todoist_313_cleanup.json"
+# 318 が /313/bulk に載せた件（sync_meta に出した回の写し）。同じタスクを 20:00 でも聞かない（二重質問の防止）
+QUEUE_318 = REPO / ".jarvis_state" / "todoist_318" / "bulk_queue.json"
 MAX_TOP = 5
 NEED_OWNER_RE = re.compile(
     r"(要ボス|検討|どうする|振込|解約|退会|資金|対外|方針)",
@@ -102,17 +104,33 @@ def _fetch_active_tasks(page_limit: int = 200, max_pages: int = 20) -> list[dict
     return out
 
 
+def queued_by_318(path: Path = QUEUE_318) -> set[str]:
+    """318 が /313/bulk に載せた task_id。ファイルが無い・未公開なら空（従来どおり）。"""
+    try:
+        from jarvis_todoist_318_handoff import published_queue_ids  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        return set()
+    return published_queue_ids(path)
+
+
 def collect_items(
     limit: int = MAX_TOP,
     judgments: dict | None = None,
     tasks: list[dict] | None = None,
+    exclude_ids: set[str] | None = None,
 ) -> tuple[list[dict], int]:
-    """`judgments` に「残す」済みで内容が変わっていないものは除く（合計にも入れない）。"""
+    """`judgments` に「残す」済みで内容が変わっていないものは除く（合計にも入れない）。
+
+    `exclude_ids` は 318 が /313/bulk で聞いている件（既定はその写しを読む）。同じタスクは片方だけで聞く。
+    """
     today = _today()
     if tasks is None:
         tasks = _fetch_active_tasks()
     if judgments:
         tasks, _ = jd.filter_kept(tasks or [], judgments)
+    skip = queued_by_318() if exclude_ids is None else exclude_ids
+    if skip:
+        tasks = [t for t in tasks or [] if str(t.get("id") or "") not in skip]
     scored: list[tuple[int, dict]] = []
     for t in tasks or []:
         due = (t.get("due") or {}).get("date") or ""

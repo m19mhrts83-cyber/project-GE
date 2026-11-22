@@ -3,12 +3,12 @@
 **作業を始めたら、まず [`PROGRESS.md`](./PROGRESS.md) を読む**（どの Phase まで出来ているか・持ち越しがここにある）。
 
 Todoist の未完了タスクを優先順に拾い、前回から変わっていない件は飛ばし、①AIのみ／②松野さんの判断／③本人操作に仕分ける。
-Phase 2 以降で ① を AI が進め、② を `/313/bulk` で判断してもらい、③ を 312 の週次へ渡す（今はまだ作らない）。
+② は `/313/bulk` で判断してもらい（本人回答は翌回に読み戻して再判定）、③ は 312「今週の9件」へ渡す（Phase 2・**載せる／送るはフラグを付けた時だけ**）。① の自律実行はまだ作らない。
 
 - 状態: **設計中**（registry の status は変えない。昇格は松野さんの了承後）
 - 設計の正本: FlowForge [flow_HMy15MUxWiSpw5QgAPYa_8e4](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_HMy15MUxWiSpw5QgAPYa_8e4)（承認済み 15 ノード・11 接続）。各ノードの説明文が仕様。読み方は [`flow.md`](./flow.md)
 - 仕様を変えたい時は独断で変えない。300 BL（ラスカル）に相談する
-- 実装: `scripts/jarvis_todoist_318_triage.py`／基準: `config/todoist_318_criteria.yaml`／テスト: `scripts/tests/test_todoist_318_triage.py`
+- 実装: `scripts/jarvis_todoist_318_triage.py`（本体）・`scripts/jarvis_todoist_318_handoff.py`（Phase 2 の部品）／基準: `config/todoist_318_criteria.yaml`／テスト: `scripts/tests/test_todoist_318_triage.py`・`test_todoist_318_phase2.py`
 - 関係: 起票は [312](../312_Todoist起票整理係/CLAUDE.md)、完了・片付け・毎朝の 0.5 は [313](../313_完了候補確認係/CLAUDE.md)、コメント起動は [317](../317_コメント起動係/CLAUDE.md)
 
 ## 1. 役割
@@ -20,6 +20,13 @@ Phase 2 以降で ① を AI が進め、② を `/313/bulk` で判断しても�
   - 1-3 前回から変化なしの除外（題・説明・期限・締切・優先度・ラベル・コメント・本人回答・親子の依存）
   - 1-4 3分類と根拠。迷ったら②。大規模は印だけ付けて既存タスクのまま
   - 内部ログ（`.jarvis_state/todoist_318/`・git 管理外）に分類根拠・採用基準・判断案・停止理由・次回再評価条件・処理日時と「報告案」を保存
+- **やること（Phase 2・既定は案の保存まで）**
+  - 本人回答の読み戻し: owner_decisions（surface=`todoist_313`・target_type=`todoist_task`。/313/bulk と 20:00 のボタン）の最新を毎回読む。読めなければ安全停止（`--owner-answers skip` を明示した時だけ読まない）
+    - 回答だけが変わった件は「回答取込」として聞き直さない。再評価は「日を変える」→その日、「残す」→14日後、ほかの項目が後から変わった時
+  - ② → `/313/bulk`: 回答待ちの ② を CleanupCard と同じ形で `sync_meta.todoist_318_bulk_queue` に置く（`--publish` の時だけ）。既存の `jarvis_todoist_cleanup_bulk.py`（GHA 30分ごと）が画面の材料に混ぜる。選んだ結果は既存どおり owner_decisions に残り、完了・削除・日を変えるは既存の reflect が反映する
+  - ③ → 312「今週の9件」: `sync_meta.todoist_318_weekly_handoff`（`--publish` の時だけ）。週次ピックが候補に入れ、理由「318: 本人の操作が要る」を付ける（🤖 の件でも入る）
+  - 通知・報告の案: `#consult`（新しく待ちに入った件だけ・1回だけ）と `#ai-hub`（終了報告）。`drafts/` に保存。**送るのは `--send-slack` の時だけ**。`#consult` は `--publish` で画面に載っていない時は送らない
+  - 313 との二重質問の防止（同じタスクは片方だけ）: 313 の 20:00 片付けが36時間以内に出した件は 318 が載せない。318 が載せた件（`bulk_queue.json` の published=true）は 313 の片付けが出さない。313 の状態が読めない時は ② を載せない（部分成功）
 - **やらないこと（Phase 1）**
   - Todoist への書き込み一切（コメント・完了・削除・期限変更）
   - Slack 送信（#consult・#ai-hub とも「案」の保存だけ）、`/313/bulk` への登録
@@ -54,7 +61,9 @@ Phase 2 以降で ① を AI が進め、② を `/313/bulk` で判断しても�
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 PY=~/selenium_env/venv/bin/python
 $PY scripts/jarvis_todoist_318_triage.py run --dry-run      # 履歴は更新しない（内部ログは残す）
-$PY scripts/jarvis_todoist_318_triage.py run                # 履歴も更新（Todoist は読むだけ）
+$PY scripts/jarvis_todoist_318_triage.py run                # 履歴も更新（Todoist は読むだけ・載せない・送らない）
+$PY scripts/jarvis_todoist_318_triage.py run --publish      # ②③を /313/bulk・週次へ載せる（Supabase sync_meta に書く。松野さん了承後）
+$PY scripts/jarvis_todoist_318_triage.py run --publish --send-slack  # ＋#consult 通知・#ai-hub 報告（松野さん了承後）
 $PY scripts/jarvis_todoist_318_triage.py status             # ロック・停止スイッチ・直近の報告案
 $PY scripts/jarvis_todoist_318_triage.py unlock --force     # 異常終了で残ったロックを外す（実行中でないと確かめてから）
 touch .jarvis_state/todoist_318/STOP                         # 停止スイッチ（消すと解除）。環境変数 TODOIST_318_STOP=1 でも可
@@ -89,3 +98,4 @@ touch .jarvis_state/todoist_318/STOP                         # 停止スイッ�
 |---|---|
 | 2026-11-22 | FlowForge でフロー設計（たたき台→承認済み 15 ノード） |
 | 2026-11-23 | Phase 1 実装（読むだけ・抽出・変化なし除外・3分類・内部ログ・手動実行）。社員フォルダ作成。313 の順位付けの部分一致・同点集中・読取の取りこぼしを直して再利用 |
+| 2026-11-23 | Phase 2 実装（②→/313/bulk・③→今週の9件・本人回答の読み戻し・#consult／#ai-hub の案・313 との二重質問防止・317 の【318】除外）。載せる・送るは既定オフ（`--publish`／`--send-slack`）。松野さん「設計書どおりなら都度承認なしで進めてよい」 |

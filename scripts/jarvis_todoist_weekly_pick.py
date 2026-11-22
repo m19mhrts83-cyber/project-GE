@@ -60,6 +60,7 @@ PICK_TEXT = {
     "interest": "興味・勢いがある",
     "inlet": "入口で{n}日待っている",
     "planned": "前の週の見通しでこの週に置いていた",
+    "handoff_318": "318: 本人の操作が要る",
 }
 
 
@@ -237,11 +238,14 @@ def build_snapshot(
     inlet_topics: list[dict[str, Any]],
     today: date,
     now: datetime,
+    handoff: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     monday = target_monday(today)
     days = pick_dates(monday)
     prev_mon = monday - timedelta(days=7)
-    owner = [t for t in tasks if is_owner_task(t)]
+    handoff = handoff or {}
+    # 318 が「本人の操作が要る（③）」と仕分けた件は、🤖 印でも本人の候補に入れる（既存タスクのまま）
+    owner = [t for t in tasks if is_owner_task(t) or (str(t.get("id")) in handoff and not t.get("checked") and not t.get("is_deleted"))]
 
     left_ids: set[str] = set()
     for t in owner:
@@ -254,6 +258,11 @@ def build_snapshot(
                   week=(monday, monday + timedelta(days=6)))
         for t in owner
     ]
+    for c in cands:
+        if c["id"] in handoff:
+            c["score"] += 20
+            c["reasons"] = ([{"tag": "handoff_318", "text": PICK_TEXT["handoff_318"]}] + c["reasons"])[:3]
+            c["from_318"] = True
     cands.sort(key=lambda c: (-c["score"], c["title"]))
     inlet = sorted((inlet_candidate(x, today=today) for x in inlet_topics), key=lambda c: -c["score"])
 
@@ -377,9 +386,12 @@ def snapshot(*, dry: bool, now: datetime, notify: bool) -> int:
     monday = target_monday(today)
     tasks = c.active_tasks()
     done = completed_between(monday - timedelta(days=7), monday - timedelta(days=1))
+    import jarvis_todoist_318_handoff as ho  # noqa: PLC0415
+
     snap = build_snapshot(
         tasks=tasks, completed_last_week=done, pick_history=pick_counts(),
         inlet_topics=open_inlet_topics(), today=today, now=now,
+        handoff=ho.handoff_map(ho.read_meta(c.sb, ho.HANDOFF_KEY), now),
     )
     last = snap["last"]
     print(f"週 {snap['week']}: 候補 {len(snap['candidates'])} 件（入口 {len(snap['inlet'])}）、おすすめ {len(snap['recommended'])} 件、"

@@ -36,6 +36,9 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 SCRIPTS = Path(__file__).resolve().parent
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+from jarvis_todoist_webhook_handle import is_agent_comment  # noqa: E402  （【318】などの AI 記録コメントの見分け）
 STATE = REPO / ".jarvis_state" / "comment_dispatch.json"
 EXAMPLE = REPO / ".jarvis_state" / "comment_dispatch.example.json"
 _MAC_PY = Path("/Users/matsunomasaharu2/selenium_env/venv/bin/python")
@@ -821,7 +824,8 @@ def main() -> int:
         )
 
     notes_raw = fetch_unprocessed_notes(limit=15)
-    notes = [summarize_note(r) for r in notes_raw]
+    # AI 社員の記録コメント（【318】など）は人の依頼ではない。報告・Phase B の起動に数えない（webhook_handle が処理済みにする）
+    notes = [n for n in (summarize_note(r) for r in notes_raw) if not is_agent_comment(str(n.get("comment") or ""))]
     # Also re-classify already-fetched for report even if handle marked some
     phase_b_results: list[str] = []
     if args.phase_b:

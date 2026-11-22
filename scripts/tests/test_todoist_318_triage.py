@@ -63,6 +63,25 @@ class FakeReader:
         raise AssertionError(f"想定外のパス {path}")
 
 
+class FakeSb:
+    """Supabase の偽物。owner_decisions を返し、sync_meta への書き込みを覚える。"""
+
+    def __init__(self, decisions=None, fail=False):
+        self.decisions = decisions or []
+        self.fail = fail
+        self.writes: list[dict] = []
+
+    def __call__(self, path, *, params=None, method="GET", body=None, prefer=""):
+        if self.fail:
+            raise urllib.error.HTTPError(path, 500, "x", {}, None)
+        if path == "owner_decisions" and method == "GET":
+            return list(self.decisions)
+        if path == "sync_meta" and method == "POST":
+            self.writes.append(body)
+            return None
+        raise AssertionError(f"想定外 {method} {path}")
+
+
 class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -70,11 +89,19 @@ class Base(unittest.TestCase):
         self.paths = tr.Paths(self.state)
         (self.state / "todoist_313_judgments.json").write_text(json.dumps({"keep": {}, "streak": {}}), encoding="utf-8")
         self.env = {"TODOIST_API_TOKEN_OWNER": "dummy"}
+        self.sb = FakeSb()
+        self.posts: list[tuple[str, str]] = []
 
     def tearDown(self):
         self.tmp.cleanup()
 
+    def poster(self, ch, text):
+        self.posts.append((ch, text))
+        return True
+
     def run_once(self, reader, dry=False, env=None, **kw):
+        kw.setdefault("sb", self.sb)
+        kw.setdefault("poster", self.poster)
         opts = tr.RunOptions(dry_run=dry, **kw)
         return tr.execute(self.paths, CRITERIA, env or self.env, lambda _tok: reader, opts, now_fn=lambda: NOW)
 
@@ -118,7 +145,7 @@ class PreflightTest(Base):
 
     def test_313_window_and_lock(self):
         at = NOW.replace(hour=10, minute=40)
-        opts = tr.RunOptions(dry_run=True)
+        opts = tr.RunOptions(dry_run=True, sb=self.sb)
         run = tr.execute(self.paths, CRITERIA, self.env, lambda _t: FakeReader([]), opts, now_fn=lambda: at)
         self.assertEqual(run["stop_code"], "overlap_313_window")
         (self.state / "agent_run_locks.json").write_text(
@@ -339,7 +366,7 @@ class SafetyTest(Base):
     def test_only_get_paths_and_no_writes(self):
         r = FakeReader([task("a"), task("b", content="🤖 x")])
         run = self.run_once(r)
-        self.assertEqual(run["writes"], {"todoist": 0, "slack": 0})
+        self.assertEqual(run["writes"], {"todoist": 0, "slack": 0, "supabase": 0})
         self.assertTrue(all(p == "/user" or p.startswith(("/tasks", "/comments")) for p in r.paths))
         self.assertFalse(hasattr(tr.TodoistReader, "post"))
 
@@ -364,7 +391,7 @@ class SafetyTest(Base):
 
     def test_time_limit_carries_over(self):
         ticks = iter([0.0] + [0.0] + [61 * 60.0] * 10)
-        opts = tr.RunOptions(dry_run=True)
+        opts = tr.RunOptions(dry_run=True, sb=self.sb)
         run = tr.execute(
             self.paths, CRITERIA, self.env, lambda _t: FakeReader([task("a"), task("b")]), opts,
             now_fn=lambda: NOW, clock=lambda: next(ticks),

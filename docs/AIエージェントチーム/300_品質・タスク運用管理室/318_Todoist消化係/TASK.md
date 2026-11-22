@@ -4,7 +4,7 @@
 
 | 項目 | 値 |
 |---|---|
-| task_id | orca task_1588877e6c3e（Phase 1 実装） |
+| task_id | orca task_1588877e6c3e（Phase 1 実装・PR #582 マージ済）／task_becb7616c903（Phase 2 実装） |
 | agent_id | 318 |
 | executor | claude_code（Miss Lemon・Orca worker） |
 | status | done（PR レビュー待ち。マージはラスカルが松野さんの了承後） |
@@ -26,9 +26,17 @@ Phase 1 実装（読むだけ・抽出・変化なし除外・3分類・内部�
 - [x] テスト `scripts/tests/test_todoist_318_triage.py`、実データで手動実行（読むだけ）
 - [x] Todoist 書き込み・Slack 送信・定期起動の登録なし
 
+## Phase 2 完了条件
+
+- [x] ② → /313/bulk（既存の取り込み先 sync_meta・CleanupCard 形式）、313 20:00 との二重質問防止、本人回答の読み戻しと再判定
+- [x] ③ → 312 今週の9件（既存の週次ピックの候補形式）
+- [x] #consult 通知・#ai-hub 報告は案の保存（送信はフラグ）
+- [x] 317 の【318】除外とテスト
+- [x] 実データの掲載・送信はしない（`--publish`／`--send-slack` は松野さんが朝に決める）
+
 ## 成果物
 
-- `scripts/jarvis_todoist_318_triage.py`
+- `scripts/jarvis_todoist_318_triage.py`・`scripts/jarvis_todoist_318_handoff.py`
 - `config/todoist_318_criteria.yaml`
 - `scripts/tests/test_todoist_318_triage.py`
 - このフォルダの `CLAUDE.md`・`PROGRESS.md`・`flow.md`

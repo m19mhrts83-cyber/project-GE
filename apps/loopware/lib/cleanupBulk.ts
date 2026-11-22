@@ -21,6 +21,11 @@ export type CleanupCard = {
   suggest: Suggest;
   why: string;
   priority?: string | number | null;
+  /** 318 Todoist消化係から来た判断依頼（②）。scripts/jarvis_todoist_318_handoff.py が作る */
+  origin?: "318";
+  deadline?: string | null;
+  /** 前回の本人判断（例: 前回: 残す（2026-11-20）） */
+  prev?: string;
 };
 
 export type CleanupSnapshot = {
@@ -29,6 +34,8 @@ export type CleanupSnapshot = {
   labels: string[];
   total: number;
   cards: CleanupCard[];
+  /** 318 から足した件数 */
+  from_318?: number;
 };
 
 /** 松野さんの選択。未選択のカードは何も記録しない（おすすめは初期表示だけ） */
@@ -83,7 +90,8 @@ export function buildCleanupDecisions(
         why: c.why,
         sender: c.sender,
         age_days: c.age_days,
-        label: "スター起票",
+        label: c.origin === "318" ? "318判断依頼" : "スター起票",
+        origin: c.origin,
         followed_suggest: ch.act === c.suggest,
       },
     });
