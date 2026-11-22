@@ -76,10 +76,21 @@ def _run_json(cmd: list[str]) -> dict[str, Any]:
 
 
 def _collect_sb(*, mine_only: bool) -> list[dict[str, Any]]:
+    # 714 owns extraction for prepared meetings. The dedicated outbox/card path handles them.
+    import jarvis_todoist_sb_propose as sb
+    import jarvis_meeting_minutes_curate as curate
+    try:
+        notes = sb._list_or_search(latest=True, keyword=None, page_size=1)
+    except (Exception, SystemExit):
+        return []
+    if not notes: return []
+    mid = str(notes[0].get("id") or "")
+    if curate._prepared_path(mid).exists():
+        return []
     cmd = [
         str(PY),
         str(REPO / "scripts" / "jarvis_todoist_sb_propose.py"),
-        "--latest",
+        "--meeting-id", mid,
         "--json",
     ]
     if mine_only:

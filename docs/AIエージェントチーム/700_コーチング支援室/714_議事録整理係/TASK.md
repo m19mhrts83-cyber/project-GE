@@ -4,16 +4,16 @@
 
 | 項目 | 値 |
 |---|---|
-| task_id | （Todoist id または run_id） |
+| task_id | task_dc976c4700e9 |
 | agent_id | 714 |
-| executor | cursor / claude_code / gencode / launchd / gha / … |
-| status | queued |
+| executor | codex |
+| status | running |
 | started_at | |
 | finished_at | |
 
 ## 依頼
 
-（何をするか。入力は `input/` または外部パス）
+714のNotion保存成功後に構造化した本人TODO候補だけを312へ渡し、Slack個別了承後に起票する。2026-11-22本人承認。FlowForge実作図とモック検証を含む。
 
 ## 完了条件
 
@@ -28,3 +28,11 @@
 ## メモ・障害
 
 - 
+
+## 2026-11-22 実装結果
+
+実装・検証とFlowForge改訂は完了。マージ・デプロイ・本番候補配送は未実施で別了承。入力契約・実行境界・復旧・過去6件の件数は714のdocs/saved-minutes-to-todo.mdを参照。旧ローカル下書きの削除は未承認のため実施していない。
+
+## 本人判定の改訂（2026-11-22）
+
+初回18件の保留理由を分類し、本人表記を非公開設定へ移す。未知表記は推測しない。確認待ちの対応は有効にせず、枠・判定・合成データテストを先行する。#555は最新mainへrebase済み、登録とツールのマージ済み内容を保持。
