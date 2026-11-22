@@ -34,6 +34,15 @@ DEFAULT_API = "https://api.todoist.com/api/v1"
 # Jarvis 分身（Webhook initiator / posted_uid）
 JARVIS_UID_DEFAULT = "60814751"
 LOG = "📎 Todoist Webhookコメント"
+# AI 社員が本人トークンで書く記録コメント（投稿者 uid では自分と見分けられない）。人のコメントとして
+# 受領を返すと、その返しでまた相手が反応する循環になるので、本文の先頭で見分けて処理済みにする。
+# 318 Todoist消化係の【318】（FlowForge 318 node_format_log「317 が【318】コメントを処理しない」）
+AGENT_COMMENT_PREFIXES = ("【318】",)
+
+
+def is_agent_comment(text: str) -> bool:
+    """AI 社員の記録コメントか（先頭の空白は無視）。"""
+    return str(text or "").lstrip().startswith(AGENT_COMMENT_PREFIXES)
 
 
 def _now_iso() -> str:
@@ -276,6 +285,10 @@ def main() -> int:
         s = _summarize(row)
         if s["posted_uid"] in skip_uids:
             # 自分の配信は既定で処理済み扱いにして溜めない（--reply / --mark-only を待たない）
+            _mark_processed(int(s["row_id"]))
+            continue
+        if is_agent_comment(s["comment"]):
+            # AI 社員の記録（【318】など）は受領も返さず処理済みにする（循環防止）
             _mark_processed(int(s["row_id"]))
             continue
         if not s["comment"]:

@@ -49,12 +49,14 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
 import jarvis_todoist_313_judgment as jd313  # noqa: E402  （指紋照合を再利用）
+import jarvis_todoist_318_handoff as ho  # noqa: E402  （Phase 2: /313/bulk・週次・通知の部品）
 from jarvis_todoist_mark import AI_MARK, REQUESTED_MARK, strip_mark  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
 AGENT_ID = "318"
 AGENT_ROLE = "Todoist消化"
-PHASE = "phase1"
+PHASE = "phase2"
+HOLD_AFTER_DEFER_DAYS = 14  # /313/bulk で「残す」を選んだら、この日数たってから再評価（cleanup_bulk の HOLD_DAYS と同じ）
 MAX_TASKS = 5
 MAX_MINUTES = 60
 COMMENT_FETCH_CAP = 30  # 変化確認でコメントを読む上限（API の呼びすぎ防止。残りは繰越）
@@ -69,8 +71,8 @@ API_BASE = "https://api.todoist.com/api/v1"
 CATEGORY_TEXT = {"1": "①AIのみ", "2": "②松野さんの判断", "3": "③本人操作"}
 PROPOSAL_TEXT = {
     "1": "Phase 2 で自律実行の対象（Phase 1 は実行しない。Todoist は閉じない）",
-    "2": "松野さんに一言判断を依頼する案（/313/bulk と #consult は Phase 2。今回は案の保存だけ）",
-    "3": "312 の週次計画（今週の9件）へ既存タスクのまま渡す案（今回は区分の記録だけ）",
+    "2": "松野さんに一言判断を依頼（/313/bulk の待ちに入れる。載るのは --publish の時だけ）",
+    "3": "312 の週次計画（今週の9件）へ既存タスクのまま渡す（載るのは --publish の時だけ）",
 }
 NEXT_RECHECK = "題・説明・期限・締切・優先度・ラベル・コメント（【318】以外）・本人回答・親子の依存のどれかが変わったら再評価"
 
@@ -188,6 +190,22 @@ class Paths:
     @property
     def packet(self) -> Path:
         return self.root / "packet.json"
+
+    @property
+    def bulk_queue(self) -> Path:
+        return self.root / "bulk_queue.json"
+
+    @property
+    def weekly_handoff(self) -> Path:
+        return self.root / "weekly_handoff.json"
+
+    @property
+    def drafts(self) -> Path:
+        return self.root / "drafts"
+
+    @property
+    def cleanup_313(self) -> Path:
+        return self.state_dir / "todoist_313_cleanup.json"
 
     @property
     def judgments_313(self) -> Path:
@@ -343,6 +361,7 @@ class Basis:
     judgments_313: dict[str, Any]
     history: dict[str, Any]
     first_run: bool
+    owner_answers: dict[str, dict[str, str]] = field(default_factory=dict)
 
     @property
     def adopted_ids(self) -> list[str]:
@@ -561,10 +580,21 @@ def snapshot(
 
 
 def owner_answer_sig(task_id: str, basis: Basis) -> str:
-    """本人回答: 313 の「残す」記録 ＋ 318 履歴の本人回答（Phase 2 で /313/bulk から入る）。"""
+    """本人回答: 313 の「残す」記録 ＋ owner_decisions（/313/bulk・20:00 ボタン）の最新の判断。"""
     keep = (basis.judgments_313.get("keep") or {}).get(task_id) or {}
-    own = ((basis.history.get("tasks") or {}).get(task_id) or {}).get("owner_answer") or {}
+    own = basis.owner_answers.get(task_id) or {}
     return json.dumps({"keep313": keep.get("fp") or "", "own": own}, sort_keys=True, ensure_ascii=False)
+
+
+def recheck_on_for(answer: dict[str, str], t: dict, today: date) -> str:
+    """本人回答の後、いつ再評価するか。日を変えた → その日。残す → 14日後。完了・削除 → タスクが消える。"""
+    act = (answer or {}).get("action") or ""
+    if act == "reschedule":
+        du = due_of(t)
+        return du.isoformat() if du else (today + timedelta(days=HOLD_AFTER_DEFER_DAYS)).isoformat()
+    if act in ("defer", "keep"):
+        return (today + timedelta(days=HOLD_AFTER_DEFER_DAYS)).isoformat()
+    return ""
 
 
 HINT_KEYS = {"note_count"}  # 読み方の手がかり。変化の判定には使わない（317 の受領の返しでも増えるため）
@@ -671,6 +701,11 @@ class RunOptions:
     emit_packet: bool = False
     ai_answers: dict[str, Any] | None = None
     allow_313_window: bool = False
+    owner_answers: str = "supabase"  # supabase（読めなければ安全停止）／skip（明示した時だけ）
+    publish: bool = False  # ② を /313/bulk、③ を週次へ載せる（Supabase sync_meta への書き込み）
+    send_slack: bool = False  # #consult 通知と #ai-hub 報告を実際に送る
+    sb: Callable[..., Any] | None = None  # Supabase（テストで差し替え）
+    poster: Callable[[str, str], bool] | None = None  # (channel, text) -> 送れたか
 
 
 def new_run_id(now: datetime) -> str:
@@ -681,11 +716,12 @@ def build_report_draft(run: dict[str, Any]) -> str:
     c = run["counts"]
     sig = {"success": "🟢", "partial": "🟡", "failed": "🔴", "stopped": "⏸"}.get(run["result"], "")
     lines = [
-        f"【報告案】{AGENT_ID} {AGENT_ROLE}・手動（Phase 1・送信しない）",
+        f"【報告案】{AGENT_ID} {AGENT_ROLE}・手動",
         f"{sig} 判定: {run['result']}" + (f"（{run['stop_reason']}）" if run.get("stop_reason") else ""),
         f"候補 {c['candidates']}件 ／ 確認 {c['examined']}件 ／ 繰越 {c['carried_over']}件",
         f"変化なし {c['skipped_unchanged']}件 ／ 313で残す済 {c['skipped_kept_313']}件 ／ 保留 {c['held']}件",
-        f"仕分け ①{c['cat1']} ②{c['cat2']} ③{c['cat3']}（大規模 {c['large']}）",
+        f"仕分け ①{c['cat1']} ②{c['cat2']} ③{c['cat3']}（大規模 {c['large']}）／回答取込 {c['answered']}件",
+        f"/313/bulk 待ち {c['queued']}件（313で質問中 {c['asked_313']}）／週次へ {c['handoff']}件",
     ]
     if run.get("errors"):
         lines.append(f"要確認 {len(run['errors'])}件（内部ログ参照）")
@@ -706,6 +742,11 @@ def _empty_counts() -> dict[str, int]:
         "cat2": 0,
         "cat3": 0,
         "large": 0,
+        "answered": 0,
+        "rechecked": 0,
+        "queued": 0,
+        "asked_313": 0,
+        "handoff": 0,
     }
 
 
@@ -737,7 +778,8 @@ def execute(
         "errors": [],
         "result": "failed",
         "stop_reason": "",
-        "writes": {"todoist": 0, "slack": 0},  # Phase 1 は常に 0
+        "writes": {"todoist": 0, "slack": 0, "supabase": 0},  # Todoist は常に 0（Phase 3 まで書かない）
+        "flags": {"publish": opts.publish and not opts.dry_run, "send_slack": opts.send_slack and not opts.dry_run},
     }
     lock_taken = False
     packet: list[dict[str, Any]] = []
@@ -764,6 +806,16 @@ def execute(
             "history_tasks": len(basis.history.get("tasks") or {}),
             "first_run": basis.first_run,
         }
+        if opts.owner_answers == "skip":
+            run["basis"]["owner_answers"] = "skipped（明示）"
+        else:
+            if opts.sb is None:
+                raise SafeStop("owner_answers_unavailable", "本人回答（owner_decisions）の読み口が無い。--owner-answers skip を明示しない限り止める")
+            try:
+                basis.owner_answers = ho.fetch_owner_answers(opts.sb, started)
+            except Exception as e:  # noqa: BLE001
+                raise SafeStop("owner_answers_unreadable", f"本人回答が読めない（{type(e).__name__}）。回答なしとは扱わない") from e
+            run["basis"]["owner_answers"] = len(basis.owner_answers)
 
         today = started.date()
         try:
@@ -834,8 +886,32 @@ def execute(
             )
             snap_id = _h(*[snap[k] for k in sorted(snap) if k not in HINT_KEYS])
             status, changed = detect_change(tid, snap, basis)
+            row = hist_tasks.get(tid) or {}
+            if status == "changed" and "owner_answer" in changed and basis.owner_answers.get(tid):
+                status = "answered"  # 新しい本人回答。一緒に変わった期限などは回答の反映とみなし、すぐ聞き直さない
+            elif status == "new" and basis.owner_answers.get(tid):
+                rc0 = recheck_on_for(basis.owner_answers[tid], t, today)
+                if rc0 and rc0 > today.isoformat():
+                    status = "answered"  # 初めて見る件でも、最近の本人回答の待ち期間中なら聞かない
+            elif status == "unchanged" and row.get("recheck_on") and today.isoformat() >= str(row["recheck_on"]):
+                status, changed = "recheck", ["recheck_on"]
             entry["status"] = status
             entry["snapshot_id"] = snap_id
+            if status == "answered":
+                ans = basis.owner_answers[tid]
+                rc = recheck_on_for(ans, t, today)
+                entry.update(
+                    answer={"action": ans.get("action"), "decided_at": ans.get("decided_at"), "decision_id": ans.get("decision_id")},
+                    skip_reason="本人回答を判断履歴へ取り込み（今回は聞き直さない）",
+                    next_recheck=(f"{rc} に再評価" if rc else "") + ("・" if rc else "") + NEXT_RECHECK,
+                )
+                run["counts"]["answered"] += 1
+                run["tasks"].append(entry)
+                _touch_history(hist_tasks, tid, run_id, started, {"snapshot": snap})
+                hist_tasks[tid].update(queue_state="answered", owner_answer=ans, recheck_on=rc)
+                continue
+            if status == "recheck":
+                run["counts"]["rechecked"] += 1
             if status == "unchanged":
                 entry["skip_reason"] = "前回から変化なし（分類・実行・再質問・コメントを省略）"
                 entry["next_recheck"] = NEXT_RECHECK
@@ -863,6 +939,12 @@ def execute(
             run["counts"]["large"] += int(bool(cls.get("large")))
             run["tasks"].append(entry)
             _touch_history(hist_tasks, tid, run_id, started, {"snapshot": snap, "category": cls["category"]})
+            hist_tasks[tid].update(
+                queue_state="pending" if cls["category"] == "2" else None,
+                last_reason=str(cls.get("reason") or "")[:200],
+                last_large=bool(cls.get("large")),
+                recheck_on="",
+            )
             if opts.emit_packet:
                 if comments is None:
                     try:
@@ -871,6 +953,8 @@ def execute(
                         comments = []
                 packet.append(_packet_row(t, comments, snap_id, cls))
 
+        active_by_id = {str(t.get("id")): t for t in active}
+        _route_and_notify(run, paths, opts, hist_tasks, active_by_id, started)
         run["result"] = "partial" if run["errors"] else "success"
     except SafeStop as s:
         run["result"] = s.result
@@ -886,15 +970,114 @@ def execute(
                 atomic_write_json(paths.history, hist_doc)
             if opts.emit_packet and packet:
                 atomic_write_json(paths.packet, {"run_id": run_id, "note": _PACKET_NOTE, "tasks": packet})
+            run["hub_report_draft"] = ho.hub_report_text(run)
+            _save_draft(paths, run_id, "hub", run["hub_report_draft"])
             atomic_write_json(paths.runs / f"{run_id}.json", run)
             run["saved"] = True
         except Exception as e:  # noqa: BLE001
             run["saved"] = False
             run["result"] = "failed"
             run["stop_reason"] = (run.get("stop_reason") or "") + f"／内部ログの保存に失敗（{type(e).__name__}）"
+        # 終了報告（#ai-hub）は内部ログを保存できた後だけ。313 は #report なので重ならない
+        if opts.send_slack and not opts.dry_run and run.get("saved") and run["result"] != "stopped":
+            poster = opts.poster or _post_default
+            try:
+                ok = poster("hub", run["hub_report_draft"])
+            except Exception:  # noqa: BLE001
+                ok = False
+            run.setdefault("notify", {})["hub_sent"] = ok
+            if ok:
+                run["writes"]["slack"] += 1
+            try:
+                atomic_write_json(paths.runs / f"{run_id}.json", run)
+            except Exception:  # noqa: BLE001
+                pass
         if lock_taken:
             release_lock(paths, run_id)
     return run
+
+
+def _post_default(channel: str, text: str) -> bool:
+    """既存の Webhook 投稿（jarvis_slack_webhook_post.py）。--send-slack の時だけ呼ばれる。"""
+    import subprocess  # noqa: PLC0415
+
+    r = subprocess.run(
+        [sys.executable, str(REPO / "scripts" / "jarvis_slack_webhook_post.py"), "--channel", channel, "--text", text, "--no-fb-footer"],
+        capture_output=True, text=True, timeout=60,
+    )
+    return r.returncode == 0
+
+
+def _route_and_notify(
+    run: dict[str, Any], paths: Paths, opts: RunOptions, hist_tasks: dict[str, Any],
+    active_by_id: dict[str, dict], started: datetime,
+) -> None:
+    """② → /313/bulk の待ち、③ → 週次の受け渡し、通知・報告の案。外へ出すのはフラグの時だけ。"""
+    live = not opts.dry_run
+    asked = ho.asked_by_313(paths.cleanup_313, started)
+    if asked is None:
+        # 313 の質問状況が分からない時は二重質問を避けて ② を載せない
+        run["errors"].append({"where": "cleanup_313", "error": "313 片付けの状態が読めないので②を /313/bulk に載せない"})
+        cards, gone = [], {"gone": 0, "asked_313": 0}
+    else:
+        cards, gone = ho.build_bulk_cards(hist_tasks, active_by_id, asked)
+    handoff = ho.build_weekly_handoff(hist_tasks, active_by_id)
+    run["counts"]["queued"] = len(cards)
+    run["counts"]["asked_313"] = gone["asked_313"]
+    run["counts"]["handoff"] = len(handoff)
+    published = False
+    if opts.publish and live:
+        if opts.sb is None:
+            run["errors"].append({"where": "publish", "error": "Supabase の読み口が無いので載せなかった"})
+        else:
+            try:
+                ho.publish(opts.sb, ho.QUEUE_KEY, ho.queue_doc(run["run_id"], started, cards, published=True), started)
+                ho.publish(opts.sb, ho.HANDOFF_KEY, ho.handoff_doc(run["run_id"], started, handoff, published=True), started)
+                run["writes"]["supabase"] += 2
+                published = True
+            except Exception as e:  # noqa: BLE001
+                run["errors"].append({"where": "publish", "error": type(e).__name__})
+    run["published"] = published
+    # 手元の写し（題を含むので非公開の置き場だけ）。preview は毎回、本体は sync_meta に載せた回だけ書く
+    # → 313 片付けは本体（= 画面に出ている件）だけを外す
+    atomic_write_json(paths.root / "bulk_queue.preview.json", ho.queue_doc(run["run_id"], started, cards, published=False))
+    atomic_write_json(paths.root / "weekly_handoff.preview.json", ho.handoff_doc(run["run_id"], started, handoff, published=False))
+    if published:
+        atomic_write_json(paths.bulk_queue, ho.queue_doc(run["run_id"], started, cards, published=True))
+        atomic_write_json(paths.weekly_handoff, ho.handoff_doc(run["run_id"], started, handoff, published=True))
+    # 通知の案: 新しく待ちに入った件だけ（前に知らせた件は出さない）。313 の質問中は cards に入っていない
+    new_cards = [c for c in cards if not (hist_tasks.get(c["id"]) or {}).get("notified_at")]
+    url = _bulk_url(started)
+    consult = ho.consult_text(new_cards, len(cards), url) if new_cards else ""
+    run["notify"] = {"consult_new": len(new_cards), "consult_sent": False, "hub_sent": False}
+    if consult:
+        _save_draft(paths, run["run_id"], "consult", consult)
+    if opts.send_slack and live:
+        poster = opts.poster or _post_default
+        if consult and published:  # 画面に載っていないのに「開いて」と送らない
+            if poster("consult", consult):
+                run["writes"]["slack"] += 1
+                run["notify"]["consult_sent"] = True
+                for c in new_cards:
+                    hist_tasks[c["id"]]["notified_at"] = started.isoformat(timespec="seconds")
+            else:
+                run["errors"].append({"where": "slack_consult", "error": "送信失敗"})
+        elif consult:
+            run["notify"]["consult_skip"] = "/313/bulk に載っていないので通知しない（--publish が要る）"
+
+
+def _bulk_url(now: datetime) -> str:
+    try:
+        from jarvis_todoist_312_collect import nody_url  # noqa: PLC0415
+
+        return nody_url(ho.BULK_PATH, now)
+    except Exception:  # noqa: BLE001
+        return "https://jarvis-loopware.vercel.app" + ho.BULK_PATH
+
+
+def _save_draft(paths: Paths, run_id: str, kind: str, text: str) -> None:
+    paths.drafts.mkdir(parents=True, exist_ok=True)
+    (paths.drafts / f"{run_id}_{kind}.txt").write_text(text + "\n", encoding="utf-8")
 
 
 _PACKET_NOTE = (
@@ -956,11 +1139,24 @@ def cmd_run(args: argparse.Namespace) -> int:
         emit_packet=args.emit_packet,
         ai_answers=answers if isinstance(answers, dict) else None,
         allow_313_window=args.allow_313_window,
+        owner_answers=args.owner_answers,
+        publish=args.publish,
+        send_slack=args.send_slack,
+        sb=_default_sb(),
     )
     run = execute(paths, Path(args.criteria), dict(os.environ), TodoistReader, opts)
     print(run["report_draft"])
     print(f"📎 run_id={run['run_id']} mode={run['mode']} saved={run.get('saved')} log=todoist_318/runs/{run['run_id']}.json")
     return {"success": 0, "stopped": 0, "partial": 1}.get(run["result"], 2)
+
+
+def _default_sb() -> Callable[..., Any] | None:
+    """Supabase の読み書き口（312 の部品を再利用）。鍵が無ければ None（本人回答が要る時は安全停止になる）。"""
+    if not (os.environ.get("JARVIS_SUPABASE_URL") and os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY")):
+        return None
+    from jarvis_todoist_312_collect import sb  # noqa: PLC0415
+
+    return sb
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -995,6 +1191,10 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--emit-packet", action="store_true", help="AI分類用の材料を packet.json に書く")
     r.add_argument("--ai-answers", default=None, help="Claude Code が書いた分類（answers.json）")
     r.add_argument("--allow-313-window", action="store_true", help="10:15–11:30 でも動かす（313 と重ならないと確かめた時だけ）")
+    r.add_argument("--owner-answers", choices=["supabase", "skip"], default="supabase",
+                   help="本人回答（owner_decisions）を読む。skip は明示した時だけ（読めない時に黙って skip しない）")
+    r.add_argument("--publish", action="store_true", help="②を /313/bulk、③を週次へ載せる（Supabase sync_meta に書く。既定オフ）")
+    r.add_argument("--send-slack", action="store_true", help="#consult 通知と #ai-hub 報告を送る（既定オフ。--publish が無いと #consult は送らない）")
     r.set_defaults(func=cmd_run)
     s = sub.add_parser("status")
     s.set_defaults(func=cmd_status)

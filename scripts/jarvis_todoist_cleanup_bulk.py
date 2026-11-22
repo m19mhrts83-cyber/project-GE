@@ -171,7 +171,19 @@ def snapshot(*, dry: bool, now: datetime) -> int:
         print(f"ラベルで直接取得 {len(by_label)} 件")
         have = {str(t["id"]) for t in tasks}
         tasks = tasks + [t for t in by_label if str(t["id"]) not in have]
-    snap = build_snapshot(tasks=tasks, held=held_ids(now), today=now.date(), now=now)
+    held = held_ids(now)
+    snap = build_snapshot(tasks=tasks, held=held, today=now.date(), now=now)
+    # 318 Todoist消化係の ②（松野さんの判断が要る）を混ぜる。318 が --publish で置いた時だけ載る
+    import jarvis_todoist_318_handoff as ho  # noqa: PLC0415
+
+    merged = ho.merge_bulk_cards(snap["cards"], ho.read_meta(c.sb, ho.QUEUE_KEY),
+                                 active_by_id={str(t["id"]): t for t in tasks}, held=held, now=now)
+    n318 = len(merged) - len(snap["cards"])
+    if n318:
+        snap["cards"] = merged[:MAX_CARDS]
+        snap["total"] += n318
+        snap["from_318"] = n318
+        print(f"318 の判断依頼 {n318} 件を足した")
     by: dict[str, int] = {}
     for x in snap["cards"]:
         by[x["suggest"]] = by.get(x["suggest"], 0) + 1

@@ -107,7 +107,9 @@ export default function CleanupBulkClient() {
     <div className="wk-section">
       <div className="glass wk-head">
         <div>
-          <div className="meta">スター付きメール由来 {snap.total} 件</div>
+          <div className="meta">
+            {snap.from_318 ? `318の判断依頼 ${snap.from_318} 件＋スター付きメール由来 ${snap.total - snap.from_318} 件` : `スター付きメール由来 ${snap.total} 件`}
+          </div>
           <div className="wk-progress">
             <b>{decided}</b>
             <span>件を選んだ（完了 {counts.close}／削除 {counts.drop}／日を変更 {counts.reschedule}／残す {counts.keep}）</span>
@@ -142,7 +144,14 @@ export default function CleanupBulkClient() {
               <span style={{ flex: 1 }}>
                 <b>{c.title}</b>
                 <span className="meta" style={{ display: "block" }}>
-                  {[c.sender, c.mail_date && `${c.mail_date}のメール`, c.age_days != null && `${c.age_days}日前`].filter(Boolean).join("｜")}
+                  {[
+                    c.origin === "318" && "318 判断依頼",
+                    c.sender,
+                    c.mail_date && `${c.mail_date}のメール`,
+                    c.age_days != null && `${c.age_days}日前`,
+                    (c.deadline || (c.origin === "318" && c.due)) && `期限 ${c.deadline || c.due}`,
+                    c.prev,
+                  ].filter(Boolean).join("｜")}
                 </span>
               </span>
             </label>
