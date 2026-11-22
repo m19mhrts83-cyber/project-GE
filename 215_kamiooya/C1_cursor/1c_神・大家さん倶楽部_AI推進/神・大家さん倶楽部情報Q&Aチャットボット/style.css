@@ -819,6 +819,12 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   /* スマホでは質問文を2行まで出す（1行で切れると何の質問か分からないため） */
   .ab-rank-q { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 }
+/* 切れている質問は押すと全文（2026-11-22）。▼で押せることを示す */
+.ab-rank-q.is-cut { cursor: pointer; position: relative; padding-right: 1.2rem; }
+.ab-rank-q.is-cut::after { content: "▼"; position: absolute; right: 0; top: .1em; font-size: .7rem; color: #1E4F8F; }
+.ab-rank-q.is-cut.is-open::after { content: "▲"; }
+.ab-rank-q.is-open { white-space: normal; overflow: visible; overflow-wrap: anywhere; display: block; -webkit-line-clamp: unset; line-clamp: none; background: #f4f6fb; border-radius: 8px; padding: .25rem 1.2rem .25rem .4rem; }
+.ab-rank-q.is-cut:focus-visible { outline: 2px solid #FE910B; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .ab-stack, .ab-rank li, .ab-rank-bar i, .ab-arc, .ab-share i, .ab-pair-bars { transition: none !important; }
 }
