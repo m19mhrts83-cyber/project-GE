@@ -50,6 +50,13 @@ npm run dev   # http://127.0.0.1:3004
   AI案の曜日（payload.ai_day）と置いた曜日（payload.day）が残る
 - 反映: 同じスクリプトの `--mode reflect`（30分ごと）が commit の plan を Todoist へ（期日を入れる／外す、入口の話題を 🦾依頼 で作る、
   やめる・AIへはコメントだけ）。反映したら action=done（target_type=weekly_commit）を足す。312 はタスクを閉じない
+- 判断の重さ（2026-11-23）: 各件に「すぐ決まる」（判断すれば進む・終わる）／「じっくり」（ラリーして形にする）／「未判別」の印と根拠1行。
+  基準は `config/todoist_weekly_weight.yaml`（snapshot 側で判定・AI は呼ばない）。見出しに置いた件の内訳（すぐ決まる n／じっくり n／未判別 n）
+- じっくり枠: じっくりは週1件を**火・金**（`deep_frame.weekdays`）に1回目・2回目として置く。9件の上限は枠の2回を含めて数える（月水金は7件まで）。
+  すぐ決まるは月→水→金に前倒し。2件目以降のじっくりは「翌週以降の候補へ」の理由つき。枠には社員1名のフロー磨き込み
+  （チャッピー相談→図で確認→本人判断→運用で確認）も入れられる。社員は本人が決める（config の `staff_by_week` か画面で書く。自動で決めない）。
+  枠のタスクは1回目の日に期日・2回目はコメント、社員の分は Todoist に起票しない（判断ログ target_type=`weekly_deep_frame` だけ）。
+  本人が置き直した・空けた枠は下書きのまま（再読込で上書きしない）
 - 下書き: 端末の localStorage（`weekpick:v1:<週>`）に自動保存。確定し直すと新しい行が増え、最後の確定だけ反映
 - 試す: `python3 scripts/jarvis_todoist_weekly_pick.py --mode snapshot --dry-run`、テスト `npm test`（tests/weekPick.test.ts）と
   `python3 -m unittest scripts/tests/test_todoist_weekly_pick.py`

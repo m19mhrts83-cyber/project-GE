@@ -11,18 +11,52 @@ import {
   buildPlan,
   dayCounts,
   dayLabel,
+  deepOf,
+  deepOver,
+  deepTitle,
+  deferredReason,
   eventsByDay,
   initialState,
+  placedTotal,
+  placedWeights,
+  regularCap,
   shortTitle,
   threeWeeks,
   weekday,
+  weightLabel,
+  weightOf,
   type Calendar,
   type Candidate,
+  type DeepChoice,
   type InletCandidate,
   type NextStep,
   type Snapshot,
   type WeekState,
 } from "@/lib/weekPick";
+
+/** 判断の重さの印（すぐ決まる／じっくり／未判別）。根拠はタップ・ホバーで */
+function WeightBadge({ s, c }: { s: Snapshot; c: Candidate | InletCandidate }) {
+  if (!s.weight) return null; // 古い snapshot（rule-v1）には無い
+  const w = weightOf(c);
+  return (
+    <span className={`wk-badge wt-${w}`} title={c.weight_why || ""}>
+      {weightLabel(s, w)}
+    </span>
+  );
+}
+
+/** 置いた件の内訳（A すぐ決まる n／B じっくり n／未判別 n） */
+function WeightSummary({ s, st }: { s: Snapshot; st: WeekState }) {
+  if (!s.weight) return null;
+  const n = placedWeights(s, st);
+  return (
+    <div className="wk-weights" aria-label="判断の重さの内訳">
+      <span className="wt-quick">{weightLabel(s, "quick")} <b>{n.quick}</b></span>
+      <span className="wt-deep">{weightLabel(s, "deep")} <b>{n.deep}</b>{s.weight.deep_per_week != null && <small>/週{s.weight.deep_per_week}</small>}</span>
+      {n.unknown > 0 && <span className="wt-unknown">{weightLabel(s, "unknown")} <b>{n.unknown}</b></span>}
+    </div>
+  );
+}
 
 type Status = { commit: { id: number; decided_at: string } | null; applied: { decided_at: string; result: unknown } | null };
 type Step = 1 | 2 | 3;
@@ -117,8 +151,10 @@ export default function WeekPickClient() {
   const s = snap;
   const byId = new Map(s.candidates.map((c) => [c.id, c]));
   const counts = dayCounts(s, st);
-  const placed = Object.values(counts).reduce((a, b) => a + b, 0);
+  const placed = placedTotal(s, st); // じっくり枠の回数も含めて数える
   const cap = s.per_day * s.days.length;
+  const regularPlaced = Object.values(counts).reduce((a, b) => a + b, 0);
+  const deep = deepOf(s, st);
   const leftIds = Object.keys(st.left);
   const leftDone = leftIds.filter((id) => st.left[id].tags.length || st.left[id].next !== "keep").length;
   const committedThisWeek = !!status.commit && !recommit;
@@ -130,6 +166,9 @@ export default function WeekPickClient() {
         x.inlet[tid] = day ? { action: "week", day } : { action: "keep" };
       } else {
         x.slots[id] = day;
+        // じっくり枠に入れていた件を月水金に置いたら、枠からは外す（同じ件を二重に数えない）
+        if (day && x.deep?.kind === "task" && x.deep.id === id) x.deep = { kind: "none" };
+        if (day && !x.deep && deep.kind === "task" && deep.id === id) x.deep = { kind: "none" };
       }
       return x;
     });
@@ -137,8 +176,20 @@ export default function WeekPickClient() {
     if (day) flash(`${dayLabel(day)} に置きました`);
   }
 
-  function dayFull(day: string) {
-    return (counts[day] || 0) >= s.per_day;
+  function setDeep(d: DeepChoice) {
+    update((x) => {
+      x.deep = d;
+      if (d.kind === "task") x.slots[d.id] = null;
+      return x;
+    });
+    if (d.kind !== "none") flash("じっくり枠に入れました");
+  }
+
+  /** その日に置けないか（曜日の枠 3件、または9件の上限からじっくり枠を引いた数に達している。置き済みの件の移動は可） */
+  function dayFull(day: string, id?: string) {
+    if ((counts[day] || 0) >= s.per_day) return true;
+    const already = id ? (id.startsWith("inlet:") ? st?.inlet[id.slice(6)]?.action === "week" : !!st?.slots[id]) : false;
+    return !already && regularPlaced >= regularCap(s);
   }
 
   async function commit() {
@@ -173,12 +224,19 @@ export default function WeekPickClient() {
             <b>{placed}</b>
             <span>/ {cap} 件を置いた</span>
           </div>
+          <WeightSummary s={s} st={st} />
         </div>
         <div className="wk-dots" aria-label="曜日ごとの枠">
           {s.days.map((d) => (
             <div key={d} className={`wk-dot ${counts[d] >= s.per_day ? "full" : ""}`}>
               <span>{WD[weekday(d)]}</span>
               <b>{counts[d]}/{s.per_day}</b>
+            </div>
+          ))}
+          {(s.deep_frame?.days || []).map((d) => (
+            <div key={`deep${d}`} className={`wk-dot deep ${deep.kind !== "none" ? "full" : ""}`}>
+              <span>{WD[weekday(d)]}</span>
+              <b>じっくり</b>
             </div>
           ))}
         </div>
@@ -217,6 +275,20 @@ export default function WeekPickClient() {
         <Review s={s} st={st} update={update} byId={byId} onNext={() => setStep(2)} />
       )}
 
+      {step === 2 && s.weight && !s.weight.ok && (
+        <div className="wk-banner">
+          <Icon name="warn" size={18} />
+          <span>判断の重さの基準が読めませんでした（{s.weight.error}）。今週は全件「{weightLabel(s, "unknown")}」で、じっくりの週1件・前倒しは掛けていません。</span>
+        </div>
+      )}
+      {step === 2 && deepOver(s, st) > 0 && (
+        <div className="wk-banner">
+          <Icon name="warn" size={18} />
+          <span>
+            {weightLabel(s, "deep")}が {placedWeights(s, st).deep} 件入っています（目安は週 {s.weight?.deep_per_week} 件）。このままでも確定できます。
+          </span>
+        </div>
+      )}
       {step === 2 && (
         <div className="wk-board">
           <section className="wk-cal-col">
@@ -228,13 +300,16 @@ export default function WeekPickClient() {
               sel={sel}
               onDayTap={(d) => {
                 if (!sel) return;
-                if (dayFull(d)) return flash(`${dayLabel(d)} はもう ${s.per_day} 件です`);
+                if (dayFull(d, sel)) {
+                  return flash((counts[d] || 0) >= s.per_day ? `${dayLabel(d)} はもう ${s.per_day} 件です` : `9件の上限です（じっくり枠 ${s.deep_frame?.days.length || 0} 回を含む）`);
+                }
                 place(sel, d);
               }}
               onChipTap={(id) => setSel(sel === id ? null : id)}
             />
           </section>
           <section className="wk-list-col">
+            {s.deep_frame && <DeepFrameCard s={s} st={st} deep={deep} setDeep={setDeep} />}
             <PickList
               s={s}
               st={st}
@@ -245,6 +320,8 @@ export default function WeekPickClient() {
               dayFull={dayFull}
               showAll={showAll}
               setShowAll={setShowAll}
+              setDeep={setDeep}
+              deep={deep}
             />
             <button className="cta" onClick={() => setStep(3)}>
               確定へ <Icon name="arrow" size={18} />
@@ -390,6 +467,9 @@ function CalendarBoard({
   const weeks = threeWeeks(s.days[0]);
   const ev = eventsByDay(cal);
   const pickDays = new Set(s.days);
+  const deepDays = s.deep_frame?.days || [];
+  const deepNow = deepOf(s, st);
+  const deepChip = deepNow.kind !== "none" ? shortTitle(deepTitle(s, deepNow)) : "";
   const placedBy: Record<string, { id: string; title: string }[]> = {};
   for (const [id, d] of Object.entries(st.slots)) if (d) (placedBy[d] ||= []).push({ id, title: shortTitle(byId.get(id)?.title || id) });
   for (const c of s.inlet) {
@@ -408,6 +488,7 @@ function CalendarBoard({
     <div className="wk-cal glass">
       <div className="wk-cal-legend">
         <span><i className="lg pick" />置いたタスク</span>
+        {s.deep_frame && <span><i className="lg deep" />じっくり枠（週1件）</span>}
         <span><i className="lg hard" />締切・支払い・行事</span>
         <span><i className="lg fam" />家族の予定（参考）</span>
       </div>
@@ -426,7 +507,8 @@ function CalendarBoard({
             {days.map((d) => {
               const isPick = wi === 0 && pickDays.has(d);
               const wd = weekday(d);
-              const role = wi !== 0 ? "" : isPick ? "枠" : wd === 2 || wd === 4 ? "空け" : wd === 6 || wd === 0 ? "残り" : "";
+              const isDeep = wi === 0 && deepDays.includes(d);
+              const role = wi !== 0 ? "" : isDeep && !isPick ? "じっくり" : isPick ? "枠" : wd === 2 || wd === 4 ? "空け" : wd === 6 || wd === 0 ? "残り" : "";
               const events = ev[d] || [];
               const holiday = events.find((e) => e.kind === "holiday");
               return (
@@ -442,6 +524,11 @@ function CalendarBoard({
                     {role && <span className={`role ${isPick ? "pick" : ""}`}>{role}</span>}
                   </div>
                   {holiday && <div className="wk-ev hol">{holiday.title}</div>}
+                  {isDeep && (
+                    <div className={`wk-ev deep ${deepChip ? "" : "empty"}`} title={deepChip || "じっくり枠（空き）"}>
+                      {deepChip ? `じっくり${deepDays.indexOf(d) + 1}回目: ${deepChip}` : "じっくり枠（空き）"}
+                    </div>
+                  )}
                   {(hardBy[d] || []).map((t, i) => (
                     <div key={`h${i}`} className="wk-ev hard" title={t}>{t}</div>
                   ))}
@@ -494,6 +581,8 @@ function PickList({
   dayFull,
   showAll,
   setShowAll,
+  setDeep,
+  deep,
 }: {
   s: Snapshot;
   st: WeekState;
@@ -501,14 +590,17 @@ function PickList({
   sel: string | null;
   setSel: (id: string | null) => void;
   place: (id: string, day: string | null) => void;
-  dayFull: (d: string) => boolean;
+  dayFull: (d: string, id?: string) => boolean;
   showAll: boolean;
   setShowAll: (v: boolean) => void;
+  setDeep: (d: DeepChoice) => void;
+  deep: DeepChoice;
 }) {
   const rec = new Map(s.recommended.map((r) => [r.id, r.day]));
   const placedIds = new Set(Object.entries(st.slots).filter(([, d]) => d).map(([id]) => id));
   const recList = s.candidates.filter((c) => rec.has(c.id));
-  const others = s.candidates.filter((c) => !rec.has(c.id) && !(st.left[c.id] && st.left[c.id].next !== "keep"));
+  const inFrame = deep.kind === "task" ? deep.id : null;
+  const others = s.candidates.filter((c) => !rec.has(c.id) && c.id !== inFrame && !(st.left[c.id] && st.left[c.id].next !== "keep"));
   const extraPlaced = others.filter((c) => placedIds.has(c.id));
   const rest = others.filter((c) => !placedIds.has(c.id));
   const nextRank = new Map(s.next_preview.map((id, i) => [id, i + 1]));
@@ -520,10 +612,10 @@ function PickList({
         おすすめ {recList.length} 件 <small>AI の案。理由を直して置き直せます</small>
       </h2>
       {recList.map((c) => (
-        <PickCard key={c.id} c={c} s={s} st={st} update={update} sel={sel} setSel={setSel} place={place} dayFull={dayFull} aiDay={rec.get(c.id) || null} />
+        <PickCard key={c.id} c={c} s={s} st={st} update={update} sel={sel} setSel={setSel} place={place} dayFull={dayFull} aiDay={rec.get(c.id) || null} setDeep={s.deep_frame ? setDeep : undefined} />
       ))}
       {extraPlaced.map((c) => (
-        <PickCard key={c.id} c={c} s={s} st={st} update={update} sel={sel} setSel={setSel} place={place} dayFull={dayFull} aiDay={null} />
+        <PickCard key={c.id} c={c} s={s} st={st} update={update} sel={sel} setSel={setSel} place={place} dayFull={dayFull} aiDay={null} setDeep={s.deep_frame ? setDeep : undefined} />
       ))}
 
       {s.inlet.length > 0 && (
@@ -541,7 +633,7 @@ function PickList({
         そのほかの候補 <small>{rest.length} 件・上ほど急ぎ</small>
       </h2>
       {visibleRest.map((c) => (
-        <PickCard key={c.id} c={c} s={s} st={st} update={update} sel={sel} setSel={setSel} place={place} dayFull={dayFull} aiDay={null} compact nextRank={nextRank.get(c.id)} />
+        <PickCard key={c.id} c={c} s={s} st={st} update={update} sel={sel} setSel={setSel} place={place} dayFull={dayFull} aiDay={null} compact nextRank={nextRank.get(c.id)} setDeep={s.deep_frame ? setDeep : undefined} />
       ))}
       {rest.length > 10 && (
         <button className="secondary" onClick={() => setShowAll(!showAll)}>
@@ -564,6 +656,7 @@ function PickCard({
   aiDay,
   compact = false,
   nextRank,
+  setDeep,
 }: {
   c: Candidate;
   s: Snapshot;
@@ -572,10 +665,11 @@ function PickCard({
   sel: string | null;
   setSel: (id: string | null) => void;
   place: (id: string, day: string | null) => void;
-  dayFull: (d: string) => boolean;
+  dayFull: (d: string, id?: string) => boolean;
   aiDay: string | null;
   compact?: boolean;
   nextRank?: number;
+  setDeep?: (d: DeepChoice) => void;
 }) {
   const day = st.slots[c.id] || null;
   const r = st.reasons[c.id] || { tags: [], text: "" };
@@ -585,6 +679,7 @@ function PickCard({
   const [more, setMore] = useState(false);
   const extra = Object.entries(PICK_REASONS).filter(([k]) => !aiTags.has(k) && !["inlet", "carried", "planned"].includes(k));
   const extraOn = extra.filter(([k]) => r.tags.includes(k));
+  const deferred = deferredReason(s, c.id);
 
   function toggleReason(tag: string, text: string) {
     update((x) => {
@@ -611,6 +706,7 @@ function PickCard({
         </a>
       </div>
       <div className="wk-meta">
+        <WeightBadge s={s} c={c} />
         {c.priority !== "p4" && <span className={`wk-badge ${c.priority}`}>{c.priority}</span>}
         {lim && <span className="wk-badge hard">締切 {dayLabel(lim)}</span>}
         {!lim && c.due && <span className="wk-badge">期日 {dayLabel(c.due)}</span>}
@@ -619,18 +715,28 @@ function PickCard({
         {moved && <span className="wk-badge moved">{day ? "AI案から移した" : "AI案を外した"}</span>}
         {nextRank && <span className="wk-badge">次週候補 {nextRank}位</span>}
       </div>
+      {(deferred || (!compact && s.weight && c.weight_why)) && (
+        <p className="meta wk-weight-why">
+          {deferred ? `${deferred}（${c.weight_why || ""}）` : `${weightLabel(s, weightOf(c))}: ${c.weight_why}`}
+        </p>
+      )}
 
       <div className="wk-days">
         {s.days.map((d) => (
           <button
             key={d}
             className={`wk-daybtn ${day === d ? "on" : ""}`}
-            disabled={day !== d && dayFull(d)}
+            disabled={day !== d && dayFull(d, c.id)}
             onClick={() => place(c.id, day === d ? null : d)}
           >
             {WD[weekday(d)]}
           </button>
         ))}
+        {setDeep && weightOf(c) === "deep" && (
+          <button className="wk-daybtn wide deep" onClick={() => setDeep({ kind: "task", id: c.id })}>
+            じっくり枠へ
+          </button>
+        )}
         {day && (
           <button className="wk-daybtn off" onClick={() => place(c.id, null)} aria-label="置くのをやめる">
             <Icon name="x" size={14} />
@@ -691,7 +797,7 @@ function InletCard({
   st: WeekState;
   update: (fn: (x: WeekState) => WeekState) => void;
   place: (id: string, day: string | null) => void;
-  dayFull: (d: string) => boolean;
+  dayFull: (d: string, id?: string) => boolean;
 }) {
   const v = st.inlet[c.id];
   return (
@@ -699,6 +805,7 @@ function InletCard({
       <div className="wk-card-head">
         <strong>{c.title}</strong>
         <span className="wk-badge warn">入口 {c.waited_days}日</span>
+        <WeightBadge s={s} c={c} />
       </div>
       {c.body && c.body !== c.title && <p className="meta wk-body">{c.body}</p>}
       <div className="wk-days">
@@ -706,7 +813,7 @@ function InletCard({
           <button
             key={d}
             className={`wk-daybtn ${v?.action === "week" && v.day === d ? "on" : ""}`}
-            disabled={!(v?.action === "week" && v.day === d) && dayFull(d)}
+            disabled={!(v?.action === "week" && v.day === d) && dayFull(d, `inlet:${c.id}`)}
             onClick={() => place(`inlet:${c.id}`, d)}
           >
             {WD[weekday(d)]}
@@ -729,6 +836,63 @@ function InletCard({
           元の発言を見る
         </a>
       )}
+    </article>
+  );
+}
+
+/* ---------------------------------------------------------------- ② じっくり枠 */
+
+function DeepFrameCard({ s, st, deep, setDeep }: { s: Snapshot; st: WeekState; deep: DeepChoice; setDeep: (d: DeepChoice) => void }) {
+  const f = s.deep_frame!;
+  const [name, setName] = useState(deep.kind === "staff" && deep.name !== f.staff?.staff ? deep.name : "");
+  const rec = f.recommended ? s.candidates.find((c) => c.id === f.recommended) : null;
+  const inFrame = deep.kind === "task" ? s.candidates.find((c) => c.id === deep.id) : null;
+  const isStaffCfg = deep.kind === "staff" && !!f.staff && deep.name === f.staff.staff;
+  const isStaffOther = deep.kind === "staff" && !isStaffCfg;
+  return (
+    <article className="glass wk-card wk-deep">
+      <div className="wk-card-head">
+        <strong>じっくり枠 {f.days.map(dayLabel).join("・")}</strong>
+        <span className="wk-badge wt-deep">週1件・{f.days.length}回</span>
+      </div>
+      <p className="meta wk-weight-why">同じ1件を1回目・2回目に分けて進める（毎日には流さない）。9件の上限に {f.days.length} 回分を数える。</p>
+      {deep.kind !== "none" ? (
+        <div className="wk-deep-now">
+          <span>{deepTitle(s, deep)}</span>
+          {inFrame?.weight_why && <small className="meta">{inFrame.weight_why}</small>}
+          {isStaffCfg && <small className="meta">本人決定（{f.staff?.decision_id}）</small>}
+        </div>
+      ) : (
+        <p className="meta">（空き）</p>
+      )}
+      <div className="wk-days">
+        {f.staff && (
+          <button className={`wk-daybtn wide ${isStaffCfg ? "on" : ""}`} onClick={() => setDeep({ kind: "staff", name: f.staff!.staff, decision_id: f.staff!.decision_id })}>
+            {f.staff.staff}
+          </button>
+        )}
+        {rec && (
+          <button className={`wk-daybtn wide ${deep.kind === "task" && deep.id === rec.id ? "on" : ""}`} onClick={() => setDeep({ kind: "task", id: rec.id })}>
+            じっくりの案: {shortTitle(rec.title).slice(0, 16)}
+          </button>
+        )}
+        <button className={`wk-daybtn wide drop ${deep.kind === "none" ? "on" : ""}`} onClick={() => setDeep({ kind: "none" })}>
+          空ける
+        </button>
+      </div>
+      <div className="wk-deep-staff">
+        <input
+          type="text"
+          value={name}
+          placeholder={`${f.staff_label}: 社員を書く（本人が決める）`}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <button className={`wk-daybtn wide ${isStaffOther ? "on" : ""}`} disabled={!name.trim()} onClick={() => setDeep({ kind: "staff", name: name.trim() })}>
+          この社員にする
+        </button>
+      </div>
+      {!!f.staff_steps.length && <p className="meta wk-weight-why">磨き込みの流れ: {f.staff_steps.join("→")}（Todoist には起票しない）</p>}
+      {st.deep === undefined && <p className="meta wk-weight-why">いまは案のまま。選ぶと下書きに残ります。</p>}
     </article>
   );
 }
@@ -768,11 +932,33 @@ function Confirm({
         <div className="wk-stat warn"><b>{removed}</b><span>AI案から外した</span></div>
         <div className="wk-stat"><b>{added}</b><span>自分で足した</span></div>
       </div>
+      <WeightSummary s={s} st={st} />
       <p className="meta">この違いと理由が判断ログに残り、来週のおすすめの並べ方を直す材料になります。</p>
       {Object.values(st.left).some((a) => !a.tags.length && a.next === "keep") && (
         <div className="wk-banner">
           <Icon name="warn" size={18} />
           <span>振り返りがまだのものがあります。理由が残ると、来週の案が良くなります（このままでも確定できます）。</span>
+        </div>
+      )}
+
+      {s.deep_frame && (
+        <div className="glass wk-sum-day deep">
+          <div className="wk-sum-head">
+            <strong>じっくり枠 {s.deep_frame.days.map(dayLabel).join("・")}</strong>
+            <span className="meta">週1件</span>
+          </div>
+          {plan.deep_frame ? (
+            <div className="wk-sum-item">
+              <span>{deepTitle(s, deepOf(s, st))}</span>
+              <small>
+                {plan.deep_frame.kind === "task"
+                  ? `期日は1回目（${dayLabel(s.deep_frame.days[0])}）に入れ、2回目はコメントで残す`
+                  : "社員のフロー磨き込み。Todoist には起票しない（判断ログに残すだけ）"}
+              </small>
+            </div>
+          ) : (
+            <p className="meta">（空き）</p>
+          )}
         </div>
       )}
 

@@ -106,5 +106,127 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(kinds, ["set_due", "clear_due", "comment", "inlet", "inlet_skip"])
 
 
+class WeightTests(unittest.TestCase):
+    """判断の重さ（A すぐ決まる／B じっくり）。基準は本物の config を読む。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.cfg = w.load_weight()
+
+    def test_config_loads(self):
+        self.assertEqual(self.cfg["deep_per_week"], 1)
+        self.assertTrue(self.cfg["decision_id"])
+        self.assertEqual(self.cfg["labels"]["quick"], "すぐ決まる")
+        self.assertEqual(self.cfg["labels"]["deep"], "じっくり")
+
+    def test_deep_words(self):
+        wt, why = w.classify_weight(task(1, "サービスの方針を検討する"), self.cfg)
+        self.assertEqual(wt, "deep")
+        self.assertIn("検討", why)
+
+    def test_deep_by_subtasks_and_rally(self):
+        self.assertEqual(w.classify_weight(task(1, "資料をまとめる"), self.cfg, children=2)[0], "deep")
+        wt, why = w.classify_weight(task(1, "資料をまとめる", note_count=6), self.cfg, weeks_carried=2)
+        self.assertEqual(wt, "deep")
+        self.assertIn("6件", why)
+
+    def test_quick(self):
+        self.assertEqual(w.classify_weight(task(1, "PR を承認する"), self.cfg)[0], "quick")
+        self.assertEqual(w.classify_weight(task(1, "どれにする", description="A案: 今週／B案: 来週"), self.cfg)[0], "quick")
+        self.assertEqual(w.classify_weight(task(1, "電話する"), self.cfg, handoff_kind="owner")[0], "quick")
+        self.assertEqual(w.classify_weight(task(1, "片付け", labels=["quick"]), self.cfg)[0], "quick")
+
+    def test_large_handoff_is_deep(self):
+        self.assertEqual(w.classify_weight(task(1, "作業"), self.cfg, handoff_kind="large")[0], "deep")
+
+    def test_unknown(self):
+        self.assertEqual(w.classify_weight(task(1, "ローン残高を登録"), self.cfg), ("unknown", "手がかりなし"))
+        wt, why = w.classify_weight(task(1, "方針を承認する"), self.cfg)  # 2 対 2
+        self.assertEqual(wt, "unknown")
+        self.assertIn("割れている", why)
+        wt, why = w.classify_weight(task(1, "資料", note_count=5), self.cfg)  # B 1点だけ（2点に届かない）
+        self.assertEqual(wt, "unknown")
+        self.assertIn("弱い", why)
+
+    def test_unreadable_config_is_unknown_not_quick(self):
+        with self.assertRaises(w.WeightConfigError):
+            w.load_weight(Path("/nonexistent/todoist_weekly_weight.yaml"))
+        wt, why = w.classify_weight(task(1, "PR を承認する"), None, error="x.yaml が無い")
+        self.assertEqual(wt, "unknown")
+        self.assertIn("基準が読めない", why)
+
+    def _snap(self, tasks, cfg="default"):
+        return w.build_snapshot(tasks=tasks, completed_last_week=[], pick_history={}, inlet_topics=[], today=SUN,
+                                now=datetime(2026, 11, 15, 17, tzinfo=JST), weight_cfg=self.cfg if cfg == "default" else cfg)
+
+    def test_one_deep_per_week_and_quick_front(self):
+        tasks = [task(i, f"方針を検討{i}", priority=4) for i in range(1, 4)]  # B×3（点が高い）
+        tasks += [task(10 + i, f"PR を承認{i}", priority=2) for i in range(1, 7)]  # A×6
+        tasks += [task(20 + i, f"仕事{i}") for i in range(1, 6)]  # 未判別
+        snap = self._snap(tasks)
+        rec = {r["id"]: r["day"] for r in snap["recommended"]}
+        # 9件の上限はじっくり枠（火・金の2回）を含めて数える → 月水金は7件
+        self.assertEqual(len(rec), 7)
+        frame = snap["deep_frame"]
+        self.assertEqual(frame["days"], ["2026-11-17", "2026-11-20"])  # 火・金
+        self.assertEqual(frame["recommended"], "1")
+        self.assertEqual(frame["staff_steps"], ["チャッピー相談", "図で確認", "本人判断", "運用で確認"])
+        self.assertFalse(any(i in rec for i in ("1", "2", "3")))
+        self.assertEqual([x["id"] for x in snap["weight"]["deferred"]], ["2", "3"])
+        self.assertIn("翌週以降", snap["weight"]["deferred"][0]["reason"])
+        self.assertEqual(snap["next_preview"][:2], ["2", "3"])
+        self.assertEqual(snap["weight"]["recommended"], {"quick": 6, "deep": 1, "unknown": 1})
+        # A は月→水→金の順に前倒し（月・水が A で埋まる）
+        mon, wed, fri = snap["days"]
+        quick_days = [rec[str(10 + i)] for i in range(1, 7)]
+        self.assertEqual(quick_days.count(mon), 3)
+        self.assertEqual(quick_days.count(wed), 3)
+        self.assertEqual(list(rec.values()).count(fri), 1)
+        for d in snap["days"]:
+            self.assertLessEqual(sum(1 for v in rec.values() if v == d), 3)
+
+    def test_second_deep_with_deadline_this_week_stays(self):
+        tasks = [task(1, "方針を検討A", priority=4, labels=["properties"]), task(2, "方針を検討B", deadline={"date": "2026-11-22"})]
+        snap = self._snap(tasks)
+        self.assertEqual([c["id"] for c in snap["candidates"]], ["1", "2"])  # 締切のある B が2件目
+        self.assertEqual(snap["deep_frame"]["recommended"], "1")
+        self.assertEqual({r["id"] for r in snap["recommended"]}, {"2"})  # 枠の外でも月水金に置く
+        self.assertEqual(snap["weight"]["deferred"], [])
+
+    def test_frame_without_deep_candidate_is_empty_but_reserved(self):
+        tasks = [task(i, f"仕事{i}") for i in range(1, 15)]
+        snap = self._snap(tasks)
+        self.assertIsNone(snap["deep_frame"]["recommended"])
+        self.assertEqual(len(snap["recommended"]), 7)  # 枠は本人が社員のフロー磨き込み等を入れる用に空けておく
+
+    def test_staff_for_the_week_fills_frame(self):
+        cfg = {**self.cfg, "deep_frame": {**self.cfg["deep_frame"],
+                                          "staff_by_week": {"2026-11-16": {"staff": "社員X", "decision_id": "D-test"}}}}
+        tasks = [task(1, "方針を検討A", priority=4)] + [task(i, f"仕事{i}") for i in range(10, 20)]
+        snap = self._snap(tasks, cfg=cfg)
+        f = snap["deep_frame"]
+        self.assertIsNone(f["recommended"])
+        self.assertEqual(f["staff"]["staff"], "社員X")
+        self.assertEqual(f["staff"]["decision_id"], "D-test")
+        self.assertIn("作業フローの磨き込み", f["staff"]["title"])
+        self.assertEqual([x["id"] for x in snap["weight"]["deferred"]], ["1"])
+        self.assertIn("社員X", snap["weight"]["deferred"][0]["reason"])
+        self.assertEqual(len(snap["recommended"]), 7)
+
+    def test_config_staff_this_week(self):
+        st = self.cfg["deep_frame"]["staff_by_week"].get("2026-11-23")
+        self.assertTrue(st and st["staff"].startswith("317") and st["decision_id"])
+
+    def test_staff_frame_does_not_create_todoist_task(self):
+        self.assertEqual(w.plan_ops({"deep_new": [{"title": "x", "date": "2026-11-17"}]}), [])
+
+    def test_no_config_keeps_old_behavior(self):
+        tasks = [task(i, f"方針を検討{i}", priority=4) for i in range(1, 4)]
+        snap = self._snap(tasks, cfg=None)
+        self.assertEqual(len(snap["recommended"]), 3)
+        self.assertFalse(snap["weight"]["ok"])
+        self.assertEqual(snap["weight"]["candidates"]["unknown"], 3)
+
+
 if __name__ == "__main__":
     unittest.main()
