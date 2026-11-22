@@ -197,6 +197,7 @@ jobs:
             fi
           fi
           echo "WESTUDY_SYNC_MODE=$sync_mode" >> "$GITHUB_ENV"
+          echo "WESTUDY_FORCE_SCRAPE=$force_scrape" >> "$GITHUB_ENV"
           echo "sync mode: $sync_mode"
           (
             cd "$CHATBOT_DIR"
@@ -209,9 +210,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # force なし（手動実行の既定）は取込済みトピックを skip するので、新着トピックが無いと
+          # raw CSV が1つも出ない。それは正常（新着なし）なので失敗にしない。
+          # force（定時 schedule）で CSV が無いのは本当の異常なので従来どおり失敗させる。
+          extra=()
+          if [[ "${WESTUDY_FORCE_SCRAPE:-false}" != "true" ]]; then
+            extra+=( --allow-empty )
+          fi
           python scripts/jarvis_kamiooya_community_daily.py \
             --root "$CHATBOT_OUTPUT_ROOT/exports/raw" \
-            --report "${RUNNER_TEMP}/community-attachments-summary.json" --apply
+            --report "${RUNNER_TEMP}/community-attachments-summary.json" --apply "${extra[@]}"
 
       # 取込のあと、embedding が null の comments／公開済み openchat に emb を付ける。
       # 失敗しても state のコミットは続ける（emb は次回の週次で取り返せる）。

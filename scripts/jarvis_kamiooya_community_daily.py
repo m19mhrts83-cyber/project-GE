@@ -20,7 +20,7 @@ def trusted_upload(url):
         return False
 
 
-def candidates(root):
+def candidates(root, allow_empty=False):
     result={};files=0
     for path in sorted(root.rglob('*.csv')):
         if not path.resolve().is_relative_to(root.resolve()):raise ValueError('csv_outside_root')
@@ -36,7 +36,7 @@ def candidates(root):
                     url=a['url']
                     ident=hashlib.sha256(f'{cid}\0{canonical_url(url)}'.encode()).hexdigest()
                     result[ident]={'comment_id':cid,'url':url,'kind':a.get('kind')}
-    if not files:raise ValueError('no_harvest_csv')
+    if not files and not allow_empty:raise ValueError('no_harvest_csv')
     return result
 
 
@@ -99,9 +99,10 @@ def sync(rows,store,apply=False,max_files=200,source=None):
 
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--root',type=Path,required=True);p.add_argument('--report',type=Path,required=True);p.add_argument('--apply',action='store_true');p.add_argument('--max-files',type=int,default=200)
+    p.add_argument('--allow-empty',action='store_true',help='raw CSV が1つも無い（全トピック skip の非 force 実行）ときは失敗にせず 0 件で終える')
     a=p.parse_args(argv)
     if not 1<=a.max_files<=2000:p.error('max-files must be 1..2000')
-    counts=sync(candidates(a.root),Store(),a.apply,a.max_files)
+    counts=sync(candidates(a.root,a.allow_empty),Store(),a.apply,a.max_files)
     a.report.parent.mkdir(parents=True,exist_ok=True);a.report.write_text(json.dumps(counts,indent=2));os.chmod(a.report,0o600)
     print(json.dumps(counts),flush=True)
     return int(any(counts.get(k) for k in ('failed','budget_held','deferred','parent_pending')))
