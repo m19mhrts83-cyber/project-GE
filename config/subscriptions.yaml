@@ -127,6 +127,20 @@ services:
     usage_note: "パスワード・.env の一元管理。エージェント連携（Environments MCP・Service Account・1Password for Agents）"
     note: "2026-11-14 申込（年払い・約40ドル＝松野さん申告の仮値）。11/14 の請求書は体験 $0.00（11/14〜11/28、請求書ID in_1UbdIhHBax7L5HDfXrLMZttK）。確定額は 11/28 の請求メールで更新する。月額換算 約532円（仮）。円は 2026-11-12 終値 USDJPY 159.725 で換算。経緯: Todoist 1Password 移行判断タスク"
 
+  - id: todoist
+    name: Todoist Pro
+    category: ai
+    status: active
+    billing: yearly
+    amount_yen: 8000
+    next_bill: "2027-11-22"
+    watch: true
+    watch_reason: "金額が仮（約8,000円／年）。年払いの領収書で確定額に直す"
+    cancel_candidate: false
+    billing_url: "https://app.todoist.com/app/settings/subscription"
+    usage_note: "AIエージェントチームのタスク台帳（312 起票・313 処置・コメントでの経過）"
+    note: "2026-11-22 松野さんが月払いから年払いへ切替（本人連絡）。金額は Miss Lemon の仮値で未確認（松野さん了承のうえ仮登録）。直前の月払いは 894円／月（2026-09-21 の領収書）。Jarvis Dashboard /ai-usage では「基盤の維持」に入る"
+
   - id: muumuu
     name: ムームードメイン
     category: ai
