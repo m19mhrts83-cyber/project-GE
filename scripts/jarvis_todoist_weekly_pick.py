@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """今週の9件（Nody /week）の材料づくりと、確定した割付の Todoist 反映。
 
-日曜の夜に松野さんが Nody で「今週の9件」を選ぶ（2026-11-10 松野さん決定）。
-- snapshot … 日曜 17:00 JST: 先週の結果・残り・候補（入口で残った話題も）を集め、
+土曜の午前中に松野さんが Nody で「今週の9件」（次の月曜からの週）を選ぶ（2026-11-10 決定・2026-11-23 日曜夜→土曜午前に変更）。
+- snapshot … 土曜 07:00 JST: この週の結果・残り・候補（入口で残った話題も）を集め、
   おすすめ9件と「選ぶ理由」の案を付けて sync_meta.weekly_pick_snapshot に置く。#consult に「Nody で開く」
 - reflect  … 30分ごと: Nody で確定した割付（owner_decisions surface=weekly_pick action=commit）を
   Todoist に反映する（期日を入れる／外す、入口の話題をタスクにする、やめる・AIへはコメント）。
@@ -78,8 +78,14 @@ PICK_TEXT = {
 
 
 def target_monday(today: date) -> date:
-    """割り付ける週の月曜。月曜ならその日、ほかは次の月曜（日曜夜→翌日）。"""
+    """割り付ける週の月曜。月曜ならその日、ほかは次の月曜（土曜朝→2日後・日曜→翌日）。"""
     return today if today.weekday() == 0 else today + timedelta(days=7 - today.weekday())
+
+
+def _md(iso: str) -> str:
+    """"2026-11-30" → "11/30"（通知の文言用）"""
+    d = _d(iso)
+    return f"{d.month}/{d.day}" if d else str(iso)
 
 
 def pick_dates(monday: date) -> list[str]:
@@ -662,7 +668,7 @@ def snapshot(*, dry: bool, now: datetime, notify: bool) -> int:
     last = snap["last"]
     wr, wc = snap["weight"]["recommended"], snap["weight"]["candidates"]
     print(f"週 {snap['week']}: 候補 {len(snap['candidates'])} 件（入口 {len(snap['inlet'])}）、おすすめ {len(snap['recommended'])} 件、"
-          f"先週 完了 {last['done']}／残り {last['left']}／追加 {last['added']}")
+          f"{last['week']} の週 完了 {last['done']}／残り {last['left']}／追加 {last['added']}")
     print(f"判断の重さ: おすすめ A {wr['quick']}／B {wr['deep']}／未判別 {wr['unknown']}、"
           f"候補全体 A {wc['quick']}／B {wc['deep']}／未判別 {wc['unknown']}、B を翌週以降へ {len(snap['weight']['deferred'])} 件")
     frame = snap.get("deep_frame")
@@ -678,8 +684,8 @@ def snapshot(*, dry: bool, now: datetime, notify: bool) -> int:
     if notify:
         url = c.nody_url("/week", now)
         text = (
-            f"🟡 *今週の9件を選ぶ準備ができました*（{snap['week']} の週）\n"
-            f"先週: 完了 {last['done']} 件／残り {last['left']} 件／追加 {last['added']} 件。松野さん対応の残り {last['owner_open']} 件\n"
+            f"🟡 *今週の9件を選ぶ準備ができました*（{_md(snap['week'])}(月) からの週・土曜の午前中に）\n"
+            f"{_md(last['week'])}〜の週: 完了 {last['done']} 件／残り {last['left']} 件／追加 {last['added']} 件。松野さん対応の残り {last['owner_open']} 件\n"
             f"おすすめの内訳: すぐ決まる {wr['quick']}／じっくり {wr['deep']}／未判別 {wr['unknown']}\n"
             + (f"{frame_text}\n" if frame_text else "") +
             f"残った理由を選んでから、おすすめ9件を直して月・水・金に置いてください。\n<{url}|Nody で開く>"

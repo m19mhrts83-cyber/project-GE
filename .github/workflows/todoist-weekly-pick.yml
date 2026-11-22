@@ -1,13 +1,13 @@
 name: 今週の9件 — 材料づくり／Todoistへ反映
 
-# snapshot … 日曜 17:00 JST: 先週の結果・残り・候補（入口で残った話題も）とおすすめ9件を作り、
+# snapshot … 土曜 07:00 JST（2026-11-23〜。以前は日曜 17:00）: 次の月曜からの週を対象に、この週の結果・残り・候補（入口で残った話題も）とおすすめ9件を作り、
 #             sync_meta.weekly_pick_snapshot に置いて #consult に「Nody で開く」
 # reflect  … 30分ごと（7:00〜23:30 JST）: Nody /week で確定した割付を Todoist に反映
 # 止める: リポジトリ変数 JARVIS_WEEKLY_PICK_DISABLE=1（どちらも止まる）
 
 on:
   schedule:
-    - cron: "0 8 * * 0" # 日曜 17:00 JST: snapshot
+    - cron: "0 22 * * 5" # 土曜 07:00 JST（金 22:00 UTC）: snapshot。土曜の午前中に判断する
     - cron: "15,45 22-23,0-14 * * *" # 7:15〜23:45 JST: reflect
   workflow_dispatch:
     inputs:
@@ -56,7 +56,7 @@ jobs:
           set -euo pipefail
           MODE="reflect"
           NOTIFY="0"
-          if [[ "${SCHEDULE:-}" == "0 8 * * 0" ]]; then MODE="snapshot"; NOTIFY="1"; fi
+          if [[ "${SCHEDULE:-}" == "0 22 * * 5" ]]; then MODE="snapshot"; NOTIFY="1"; fi
           if [[ -n "${IN_MODE:-}" ]]; then MODE="$IN_MODE"; NOTIFY="0"; fi
           if [[ "${IN_NOTIFY:-false}" == "true" ]]; then NOTIFY="1"; fi
           ARGS=(--mode "$MODE")

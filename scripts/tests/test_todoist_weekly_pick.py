@@ -228,5 +228,31 @@ class WeightTests(unittest.TestCase):
         self.assertEqual(snap["weight"]["candidates"]["unknown"], 3)
 
 
+class SaturdayTests(unittest.TestCase):
+    """土曜 07:00 の snapshot（2026-11-23〜）でも、対象は次の月曜からの週。"""
+
+    def test_saturday_targets_next_monday(self):
+        sat = date(2026, 11, 28)
+        self.assertEqual(w.target_monday(sat), date(2026, 11, 30))
+        self.assertEqual(w.pick_dates(w.target_monday(sat)), ["2026-11-30", "2026-12-02", "2026-12-04"])
+
+    def test_saturday_snapshot_week_and_left(self):
+        tasks = [
+            task(1, "この週の水曜に置いた", due={"date": "2026-11-25"}),
+            task(2, "土曜の今日に置いた", due={"date": "2026-11-28"}),
+            task(3, "次の週の火曜に置いた", due={"date": "2026-12-01"}),
+            task(4, "締切が来週", deadline={"date": "2026-12-03"}),
+        ]
+        snap = w.build_snapshot(tasks=tasks, completed_last_week=[], pick_history={}, inlet_topics=[],
+                                today=date(2026, 11, 28), now=datetime(2026, 11, 28, 7, tzinfo=JST))
+        self.assertEqual(snap["week"], "2026-11-30")
+        self.assertEqual(snap["last"]["week"], "2026-11-23")  # 「結果・残り」は作った週（月曜から）
+        self.assertEqual(snap["last"]["left"], 2)  # 月曜より前の期日（水・土）
+        self.assertEqual({x["id"] for x in snap["dated_in_week"]}, {"3"})
+        c4 = next(c for c in snap["candidates"] if c["id"] == "4")
+        self.assertIn("あと5日", c4["reasons"][0]["text"])  # 土曜から数える
+        self.assertEqual(w._md(snap["week"]), "11/30")
+
+
 if __name__ == "__main__":
     unittest.main()

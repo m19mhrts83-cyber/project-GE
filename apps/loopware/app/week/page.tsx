@@ -12,7 +12,7 @@ export default function WeekPage() {
           <Icon name="back" size={22} />
         </Link>
         <div className="grow">
-          <div className="eyebrow acc">週次 ／ 日曜の夜</div>
+          <div className="eyebrow acc">週次 ／ 土曜の午前</div>
           <h1>今週の9件</h1>
         </div>
       </div>

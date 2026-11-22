@@ -89,7 +89,7 @@ export default function HubPage() {
         </span>
         <span className="txt">
           <strong>今週の9件</strong>
-          <span className="meta">日曜の夜に。残った理由→おすすめを直して月・水・金に置く</span>
+          <span className="meta">土曜の午前中に。残った理由→おすすめを直して月・水・金に置く</span>
         </span>
         <Icon name="next" size={18} />
       </Link>
