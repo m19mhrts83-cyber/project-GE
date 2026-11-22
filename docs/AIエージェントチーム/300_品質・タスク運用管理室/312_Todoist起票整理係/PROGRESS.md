@@ -1,6 +1,12 @@
 # 312 PROGRESS
 
-更新: 2026-11-07
+更新: 2026-11-22
+
+## 2026-11-22 状態ファイルの時刻
+
+- 原因: `todoist_312_digest.json`（`last_digest_at`）は旧 `jarvis_todoist_312_digest.py`（10/21 で役目終了）だけが書いていた。本線は GHA（collect／reflect。状態は Supabase）なので、ローカルのこの時刻は止まって見えた。生存は 315-B が GHA の最終成功で見ている
+- 修正: ローカルの週次（`jarvis_todoist_weekly_pick.py` の snapshot／reflect）が成功した回に `last_run_at`（snapshot は `last_digest_at` も）を書く。dry-run・失敗では書かない
+- 未対応: GHA の collect は一時的な実行環境のため、ローカル state には書かない（書く必要もない。生存は GHA 実行履歴）
 
 ## ループウェア実装
 

@@ -471,6 +471,20 @@ def reflect(*, dry: bool, now: datetime) -> int:
     return 0
 
 
+def _stamp_312(*, digest_at: bool) -> None:
+    """成功した回の最終実行時刻を 312 の状態ファイルへ（本線は GHA だが、ローカルの週次はここ）。"""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import jarvis_todoist_313_judgment as jd
+
+        jd.stamp_run(
+            digest_at=digest_at,
+            path=jd.REPO / ".jarvis_state" / "todoist_312_digest.json",
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"state 時刻の記録に失敗（本処理は成功）: {e}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--mode", choices=["snapshot", "reflect"], default="snapshot")
@@ -485,8 +499,14 @@ def main(argv: list[str] | None = None) -> int:
     now = datetime.now(JST)
     try:
         if a.mode == "reflect":
-            return reflect(dry=a.dry_run, now=now)
-        return snapshot(dry=a.dry_run, now=now, notify=not a.no_notify)
+            rc = reflect(dry=a.dry_run, now=now)
+            stamp = False
+        else:
+            rc = snapshot(dry=a.dry_run, now=now, notify=not a.no_notify)
+            stamp = True
+        if rc == 0 and not a.dry_run:
+            _stamp_312(digest_at=stamp)
+        return rc
     except urllib.error.HTTPError as e:
         print(f"HTTP {e.code}: {e.read().decode(errors='replace')[:300]}", file=sys.stderr)
         return 1

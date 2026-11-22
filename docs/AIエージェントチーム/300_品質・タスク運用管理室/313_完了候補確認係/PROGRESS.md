@@ -1,6 +1,15 @@
 # 313 PROGRESS
 
-更新: 2026-11-07
+更新: 2026-11-22
+
+## 2026-11-22 空回り停止・状態時刻
+
+- [x] 原因: 最終まとめ時刻（`todoist_313_digest.json` の `last_digest_at`）は旧 digest だけが書く。runner は片付け・外で済んだ候補に切り替え済みで、実行も Slack 送信も毎日成功していたが、この時刻は誰も更新していなかった
+- [x] 修正: 送信成功時に `last_run_at`／`last_digest_at` を書く（失敗・dry-run では書かない）。`jarvis_todoist_313_judgment.stamp_run`
+- [x] 「残す」記録（`--keep N`）と、内容が変わるまで再提示しない指紋照合。置き場は `.jarvis_state/todoist_313_judgments.json`（非公開・task_id と指紋のみ）
+- [x] 連続日数: 片付けに「同じ候補を N 日連続」を1行。外で済んだ候補は state の `streak_line`
+- [x] テスト `scripts/tests/test_todoist_313_judgment.py`
+- [ ] Slack ボタンで「残す」を押せるようにする（現状は CLI `--keep`。ボタン化は別件）
 
 ## ループウェア実装（進行中→本線化）
 

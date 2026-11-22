@@ -188,6 +188,9 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 TODOIST_313_AUTHOR=FRIDAY ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --apply --select '✅1'
 # 期日超過（了承後・📅番号）
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_overdue.py --apply --select '📅3,📅5'
+# 「残す」と答えたものを記録（直近の片付け／外で済んだ候補の #N。Todoist には触らない）
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_cleanup.py --keep 1,3
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_done_elsewhere.py --keep 2
 # Slack返信拾い（クラウド）
 python3 scripts/jarvis_todoist_313_slack_ingest.py --dry-run
 # FRIDAY が実行する時は TODOIST_313_AUTHOR=FRIDAY（先頭が【FRIDAY】。既定は Jarvis）
@@ -218,3 +221,4 @@ python3 scripts/jarvis_todoist_313_slack_ingest.py --dry-run
 | 2026-11-12 | 「0.5 期限切れ処置（Miss Lemon・毎日）」を追加。中身確認→処置案→了承→コメント→処置。専用プロジェクトは作らない（松野さん相談） |
 | 2026-11-12 | 0.5 を「本日のタスク処置（毎朝10:30 予定タスク）」に改訂。週次で1日2件程度を割り振り、Miss Lemon が朝にやり切り #report に1通。夜のスレ返信は翌朝の 313 が拾う。10分超は【提案】別タスク（期日なし） |
 | 2026-11-12 | 名称を **Todoistタスク処置係**（旧: 完了候補確認係）に変更。Slack 表記も `313 タスク処置`。フォルダ名 `313_完了候補確認係` はリンク切れ防止のため据え置き |
+| 2026-11-22 | 状態ファイルの時刻ずれ修正＋同じ候補の繰り返し停止。runner は片付け（`cleanup.py`）・外で済んだ候補（`done_elsewhere.py`）を呼ぶが、最終まとめ時刻は旧 `digest.py` だけが `todoist_313_digest.json` に書いていたので 11/07 のまま止まって見えた（実行・Slack 送信は毎日通っていた）。送信が通った回に `last_run_at`／`last_digest_at` を書く。あわせて **「残す」判断の記録**（`.jarvis_state/todoist_313_judgments.json`・未追跡）＝残すと答えた候補は題・期日・説明・ラベル・優先度・更新時刻が変わるまで再提示しない。close 了承は従来どおり `--apply --select`。digest に「同じ候補を N 日連続」の1行（`jarvis_todoist_313_judgment.py`） |
