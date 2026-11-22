@@ -5,7 +5,7 @@ import { createRaimoAuthGateway } from '../../../lib/raimoAuthGateway.ts';
 import { createProductionAdapter, digest } from '../../../lib/raimoAuthAdapter.ts';
 const origin='https://ma-54t2keqdelz3.raimo-app.buzz';
 const config={origin,projectUrl:Deno.env.get('SUPABASE_URL')||'',serviceKey:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'',
- raimoBase:origin+'/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0',gatewaySecret:Deno.env.get('RAIMO_AUTH_GATEWAY_SECRET')||'',proxySecret:Deno.env.get('COMMUNITY_ATTACHMENTS_PROXY_SECRET')||''};
+ raimoBase:origin+'/miniAppApi/be_nXbcTm3EumRbotHtAwGGXb45raHz0',gatewaySecret:Deno.env.get('RAIMO_AUTH_GATEWAY_SECRET')||'',proxySecret:Deno.env.get('COMMUNITY_ATTACHMENTS_PROXY_SECRET')||'',githubDispatchToken:Deno.env.get('GITHUB_RANKING_DISPATCH_TOKEN')||''};
 const verify=async(raw:string,stored:string)=>{
  if(/^\$2[aby]\$\d{2}\$/.test(stored))return bcrypt.compare(raw,stored);
  if(/^[0-9a-f]{64}$/i.test(stored))return await digest(raw)===stored.toLowerCase();

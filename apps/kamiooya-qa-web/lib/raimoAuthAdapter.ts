@@ -5,7 +5,9 @@ import {answerTier,cacheable,queryKey,fresh} from './answerCost.ts';
 import {answerHash,cleanMeta,RAIMO_ANSWER_MODEL,type AnswerMeta} from './answerMeta.ts';
 // Runtime-neutral production adapters. Secrets are injected only by the Edge entrypoint.
 import type { GatewayDependencies } from './raimoAuthGateway.ts';
-export type RuntimeConfig = { origin: string; raimoBase: string; gatewaySecret: string; projectUrl: string; serviceKey: string; proxySecret: string };
+export type RuntimeConfig = { origin: string; raimoBase: string; gatewaySecret: string; projectUrl: string; serviceKey: string; proxySecret: string; githubDispatchToken?: string };
+// 運営分析の「ランキングを作り直す」で起動する Actions（2026-11-23）。鍵は Actions の起動だけができる、このリポジトリ限定のもの。
+const REBUILD_WORKFLOW='https://api.github.com/repos/m19mhrts83-cyber/project-GE/actions/workflows/course-theme-weekly.yml/dispatches';
 export const digest = async (s: string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))), b => b.toString(16).padStart(2, '0')).join('');
 export class UpstreamError extends Error {
   code: string; status: number;
@@ -195,6 +197,19 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     themeDecisions:async(ids)=>{const ok=ids.filter(i=>/^r[0-9]{8}[a-z0-9_-]{0,20}$/.test(i));return ok.length?rest('qa_theme_decisions?select=round_id,theme_id,choice,revised_title,reason,decided_at&round_id=in.('+ok.join(',')+')'):[];},
     // (4) の拡張: オープンチャットの質問ランキング。最新の回だけ（1回 百KB前後）。11/16
     openchatRankings:async(limit)=>rest('qa_openchat_rankings?select=id,created_at,period_days,ranking,by_chat,stats&order=created_at.desc&limit='+Math.max(1,Math.min(5,limit))),
+    // 画面からの作り直し（2026-11-23）。依頼の記録と、Actions の起動。
+    rebuildRequests:async(limit)=>rest('qa_ranking_rebuilds?select=requested_by,requested_at,dispatched&order=requested_at.desc&limit='+Math.max(1,Math.min(20,limit))),
+    requestRankingRebuild:async(userId)=>{
+      const token=c.githubDispatchToken||'';
+      if(!token)return {ok:false,error:'not_configured'};
+      let error='';
+      try{
+        const r=await transport(REBUILD_WORKFLOW,{method:'POST',headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'kamiooya-ai-navi','Content-Type':'application/json'},body:JSON.stringify({ref:'main'}),signal:AbortSignal.timeout(20000)});
+        if(r.status!==204)error='github_'+r.status;
+      }catch{error='github_unreachable';}
+      await rest('qa_ranking_rebuilds',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({requested_by:userId,dispatched:!error,error})});
+      return error?{ok:false,error}:{ok:true};
+    },
     saveThemeDecision:async row=>{await rest('qa_theme_decisions?on_conflict=round_id,theme_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
     listChangeLog:async()=>rest('qa_change_log?visible=is.true&select=released_on,title,body,trigger&order=released_on.desc,id.desc&limit=200'),
     saveFeedback:async row=>{await rest('qa_answer_feedback?on_conflict=user_id,chat_id,message_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},

@@ -5466,9 +5466,62 @@ const App = {
     try {
       const r = await App.apiClient('POST', '/admin/ranking-themes/list', {});
       App.renderRankingThemes(r || {});
+      App.renderRankingRebuild((r && r.rebuild) || null);
     } catch (e) {
       status.textContent = '取得できませんでした: ' + ((e && e.message) || String(e));
     }
+  },
+  // 画面からランキングを作り直す（2026-11-23）。押す前に費用の確認を出す。作成中は押せない。
+  rankingRebuildTimer: null,
+  renderRankingRebuild: (rb) => {
+    const box = document.getElementById('rankingRebuild');
+    if (!box) return;
+    box.classList.toggle('hidden', !rb);
+    if (!rb) return;
+    const btn = document.getElementById('rankingRebuildBtn'), msg = document.getElementById('rankingRebuildMsg');
+    const conf = document.getElementById('rankingRebuildConfirm'), yes = document.getElementById('rankingRebuildYes'), no = document.getElementById('rankingRebuildNo');
+    const when = function (iso) {
+      const d = new Date(iso || '');
+      return isNaN(d.getTime()) ? '' : (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+    };
+    const who = rb.last_requested_by_name ? rb.last_requested_by_name + 'さん' : '';
+    const running = rb.state === 'running';
+    btn.disabled = rb.state !== 'idle';
+    btn.classList.toggle('opacity-50', btn.disabled);
+    if (running) {
+      btn.textContent = '⏳ 作り直しています…';
+      msg.textContent = when(rb.last_requested_at) + ' に' + (who ? who + 'が' : '') + '依頼しました。できると自動で表示が変わります（10〜20分ほど）。';
+      conf.classList.add('hidden');
+    } else {
+      btn.textContent = '🔄 ランキングを今すぐ作り直す';
+      msg.textContent = rb.state === 'limit' ? '今日はもう作り直せません（1日 ' + (rb.daily_limit || 5) + ' 回まで）。'
+        : rb.maybe_failed ? '前回（' + when(rb.last_requested_at) + '）の作り直しが、うまくできなかったようです。もう一度押してください。'
+        : rb.last_requested_at ? '前回の作り直し: ' + when(rb.last_requested_at) + (who ? '（' + who + '）' : '') : '';
+    }
+    clearTimeout(App.rankingRebuildTimer);
+    // 作成中は2分ごとに見直し、新しい回ができたら表示を差し替える
+    if (running) App.rankingRebuildTimer = setTimeout(function () { void App.loadRankingThemes(); void App.loadOpenchatRanking(); }, 120000);
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', function () { if (!btn.disabled) conf.classList.remove('hidden'); });
+    no.addEventListener('click', function () { conf.classList.add('hidden'); });
+    yes.addEventListener('click', async function () {
+      conf.classList.add('hidden');
+      btn.disabled = true;
+      msg.textContent = '依頼しています…';
+      try {
+        const r = await App.apiClient('POST', '/admin/ranking-themes/rebuild', {});
+        App.renderRankingRebuild((r && r.rebuild) || null);
+      } catch (e) {
+        const code = e && e.errorCode;
+        msg.textContent = code === 'in_progress' ? 'いま作り直しています。できるまでお待ちください。'
+          : code === 'daily_limit' ? '今日はもう作り直せません。'
+          : code === 'not_configured' ? 'まだ準備中のため作り直せません（松野さんに連絡してください）。'
+          : '作り直しを始められませんでした。少し時間をおいてもう一度押してください。';
+        btn.disabled = false;
+        if (code === 'in_progress' || code === 'daily_limit') void App.loadRankingThemes();
+      }
+    });
   },
   renderRankingThemes: (r) => {
     const status = document.getElementById('rankingThemesStatus');
@@ -5476,7 +5529,7 @@ const App = {
     const esc = App.escapeHtml;
     const latest = r.latest;
     if (!latest) {
-      status.textContent = 'まだ集計の回がありません（毎週月曜の朝に作られます）。';
+      status.textContent = 'まだ集計の回がありません（「ランキングを今すぐ作り直す」で作れます）。';
       list.innerHTML = ''; cards.innerHTML = ''; hist.innerHTML = '';
       return;
     }
@@ -5566,7 +5619,7 @@ const App = {
     const fmt = (n) => Number(n || 0).toLocaleString('ja-JP');
     const latest = r.latest;
     if (!latest || !(latest.ranking || []).length) {
-      status.textContent = latest ? '' : 'まだ集計の回がありません（毎週月曜の朝に作られます）。';
+      status.textContent = latest ? '' : 'まだ集計の回がありません（「ランキングを今すぐ作り直す」で作れます）。';
       body.innerHTML = '<div class="ab-empty"><i class="fa-solid fa-comments"></i><p>まだ表示できるランキングがありません。</p></div>';
       return;
     }
