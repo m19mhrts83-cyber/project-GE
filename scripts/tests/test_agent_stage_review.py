@@ -20,8 +20,9 @@ def wk(*sigs, runs=7):
 AGENTS = [
     {"id": "114", "name": "物件一次判定係", "status": "運用確認"},
     {"id": "311", "name": "送信前品質係", "status": "運用確認"},
-    {"id": "814", "name": "UI点検係", "status": "設計中"},
-    {"id": "615", "name": "為替見張り係", "status": "設計中"},
+    {"id": "814", "name": "UI点検係", "status": "設計中", "flow_confirmed_at": "2026-11-10"},
+    {"id": "615", "name": "為替見張り係", "status": "設計中", "flow_confirmed_at": "2026-11-10"},
+    {"id": "816", "name": "未確認係", "status": "設計中"},
     {"id": "900", "name": "定常係", "status": "運用"},
 ]
 
@@ -62,6 +63,17 @@ class ProposeTests(unittest.TestCase):
         keys = [p["key"] for p in rep["proposals"]]
         self.assertIn("814:設計中>運用確認", keys)
         self.assertNotIn("615:設計中>運用確認", keys)
+
+    def test_design_to_check_needs_flow_confirmation(self):
+        # 動いていても、図の確認と松野さんの判断の印が無ければ提案しない
+        rep = self.run_({"816": wk("🟢")})
+        self.assertFalse(any(p["id"] == "816" for p in rep["proposals"]))
+        w = {p["key"]: p for p in rep["watch"]}
+        self.assertTrue(any("flow_confirmed_at" in b for b in w["816:設計中>運用確認"]["blockers"]))
+
+    def test_design_to_check_needs_running_even_if_confirmed(self):
+        rep = self.run_({"814": wk("⚪", runs=0)})
+        self.assertFalse(any(p["id"] == "814" for p in rep["proposals"]))
 
     def test_demote_after_two_red_weeks(self):
         rep = self.run_({"900": wk("🔴", "🔴")})

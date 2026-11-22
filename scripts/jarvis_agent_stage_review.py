@@ -76,7 +76,8 @@ def load_agents(path: Path = REGISTRY) -> list[dict[str, str]]:
     for aid, a in (reg.get("agents") or {}).items():
         st = str((a or {}).get("status") or "")
         if st in STAGES:
-            out.append({"id": str(aid), "name": str(a.get("name") or ""), "status": st})
+            out.append({"id": str(aid), "name": str(a.get("name") or ""), "status": st,
+                        "flow_confirmed_at": str(a.get("flow_confirmed_at") or "")})
     return sorted(out, key=lambda x: x["id"])
 
 
@@ -211,8 +212,15 @@ def propose(agents: list[dict[str, str]], hist: dict[str, list[dict[str, Any]]],
         elif a["status"] == "設計中":
             to = "運用確認"
             runs = latest.get("runs") if latest else None
+            # 22_（2026-11-23）: 運用確認へ上げる＝図の確認済み＋松野さんの判断＋運用の開始。
+            # 図確認と判断の印は registry の flow_confirmed_at。印が無い間は提案しない（見守りに置く）。
+            confirmed = str(a.get("flow_confirmed_at") or "").strip()
+            if confirmed:
+                reasons.append(f"図の確認と松野さんの判断が済み（{confirmed}）")
+            else:
+                blockers.append("図の確認と松野さんの判断の印（registry の flow_confirmed_at）がまだない")
             if latest and (runs or 0) >= int(chk.get("min_runs") or 1) and sigs[0] in (chk.get("ok_signals") or ["🟢", "🟡"]):
-                reasons.append(f"今週 {runs} 回動いた（{sigs[0]} {latest['why']}）＝定時が動き始めた")
+                reasons.append(f"今週 {runs} 回動いた（{sigs[0]} {latest['why']}）＝運用が始まった")
             elif not latest:
                 blockers.append("動いた跡を数える場所が未登録（config/agent_weekly_activity.yaml）" if hist
                                 else "週次稼働の記録がまだない")
