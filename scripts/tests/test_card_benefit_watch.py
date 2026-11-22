@@ -176,6 +176,15 @@ class StaleAndMonthlyTests(unittest.TestCase):
         text = c.build_slack_text(r, header="H", dash_url="u", mask=True)
         self.assertIn("Zaim が古い（基準日6/10）", text)
 
+    def test_olive_confirmed_stale(self):
+        cfg = {**CFG, "cards": {**CFG["cards"], "a": {**CFG["cards"]["a"], "stale_days": 45}}}
+        old = c.compute(cfg, st_a(1_000_000, "2026-05-15"), date(2026, 7, 1))
+        self.assertTrue(old["cards"][0]["usage_stale"])
+        self.assertIn("Aは5/15現在の確定値（古い）",
+                      c.build_slack_text(old, header="H", dash_url="u", mask=True))
+        fresh = c.compute(cfg, st_a(1_000_000, "2026-06-15"), date(2026, 7, 1))
+        self.assertFalse(fresh["cards"][0]["usage_stale"])
+
     def test_zaim_fresh_no_line(self):
         cfg = dict(CFG, zaim_stale_days=10)
         state = {"bonvoy": {"zaim": {"usage_yen": 100000, "as_of": "2026-06-28"}}}
