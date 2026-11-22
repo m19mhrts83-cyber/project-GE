@@ -145,7 +145,7 @@ caffeinate -dimsu /path/to/.../scripts/run_westudy_pipeline.sh
 **project-GE リポジトリ直下**の `.github/workflows/westudy-raimo-weekly.yml` で、以下を**毎週 1 回**（日曜 06:30 JST 目安）自動実行します。  
 （`215_kamiooya/.github/` 配下に置いても GitHub は読み込みません。）
 
-1. WeStudy スクレイプ（**cron 週次は `--force` で全トピック再取得**。新規コメントは完了済みトピックにも付くため）  
+1. WeStudy スクレイプ（**定時 cron は `--force` で全トピック再取得**（手動実行は既定で force なし）。新規コメントは完了済みトピックにも付くため）  
 2. 差分CSV生成（**state 更新は Raimo 取込成功後**）  
 3. 差分が 1 件以上のときのみ Raimo 自動取込（0件ならスキップ）  
 

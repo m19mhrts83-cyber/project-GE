@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## 背景
 
-週次 CI（`westudy-raimo-weekly.yml`、日曜 08:00 JST）が落ちると Gmail に GitHub Actions の Fail 通知が来る。  
+取込 CI（`westudy-raimo-weekly.yml`。月〜土 朝8時=コメント＋新しい lesson、日曜 朝8時=全部取り直し、毎日14時=朝が失敗した時の予備）が落ちると Gmail に GitHub Actions の Fail 通知が来る。  
 安定するまで Jarvis がやり取りのついでに結果を確認する。
 
 ## 無効化
