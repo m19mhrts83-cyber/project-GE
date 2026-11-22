@@ -117,6 +117,10 @@ type BenefitCard = {
   usage_source?: string | null;
   usage_caveat?: string | null;
   usage_stale_days?: number | null;
+  usage_transfers_expected?: boolean | null;
+  usage_transfer_rows?: number | null;
+  usage_other_transfer_rows?: number | null;
+  usage_transfers_checked?: boolean | null;
   pace_per_month_yen?: number | null;
   counts_note?: string | null;
   grant_note?: string | null;
@@ -465,6 +469,13 @@ export default async function VpointPage() {
                   <p className="meta">
                     出どころ: {c.usage_source}
                     {c.usage_caveat ? ` ／ ${c.usage_caveat}` : ""}
+                  </p>
+                ) : null}
+                {c.usage_kind === "estimate" && c.usage_transfers_expected ? (
+                  <p className="meta">
+                    {c.usage_transfers_checked
+                      ? `概算（振替含む）: Amazon 向けの振替 ${c.usage_transfer_rows ?? 0} 件を加算 · 未算入の振替 ${c.usage_other_transfer_rows ?? 0} 件`
+                      : "振替行は未加算（Zaim CSV を読めていません）"}
                   </p>
                 ) : null}
                 {(c.tiers || []).length > 0 ? (

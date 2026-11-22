@@ -133,6 +133,62 @@ class ZaimTransferTests(unittest.TestCase):
         period = (date(2026, 3, 1), date(2027, 2, 28))
         r = c.aggregate_zaim_transfers(p, self.CFG, period)
         self.assertEqual((r["usage_yen"], r["rows"], r["as_of"]), (1200, 2, "2026-05-01"))
+        self.assertEqual(r["other_rows"], 1)  # カード→別の入金先は足さず件数だけ
+        self.assertTrue(r["checked"])
+
+    def test_negative_transfer_is_refund_netted(self):
+        p = self._csv(
+            "2026-04-01,transfer,FOO CARD,Shop.example,,,0,1000\n"
+            "2026-04-02,transfer,FOO CARD,Shop.example,,,0,-300\n"  # 返金
+        )
+        r = c.aggregate_zaim_transfers(p, self.CFG, (date(2026, 3, 1), date(2027, 2, 28)))
+        self.assertEqual((r["usage_yen"], r["rows"]), (700, 2))
+
+    def test_unreadable_csv_is_unchecked(self):
+        r = c.aggregate_zaim_transfers(Path("/nonexistent.csv"), self.CFG, (date(2026, 3, 1), date(2027, 2, 28)))
+        self.assertFalse(r["checked"])
+
+    def _refresh(self, csv_path):
+        import json, os, tempfile
+        sd = Path(tempfile.mkdtemp())
+        idx = {"csv": str(csv_path), "updated_at": "x", "rows": {
+            "1": {"date": "2026-04-01", "amount": 500, "shop": "店", "item": "", "pay": "FOO CARD"}}}
+        (sd / "zaim_learn_csv_index.json").write_text(json.dumps(idx), encoding="utf-8")
+        old = os.environ.get("JARVIS_STATE_DIR")
+        os.environ["JARVIS_STATE_DIR"] = str(sd)
+        try:
+            cfg = {"cards": {"bonvoy": dict(CFG["cards"]["b"], **{"zaim_transfer_to_include": ["Shop.example"]})}}
+            st = {}
+            c.refresh_bonvoy(st, cfg, date(2026, 7, 1))
+            return st["bonvoy"]["zaim"], cfg
+        finally:
+            if old is None:
+                os.environ.pop("JARVIS_STATE_DIR")
+            else:
+                os.environ["JARVIS_STATE_DIR"] = old
+
+    def test_refresh_records_counts_and_warns_when_csv_missing(self):
+        z, _ = self._refresh(self._csv(
+            "2026-04-01,transfer,FOO CARD,Shop.example,,,0,1000\n"
+            "2026-04-02,transfer,FOO CARD,Other,,,0,300\n"))
+        self.assertEqual((z["usage_yen"], z["transfer_rows"], z["other_transfer_rows"]), (1500, 1, 1))
+        self.assertTrue(z["transfers_checked"])
+        z2, _ = self._refresh(Path("/nonexistent.csv"))
+        self.assertEqual(z2["usage_yen"], 500)  # 過少のままだが…
+        self.assertFalse(z2["transfers_checked"])  # …警告できる状態で持つ
+
+    def test_slack_lines_for_transfers_and_warning(self):
+        cfg = dict(CFG, zaim_stale_days=10)
+        cfg["cards"] = {**CFG["cards"], "b": dict(CFG["cards"]["b"], zaim_transfer_to_include=["Shop.example"])}
+        ok = {"bonvoy": {"zaim": {"usage_yen": 1, "as_of": "2026-06-28", "transfer_rows": 3,
+                                  "other_transfer_rows": 1, "transfers_checked": True}}}
+        txt = c.build_slack_text(c.compute(cfg, ok, date(2026, 7, 1)), header="H", dash_url="u")
+        self.assertIn("・Bは振替3件を含む概算", txt)
+        bad = {"bonvoy": {"zaim": {"usage_yen": 1, "as_of": "2026-06-28", "transfers_checked": False}}}
+        txt = c.build_slack_text(c.compute(cfg, bad, date(2026, 7, 1)), header="H", dash_url="u")
+        self.assertIn("・Bの振替は未加算（要再取込）", txt)
+        r = c.compute(cfg, ok, date(2026, 7, 1))["cards"][1]
+        self.assertIn("振替含む", r["usage_source"])
 
     def test_no_keyword_or_missing_file(self):
         period = (date(2026, 3, 1), date(2027, 2, 28))
