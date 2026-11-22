@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import re
@@ -59,6 +60,10 @@ TEIKI_GUIDE = "https://teikibarai.smbc-card.com/guide"
 SHOT_DIR = STATE_DIR / "teiki_barai_chance"
 # 券チェック頻度（券>0 なら is_due が即 True）
 DEFAULT_INTERVAL_DAYS = 3
+# サイトがメンテ画面（停止中）の間の確認間隔（D4・2026-11-23）。券>0 の再起動はしない。
+# 再開の検知はこの間隔の確認で行う。
+MAINTENANCE_INTERVAL_DAYS = 3
+RUN_LOCK_PATH = STATE_DIR / "teiki_barai_chance" / "run.lock"
 
 SKIP_DRAW_STATUSES = {
     "done",
@@ -105,6 +110,49 @@ def _parse_iso(s: str | None) -> datetime | None:
         return None
 
 
+_MAINT_RE = re.compile(r"メンテナンス")
+_STOP_RE = re.compile(r"一時的に停止|停止して(?:お)?り|サービス(?:を)?停止|ご利用いただけません")
+
+
+def detect_site_status(text: str) -> dict[str, Any]:
+    """画面本文からサイト状態を判定する（実行時に AI は呼ばない）。
+
+    maintenance: 『システムメンテナンスにより、サービスを一時的に停止しております』等
+    normal: それ以外（ログイン未完了・公開トップの判定は従来どおり別ロジック）
+    根拠: 11/23 の画面（再開時期『決まり次第』）。未知の文言は normal のまま＝従来どおり。
+    """
+    t = text or ""
+    if _MAINT_RE.search(t) and _STOP_RE.search(t):
+        note = ""
+        for line in t.splitlines():
+            line = line.strip()
+            if "再開" in line:
+                note = line[:120]
+                break
+        return {"site_status": "maintenance", "maintenance_note": note}
+    return {"site_status": "normal", "maintenance_note": ""}
+
+
+def acquire_run_lock(path: Path | None = None) -> Any:
+    """同時に1本だけ（CDP の port 9235 とプロファイルを共有するため）。
+
+    取れたら fd（呼び出し側が保持）、取れなければ None。flock なので落ちれば自動で外れる。
+    """
+    path = path or RUN_LOCK_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = open(path, "a+", encoding="utf-8")
+    try:
+        fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        fd.close()
+        return None
+    fd.seek(0)
+    fd.truncate()
+    fd.write(f"{os.getpid()} {now_iso()}\n")
+    fd.flush()
+    return fd
+
+
 def is_due(state: dict[str, Any], force: bool = False) -> tuple[bool, str]:
     if force:
         return True, "force"
@@ -114,9 +162,13 @@ def is_due(state: dict[str, Any], force: bool = False) -> tuple[bool, str]:
     last = _parse_iso(state.get("last_check_at"))
     if last is None:
         return True, "never_checked"
-    tickets = state.get("ticket_count")
-    if isinstance(tickets, int) and tickets > 0:
-        return True, "tickets_pending"
+    if state.get("site_status") == "maintenance":
+        # 停止中は前回値の券数を理由に起動しない。3日に1回の確認で再開を検知する。
+        interval = int(state.get("maintenance_interval_days") or MAINTENANCE_INTERVAL_DAYS)
+    else:
+        tickets = state.get("ticket_count")
+        if isinstance(tickets, int) and tickets > 0:
+            return True, "tickets_pending"
     elapsed = datetime.now(JST) - last
     if elapsed >= timedelta(days=interval):
         return True, f"interval_{interval}d"
@@ -437,6 +489,23 @@ def scrape_and_maybe_draw(
     *,
     do_draw: bool,
 ) -> dict[str, Any]:
+    # メンテ画面（停止中）なら規約同意などの操作をせず、停止中として返す
+    site = detect_site_status(_body(page, 5000))
+    if site["site_status"] == "maintenance":
+        _shot(page, "teiki_maintenance")
+        print(f"⚠️ テイチャン: サイトがメンテナンス停止中（{site['maintenance_note'] or '再開時期の記載なし'}）")
+        return {
+            "site_status": "maintenance",
+            "maintenance_note": site["maintenance_note"],
+            "enrolled": None,
+            "ticket_count": None,
+            "w_chance_tickets": None,
+            "service_count": None,
+            "page_url": page.url,
+            "draw": None,
+            "public_landing": False,
+            "login_incomplete": False,
+        }
     # 会員なら gift_info を正
     if "logout" in _body(page, 500).lower() or "ログアウト" in _body(page, 800):
         if "gift_info" not in page.url:
@@ -483,6 +552,7 @@ def scrape_and_maybe_draw(
         "draw": None,
         "public_landing": bool(counts.get("public_landing")),
         "login_incomplete": login_incomplete,
+        "site_status": "normal",
     }
     if login_incomplete:
         print("⚠️ テイチャン: ログイン未完了のため券数・規約状態は更新しない")
@@ -696,6 +766,22 @@ def apply_scrape_to_state(state: dict[str, Any], scrape: dict[str, Any]) -> None
         state["last_login_ok"] = False
         state["last_error"] = "login_incomplete"
         return
+    if scrape.get("site_status") == "maintenance":
+        # 停止中: 券数・規約は前回値のまま（古い）。停止の事実と最終確認日だけ記録する。
+        state["last_login_ok"] = True
+        state.pop("last_error", None)
+        if state.get("site_status") != "maintenance":
+            state["maintenance_since"] = now_iso()
+        state["site_status"] = "maintenance"
+        state["maintenance_note"] = scrape.get("maintenance_note") or ""
+        state["maintenance_last_seen_at"] = now_iso()
+        return
+    if state.get("site_status") == "maintenance":
+        # 再開を検知（通常画面に戻った）。通常の間隔・券数の起動に戻る。
+        state["maintenance_ended_at"] = now_iso()
+    for k in ("maintenance_since", "maintenance_note", "maintenance_last_seen_at"):
+        state.pop(k, None)
+    state["site_status"] = "normal"
     state["last_login_ok"] = True
     state.pop("last_error", None)
     if scrape.get("enrolled") in ("yes", "no", "unknown"):
@@ -703,6 +789,8 @@ def apply_scrape_to_state(state: dict[str, Any], scrape: dict[str, Any]) -> None
     for key in ("ticket_count", "w_chance_tickets", "service_count"):
         if scrape.get(key) is not None:
             state[key] = scrape[key]
+    if scrape.get("ticket_count") is not None:
+        state["ticket_count_confirmed_at"] = now_iso()
     draw = scrape.get("draw")
     if draw and draw.get("ok"):
         state["last_draw_at"] = draw.get("at") or now_iso()
@@ -734,6 +822,8 @@ def print_status(state: dict[str, Any], env: dict[str, str]) -> None:
                 "last_draw_at": state.get("last_draw_at"),
                 "last_draw": state.get("last_draw"),
                 "interval_days": state.get("interval_days"),
+                "site_status": state.get("site_status") or "normal",
+                "maintenance_since": state.get("maintenance_since"),
                 "actionables": actionables,
                 "services": [
                     {
@@ -805,7 +895,10 @@ def main() -> int:
     if not due and args.run and not args.force:
         print(f"📎 テイチャン: 間隔内のためスキップ（{reason}）。--force で実行可")
         print_status(state, env)
-        if want_slack:
+        if want_slack and state.get("site_status") == "maintenance":
+            # 停止中は3日に1回の確認の時だけ短報を出す（スキップは黙る・D4）
+            print("📎 slack: メンテナンス停止中のため間隔内スキップは投稿しない")
+        elif want_slack:
             print(
                 f"📎 slack: {push_slack_report(outcome='skipped', state=state, reason=reason)}"
             )
@@ -819,6 +912,11 @@ def main() -> int:
         print(format_report(actionables=actionables, scrape=None, state=state, drew=False))
         return 0
 
+    lock_fd = acquire_run_lock()
+    if lock_fd is None:
+        print("📎 テイチャン: 別の実行が進行中のため起動しない（排他）")
+        return 0
+    was_maintenance = state.get("site_status") == "maintenance"
     try:
         scrape = run_browser(do_draw=not args.skip_draw, headless=args.headless)
         apply_scrape_to_state(state, scrape)
@@ -849,6 +947,11 @@ def main() -> int:
         note = ""
         if actionables:
             note = f"Step1候補{len(actionables)}件"
+        if scrape.get("site_status") == "maintenance":
+            outcome = "maintenance"
+            note = ""
+        elif was_maintenance and not scrape.get("login_incomplete"):
+            note = "メンテナンス明けを検知（通常の間隔に戻します）" + (" · " + note if note else "")
         print(
             f"📎 slack: {push_slack_report(outcome=outcome, state=state, scrape=scrape, note=note)}"
         )

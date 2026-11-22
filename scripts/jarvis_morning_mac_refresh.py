@@ -510,14 +510,21 @@ def teiki_draw_needs_catchup() -> bool:
         return False
     if teiki.get("disabled") is True:
         return False
-    tickets = teiki.get("ticket_count")
-    if isinstance(tickets, int) and tickets > 0:
-        return True
-    w = teiki.get("w_chance_tickets")
-    if isinstance(w, int) and w > 0:
-        return True
+    maintenance = teiki.get("site_status") == "maintenance"
+    if not maintenance:
+        # メンテ停止中の券数は前回値で古い。停止中は券数を理由に毎朝起動しない（D4）
+        tickets = teiki.get("ticket_count")
+        if isinstance(tickets, int) and tickets > 0:
+            return True
+        w = teiki.get("w_chance_tickets")
+        if isinstance(w, int) and w > 0:
+            return True
     last_s = str(teiki.get("last_check_at") or "")
-    interval = int(teiki.get("interval_days") or 3)
+    interval = int(
+        (teiki.get("maintenance_interval_days") or 3)
+        if maintenance
+        else (teiki.get("interval_days") or 3)
+    )
     if not last_s:
         return True
     try:
