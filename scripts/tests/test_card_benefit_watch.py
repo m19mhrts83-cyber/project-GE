@@ -24,7 +24,7 @@ CFG = {
         "b": {
             "name": "カードB", "short": "B", "usage_source": "zaim_estimate",
             "period": {"type": "annual_from", "month": 3, "day": 1},
-            "zaim_pay_contains": "FOO CARD", "zaim_exclude_keywords": ["年会費"],
+            "zaim_pay_contains": "FOO CARD", "zaim_transfer_include_dest": ["SHOP"], "zaim_exclude_keywords": ["年会費"],
             "tiers": [
                 {"id": "t1", "label": "目標", "threshold_yen": 2_000_000,
                  "reward": "r", "threshold_status": "needs_check"},
@@ -99,6 +99,35 @@ class ZaimTests(unittest.TestCase):
         self.assertEqual(agg["usage_yen"], 1200)
         self.assertEqual(agg["rows"], 2)
         self.assertEqual(agg["as_of"], "2026-06-10")
+
+    def test_transfers_added_only_for_included_dest(self):
+        index = {"rows": {
+            "1": {"date": "2026-04-01", "amount": 1000, "shop": "店", "item": "", "pay": "FOO CARD"}},
+            "transfers": [
+                {"date": "2026-05-01", "amount": 300, "pay": "FOO CARD 本会員", "dest": "Shop.example"},
+                {"date": "2026-05-02", "amount": 400, "pay": "FOO CARD", "dest": "wallet"},       # 未算入
+                {"date": "2026-05-03", "amount": 900, "pay": "銀行", "dest": "FOO CARD"},        # 引落＝対象外
+                {"date": "2025-05-03", "amount": 50, "pay": "FOO CARD", "dest": "shop"},        # 期間外
+            ]}
+        period = c.period_for(CFG["cards"]["b"], date(2026, 7, 1))
+        agg = c.aggregate_zaim(index, CFG["cards"]["b"], period)
+        self.assertEqual(agg["usage_yen"], 1300)
+        self.assertEqual((agg["transfer_rows"], agg["other_transfer_rows"]), (1, 1))
+        self.assertTrue(agg["transfers_checked"])
+        self.assertEqual(agg["as_of"], "2026-05-01")
+
+    def test_no_transfers_key_means_unchecked(self):
+        index = {"rows": {"1": {"date": "2026-04-01", "amount": 10, "shop": "", "item": "", "pay": "FOO CARD"}}}
+        agg = c.aggregate_zaim(index, CFG["cards"]["b"], c.period_for(CFG["cards"]["b"], date(2026, 7, 1)))
+        self.assertFalse(agg["transfers_checked"])
+
+    def test_slack_shows_transfer_count_without_amount(self):
+        state = {"bonvoy": {"zaim": {"usage_yen": 1_500_000, "as_of": "2026-06-28",
+                                     "transfer_rows": 3, "other_transfer_rows": 1, "transfers_checked": True}}}
+        r = c.compute(dict(CFG, zaim_stale_days=10), state, date(2026, 7, 1))
+        text = c.build_slack_text(r, header="H", dash_url="u")
+        self.assertIn("Bは振替3件を含む概算", text)
+        self.assertNotIn("1,500,000", text)
 
     def test_estimate_kind_has_caveat(self):
         state = {"bonvoy": {"zaim": {"usage_yen": 100000, "as_of": "2026-06-10"}}}

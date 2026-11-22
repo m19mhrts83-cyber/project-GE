@@ -59,6 +59,9 @@ cards:
     usage_basis: estimate
     zaim_pay_contains: "MARRIOTT BONVOY"
     zaim_exclude_keywords: ["年会費"]
+    # Zaim で「アメックス→Amazon 口座」の振替になっている分は利用額として足す（Zaim 側の設定は変えない）。
+    # 他の振替（ウォレットへのチャージ等）は足さず、件数だけ報告する。銀行→カードの引落振替は支払元が銀行なので対象外
+    zaim_transfer_include_dest: ["Amazon"]
     counts_note: "家族カード分は基本カードに合算"
     grant_note: "特典の付与時期は未確認"
     tiers:
