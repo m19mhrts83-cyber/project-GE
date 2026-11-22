@@ -36,7 +36,7 @@ CFG = {
     "vpoint_exits": {"items": [
         {"label": "x", "status": "unconfirmed", "checked_on": "2026-01-01", "source": "s"},
         {"label": "投資", "status": "confirmed", "checked_on": "2026-01-01", "source": "s",
-         "featured": True, "note": "注記"},
+         "featured": True, "note": "注記", "extra_notes": ["追記"]},
     ]},
 }
 
@@ -153,6 +153,7 @@ class HistoryAndSlackTests(unittest.TestCase):
         items = c.build_vpoint_exits(CFG)["items"]
         self.assertEqual(items[0]["label"], "投資")  # featured が先頭
         self.assertTrue(items[0]["featured"])
+        self.assertEqual(items[0]["extra_notes"], ["追記"])
         self.assertEqual(items[1]["status_label"], "未確認")
 
     def test_slack_text_shape_and_mask(self):

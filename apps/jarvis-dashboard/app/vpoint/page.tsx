@@ -142,6 +142,7 @@ type ExitItem = {
   source?: string;
   featured?: boolean;
   note?: string | null;
+  extra_notes?: string[];
 };
 
 type CardBenefit = {
@@ -568,6 +569,11 @@ export default async function VpointPage() {
                     </strong>
                   </header>
                   {x.note ? <p className="sum">{x.note}</p> : null}
+                  {(x.extra_notes || []).map((n) => (
+                    <p className="sum" key={n}>
+                      ［未確認］ {n}
+                    </p>
+                  ))}
                   <p className="meta">
                     確認日 {x.checked_on || "—"} · 出どころ: {x.source || "—"}
                   </p>

@@ -421,6 +421,7 @@ def build_vpoint_exits(cfg: dict[str, Any]) -> dict[str, Any]:
                 "source": it.get("source"),
                 "featured": bool(it.get("featured")),
                 "note": it.get("note"),
+                "extra_notes": [str(n) for n in (it.get("extra_notes") or [])],
             }
         )
     items.sort(key=lambda x: not x["featured"])  # 先頭＝最優先（投資）。同順位は設定順
