@@ -309,6 +309,7 @@ def compute_card(
     )
     if usage["kind"] == "estimate":
         out["usage_caveat"] = str(cfg.get("zaim_note") or "概算")
+        out["usage_stale"] = (today - as_of).days > int(cfg.get("zaim_stale_days", 10))
     for t in c.get("tiers") or []:
         thr = int(t["threshold_yen"])
         remaining = max(thr - usage["usage_yen"], 0)
@@ -506,6 +507,12 @@ def build_slack_text(result: dict[str, Any], *, header: str, dash_url: str, mask
             f"   あと{fmt_man(t['remaining_yen'], mask)}・月{fmt_man(t['need_per_month_yen'], mask)}"
             f"必要→{t['verdict']}"
         )
+    # 概算元（Zaim）が古いときは必ず知らせる
+    stale = [c for c in result["cards"] if c.get("usage_stale")]
+    for c in stale:
+        d = c["usage_as_of"]
+        lines.append(f"・Zaim が古い（基準日{int(d[5:7])}/{int(d[8:])}）")
+        lines.append(f"  取込が進むまで{c['short']}は目安")
     # 条件の確からしさ（ここを省かない）
     weak = sorted(
         {

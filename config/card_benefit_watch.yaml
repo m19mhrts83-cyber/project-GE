@@ -18,6 +18,8 @@ pace:
 
 # Zaim 概算の注意（Bonvoy）
 zaim_note: "Zaim は取込日ベースの概算。アメックス画面の数字とずれる"
+# Zaim の基準日がこの日数より古いと「Zaim が古い」と短報・画面に出す
+zaim_stale_days: 10
 
 cards:
   olive:

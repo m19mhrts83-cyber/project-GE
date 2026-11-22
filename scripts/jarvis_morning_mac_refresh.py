@@ -90,6 +90,8 @@ ETC_REBATE_RUNNER = REPO / "launchd" / "etc_rebate_monthly_runner.sh"
 ETC_REBATE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_etc_rebate"
 VPOINT_MONTHLY_STATE = REPO / ".jarvis_state" / "vpoint_monthly.json"
 TEIKI_BARAI_STATE = REPO / ".jarvis_state" / "teiki_barai_chance.json"
+CARD_BENEFIT_RUNNER = REPO / "launchd" / "card_benefit_monthly_runner.sh"
+CARD_BENEFIT_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_card_benefit"
 VPOINT_ROUTINE_RUNNER = REPO / "launchd" / "vpoint_routine_runner.sh"
 VPOINT_ROUTINE_LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_vpoint_routine"
 TEIKI_DRAW_RUNNER = REPO / "launchd" / "teiki_draw_runner.sh"
@@ -453,6 +455,47 @@ def vpoint_routine_needs_catchup() -> bool:
     if data.get("disabled") is True:
         return False
     return data.get("last_check_c") != now.strftime("%Y-%m")
+
+
+def card_benefit_needs_catchup() -> bool:
+    """年間特典ウォッチ: 28日以降で今月まだ成功印なし（停止 JARVIS_CARD_BENEFIT_DISABLE=1）。"""
+    try:
+        import jarvis_card_benefit_monthly as cbm
+
+        return cbm.needs_catchup()
+    except Exception as e:  # noqa: BLE001
+        print(f"# card_benefit catchup check failed: {e}", file=sys.stderr)
+        return False
+
+
+def spawn_card_benefit_monthly(*, dry_run: bool) -> str:
+    if not CARD_BENEFIT_RUNNER.is_file():
+        print(f"# card_benefit: missing {CARD_BENEFIT_RUNNER}", file=sys.stderr)
+        return "missing"
+    if dry_run:
+        print("# dry-run: would spawn card_benefit_monthly_runner.sh", flush=True)
+        return "dry_run"
+    CARD_BENEFIT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    out = open(CARD_BENEFIT_LOG_DIR / "morning_catchup.out.log", "a", encoding="utf-8")
+    err = open(CARD_BENEFIT_LOG_DIR / "morning_catchup.err.log", "a", encoding="utf-8")
+    try:
+        out.write(f"\n# spawn {now_iso()}\n")
+        out.flush()
+        subprocess.Popen(
+            ["/bin/zsh", str(CARD_BENEFIT_RUNNER)],
+            cwd=str(REPO),
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
+        print("# card_benefit: spawned runner in background", flush=True)
+        return "spawned"
+    except Exception as e:
+        print(f"# card_benefit spawn failed: {e}", file=sys.stderr)
+        out.close()
+        err.close()
+        return "error"
 
 
 def teiki_draw_needs_catchup() -> bool:
@@ -1483,6 +1526,15 @@ def main() -> int:
     else:
         results["steps"]["vpoint_routine"] = "fresh"
         print("# vpoint_routine: skip (outside window C or already done)", flush=True)
+
+    # 8c2. 年間特典ウォッチ（毎月28日 09:50 の取りこぼし）
+    if card_benefit_needs_catchup():
+        results["steps"]["card_benefit_monthly"] = spawn_card_benefit_monthly(
+            dry_run=args.dry_run
+        )
+    else:
+        results["steps"]["card_benefit_monthly"] = "fresh"
+        print("# card_benefit: skip (before 28th, disabled, or already done)", flush=True)
 
     # 8d. テイチャン自動抽選（券残 or interval）
     if teiki_draw_needs_catchup():
