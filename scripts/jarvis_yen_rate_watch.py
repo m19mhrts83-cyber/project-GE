@@ -312,7 +312,7 @@ def render_chart(
 
     def _plot(ax, series: list[dict[str, Any]], title: str) -> None:
         if not series:
-            ax.set_title(f"{title}（データなし）")
+            ax.set_title(f"{title} (no data)")
             return
         xs = [datetime.fromisoformat(r["trade_date"]) for r in series]
         ys = [float(r["close"]) for r in series]
@@ -321,8 +321,8 @@ def render_chart(
         lo = min(ys)
         hi_i = ys.index(hi)
         lo_i = ys.index(lo)
-        ax.scatter([xs[hi_i]], [hi], color="#c0392b", zorder=5, label=f"高 {hi:.2f}")
-        ax.scatter([xs[lo_i]], [lo], color="#27ae60", zorder=5, label=f"安 {lo:.2f}")
+        ax.scatter([xs[hi_i]], [hi], color="#c0392b", zorder=5, label=f"High {hi:.2f}")
+        ax.scatter([xs[lo_i]], [lo], color="#27ae60", zorder=5, label=f"Low {lo:.2f}")
         ax.axhline(ys[-1], color="#888", linestyle="--", linewidth=0.8, alpha=0.7)
         ax.set_title(title)
         ax.legend(loc="best", fontsize=8)
