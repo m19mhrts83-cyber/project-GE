@@ -47,20 +47,23 @@ test('入力の検査', () => {
   assert.throws(() => feedbackRow('o1', { chat_id: 'c1', message_id: 'zz', rating: 'good', comment: '' }, messages), e => e.status === 404);
 });
 
-test('評価の一覧は「管理者」かつ「スイッチで見える人」だけ。会員のIDは返さない', async () => {
+test('評価の一覧は「管理者」かつ「スイッチで見える人」だけ。会員のIDは返さず、名前と会員番号を付ける', async () => {
   const origin2 = 'https://offline.example';
-  const users = { o1: { ...owner }, a1: { ...admin }, u1: { id: 'u1', email: 'owner2@example.test', role: 'user', status: 'approved', authVersion: '1' } };
+  const users = { o1: { ...owner }, a1: { ...admin }, u1: { id: 'u1', email: 'owner2@example.test', role: 'user', status: 'approved', authVersion: '1', name: '山田 花子', member_no: '1234' } };
   const tokens = new Map([['a'.repeat(64), 'o1'], ['b'.repeat(64), 'a1'], ['c'.repeat(64), 'u1']]);
   const handler = createRaimoAuthGateway({ origin: origin2, member: async id => users[id] || null,
     sessions: { get: async t => tokens.has(t) ? { uid: tokens.get(t), authVersion: '1', expires: Date.now() + 60000 } : null, put: async () => {}, delete: async () => {} },
     authenticate: async () => null, allowLogin: async () => true, chatOwner: async () => null, forward: async () => ({}), attachmentSession: async () => ({}),
     featureFlags: async () => [{ feature: 'answer_feedback', stage: 'owner', owner_ids: ['owner@example.test', 'owner2@example.test'] }],
-    listFeedback: async () => [{ user_id: 'secret-user', rating: 'bad', comment: 'c', question: 'q', answer: 'a', updated_at: 't' }] });
+    listFeedback: async () => [{ user_id: 'secret-user', rating: 'bad', comment: 'c', question: 'q', answer: 'a', updated_at: 't' }, { user_id: 'u1', rating: 'great', comment: '', question: 'q2', answer: 'a2', updated_at: 't2' }] });
   const post = t => handler(new Request('https://g.example/admin/answer-feedback/list', { method: 'POST', headers: { Origin: origin2, Authorization: 'Bearer ' + t }, body: '{}' }));
   const ok = await post('a'.repeat(64));
   assert.equal(ok.status, 200);
   const body = await ok.json();
-  assert.deepEqual(body, { feedback: [{ rating: 'bad', reasons: [], comment: 'c', question: 'q', answer: 'a', updated_at: 't', answer_mode: null, answer_tier: null, answer_model: null, answer_reused: null, sources: [] }], sources_top: [], source_clicks: 0 });
+  assert.deepEqual(body, { feedback: [
+    { member: null, rating: 'bad', reasons: [], comment: 'c', question: 'q', answer: 'a', updated_at: 't', answer_mode: null, answer_tier: null, answer_model: null, answer_reused: null, sources: [] },
+    { member: { name: '山田 花子', member_no: '1234' }, rating: 'great', reasons: [], comment: '', question: 'q2', answer: 'a2', updated_at: 't2', answer_mode: null, answer_tier: null, answer_model: null, answer_reused: null, sources: [] }], sources_top: [], source_clicks: 0 });
+  assert.ok(!JSON.stringify(body).includes('u1') && !JSON.stringify(body).includes('secret-user') && !JSON.stringify(body).includes('owner2@'));
   assert.equal((await post('b'.repeat(64))).status, 404); // 管理者でも名指しが無い
   assert.equal((await post('c'.repeat(64))).status, 403); // 名指しでも一般会員
 });
