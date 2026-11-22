@@ -770,6 +770,9 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 .ab-share i + i { transform-origin: right; }
 .is-in .ab-share i { transform: scaleX(1); }
 .ab-share span { color: #fff; font-size: .8rem; font-weight: 700; font-style: normal; white-space: nowrap; }
+.ab-share-labels { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .3rem 1rem; margin-top: .4rem; font-size: .9rem; color: #334155; }
+.ab-share-labels > span { display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap; }
+.ab-share-labels b { color: #1e293b; font-size: 1.05rem; }
 .ab-vs-readout { margin-top: .8rem; }
 .ab-pair { display: flex; align-items: stretch; gap: 2px; height: 7.5rem; border-bottom: 1px solid #cbd5e1; padding-bottom: 0; }
 .ab-pair-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 6px 6px 0 0; }
