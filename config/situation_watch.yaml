@@ -134,12 +134,12 @@ items:
       ルール: jarvis-line-export-reminder.mdc
 
   - id: westudy_weekly
-    title: WeStudyコメント日次CI
+    title: WeStudy取込CI
     category: ops
     enabled: true
     source: .jarvis_state/westudy_weekly_watch.json
     cursor_prompt: |
-      WeStudyコメント日次 GitHub Actions の結果を確認して。コメントは毎日、lesson説明は日曜週次。失敗ならログ要約と再実行案を。
+      WeStudy取込 GitHub Actions の結果を確認して。月〜土 朝8時=コメント＋新しい lesson、日曜 朝8時=全部取り直し、毎日14時=朝が失敗した時の予備。失敗ならログ要約と再実行案を。
       コマンド: scripts/jarvis_westudy_weekly_check.py
       ルール: jarvis-westudy-weekly-watch.mdc
 

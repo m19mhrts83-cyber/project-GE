@@ -70,9 +70,9 @@ usage() {
 必要な環境変数:
   WESTUDY_USER, WESTUDY_PASS
   CHATBOT_OUTPUT_ROOT（任意。未設定時は OneDrive 固定パス）
-  WESTUDY_SKIP_LESSONS=1（任意。コメントだけ取得し、lesson説明は週次まで維持）
+  WESTUDY_SKIP_LESSONS=1（任意。コメントだけ取得し、lesson説明は日曜の全部取り直しまで維持）
   WESTUDY_LESSON_MODE=new（任意。毎日の新着確認。目次だけ見て、まだ無い lesson の説明だけ取って足す。
-    既存 lesson の更新・削除は週次フルで拾う。動画の文字起こしは Mac の kamiooya_video_weekly.py が続けて行う）
+    既存 lesson の更新・削除は日曜の全部取り直しで拾う。動画の文字起こしは Mac の kamiooya_video_weekly.py が続けて行う）
   Supabase（任意・設定時は step2 実行）:
     SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY（推奨）
   Raimo（任意・設定時は step3 実行。RAIMO_* が正。LIMO_* も可）:
@@ -133,7 +133,7 @@ if [[ "$LESSON_MODE" == "new" ]]; then
 fi
 
 if [[ "$LESSON_MODE" == "skip" ]]; then
-  echo "==> step1b: 日次コメントモードのためlesson説明収集はスキップ（週次で更新）"
+  echo "==> step1b: コメントのみモードのためlesson説明収集はスキップ（日曜の全部取り直しで更新）"
 elif [[ -f "$LESSON_SCRAPER" && -f "$LESSON_DELTA_SCRIPT" ]]; then
   if [[ "$LESSON_MODE" == "new" ]]; then
     echo "==> step1b: WeStudy lesson 新着確認（目次だけ見て、新しい lesson の説明だけ取る）"

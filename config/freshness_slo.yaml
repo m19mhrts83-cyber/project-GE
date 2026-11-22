@@ -133,7 +133,7 @@ products:
     owner: 500 不動産パイプライン
     action: "gh run list -w kurashift-re-daily-inquiry.yml"
   - id: gha_westudy
-    label: WeStudy コメント日次取込
+    label: WeStudy 取込（毎朝コメント＋日曜全部取り直し）
     kind: gha
     workflow: westudy-raimo-weekly.yml
     max_age_h: 36
