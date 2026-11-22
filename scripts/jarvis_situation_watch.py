@@ -536,7 +536,18 @@ def eval_vpoint(meta: dict) -> dict[str, Any]:
             "interval_days": teiki.get("interval_days"),
             "href": "/vpoint#teiki-barai",
         }
+    # 614 年間特典ウォッチ（Olive／Bonvoy）。実額は .jarvis_state（gitignore）由来。失敗しても vpoint を止めない
+    card_benefit = None
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import jarvis_card_benefit_watch as _cbw
+
+        if _cbw.state_path().is_file():
+            card_benefit = _cbw.compute_from_files()
+    except Exception as e:  # noqa: BLE001
+        print(f"# card_benefit skipped: {e}", file=sys.stderr)
     payload: dict[str, Any] = {
+        "card_benefit": card_benefit,
         "grant_summary": grant or None,
         "grant_history": hist,
         "dashboard_ack_target_month": ack,

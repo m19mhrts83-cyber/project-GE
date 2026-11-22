@@ -12,11 +12,12 @@
 - ビルダー（組織図）: https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
 - 設計の流れ図: [`flow.md`](./flow.md)
-- Slack 短報正本: `scripts/jarvis_points_rebate_slack_report.py`（`--kind teiki|etc|vpoint`）
+- Slack 短報正本: `scripts/jarvis_points_rebate_slack_report.py`（`--kind teiki|etc|vpoint|card_benefit`）
 - 本線スクリプト:
   - テイチャン: `jarvis_teiki_barai_chance.py` ＋ `launchd/teiki_draw_runner.sh`
   - ETC還元: `jarvis_etc_rebate_fetch.py` ＋ 月次 launchd（20〜26日）
   - Vポイント定例: `jarvis_vpoint_routine.py`（窓C）
+  - 年間特典ウォッチ（Olive Infinite／Marriott Bonvoy の2枚だけ）: `jarvis_card_benefit_watch.py`（条件は `config/card_benefit_watch.yaml`、実額は `.jarvis_state/card_benefit_watch.json`）
 
 ## 設計ゲート（4点）
 
@@ -33,6 +34,7 @@
   1. テイチャン券確認・抽選 → `/vpoint` ＋ Slack
   2. ETC 平日朝夕の還元サマリ取得 → `/etc` ＋ Slack
   3. Vポイント定例（窓C）の要約 → `/vpoint` ＋ Slack
+  4. 年間特典ウォッチ（Olive Infinite／Marriott Bonvoy）: 達成率・月あたり必要額・届くペースか → `/vpoint#card-benefit` ＋ Slack 月次短報。**今月どちらに寄せるかの判断材料**（決めるのは松野さん）。過渡期なので2枚だけ（汎用化しない）
 - **やらないこと**
   - 年会費・二重課金ガード本体（**612**＝払う側）
   - Zaim 鮮度・費目（**613**）
@@ -112,3 +114,4 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_agent_team_statu
 | 2026-10-17 | **ポイント・還元ウォッチ**に改名・拡大。ETC／Vポイント定例も `#report` 相乗り。612（払う側）と分離 |
 | 2026-10-17 | ビルダー組織図に追加（共有 `uksxiDIzE1AEckKH`）。`flow.md` 素案を613型で充填 |
 | 2026-10-29 | Vポイント Slack の文面を人の言葉に: 「要Jarvis確認」→「手で確認する項目: N件（一覧は下のページ）」、「窓C定例」→「月末の定例チェック（25日〜末日）」（松野FB） |
+| 2026-11-23 | **年間特典ウォッチ**を追加（親: 600 ラコ #25）。Olive は Gmail 月次メール『各種特典条件達成状況』＝**確定値**、Bonvoy は Zaim 取込行＝**概算**（取込日ベースで画面とずれる）。条件の金額は `threshold_status`（確認済み／推定／要確認／未確認）を画面と Slack に必ず併記し、公式で確かめるまで「確認済み」にしない。`/vpoint` に年間特典・Olive 履歴（達成済み＝入会特典／これから＝継続特典）・Vポイントの出口（確認済み／注意／未確認。**Vポイント投資を先頭・大きめ**に出し「元本割れの可能性・判断は松野さん」を注記、その下にPay・請求額充当・景品）。Slack `--kind card_benefit`（dry-run まで。実投稿と launchd は松野さんの了承後。停止は `JARVIS_CARD_BENEFIT_SLACK_REPORT_DISABLE=1`）。実額入りの控えは公開リポの `reports/` でなく state 側 |

@@ -1,0 +1,121 @@
+# 614 年間特典ウォッチ — 条件の線（公式・松野さん確認ベース）。実額（利用額）はここに書かない。
+# 実額は .jarvis_state/card_benefit_watch.json（gitignore 済み）に置く。
+#
+# threshold_status（画面にそのまま出す）:
+#   confirmed  = 公式で確認済み
+#   estimated  = 公式ページの読み取りに難があり推定（要目視）
+#   needs_check = 公式ページの検索要約ベース（要確認）
+#   unknown    = 未確認
+# 記憶・推測で埋めない。確認できたら status を confirmed に上げ、source_note を直す。
+
+version: 1
+
+# 「届くペースか」の判定。必要な月額 ÷ 直近までの月ペース
+#   <= reach_ratio  -> 届く / <= tight_ratio -> 厳しい / それ超 -> 届かない見込み
+pace:
+  reach_ratio: 1.0
+  tight_ratio: 1.5
+
+# Zaim 概算の注意（Bonvoy）
+zaim_note: "Zaim は取込日ベースの概算。アメックス画面の数字とずれる"
+
+cards:
+  olive:
+    name: "Olive Infinite"
+    short: "Olive"
+    period:
+      type: fixed
+      start: "2026-06-01"
+      end: "2027-06-30"
+    usage_source: gmail_monthly      # 三井住友カードの月次メール『各種特典条件達成状況』
+    usage_basis: confirmed           # メール値は確定値（売上到着ベース）
+    counts_note: "デビット+クレジット合算。ポイント払い・年会費・つみたて投資・電子マネー等のチャージは対象外"
+    grant_note: "付与は集計期間終了後の翌月末ごろ"
+    tiers:
+      - id: tier1
+        label: "継続特典（下の段）"
+        threshold_yen: 4000000
+        reward: "40,000pt"
+        threshold_status: estimated
+        source_note: "公式ページ『400万円で40,000pt』と読めるが文字化けのため推定・要目視"
+      - id: tier2
+        label: "継続特典（上の段）"
+        threshold_yen: 7000000
+        reward: "110,000pt"
+        threshold_status: estimated
+        source_note: "公式ページ『700万円で110,000pt』と読めるが文字化けのため推定・要目視"
+
+  bonvoy:
+    name: "Marriott Bonvoy アメックス・プレミアム"
+    short: "Bonvoy"
+    period:
+      type: annual_from              # 毎年 month/day 起点の1年（松野さん確認）
+      month: 3
+      day: 1
+    usage_source: zaim_estimate
+    usage_basis: estimate
+    zaim_pay_contains: "MARRIOTT BONVOY"
+    zaim_exclude_keywords: ["年会費"]
+    counts_note: "家族カード分は基本カードに合算"
+    grant_note: "特典の付与時期は未確認"
+    tiers:
+      - id: free_night
+        label: "無料宿泊（最大75,000pt分）"
+        threshold_yen: 4000000
+        reward: "無料宿泊"
+        threshold_status: needs_check
+        source_note: "公式ページの検索要約ベース（要確認）"
+      - id: platinum
+        label: "プラチナエリート"
+        threshold_yen: 5000000
+        reward: "プラチナエリート"
+        threshold_status: needs_check
+        source_note: "公式ページの検索要約ベース（要確認）"
+
+# Olive の履歴欄。実際に進呈された記録（pt・日付）は state の olive.grants に置く（ここには書かない）。
+# ここは「継続特典」のこれから側の線（公式の仕組み）だけ。
+olive_history:
+  continuous:
+    label: "継続特典"
+    period_start: "2026-06-01"
+    period_end: "2027-06-30"
+    grant_timing: "集計期間終了後の翌月末ごろ（2027年7月末ごろ）"
+
+# 『Vポイントの出口』欄。status: confirmed=確認済み / notice=注意 / unconfirmed=未確認
+# checked_on は確認した日、source は出どころ。公式で確認できないものは unconfirmed のまま。
+vpoint_exits:
+  official_sources:
+    - "https://www.smbc-card.com/mem/wp/about_vp.jsp?id=use"
+    - "https://www.smbc.co.jp/kojin/olive-account/guide/vpoint-use/"
+  items:
+    # 最優先で見せる出口（松野さん指示 2026-11-23）。ほかの出口はその下に並べる
+    - label: "Vポイント投資（SBI証券の投信・国内株現物。1pt=1円、100pt以上。外国株・債券は不可）"
+      status: confirmed
+      checked_on: "2026-11-23"
+      source: "三井住友カード公式／三井住友銀行 Olive 公式（Vポイントの使い方）"
+      featured: true
+      note: "投資は元本割れの可能性があります。判断は松野さん"
+    - label: "VポイントPayアプリ（Visaタッチ・iD加盟店で 1pt=1円）"
+      status: confirmed
+      checked_on: "2026-11-23"
+      source: "三井住友カード公式（Vポイントの使い方）"
+    - label: "カード請求額への充当・キャッシュバック"
+      status: confirmed
+      checked_on: "2026-11-23"
+      source: "三井住友カード公式（Vポイントの使い方）"
+    - label: "景品交換（交換後の取消不可）"
+      status: confirmed
+      checked_on: "2026-11-23"
+      source: "三井住友カード公式（Vポイントの使い方）"
+    - label: "Olive の『ポイント払いモード』の利用は年間利用額の集計対象外（継続特典の達成に数えない）"
+      status: notice
+      checked_on: "2026-11-23"
+      source: "三井住友カード『各種特典条件達成状況』メール／公式"
+    - label: "マイル・Marriott Bonvoy への交換"
+      status: unconfirmed
+      checked_on: "2026-11-23"
+      source: "公式の上記2ページで確認できなかった"
+    - label: "旅行での使い道"
+      status: unconfirmed
+      checked_on: "2026-11-23"
+      source: "公式の上記2ページで確認できなかった"
