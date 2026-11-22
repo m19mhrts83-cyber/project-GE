@@ -10,7 +10,8 @@
 - Todoist への書き込みは【318】コメントの追記だけ（jarvis_todoist_318_comment.py・--write-comments の時だけ・既定オフ）
 - Slack・/313/bulk・週次へは --send-slack／--publish の時だけ（既定は案の保存）
 - 起動は手動。定時（--trigger schedule）は朝枠の担当が 318 の時だけ動く（jarvis_todoist_morning_slot.py）。launchd は未登録
-- ① の自律実行はしない（やる予定の内容を planned_action に記録するだけ）
+- ① の自律実行は --execute-auto の時だけ（jarvis_todoist_318_work.py。材料出し → Claude Code → 取り込み。調査・資料確認・文面下書きまで）
+  付けない時は「やる予定の内容」を planned_action に記録するだけ
 - 1 回 最大 60 分・処理 5 件
 
 使い方（Mac）:
@@ -54,12 +55,13 @@ import jarvis_todoist_313_judgment as jd313  # noqa: E402  （指紋照合を再
 import jarvis_todoist_318_handoff as ho  # noqa: E402  （Phase 2: /313/bulk・週次・通知の部品）
 import jarvis_todoist_318_comment as cm  # noqa: E402  （Phase 3 準備: 【318】コメント。--write-comments の時だけ）
 import jarvis_todoist_morning_slot as ms  # noqa: E402  （Phase 3 準備: 10:30 の朝枠を 313 0.5 と取り合わない）
+import jarvis_todoist_318_work as wk  # noqa: E402  （①自律実行 2-1・2-2。--execute-auto の時だけ）
 from jarvis_todoist_mark import AI_MARK, REQUESTED_MARK, strip_mark  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
 AGENT_ID = "318"
 AGENT_ROLE = "Todoist消化"
-PHASE = "phase3-prep"
+PHASE = "phase3-auto"
 HOLD_AFTER_DEFER_DAYS = 14  # /313/bulk で「残す」を選んだら、この日数たってから再評価（cleanup_bulk の HOLD_DAYS と同じ）
 MAX_TASKS = 5
 MAX_MINUTES = 60
@@ -214,6 +216,14 @@ class Paths:
     @property
     def judgments_313(self) -> Path:
         return self.state_dir / "todoist_313_judgments.json"
+
+    @property
+    def work(self) -> Path:
+        return self.root / "work"  # ①自律実行の材料・成果物（git 管理外）
+
+    @property
+    def work_packet(self) -> Path:
+        return self.work / "packet.json"
 
     @property
     def agent_locks(self) -> Path:
@@ -612,6 +622,10 @@ def recheck_on_for(answer: dict[str, str], t: dict, today: date) -> str:
 HINT_KEYS = {"note_count"}  # 読み方の手がかり。変化の判定には使わない（317 の受領の返しでも増えるため）
 
 
+def _snap_id(snap: dict[str, str]) -> str:
+    return _h(*[snap[k] for k in sorted(snap) if k not in HINT_KEYS])
+
+
 def detect_change(task_id: str, snap: dict[str, str], basis: Basis) -> tuple[str, list[str]]:
     prev = ((basis.history.get("tasks") or {}).get(task_id) or {}).get("snapshot")
     if not prev:
@@ -739,6 +753,8 @@ class RunOptions:
     writer_factory: Callable[[str], Any] | None = None  # token -> コメントの書き口（テストで差し替え）
     trigger: str = "manual"  # manual／schedule（schedule は朝枠の担当が 318 の時だけ動く）
     t313_path: Path | None = None  # 313 0.5 の作業ファイル（既定 /tmp/t313_pending.json。テストで差し替え）
+    execute_auto: bool = False  # ①自律実行（2-1・2-2）。既定オフ。材料出しと結果の取り込みだけ（AI は Claude Code が回す）
+    work_results: list[dict[str, Any]] | None = None  # Claude Code が書いた work/results.json の results
 
 
 def new_run_id(now: datetime) -> str:
@@ -756,6 +772,11 @@ def build_report_draft(run: dict[str, Any]) -> str:
         f"仕分け ①{c['cat1']} ②{c['cat2']} ③{c['cat3']}（大規模 {c['large']}）／回答取込 {c['answered']}件",
         f"/313/bulk 待ち {c['queued']}件（313で質問中 {c['asked_313']}）／週次へ {c['handoff']}件",
     ]
+    if (run.get("flags") or {}).get("execute_auto"):
+        lines.append(
+            f"①自律 着手 {c.get('work_started', 0)}／やり切り {c.get('work_done', 0)}・途中 {c.get('work_partial', 0)}"
+            f"／②へ {c.get('work_to2', 0)}・③へ {c.get('work_to3', 0)}・週次へ {c.get('work_weekly', 0)}"
+        )
     cmt = run.get("comments") or {}
     if cmt.get("enabled"):
         lines.append(
@@ -786,6 +807,14 @@ def _empty_counts() -> dict[str, int]:
         "queued": 0,
         "asked_313": 0,
         "handoff": 0,
+        "work_started": 0,
+        "work_held": 0,
+        "work_done": 0,
+        "work_partial": 0,
+        "work_to2": 0,
+        "work_to3": 0,
+        "work_weekly": 0,
+        "work_discarded": 0,
     }
 
 
@@ -822,6 +851,7 @@ def execute(
             "publish": opts.publish and not opts.dry_run,
             "send_slack": opts.send_slack and not opts.dry_run,
             "write_comments": opts.write_comments and not opts.dry_run,
+            "execute_auto": opts.execute_auto,  # dry-run でも材料出し・確認までは動く（成果物は作らない）
         },
     }
     lock_taken = False
@@ -878,6 +908,18 @@ def execute(
             except Exception as e:  # noqa: BLE001
                 raise SafeStop("owner_answers_unreadable", f"本人回答が読めない（{type(e).__name__}）。回答なしとは扱わない") from e
             run["basis"]["owner_answers"] = len(basis.owner_answers)
+        # ①自律実行の準備: 作業範囲（work_scope）と前回の材料。読めなければ ① は始めない（分類・ほかの処理は続ける）
+        scope: dict[str, Any] | None = None
+        old_packet: list[dict[str, Any]] = []
+        new_items: list[dict[str, Any]] = []
+        if opts.execute_auto:
+            try:
+                scope = wk.load_scope(criteria_path)
+                old_packet = wk.read_packet(paths.work_packet)["items"]
+                run["basis"]["work_scope"] = scope["decision_id"]
+            except Exception as e:  # noqa: BLE001
+                scope = None
+                run["errors"].append({"where": "work_scope", "error": f"①自律実行の範囲・材料が読めない（{e}）。今回は始めない"})
 
         today = started.date()
         try:
@@ -946,7 +988,7 @@ def execute(
                 t, comments, children, owner_answer_sig(tid, basis),
                 comments_hash=str((prev or {}).get("comments") or "") if comments is None else "",
             )
-            snap_id = _h(*[snap[k] for k in sorted(snap) if k not in HINT_KEYS])
+            snap_id = _snap_id(snap)
             status, changed = detect_change(tid, snap, basis)
             row = hist_tasks.get(tid) or {}
             if status == "changed" and "owner_answer" in changed and basis.owner_answers.get(tid):
@@ -991,6 +1033,28 @@ def execute(
             cls = classify(t, basis.rules)
             cls = apply_ai_answer(cls, (opts.ai_answers or {}).get(tid), snap_id)
             cls.pop("blocked_by_adopted_2", None)
+            work_decision = ""
+            if scope is not None and cls["category"] == "1":
+                # 2-2 始める前の確認（停止スイッチ・時間上限・承認待ち・承認が要る語・本人操作・大規模）
+                elapsed = (clock() - t0) / 60.0
+                stop_now = stop_switch_on(paths, env) or (f"時間上限 {opts.max_minutes} 分" if elapsed >= opts.max_minutes else "")
+                if not stop_now and run["counts"]["work_started"] >= opts.max_tasks:
+                    stop_now = f"着手は 1 回 {opts.max_tasks} 件まで"
+                text = clean_title(t) + " " + URL_RE.sub(" ", str(t.get("description") or ""))
+                work_decision, work_why = wk.precheck(
+                    text, scope=scope, large=bool(cls.get("large")),
+                    owner_op_hit=any(r.category == "3" and rule_hits(r, t) for r in basis.rules),
+                    approval_wait=_approval_waiting(row, basis.owner_answers.get(tid)),
+                    stop_reason=stop_now,
+                )
+                if work_decision in ("to2", "to3"):
+                    cls = {**cls, "category": work_decision[-1], "moved_from": "1", "reason": work_why}
+                    run["counts"][f"work_{work_decision}"] += 1
+                elif work_decision == "weekly":
+                    run["counts"]["work_weekly"] += 1
+                elif work_decision == "hold":
+                    run["counts"]["work_held"] += 1
+                entry["work"] = {"decision": work_decision, "why": work_why}
             entry.update(cls)
             entry["proposal"] = PROPOSAL_TEXT[cls["category"]]
             if cls.get("large"):
@@ -1010,6 +1074,24 @@ def execute(
                 last_large=bool(cls.get("large")),
                 recheck_on="",
             )
+            if work_decision == "weekly":
+                hist_tasks[tid]["work_318"] = {"state": "weekly", "at": started.isoformat(timespec="seconds"), "run_id": run_id}
+            if work_decision == "start":
+                # 2-1 の材料を出す（作業そのものはこの実行の Claude Code が行い、--work-results で取り込む）
+                try:
+                    cs = comments if comments is not None else paginate(reader, f"/comments?task_id={urllib.parse.quote(tid)}", limit=100)
+                except Exception as e:  # noqa: BLE001
+                    cs = None
+                    entry["work"].update(decision="hold", why=f"材料のコメントが読めない（{type(e).__name__}）。今回は着手しない")
+                    run["counts"]["work_held"] += 1
+                if cs is not None:
+                    wid = wk.new_work_id(started)
+                    new_items.append(wk.packet_item(t, cs, snap_id, entry["planned_action"], scope, work_id=wid, run_id=run_id, now=started))
+                    entry["work"].update(state="awaiting_ai", work_id=wid)
+                    entry["proposal"] = "①自律実行: 作業の材料を出した（この実行の Claude Code の結果待ち・調査／資料確認／文面下書きまで。Todoist は閉じない）"
+                    run["counts"]["work_started"] += 1
+                    hist_tasks[tid]["work_318"] = {"state": "awaiting_ai", "work_id": wid, "snapshot_id": snap_id,
+                                                   "at": started.isoformat(timespec="seconds"), "run_id": run_id}
             if opts.emit_packet:
                 if comments is None:
                     try:
@@ -1019,10 +1101,14 @@ def execute(
                 packet.append(_packet_row(t, comments, snap_id, cls))
 
         active_by_id = {str(t.get("id")): t for t in active}
+        if scope is not None:
+            _run_work(run, paths, opts, env, reader, basis, hist_tasks, active_by_id, children, scope,
+                      old_packet, new_items, started, lambda: (clock() - t0) / 60.0)
         _route_and_notify(run, paths, opts, hist_tasks, active_by_id, started)
         # 【318】コメントの下書き（変化があって分類した件だけ）。書くのは内部ログを保存した後・--write-comments の時だけ
+        # ① の作業を始めた件（結果待ち）は、結果を取り込んだ回にだけコメントする
         for e in run["tasks"]:
-            if e.get("category"):
+            if e.get("category") and e.get("status") != "work_result" and (e.get("work") or {}).get("state") != "awaiting_ai":
                 e["comment_draft"] = cm.format_comment(e, run_id, published=bool(run.get("published")))
         run["result"] = "partial" if run["errors"] else "success"
     except SafeStop as s:
@@ -1089,6 +1175,89 @@ def execute(
         if slot_taken:
             ms.release(paths.state_dir, run_id)
     return run
+
+
+def _approval_waiting(row: dict[str, Any], answer: dict[str, Any] | None) -> bool:
+    """②へ移した件（承認待ち）か。本人の回答がその後に来ていれば待ちは解けている。"""
+    w = (row or {}).get("work_318") or {}
+    if w.get("state") != "approval_wait":
+        return False
+    if not answer:
+        return True
+    try:
+        return datetime.fromisoformat(str(answer.get("decided_at") or "").replace("Z", "+00:00")) <= datetime.fromisoformat(str(w.get("at")))
+    except ValueError:
+        return True  # 比べられない時は待ちのまま（自動で再実行しない側）
+
+
+def _run_work(
+    run: dict[str, Any], paths: Paths, opts: RunOptions, env: dict[str, str], reader: Reader, basis: Basis,
+    hist_tasks: dict[str, Any], active_by_id: dict[str, dict], children: dict[str, list[str]], scope: dict[str, Any],
+    old_packet: list[dict[str, Any]], new_items: list[dict[str, Any]], started: datetime, elapsed_min: Callable[[], float],
+) -> None:
+    """2-1 の結果の取り込み（2-2 の確認つき）と、材料（packet）の書き出し。Todoist には触らない。"""
+    run_id = run["run_id"]
+    at = started.isoformat(timespec="seconds")
+    resolved: set[str] = set()  # dry-run では材料から外さない（本実行で取り込めるように）
+    work_log: dict[str, Any] = {"packet_in": len(old_packet), "results_in": len(opts.work_results or [])}
+
+    def current_snap(tid: str) -> str | None:
+        t = active_by_id.get(tid)
+        if not t:
+            return None
+        cs = paginate(reader, f"/comments?task_id={urllib.parse.quote(tid)}", limit=100)
+        return _snap_id(snapshot(t, cs, children, owner_answer_sig(tid, basis)))
+
+    def stop_check() -> str:
+        why = stop_switch_on(paths, env)
+        if why:
+            return f"停止スイッチ（{why}）"
+        return f"時間上限 {opts.max_minutes} 分" if elapsed_min() >= opts.max_minutes else ""
+
+    if opts.work_results:
+        outs, stopped = wk.import_results(
+            opts.work_results, old_packet, scope=scope, current_snap=current_snap, work_dir=paths.work,
+            run_id=run_id, now=started, dry_run=opts.dry_run, stop_check=stop_check,
+        )
+        if stopped:
+            work_log["stopped"] = stopped + "。残りの結果は取り込まず材料に残した（中断点）"
+            run["stop_reason"] = run.get("stop_reason") or work_log["stopped"]
+        for r in outs:
+            tid, oc = r.get("task_id", ""), r.get("outcome")
+            if oc in ("done", "partial", "to2", "to3", "discarded", "invalid") and not opts.dry_run:
+                resolved.add(str(r.get("work_id")))
+            if oc in ("invalid", "unverified", "save_failed"):
+                run["errors"].append({"task_id": tid, "where": "work_import", "error": r.get("reason")})
+            if oc == "discarded":
+                run["counts"]["work_discarded"] += 1
+            if oc not in ("done", "partial", "to2", "to3"):
+                continue
+            run["counts"]["work_" + oc] += 1
+            row = hist_tasks.setdefault(tid, {})
+            w = {"state": oc, "work_id": r.get("work_id"), "at": at, "run_id": run_id, "summary": r.get("summary", "")[:200]}
+            if oc in ("done", "partial"):
+                w.update(remaining=r.get("remaining", "")[:200], artifacts=r.get("artifact_names") or [], saved_dir=r.get("saved_dir"))
+                cat = "1"
+            elif oc == "to2":
+                w.update(state="approval_wait", operations=r.get("operations") or [])
+                row.update(last_category="2", queue_state="pending", last_reason=str(r.get("reason") or "")[:200])
+                cat = "2"
+            else:
+                row.update(last_category="3", queue_state=None, last_reason=str(r.get("reason") or "")[:200])
+                cat = "3"
+            row["work_318"] = w
+            run["tasks"].append({
+                "task_id": tid, "status": "work_result", "category": cat, "work": r,
+                "processed_at": at, "comment_draft": wk.format_work_comment(r, run_id, cm.PREFIX, cm.ID_LABEL),
+            })
+        work_log["results"] = outs
+    merged = wk.merge_packet(old_packet, new_items, resolved=resolved, active_ids=set(active_by_id), now=started)
+    try:
+        atomic_write_json(paths.work_packet, {"run_id": run_id, "note": wk.PACKET_NOTE, "items": merged})
+        work_log["packet_out"] = len(merged)
+    except Exception as e:  # noqa: BLE001
+        run["errors"].append({"where": "work_packet", "error": f"作業の材料を保存できない（{type(e).__name__}）"})
+    run["work"] = work_log
 
 
 def _run_comments(
@@ -1238,6 +1407,19 @@ def cmd_run(args: argparse.Namespace) -> int:
         except Exception as e:  # noqa: BLE001
             print(f"❌ AI回答ファイルが読めない（{type(e).__name__}）", file=sys.stderr)
             return 2
+    work_results = None
+    if args.work_results:
+        if not args.execute_auto:
+            print("❌ --work-results は --execute-auto と一緒に使う", file=sys.stderr)
+            return 2
+        try:
+            wr = json.loads(Path(args.work_results).read_text(encoding="utf-8"))
+            work_results = wr.get("results") if isinstance(wr, dict) else wr
+            if not isinstance(work_results, list):
+                raise ValueError("results が無い")
+        except Exception as e:  # noqa: BLE001
+            print(f"❌ 作業の結果ファイルが読めない（{type(e).__name__}）", file=sys.stderr)
+            return 2
     opts = RunOptions(
         dry_run=args.dry_run,
         max_tasks=max(1, min(args.max_tasks, MAX_TASKS)),
@@ -1251,6 +1433,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         sb=_default_sb(),
         write_comments=args.write_comments,
         trigger=args.trigger,
+        execute_auto=args.execute_auto,
+        work_results=work_results,
     )
     run = execute(paths, Path(args.criteria), dict(os.environ), TodoistReader, opts)
     print(run["report_draft"])
@@ -1310,6 +1494,9 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--send-slack", action="store_true", help="#consult 通知と #ai-hub 報告を送る（既定オフ。--publish が無いと #consult は送らない）")
     r.add_argument("--write-comments", action="store_true",
                    help="変化があって分類した件に【318】コメントを追記する（既定オフ。内部ログ保存の後・重複確認つき）")
+    r.add_argument("--execute-auto", action="store_true",
+                   help="①自律実行（既定オフ）: ① の件を実行前確認に通し、作業の材料を work/packet.json に出す。結果は --work-results で取り込む")
+    r.add_argument("--work-results", default=None, help="Claude Code が書いた作業の結果（work/results.json）。--execute-auto と一緒に")
     r.add_argument("--trigger", choices=["manual", "schedule"], default="manual",
                    help="schedule は launchd の定時起動用（朝枠の担当が 318 の時だけ動く）")
     r.set_defaults(func=cmd_run)

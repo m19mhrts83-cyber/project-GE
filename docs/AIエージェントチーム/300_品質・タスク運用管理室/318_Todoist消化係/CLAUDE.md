@@ -4,7 +4,8 @@
 
 Todoist の未完了タスクを優先順に拾い、前回から変わっていない件は飛ばし、①AIのみ／②松野さんの判断／③本人操作に仕分ける。
 ② は `/313/bulk` で判断してもらい（本人回答は翌回に読み戻して再判定）、③ は 312「今週の9件」へ渡す（Phase 2・**載せる／送るはフラグを付けた時だけ**）。
-Phase 3 準備として【318】コメント（`--write-comments`）と 10:30 の定時（未登録の雛形・313 0.5 との排他）を用意した。① の自律実行はまだ作らない（やる予定の内容を記録するだけ）。
+Phase 3 準備として【318】コメント（`--write-comments`）と 10:30 の定時（未登録の雛形・313 0.5 との排他）を用意した。
+① の自律実行（ノード2-1・2-2）は `--execute-auto` の時だけ。範囲は調査・資料確認・文面下書きまでで、成果物は内部（`work/`）に保存する。
 **有効にするかは松野さんが決める**（[`PROGRESS.md`](./PROGRESS.md) の先頭の表）。
 
 - 状態: **設計中**（registry の status は変えない。昇格は松野さんの了承後）
@@ -37,11 +38,17 @@ Phase 3 準備として【318】コメント（`--write-comments`）と 10:30 �
     - 送る前に「送信中」を判断履歴（`comment_318`）へ保存。応答不明は照合待ち → 次の回に処理ID を探してから（見つからなければ同じ処理ID で）再送。4xx は 3 回まで
     - 317 の除外（【318】を処理しない）を毎回確かめ、外れていたら書かない。1 回 5 件まで
   - 朝枠（10:30）の排他: `.jarvis_state/todoist_morning_owner.json`（無ければ担当 313）と朝枠ロック。`--trigger schedule` は担当が 318 の時だけ動き、313 の作業跡（`/tmp/t313_pending.json` 90 分以内）があれば始めない
-  - ① は実行しない。`planned_action`（executed=false・やる予定の内容・上限）を内部ログに残す。AI 見直しの回答に `plan` を書けばそれを使う
+  - `--execute-auto` が無い時、① は実行しない。`planned_action`（executed=false・やる予定の内容・上限）を内部ログに残す。AI 見直しの回答に `plan` を書けばそれを使う
+- **やること（①自律実行・既定はオフ。`--execute-auto` の時だけ）**
+  - 作業範囲は `config/todoist_318_criteria.yaml` の `work_scope`（decision_id 付き）: 調査・資料確認・文面下書き。読めなければ始めない
+  - 回し方（追加の有料 AI API なし）: `run --execute-auto` → `work/packet.json`（材料）→ この実行の Claude Code が作業して `work/results.json` → `run --execute-auto --work-results …` で取り込み
+  - 2-2 始める前: 停止スイッチ・時間上限・1回5件なら着手しない／承認待ちは本人の回答まで再実行しない／承認が要る語は②・本人操作は③・大規模は週次へ
+  - 2-2 取り込む直前: 範囲外の操作の申告・承認が要る操作の申告は②（成果物は取り込まない）、本人操作は③。内容が変わった・3日より古い・材料に無い結果は使わない。停止スイッチ・時間上限なら残りは材料に残す
+  - 成果物は `work/<task_id>/<run_id>/`（＋`progress.json`）。進捗・残作業は判断履歴 `work_318`。Todoist は閉じない。コメントは取り込んだ回だけ（`--write-comments`）
 - **やらないこと（Phase 1）**
   - Todoist への書き込み一切（完了・削除・期限変更は今後も作らない。コメントは Phase 3 準備で `--write-comments` の時だけ）
   - Slack 送信（#consult・#ai-hub とも「案」の保存だけ）、`/313/bulk` への登録
-  - ① の自律実行、他エージェントへの新規依頼
+  - ① の自律実行（`--execute-auto` の時だけ。コード修正・テスト・PR 作成は将来）、他エージェントへの新規依頼
   - 定期起動の登録（10:30 の launchd・GHA・cloud 予定タスク）、313 の起動設定の変更（313 の 0.5 はそのまま動かす。松野さん了承済み）。雛形と手順はあるが登録・移管は松野さんが決めてから
   - 外部送信・削除・支払い・契約・マージ・デプロイ
 
@@ -76,6 +83,8 @@ $PY scripts/jarvis_todoist_318_triage.py run                # 履歴も更新（
 $PY scripts/jarvis_todoist_318_triage.py run --publish      # ②③を /313/bulk・週次へ載せる（Supabase sync_meta に書く。松野さん了承後）
 $PY scripts/jarvis_todoist_318_triage.py run --publish --send-slack  # ＋#consult 通知・#ai-hub 報告（松野さん了承後）
 $PY scripts/jarvis_todoist_318_triage.py run --write-comments   # ＋変化のあった件に【318】コメント（松野さん了承後）
+$PY scripts/jarvis_todoist_318_triage.py run --execute-auto      # ①: 作業の材料を work/packet.json に出す（松野さん了承後）
+$PY scripts/jarvis_todoist_318_triage.py run --execute-auto --work-results .jarvis_state/todoist_318/work/results.json  # ①: Claude Code の結果を取り込む
 $PY scripts/jarvis_todoist_318_triage.py run --trigger schedule  # 定時用（朝枠の担当が 318 の時だけ動く。launchd の runner が使う）
 $PY scripts/jarvis_todoist_morning_slot.py status            # 朝枠の担当・ロック・313 の作業跡
 $PY scripts/jarvis_todoist_318_triage.py status             # ロック・停止スイッチ・直近の報告案
@@ -113,4 +122,5 @@ touch .jarvis_state/todoist_318/STOP                         # 停止スイッ�
 | 2026-11-22 | FlowForge でフロー設計（たたき台→承認済み 15 ノード） |
 | 2026-11-23 | Phase 1 実装（読むだけ・抽出・変化なし除外・3分類・内部ログ・手動実行）。社員フォルダ作成。313 の順位付けの部分一致・同点集中・読取の取りこぼしを直して再利用 |
 | 2026-11-23 | Phase 2 実装（②→/313/bulk・③→今週の9件・本人回答の読み戻し・#consult／#ai-hub の案・313 との二重質問防止・317 の【318】除外）。載せる・送るは既定オフ（`--publish`／`--send-slack`）。松野さん「設計書どおりなら都度承認なしで進めてよい」 |
+| 2026-11-23 | ①自律実行（ノード2-1・2-2）を既定オフで実装（`--execute-auto`・材料出し → Claude Code → 取り込み・範囲は調査／資料確認／文面下書き・承認が要る操作は②・本人操作は③・大規模は週次）。#586 マージ後、`--publish` の実地確認は 01:17 に済み |
 | 2026-11-23 | Phase 3 準備（【318】コメント `--write-comments`・重複確認と応答不明の照合／10:30 の雛形と 313 0.5 との朝枠の排他・移管手順／① のやる予定を記録）。全部既定オフ・launchd 未登録・313 の予定タスクは変えない。止まった回のログで「履歴が消えた」と誤停止する不具合も修正 |

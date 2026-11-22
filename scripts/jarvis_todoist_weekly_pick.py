@@ -61,6 +61,7 @@ PICK_TEXT = {
     "inlet": "入口で{n}日待っている",
     "planned": "前の週の見通しでこの週に置いていた",
     "handoff_318": "318: 本人の操作が要る",
+    "handoff_318_large": "318: 大規模（週次で進め方を決める）",
 }
 
 
@@ -261,7 +262,8 @@ def build_snapshot(
     for c in cands:
         if c["id"] in handoff:
             c["score"] += 20
-            c["reasons"] = ([{"tag": "handoff_318", "text": PICK_TEXT["handoff_318"]}] + c["reasons"])[:3]
+            tag = "handoff_318_large" if (handoff.get(c["id"]) or {}).get("kind") == "large" else "handoff_318"
+            c["reasons"] = ([{"tag": tag, "text": PICK_TEXT[tag]}] + c["reasons"])[:3]
             c["from_318"] = True
     cands.sort(key=lambda c: (-c["score"], c["title"]))
     inlet = sorted((inlet_candidate(x, today=today) for x in inlet_topics), key=lambda c: -c["score"])

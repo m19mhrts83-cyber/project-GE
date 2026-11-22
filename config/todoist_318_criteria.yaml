@@ -85,3 +85,28 @@ rules:
     category: "large"
     match:
       title_any: ["実装", "設計", "構築", "移行", "リニューアル", "自動化", "仕組み化"]
+
+# ---- ①自律実行の作業範囲（ノード2-1・2-2・2026-11-23）----------------------------------
+# 読むのは scripts/jarvis_todoist_318_work.py。--execute-auto を付けた時だけ使う。読めない・壊れている時は ① を始めない。
+# 出典: FlowForge flow_HMy15MUxWiSpw5QgAPYa_8e4 の node_run_a・node_halt_check（承認済み）。
+#       今回の範囲は「調査・資料確認・文面下書き」まで（2026-11-23 依頼）。許可範囲のコード修正・テスト・PR 作成は将来。
+work_scope:
+  decision_id: D-20261123-318-work-scope
+  source: "FlowForge 318 node_run_a・node_halt_check（承認済み）＋2026-11-23 依頼: 今回は調査・資料確認・文面下書きまで"
+  allowed_actions: ["research", "read", "draft"]   # 調査・資料確認・文面下書き（成果物は内部に保存するだけ）
+  # 申告されたら止めて②へ（明示承認まで）。code_change・pr は今回の範囲外なので同じく②
+  approval_operations:
+    send: "対外送信"
+    delete: "削除"
+    payment: "支払い"
+    contract: "契約"
+    merge: "マージ"
+    deploy: "デプロイ"
+    agent_request: "他エージェントへの新規依頼"
+    code_change: "コード修正（今回の範囲外）"
+    pr: "PR 作成（今回の範囲外）"
+  owner_operations:                                 # 申告されたら止めて③へ
+    owner_operation: "本人の操作"
+    owner_login: "本人のログイン・画面操作"
+  # 始める前の確認（題・説明の語。当たれば始めずに②へ）。②基準（R2-HOME-L0）と重なってもよい（二重の確認）
+  approval_words: ["送信", "送る", "返信", "振込", "支払", "送金", "契約", "解約", "削除", "消す", "マージ", "merge", "デプロイ", "deploy", "本番反映", "発注", "購入", "申込", "依頼する", "頼む"]

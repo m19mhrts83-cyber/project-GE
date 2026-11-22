@@ -28,7 +28,7 @@ flowchart LR
 | node_fetch 対象タスクの抽出 | プログラム | `candidate_filter`＋`rank`（313 overdue の順位付けを直して再利用） | 実装 |
 | node_5cc62if9 前回から変化なしの除外 | プログラム | `snapshot`／`detect_change` | 実装 |
 | node_classify タスクの3分類判定 | AI（この実行の Claude Code）＋プログラム | `classify`（ルール）→ `--ai-answers`（AI の見直し） | 実装 |
-| sub_execute／node_run_a／node_halt_check | AI | ① の `planned_action`（やる予定の内容・executed=false）を内部ログへ | 未実装（記録だけ。① の自律実行は松野さんが決めてから） |
+| sub_execute／node_run_a／node_halt_check | AI（この実行の Claude Code）＋プログラム | `jarvis_todoist_318_work`: 2-2 `precheck`（始める前）→ `work/packet.json` → Claude Code が作業 → `import_results`（2-2 取り込む直前・成果物を `work/` へ） | 実装（`--execute-auto` の時だけ。範囲は調査・資料確認・文面下書き） |
 | node_znkxTG8H #consult へ通知 | 外部サービス | `handoff.consult_text`→`drafts/`。送るのは `--send-slack`＋`--publish` の時だけ | 実装（既定は案の保存） |
 | node_human_review /313/bulk で判断 | 人間 | `sync_meta.todoist_318_bulk_queue` → `jarvis_todoist_cleanup_bulk.py` が画面へ。回答は owner_decisions → `fetch_owner_answers` で読み戻し | 実装（載せるのは `--publish` の時だけ） |
 | （③の渡し先）312 今週の9件 | プログラム | `sync_meta.todoist_318_weekly_handoff` → `jarvis_todoist_weekly_pick.py` の候補 | 実装（載せるのは `--publish` の時だけ） |
@@ -36,7 +36,7 @@ flowchart LR
 | node_comment Todoist コメント反映 | 外部サービス | `jarvis_todoist_318_comment.write_comments`（保存後・変化のある件だけ・重複確認・応答不明は照合待ち・317 除外の確認） | 実装（書くのは `--write-comments` の時だけ） |
 | end 日次結果判定・報告 | プログラム | success／partial／failed／stopped の判定、`#ai-hub` 報告案の保存（送るのは `--send-slack` の時だけ） | 実装 |
 
-## やらないこと（Phase 3 準備まで）
+## やらないこと（いまの範囲）
 
-①の実行・定期起動の登録・313 の 0.5 の移管・他エージェントへの依頼。Todoist へのコメントは仕組みとテストまで（`--write-comments` は松野さんの了承後）。
+① のコード修正・テスト・PR 作成（将来）・定期起動の登録・313 の 0.5 の移管・他エージェントへの依頼。① の実行は `--execute-auto` の時だけ。Todoist へのコメントは仕組みとテストまで（`--write-comments` は松野さんの了承後）。
 Slack 送信と /313/bulk・週次への掲載は、仕組みとテストまで。実際に載せる・送るのは松野さんの了承後に `--publish`／`--send-slack` を付けて動かす。

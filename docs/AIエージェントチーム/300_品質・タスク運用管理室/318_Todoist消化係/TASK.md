@@ -4,7 +4,7 @@
 
 | 項目 | 値 |
 |---|---|
-| task_id | orca task_1588877e6c3e（Phase 1・PR #582 マージ済）／task_becb7616c903（Phase 2・PR #585 マージ済）／task_0036d777fe4a（Phase 3 準備） |
+| task_id | orca task_1588877e6c3e（Phase 1・PR #582 マージ済）／task_becb7616c903（Phase 2・PR #585 マージ済）／task_0036d777fe4a（Phase 3 準備・PR #586 マージ済）／task_e8849b99d861（①自律実行） |
 | agent_id | 318 |
 | executor | claude_code（Miss Lemon・Orca worker） |
 | status | done（PR レビュー待ち。マージはラスカルが松野さんの了承後） |
@@ -43,12 +43,20 @@ Phase 1 実装（読むだけ・抽出・変化なし除外・3分類・内部�
 - [x] ①自律実行は作らない。① の「やる予定の内容」を内部ログに記録
 - [x] CLAUDE.md・TASK.md・PROGRESS.md（先頭に朝に決めること）
 
+## ①自律実行 完了条件（既定オフ。有効化は松野さんが朝に決める）
+
+- [x] ノード2-1: ①分類だけ。採用済み基準と作業範囲（work_scope）を確かめ、調査・資料確認・文面下書きまで。成果物は `.jarvis_state/todoist_318/work/`（git 管理外）。コード修正・PR・他エージェント依頼はしない。60分・5件。途中なら進捗・成果物・残作業を記録。大規模は週次へ。Todoist は閉じない
+- [x] ノード2-2: 始める前・取り込む直前に安全条件を確かめる。承認が要る操作は②、本人操作は③。停止スイッチ・時間上限で新しく着手せず、中断点で保存。承認待ちは自動で再実行しない
+- [x] 追加の有料 AI API なし（材料出し → Claude Code → 結果取り込み）
+- [x] `--execute-auto` の時だけ。テスト。実データは dry-run で「やる予定」まで
+- [x] CLAUDE.md・TASK.md・PROGRESS.md・移管手順書の「①の可否」
+
 ## 成果物
 
-- `scripts/jarvis_todoist_318_triage.py`・`scripts/jarvis_todoist_318_handoff.py`・`scripts/jarvis_todoist_318_comment.py`（Phase 3 準備）・`scripts/jarvis_todoist_morning_slot.py`（朝枠の排他）
+- `scripts/jarvis_todoist_318_triage.py`・`scripts/jarvis_todoist_318_handoff.py`・`scripts/jarvis_todoist_318_comment.py`（Phase 3 準備）・`scripts/jarvis_todoist_morning_slot.py`（朝枠の排他）・`scripts/jarvis_todoist_318_work.py`（①自律実行）
 - `config/todoist_318_criteria.yaml`
 - `launchd/com.matsunoma.jarvis.todoist-318.plist.template`・`launchd/jarvis_todoist_318_runner.sh`・`launchd/install_jarvis_todoist_318_launchd.sh`・`launchd/uninstall_jarvis_todoist_318_launchd.sh`（未登録）
-- `scripts/tests/test_todoist_318_triage.py`・`test_todoist_318_phase2.py`・`test_todoist_318_phase3.py`
+- `scripts/tests/test_todoist_318_triage.py`・`test_todoist_318_phase2.py`・`test_todoist_318_phase3.py`・`test_todoist_318_auto_exec.py`
 - このフォルダの `CLAUDE.md`・`PROGRESS.md`・`flow.md`・`移管手順_10時30分.md`
 
 ## メモ・障害
