@@ -80,6 +80,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/rent-step", label: "家賃ステップ", icon: "trend" },
       { href: "/metrics", label: "収支・数値", icon: "chart" },
       { href: "/billing", label: "サブスク・課金", icon: "card" },
+      // 2026-11-22: プランを上げ下げする判断用。Mac が写した4者の枠（611）
+      { href: "/ai-usage", label: "AI 使用量", icon: "ai" },
     ],
   },
   {

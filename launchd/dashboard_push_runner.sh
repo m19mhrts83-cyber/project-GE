@@ -27,6 +27,10 @@ fi
     echo "# situation_watch exit=$? (continue)"
   fi
   "$PY" "${REPO_DIR}/scripts/jarvis_dashboard_push.py"
+  # 611: AI 使用量のいまの値を /ai-usage へ写す（失敗しても push 本体は成功扱い）
+  if ! "$PY" "${REPO_DIR}/scripts/jarvis_ai_usage_snapshot.py" --push >/dev/null; then
+    echo "# ai_usage_snapshot exit=$? (continue)"
+  fi
   # Phase L: 814/815 鮮度を Slack #ops へ（失敗しても push 本体は成功扱い）
   if [[ "${JARVIS_UI_CYCLE_DISABLE:-}" != "1" ]]; then
     if ! "$PY" "${REPO_DIR}/scripts/jarvis_ui_cycle_814_815.py" --agent both --post; then
