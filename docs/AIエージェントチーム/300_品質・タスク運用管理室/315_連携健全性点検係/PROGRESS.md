@@ -35,4 +35,4 @@
 ## 2026-11-22 315-A CHRLINE health 取得修正
 
 - 原因: 実行pythonにCHRLINE/geventが無く例外握りつぶしで「取得できない」。修正: `.venv` のpythonを子プロセスで呼びPYTHONPATHを付与、読取専用維持、失敗理由を説明に出す。テスト追加。
-- Squareは未変更（保存側の定期実行が無く古い結果のまま。112担当へ別途）。マージ・launchd変更・Slack送信なし。
+- Square: 手動probe保存（7/5以降更新なし）をやめ、常駐watchの状態ファイル（state・heartbeat 24h以内・書込エラー）で自動判定。probeは外した。マージ・launchd変更・Slack送信なし。

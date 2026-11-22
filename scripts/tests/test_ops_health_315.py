@@ -16,17 +16,30 @@ import jarvis_ops_health_315_sources as sources
 
 
 class SourcesTest(unittest.TestCase):
-    def test_square_missing_old_invalid_and_failure(self):
+    def test_square_from_watch_status(self):
+        now = datetime(2026, 11, 22, 13, 0, tzinfo=timezone.utc)
+        def beat(hours):
+            return (now - timedelta(hours=hours)).astimezone(timezone(timedelta(hours=9))).isoformat()
         with tempfile.TemporaryDirectory() as tmp:
-            p = Path(tmp) / 'probe.json'
-            self.assertEqual(sources.square_snapshot(p)[0], '確認不能')
-            for age, ok, expected in [(175, True, '確認不能'), (-1, True, '確認不能'), (1, None, '確認不能'), (1, False, '異常'), (1, True, 'OK')]:
-                p.write_text(json.dumps({'last_probe_at': (datetime.now(timezone.utc)-timedelta(hours=age)).isoformat(), 'last_probe': {'ok': ok}}))
+            p = Path(tmp) / 'watch.json'
+            self.assertEqual(sources.square_snapshot(p, now)[0], '確認不能')
+            cases = [
+                ({'state': 'running', 'heartbeat_at': beat(0.1)}, 'OK'),
+                ({'state': 'running', 'heartbeat_at': beat(25)}, '確認不能'),
+                ({'state': 'running', 'heartbeat_at': beat(-2)}, '確認不能'),
+                ({'state': 'running'}, '確認不能'),
+                ({'state': 'running', 'heartbeat_at': '2026-11-22T20:00:00'}, '確認不能'),
+                ({'state': 'stopped', 'heartbeat_at': beat(1)}, '異常'),
+                ({'state': 'running', 'heartbeat_at': beat(1), 'last_write_error': 'x'}, '異常'),
+            ]
+            for data, expected in cases:
+                p.write_text(json.dumps(data))
                 before = p.read_bytes()
-                self.assertEqual(sources.square_snapshot(p)[0], expected)
+                self.assertEqual(sources.square_snapshot(p, now)[0], expected, data)
                 self.assertEqual(p.read_bytes(), before)
-            p.write_text('[]')
-            self.assertEqual(sources.square_snapshot(p)[0], '確認不能')
+            for bad in ('[]', '{broken'):
+                p.write_text(bad)
+                self.assertEqual(sources.square_snapshot(p, now)[0], '確認不能')
 
     def test_gha_completed_main_and_failure(self):
         for rc, payload, level in [(1, '', '確認不能'), (0, '[]', '確認不能'), (0, json.dumps([{'updatedAt': datetime.now(timezone.utc).isoformat(), 'conclusion': 'failure'}]), '異常')]:
@@ -50,7 +63,7 @@ class SourcesTest(unittest.TestCase):
             order.clear()
             result = sources.collect(None, cloud=True)
             self.assertEqual(order, ['gha'])
-            self.assertEqual(result['Square probe'][0], 'スキップ(cloud)')
+            self.assertEqual(result['Square（オプチャ常駐）'][0], 'スキップ(cloud)')
 
     def test_collection_separate_from_health(self):
         for levels, result in [(['OK', '異常'], '成功'), (['OK', '確認不能'], '部分成功'), (['確認不能'], '失敗'), (['OK', 'スキップ(cloud)'], '部分成功')]:

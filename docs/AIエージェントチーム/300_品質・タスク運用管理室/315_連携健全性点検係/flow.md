@@ -79,4 +79,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 ## 315-A 実装照合（2026-11-22）
 
-確定FlowForge（9ノード）の工程対応と差分は [315a-alignment](docs/315a-alignment.md)。GHA履歴→保存済みSquare→CHRLINE healthの順で収集する。Macの既知復旧1回とGmail点検を維持し、点検後の状態を報告する。途中の人の承認ノードは置かず、未解決事項の#consult連携を維持する。
+確定FlowForge（9ノード）の工程対応と差分は [315a-alignment](docs/315a-alignment.md)。GHA履歴→Square（常駐watchの状態ファイル自動判定）→CHRLINE health（.venv子プロセス）の順で収集する。Macの既知復旧1回とGmail点検を維持し、点検後の状態を報告する。途中の人の承認ノードは置かず、未解決事項の#consult連携を維持する。
