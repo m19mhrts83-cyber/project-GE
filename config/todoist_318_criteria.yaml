@@ -1,0 +1,87 @@
+# 318 Todoist消化係 — 3分類の基準（Phase 1・2026-11-23）
+#
+# 読むのは scripts/jarvis_todoist_318_triage.py。読めない・壊れている時は安全停止する（基準なしとは扱わない）。
+#
+# status:
+#   adopted  … 松野さんが採用済みの決まり（source に出典）。①（AIのみ）にしてよいのは adopted だけ
+#   proposed … Miss Lemon の案。今回の振り分けの「手がかり」には使うが、②③（AIが実行しない側）にしか寄せない。
+#              恒久基準ではない。採用されたら adopted に変え、decision_id と日付を書く
+#
+# category: "1"=AIのみで進められる / "2"=松野さんの判断が必要 / "3"=本人の操作が必要 / "large"=大規模（区分の印だけ）
+# match: title_any（題・説明の語。2文字以上）/ labels_any（ラベル完全一致）/ marks_any（題の先頭の印）/ tags_any（題の【】[]タグ）
+#
+# 取引先名・個人名・金額は書かない（公開リポ）。
+
+version: 1
+rules:
+  # ---- ①（AIのみ）: adopted だけ -------------------------------------------
+  - id: R1-MARK-AI
+    status: adopted
+    decision_id: D-20261110-todoist-mark
+    source: "Todoist 件名の印（2026-11-10 松野さん決定・scripts/jarvis_todoist_mark.py）: 🤖=AIが自分の判断で入れた／🦾依頼=松野さんが頼んでAIが入れた"
+    category: "1"
+    match:
+      marks_any: ["🤖", "🦾依頼"]
+  - id: R1-313-CONFIRM-ONLY
+    status: adopted
+    decision_id: D-20261019-313-confirm-only
+    source: "313 CLAUDE.md §3「確認のみ」（2026-10-19）: [表確認]／UI確認で一致・不一致が1行で出る・件数や有無の事実確認だけ"
+    category: "1"
+    match:
+      tags_any: ["表確認", "確認のみ"]
+      title_any: ["UI確認"]
+
+  # ---- ②（松野さんの判断）: adopted --------------------------------------------
+  - id: R2-313-OWNER
+    status: adopted
+    decision_id: D-20261019-313-owner-judgment
+    source: "313 CLAUDE.md §3「要オーナー判断」（2026-10-19）: 検討する・どうする・要ボス／資金移動・返済・カード退会・年額切替／対外メール・LINE送信／方針が複数"
+    category: "2"
+    match:
+      labels_any: ["要ボス"]
+      tags_any: ["要ボス", "要判断"]
+      title_any: ["検討", "どうする", "資金移動", "返済", "退会", "年額", "解約", "方針"]
+  - id: R2-313-NOEXEC
+    status: adopted
+    decision_id: D-20261112-313-daily-noexec
+    source: "313 CLAUDE.md §0.5 やらないこと（2026-11-12）: 対外送信・金・削除・方針の決定の実行はしない（要ることを書いて残す）"
+    category: "2"
+    match:
+      title_any: ["送信", "返信", "振込", "支払", "送金", "契約", "削除", "申込"]
+  - id: R2-HOME-L0
+    status: adopted
+    decision_id: D-HOME-L0-human-approval
+    source: "家ルール L0（~/.claude/CLAUDE.md「守ること」）: 対外送信・振込・削除・課金変更は人の了承まで実行しない"
+    category: "2"
+    match:
+      title_any: ["課金", "プラン変更", "Billing"]
+  - id: R2-WEEKLY-OWNER-HINT
+    status: adopted
+    decision_id: D-20261110-weekly-owner-hint
+    source: "312 今週の9件（2026-11-10 松野さん決定・jarvis_todoist_weekly_pick.OWNER_HINT_RE）: 🤖でも [要ボス]・[要判断]・【松野さん】 等は本人の件"
+    category: "2"
+    match:
+      tags_any: ["メール要対応", "資料待ち", "松野さん"]
+      title_any: ["ボス実施", "ボスが"]
+
+  # ---- ③（本人の操作）: proposed（手がかり。②③側にしか寄せない） -------------
+  - id: P3-OWNER-OPERATION
+    status: proposed
+    source: "Miss Lemon 案（2026-11-23）: 本人が体を動かす・本人の画面や窓口でしかできない操作"
+    category: "3"
+    match:
+      title_any: ["電話", "来店", "窓口", "署名", "押印", "捺印", "郵送", "受け取り", "受取", "立会", "立ち会", "面談", "記帳", "ログインして", "本人確認", "提出", "手書き", "書いて"]
+  - id: P3-BANK-IB
+    status: proposed
+    source: "Miss Lemon 案（2026-11-23）: 銀行IB・OTP は Claude が実行しない（2026-11-19 決定）ので、Claude から見ると本人側の作業"
+    category: "3"
+    match:
+      title_any: ["ネットバンキング", "OTP", "ワンタイム"]
+
+  # ---- 大規模（区分の印だけ。既存タスクのまま週次へ）: proposed ------------------
+  - id: P-LARGE
+    status: proposed
+    source: "Miss Lemon 案（2026-11-23）: 実装・設計・移行・構築など1回60分で終わらない見込みの件"
+    category: "large"
+    match:
+      title_any: ["実装", "設計", "構築", "移行", "リニューアル", "自動化", "仕組み化"]
