@@ -32,6 +32,7 @@ HANDOFF_STALE_DAYS = 8  # weekly_pick 側: 週をまたいだ古い受け渡し�
 BULK_PATH = "/313/bulk"
 HANDOFF_REASON_TAG = "handoff_318"
 HANDOFF_REASON_TEXT = "318: 本人の操作が要る"
+HANDOFF_LARGE_TEXT = "318: 大規模（週次で進め方を決める）"
 ACTION_TEXT = {"close": "完了", "drop": "削除", "reschedule": "日を変える", "defer": "残す", "keep": "残す"}
 
 SbFn = Callable[..., Any]
@@ -163,9 +164,14 @@ def build_weekly_handoff(hist_tasks: dict[str, Any], active_by_id: dict[str, dic
     """履歴で ③ の件（既存タスクのまま）。312 の週次ピックが読む。題は Todoist から取り直すので持たない。"""
     out = []
     for tid, row in sorted(hist_tasks.items()):
-        if row.get("last_category") != "3" or tid not in active_by_id:
+        if tid not in active_by_id:
             continue
-        out.append({"id": tid, "reason": HANDOFF_REASON_TEXT, "detail": str(row.get("last_reason") or "")[:120],
+        # ① の大規模（--execute-auto の実行前確認で「週次へ」にした件）も、既存タスクのまま週次計画へ
+        large1 = row.get("last_category") == "1" and row.get("last_large") and (row.get("work_318") or {}).get("state") == "weekly"
+        if row.get("last_category") != "3" and not large1:
+            continue
+        out.append({"id": tid, "reason": HANDOFF_LARGE_TEXT if large1 else HANDOFF_REASON_TEXT,
+                    "detail": str(row.get("last_reason") or "")[:120], "kind": "large" if large1 else "owner",
                     "large": bool(row.get("last_large")), "since": str(row.get("last_evaluated") or "")[:10]})
     return out
 

@@ -2,7 +2,7 @@
 # 318 Todoist消化係 毎朝 10:30 の定時実行（launchd から呼ぶ）。まだ登録しない（移管手順で松野さんが決めてから）。
 # - 朝枠の担当が 318 の時だけ動く（--trigger schedule。担当が 313 なら何もせず正常終了）
 # - 既定は「読む・仕分け・内部ログ」だけ。載せる・送る・コメントは TODOIST_318_RUN_FLAGS に書いた時だけ
-#   使える値: --publish --send-slack --write-comments（ほかの値があれば動かさない）
+#   使える値: --publish --send-slack --write-comments --execute-auto（ほかの値があれば動かさない。--execute-auto は材料出しまで）
 # - 停止: .jarvis_state/todoist_318/STOP を置く、または TODOIST_318_STOP=1
 set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -26,7 +26,7 @@ fi
 EXTRA=()
 for f in ${=TODOIST_318_RUN_FLAGS:-}; do
   case "$f" in
-    --publish|--send-slack|--write-comments) EXTRA+=("$f") ;;
+    --publish|--send-slack|--write-comments|--execute-auto) EXTRA+=("$f") ;;
     *) echo "# 想定外のフラグ（${f}）。動かさない" >>"$LOG"; exit 2 ;;
   esac
 done
