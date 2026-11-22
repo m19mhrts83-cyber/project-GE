@@ -146,4 +146,4 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ## CHRLINE retry キュー exhausted の扱い（2026-11-22）
 
 - 警告は「前回から新しく増えた exhausted」で判定（baselineなしは残り件数）。固定の過去分は `line_unofficial_poc/chrline_retry_queue_archive.py` で退避（既定dry-run／`--apply`は人了承後。削除せず別ファイルへ、バックアップ付き。出力は件数のみ）。
-- 点検の「直近decode標本なし→確認不能」は、新着が無い週にも出うる。decode_stats は seen>0 の実行だけ追記する仕様（案: 標本なしでもsync成功が新しければ「新着なし」としてOK扱い。未実装）。
+- 点検の「直近decode標本なし」は新着が無い週にも起きる。decode_stats は seen>0 の実行だけ追記する仕様→ 実装済み: 標本0でも sync 最終成功（キュー/health更新時刻）が48時間以内なら「新着なし＝OK」（理由を説明に表示）。syncも古い/不明なら従来どおり確認不能。

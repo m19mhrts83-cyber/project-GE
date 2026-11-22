@@ -42,4 +42,4 @@
 - 原因調査: retry キューの exhausted 146件は、書込先MDの親フォルダ名変更で書き込めず本文も未復号のまま枯渇した過去分（最後の枯渇は10月中旬、直近24hの増加は0）。新しい障害ではない。
 - 対応: `line_unofficial_poc/chrline_retry_queue_archive.py`（既定dry-run、`--apply`で退避。削除せず `.chrline_sync_retry_queue.archive.json` へ、実行前にバックアップ）。exhausted 警告は「前回から増えた分」で判定（baselineなしは残り件数）。
 - 退避の実行はマージ後に松野さん了承を確認してから。active は触らない。
-- decode_stats が止まって見える件: 新着の本文取得が1件も無い日は記録を追記しない仕様のため。点検側で「標本なし」は確認不能になる（下記CLAUDE.md参照、案のみ・未実装）。
+- decode_stats が止まって見える件: 新着の本文取得が1件も無い日は記録を追記しない仕様のため。点検側は、標本0でもsync最終成功が48時間以内なら「新着なし＝OK」と判定（実装済み）。syncも古い時は確認不能。
