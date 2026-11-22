@@ -12,4 +12,6 @@ rc=0
 "$PY" "$REPO_DIR/scripts/jarvis_freshness_watch.py" --post || rc=$?
 # 315-B: 0=成功 2=部分成功 1=失敗（結果は .jarvis_state/stall_watch_315b.json とダッシュボード）
 "$PY" "$REPO_DIR/scripts/jarvis_stall_watch_315b.py" --post || { r=$?; [ "$rc" -eq 0 ] && rc=$r; }
+# 611: AI 使用量のいまの値をダッシュボード（/ai-usage）へ写す。失敗しても監視の結果は変えない
+"$PY" "$REPO_DIR/scripts/jarvis_ai_usage_snapshot.py" --push >/dev/null || echo "# ai_usage_snapshot exit=$? (continue)" >&2
 exit "$rc"
