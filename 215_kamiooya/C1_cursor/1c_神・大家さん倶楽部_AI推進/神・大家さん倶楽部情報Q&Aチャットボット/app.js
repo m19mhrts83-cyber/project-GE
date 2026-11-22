@@ -6091,7 +6091,7 @@ const App = {
           '<span class="ab-rank-n">' + fmt(q.count) + '<small>回</small>' + (q.users != null ? '<em>' + fmt(q.users) + '人</em>' : '') + '</span></li>').join('') + '</ol>';
     const rankCard =
       '<div class="ab-card ab-ranking"><h4 class="ab-h"><i class="fa-solid fa-comments"></i> Q&amp;Aチャットの質問ランキング</h4>' +
-      '<p class="ab-muted ab-rank-note">チャットに入力された質問。同じ文の多い順・上位10（同じ人が何度聞いても人数は1人）</p>' + ranking + '</div>';
+      '<p class="ab-muted ab-rank-note">チャットに入力された質問。同じ文の多い順・上位10（同じ人が何度聞いても人数は1人）。▼の付いた質問は押すと全文が出ます</p>' + ranking + '</div>';
 
     // 6) キーワード検索ランキング（チャットとは別に）
     const kq = (kw.top || []).slice(0, 10);
@@ -6109,7 +6109,7 @@ const App = {
     const zq = (kw.zero_queries || []).slice(0, 5);
     const kwRankCard =
       '<div class="ab-card ab-ranking ab-ranking-kw"><h4 class="ab-h"><i class="fa-solid fa-magnifying-glass"></i> キーワード検索ランキング</h4>' +
-      '<p class="ab-muted ab-rank-note">「キーワード検索（全データ）」に入れた言葉。多い順・上位10</p>' + kwRanking +
+      '<p class="ab-muted ab-rank-note">「キーワード検索（全データ）」に入れた言葉。多い順・上位10。▼の付いた言葉は押すと全文が出ます</p>' + kwRanking +
       (zq.length ? '<div class="ab-zero"><b><i class="fa-solid fa-circle-exclamation"></i> 見つからなかった言葉</b>（言い換えやデータを足す候補）<div>' +
         zq.map((q) => '<span>' + esc(q.query) + '<small>' + fmt(q.count) + '回</small></span>').join('') + '</div></div>' : '') + '</div>';
 
@@ -6178,6 +6178,31 @@ const App = {
 
     root.innerHTML = lead + kpis + '<div class="ab-row">' + donut + compareCard + '</div>' +
       '<div class="ab-row ab-row-even">' + rankCard + kwRankCard + '</div>' + dailyCard;
+    // ランキングの質問が「…」で切れているときは、押すと全文を開く／閉じる（2026-11-22 松野さん）
+    // 切れているかは表示中でないと測れないので、描いた直後と、画面の大きさが変わったとき（タブを開いた・向きを変えた）に測り直す
+    const markCut = () => root.querySelectorAll('.ab-rank-q:not(.is-open)').forEach((q) => {
+      if (!q.clientWidth) return;
+      const cut = q.scrollWidth > q.clientWidth + 1 || q.scrollHeight > q.clientHeight + 1;
+      q.classList.toggle('is-cut', cut);
+      if (cut) { q.setAttribute('role', 'button'); q.setAttribute('tabindex', '0'); q.setAttribute('aria-expanded', 'false'); }
+      else { q.removeAttribute('role'); q.removeAttribute('tabindex'); q.removeAttribute('aria-expanded'); }
+    });
+    markCut();
+    App.analyticsMarkCut = markCut;
+    if (!root.dataset.rankToggle) {
+      root.dataset.rankToggle = '1';
+      if (window.ResizeObserver) new ResizeObserver(() => { if (App.analyticsMarkCut) App.analyticsMarkCut(); }).observe(root);
+      const toggleQ = (e) => {
+        const q = e.target.closest && e.target.closest('.ab-rank-q.is-cut');
+        if (!q || !root.contains(q)) return;
+        if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        const open = q.classList.toggle('is-open');
+        q.setAttribute('aria-expanded', open ? 'true' : 'false');
+      };
+      root.addEventListener('click', toggleQ);
+      root.addEventListener('keydown', toggleQ);
+    }
     const vsReadout = root.querySelector('.ab-vs-readout');
     const showPair = (d) => {
       if (!vsReadout || !d) return;
