@@ -5402,7 +5402,10 @@ const App = {
       }
       const icon = { great: '🌟', good: '👍', bad: '👎' };
       list.innerHTML = rows.length ? rows.map(function (x) {
+        // 誰の評価か（会員番号・名前）。匿名でなくてよい（2026-11-22 松野さん）
+        const who = x.member ? ((x.member.name || '') + (x.member.member_no ? '（会員番号 ' + x.member.member_no + '）' : '')) : '';
         return '<div class="border rounded p-2"><div class="text-xs text-slate-500">' + (icon[x.rating] || '') + ' ' + App.escapeHtml(String(x.updated_at || '').replace('T', ' ').slice(0, 16)) + '</div>' +
+          '<div class="feedback-who font-semibold text-blue-900">' + (who ? '👤 ' + App.escapeHtml(who) : '<span class="text-slate-500 font-normal">（名前を取得できませんでした）</span>') + '</div>' +
           '<div><span class="text-slate-500">質問：</span>' + App.escapeHtml(x.question || '') + '</div>' +
           (Array.isArray(x.reasons) && x.reasons.length ? '<div><span class="text-slate-500">理由：</span>' + x.reasons.map(function (c) { return App.escapeHtml(App.feedbackReasonLabel(c)); }).join('、') + '</div>' : '') +
           (x.comment ? '<div><span class="text-slate-500">その他：</span>' + App.escapeHtml(x.comment) + '</div>' : '') +

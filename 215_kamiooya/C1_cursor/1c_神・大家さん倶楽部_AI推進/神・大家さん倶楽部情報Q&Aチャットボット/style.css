@@ -714,7 +714,9 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
 .ab-legend-row li .ab-swatch { margin-top: 0; }
 
 /* ランキング */
-.ab-rank { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+.ab-rank { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: .55rem; }
+/* 長い質問でも行が枠からはみ出さないように（iPhoneでバーが飛び出していた。2026-11-22 松野さん） */
+.ab-rank li { min-width: 0; }
 .ab-rank li { display: flex; align-items: center; gap: .7rem; opacity: 0; transform: translateX(-8px); transition: opacity .5s ease, transform .5s ease; transition-delay: var(--d, 0ms); }
 .is-in .ab-rank li { opacity: 1; transform: none; }
 .ab-rank-no { flex: none; width: 1.8rem; height: 1.8rem; border-radius: 50%; display: grid; place-items: center; background: #eef3fa; color: #11366A; font-weight: 700; font-size: .9rem; }
@@ -814,6 +816,8 @@ html.theme-a[data-text-size="l"] body, html.theme-a[data-text-size="xl"] body { 
   .ab-vs-side { padding: .65rem .7rem; }
   .ab-pair-col:nth-child(even) .ab-xlab { visibility: hidden; }
   .ab-pair .ab-xlab { font-size: .68rem; }
+  /* スマホでは質問文を2行まで出す（1行で切れると何の質問か分からないため） */
+  .ab-rank-q { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ab-stack, .ab-rank li, .ab-rank-bar i, .ab-arc, .ab-share i, .ab-pair-bars { transition: none !important; }

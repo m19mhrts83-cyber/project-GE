@@ -236,7 +236,11 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         let clicks:unknown[]=[];
         try{clicks=d.listSourceClicks?await d.listSourceClicks():[];}catch{clicks=[];}
         const sc=summarizeSourceClicks(Array.isArray(clicks)?clicks as any[]:[]);
-        const rows=(await d.listFeedback()).map((r:any)=>({rating:r.rating,reasons:Array.isArray(r.reasons)?r.reasons:[],comment:r.comment,question:r.question,answer:String(r.answer||'').slice(0,400),updated_at:r.updated_at,
+        const raw=await d.listFeedback() as any[];
+        // 誰の評価かを出す（2026-11-22 松野さん「匿名でなくてよい、名前が分かるように」）。ID は返さず、名前と会員番号だけ。
+        const people=new Map<string,{name?:unknown;member_no?:unknown}>();
+        await Promise.all([...new Set(raw.map(r=>String(r?.user_id||'')).filter(Boolean))].map(async id=>{try{const m=await d.member(id);if(m)people.set(id,{name:m.name,member_no:m.member_no});}catch{/* 名前が引けなくても一覧は出す */}}));
+        const rows=raw.map((r:any)=>({member:people.get(String(r?.user_id||''))||null,rating:r.rating,reasons:Array.isArray(r.reasons)?r.reasons:[],comment:r.comment,question:r.question,answer:String(r.answer||'').slice(0,400),updated_at:r.updated_at,
           answer_mode:r.answer_mode??null,answer_tier:r.answer_tier??null,answer_model:r.answer_model??null,answer_reused:r.answer_reused??null,
           sources:(sc.byMessage.get(String(r.chat_id??'')+'/'+String(r.message_id??''))||[]).map(x=>({kind:x.kind,title:x.title,label:x.label}))}));
         return json({feedback:rows,sources_top:sc.top,source_clicks:Array.isArray(clicks)?clicks.length:0});
