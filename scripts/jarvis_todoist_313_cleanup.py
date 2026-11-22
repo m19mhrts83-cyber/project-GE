@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
+import jarvis_todoist_313_judgment as jd  # noqa: E402
 from jarvis_todoist_313_slack_blocks import (  # noqa: E402
     build_cleanup_blocks,
     prefer_url_mode,
@@ -101,9 +102,17 @@ def _fetch_active_tasks(page_limit: int = 200, max_pages: int = 20) -> list[dict
     return out
 
 
-def collect_items(limit: int = MAX_TOP) -> tuple[list[dict], int]:
+def collect_items(
+    limit: int = MAX_TOP,
+    judgments: dict | None = None,
+    tasks: list[dict] | None = None,
+) -> tuple[list[dict], int]:
+    """`judgments` に「残す」済みで内容が変わっていないものは除く（合計にも入れない）。"""
     today = _today()
-    tasks = _fetch_active_tasks()
+    if tasks is None:
+        tasks = _fetch_active_tasks()
+    if judgments:
+        tasks, _ = jd.filter_kept(tasks or [], judgments)
     scored: list[tuple[int, dict]] = []
     for t in tasks or []:
         due = (t.get("due") or {}).get("date") or ""
@@ -148,8 +157,28 @@ def collect_items(limit: int = MAX_TOP) -> tuple[list[dict], int]:
             "lane": lane,
             "kind": "confirm_only" if confirm else "overdue",
             "star": _star_for(title, days, confirm),
+            "fp": jd.fingerprint(t),
         })
     return items, total
+
+
+def keep_selected(select: str) -> int:
+    """直近の片付け（STATE）の #N を「残す」として記録する。Todoist には触らない。"""
+    try:
+        saved = json.loads(STATE.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        print("❌ 直近の片付け state が読めません", file=sys.stderr)
+        return 2
+    nums = {int(x) for x in re.findall(r"\d+", select)}
+    judgments = jd.load_judgments()
+    done = 0
+    for it in saved.get("items") or []:
+        if it.get("n") in nums and it.get("fp"):
+            jd.record_keep(judgments, str(it["task_id"]), str(it["fp"]), run=str(saved.get("at") or ""))
+            done += 1
+    jd.save_judgments(judgments)
+    print(f"📎 313: 「残す」{done}件を記録（内容が変わるまで再提示しません）")
+    return 0 if done else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -157,16 +186,35 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=MAX_TOP)
     ap.add_argument("--force-url-buttons", action="store_true")
+    ap.add_argument(
+        "--keep",
+        default="",
+        help="本人が「残す」と答えた番号（直近の片付けの #N）。内容が変わるまで再提示しない",
+    )
     args = ap.parse_args(argv)
+
+    if args.keep:
+        return keep_selected(args.keep)
 
     if not _token():
         print("❌ TODOIST_API_TOKEN 未設定", file=sys.stderr)
         return 2
 
-    items, total = collect_items(args.limit)
+    judgments = jd.load_judgments()
+    items, total = collect_items(args.limit, judgments)
     if not items:
         print("📎 313片付け: 超過0件（投稿なし）")
+        if not args.dry_run:
+            jd.stamp_run(digest_at=True)
         return 0
+    days_by_id = (
+        jd.update_streak(judgments, [it["task_id"] for it in items])
+        if not args.dry_run
+        else {}
+    )
+    for it in items:
+        it["streak_days"] = days_by_id.get(it["task_id"], 1)
+    line = jd.streak_line(days_by_id)
 
     url_mode = prefer_url_mode(force_url=args.force_url_buttons)
     payload = build_cleanup_blocks(
@@ -175,6 +223,7 @@ def main(argv: list[str] | None = None) -> int:
         fallback_text=f"313 片付け 上位{len(items)}/{total}",
         url_mode=url_mode,
         total_overdue=total,
+        extra_line=line,
     )
     STATE.parent.mkdir(parents=True, exist_ok=True)
     STATE.write_text(
@@ -191,16 +240,23 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
     )
     print(f"📎 313片付け: {len(items)}件（超過合計 {total}）")
+    if line:
+        print(line)
     for it in items:
         print(
             f"  #{it['n']} {it['star']} {it['days_over']}日 "
             f"{it['title_short'][:40]} → {it['new_due']}"
         )
-    return post_slack(
+    rc = post_slack(
         payload,
         dry_run=args.dry_run,
         force_url_buttons=args.force_url_buttons,
     )
+    if rc == 0 and not args.dry_run:
+        # 送信が通った回だけ、連続日数と最終まとめ時刻を残す
+        jd.save_judgments(judgments)
+        jd.stamp_run(digest_at=True)
+    return rc
 
 
 if __name__ == "__main__":

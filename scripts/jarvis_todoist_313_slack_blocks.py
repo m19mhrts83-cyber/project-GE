@@ -179,6 +179,7 @@ def build_cleanup_blocks(
     fallback_text: str,
     url_mode: bool,
     total_overdue: int = 0,
+    extra_line: str = "",
 ) -> dict[str, Any]:
     """313 片付け本線: 各件に 済んだ／いつ・優先／やめる の3ボタン。"""
     blocks: list[dict[str, Any]] = [
@@ -196,6 +197,7 @@ def build_cleanup_blocks(
                     + "\n"
                     "✅済んだ ／ 📅いつ・優先 ／ 🗑やめる（削除ではなく完了＋コメント）\n"
                     "★＝推し。要判断は「済んだ」に入れない"
+                    + (f"\n{extra_line}" if extra_line else "")
                 ),
             },
         },

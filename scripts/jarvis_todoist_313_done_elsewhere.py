@@ -25,6 +25,9 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "scripts"))
+import jarvis_todoist_313_judgment as jd  # noqa: E402
+
 JST = ZoneInfo("Asia/Tokyo")
 STATE = REPO / ".jarvis_state" / "todoist_313_done_elsewhere.json"
 PARTNERS = Path(
@@ -110,8 +113,10 @@ def _match(task_title: str, hit: dict) -> bool:
     return False
 
 
-def propose() -> list[dict]:
+def propose(judgments: dict | None = None) -> list[dict]:
     tasks = _open_tasks()
+    if judgments:
+        tasks, _ = jd.filter_kept(tasks, judgments)
     hits = _yoritoori_send_hits()
     out: list[dict] = []
     n = 0
@@ -132,6 +137,7 @@ def propose() -> list[dict]:
             "labels": labels,
             "evidence": matched,
             "confidence": "medium" if len(matched) >= 2 else "low",
+            "fp": jd.fingerprint(t),
         })
         if n >= 15:
             break
@@ -175,6 +181,24 @@ def apply_close(row: dict, author: str) -> None:
     print(f"  closed {tid} {row['title'][:40]}")
 
 
+def keep_selected(select: str) -> int:
+    try:
+        saved = json.loads(STATE.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        print("❌ 直近の候補 state が読めません", file=sys.stderr)
+        return 2
+    nums = {int(x) for x in re.findall(r"\d+", select)}
+    judgments = jd.load_judgments()
+    done = 0
+    for r in saved.get("candidates") or []:
+        if r.get("n") in nums and r.get("fp"):
+            jd.record_keep(judgments, str(r["task_id"]), str(r["fp"]), run=str(saved.get("at") or ""))
+            done += 1
+    jd.save_judgments(judgments)
+    print(f"📎 313: 「残す」{done}件を記録（内容が変わるまで再提示しません）")
+    return 0 if done else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="互換（既定が提案のみ）")
@@ -182,17 +206,36 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--select", default="")
     ap.add_argument("--author", default=os.environ.get("TODOIST_313_AUTHOR") or "Jarvis")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument(
+        "--keep",
+        default="",
+        help="本人が「残す」と答えた番号。内容が変わるまで再提示しない（Todoist には触らない）",
+    )
     args = ap.parse_args(argv)
+
+    if args.keep:
+        return keep_selected(args.keep)
 
     if not _token():
         print("❌ TODOIST_API_TOKEN 未設定", file=sys.stderr)
         return 2
 
-    rows = propose()
+    judgments = jd.load_judgments()
+    rows = propose(judgments)
+    days_by_id = jd.update_streak(judgments, [r["task_id"] for r in rows])
+    for r in rows:
+        r["streak_days"] = days_by_id.get(r["task_id"], 1)
+    line = jd.streak_line(days_by_id)
+    jd.save_judgments(judgments)
+    jd.stamp_run(digest_at=False)
     STATE.parent.mkdir(parents=True, exist_ok=True)
     STATE.write_text(
         json.dumps(
-            {"at": datetime.now(JST).isoformat(timespec="seconds"), "candidates": rows},
+            {
+                "at": datetime.now(JST).isoformat(timespec="seconds"),
+                "candidates": rows,
+                "streak_line": line,
+            },
             ensure_ascii=False,
             indent=2,
         )
@@ -205,6 +248,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     print(f"📎 313 外で済んだ候補: {len(rows)} 件")
+    if line:
+        print(line)
     for r in rows:
         ev0 = (r.get("evidence") or [{}])[0]
         print(
