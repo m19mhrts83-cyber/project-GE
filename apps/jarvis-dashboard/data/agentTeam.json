@@ -13,7 +13,7 @@
   },
   "counts": {
     "候補": 22,
-    "設計中": 10,
+    "設計中": 11,
     "運用確認": 11,
     "運用": 0,
     "停止": 0,
@@ -253,6 +253,7 @@
         "315",
         "316",
         "317",
+        "318",
         "411",
         "412",
         "413",
@@ -264,10 +265,10 @@
         "weather"
       ],
       "counts": {
-        "ai": 12,
+        "ai": 13,
         "grok": 2,
         "paired": 5,
-        "ai_only": 7,
+        "ai_only": 8,
         "grok_only": 2
       }
     }
@@ -3037,6 +3038,95 @@
           }
         ],
         "procedure_count": 6,
+        "source": "claude+registry+ops_yaml"
+      }
+    },
+    {
+      "id": "318",
+      "name": "Todoist消化係（仮）",
+      "path": "300_品質・タスク運用管理室/318_Todoist消化係",
+      "department_id": "300",
+      "department_name": "品質・タスク運用管理室",
+      "genre_id": "jarvis_cross",
+      "genre_name": "Jarvis横断",
+      "status": "設計中",
+      "status_icon": "🔵",
+      "report": "",
+      "trigger": "時間",
+      "schedule": "",
+      "tool_assigned": "",
+      "tool_fit": "",
+      "tool_notes": "",
+      "note": "2026-11-22 フロー設計中（たたき台）。フォルダ・実装は未作成。",
+      "summary": "2026-11-22 フロー設計中（たたき台）。フォルダ・実装は未作成。",
+      "flow_summary": "",
+      "builder_tag": "",
+      "mixup_kind": "",
+      "grok_counterpart": "",
+      "flowforge_id": "flow_HMy15MUxWiSpw5QgAPYa_8e4",
+      "flowforge_url": "https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_HMy15MUxWiSpw5QgAPYa_8e4",
+      "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/DJc5DtKvcq5ZgjiV",
+      "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_HMy15MUxWiSpw5QgAPYa_8e4",
+      "permissions": {
+        "can_do": "2026-11-22 フロー設計中（たたき台）。フォルダ・実装は未作成。",
+        "methods": [],
+        "methods_filled": false,
+        "env_keys": [],
+        "site_logins": [],
+        "site_logins_summary": "なし",
+        "has_site_logins": false,
+        "human_gate": "お金・外に出す・消す",
+        "secrets_note": "社員 .env は最小セット。マスターは .env.jarvis_private",
+        "source": "claude+permissions_yaml"
+      },
+      "ops": {
+        "trigger_kinds": [
+          {
+            "id": "human",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "schedule",
+            "on": true,
+            "detail": "時間",
+            "raw": "",
+            "from_registry": true
+          },
+          {
+            "id": "event",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          },
+          {
+            "id": "watch",
+            "on": false,
+            "detail": "",
+            "raw": ""
+          }
+        ],
+        "trigger_kinds_on": [
+          "schedule"
+        ],
+        "trigger_kinds_label": "時間",
+        "triggers_filled": true,
+        "when": "時間",
+        "registry_trigger": "時間",
+        "registry_schedule": "",
+        "primary_report": "",
+        "report_channels": [],
+        "reports": [],
+        "procedures": [
+          {
+            "title": "FlowForge（作業フロー）",
+            "path": "",
+            "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/DJc5DtKvcq5ZgjiV",
+            "kind": "flowforge"
+          }
+        ],
+        "procedure_count": 1,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -7205,9 +7295,15 @@
             "path": "docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/AGENTS.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/AGENTS.md",
             "kind": "doc"
+          },
+          {
+            "title": "saved-minutes-to-todo.md",
+            "path": "docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/docs/saved-minutes-to-todo.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/700_コーチング支援室/714_議事録整理係/docs/saved-minutes-to-todo.md",
+            "kind": "doc"
           }
         ],
-        "procedure_count": 6,
+        "procedure_count": 7,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -11822,6 +11918,18 @@
         "role_split": "2026-10-22 新設。設計正本 44_コメント常駐起動_317。Phase A=Ack／Phase B=許可リストAI。Builder／FlowForge／share反映済"
       },
       {
+        "side": "ai_only",
+        "agent_id": "318",
+        "agent_name": "Todoist消化係（仮）",
+        "builder_tag": "",
+        "mixup_kind": "ai_only",
+        "grok_counterpart": "",
+        "grok_ids": [],
+        "grok_labels": [],
+        "grok_department": "",
+        "role_split": "2026-11-22 フロー設計中（たたき台）。フォルダ・実装は未作成。"
+      },
+      {
         "side": "paired",
         "agent_id": "411",
         "agent_name": "Grok材料取込係",
@@ -12608,9 +12716,9 @@
     ],
     "mapping_counts": {
       "paired": 18,
-      "ai_only": 26,
+      "ai_only": 27,
       "grok_only": 23,
-      "all": 67
+      "all": 68
     },
     "note": "対応表は全件。対応あり／AI社員のみ／Grokのみ（AI社員対応なし）を含む。〔Grok:◯◯〕は置き換えではなく並べて比較する相手。"
   },
