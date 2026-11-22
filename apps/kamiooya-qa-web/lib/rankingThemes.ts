@@ -51,3 +51,26 @@ export function shapeRound(r: any, decisions: any[]) {
 export function decisionRow(userId: string, d: ThemeDecisionInput) {
   return { ...d, decided_by: userId, decided_at: new Date().toISOString() };
 }
+
+// 画面から作り直す（2026-11-23 松野さん「好きなタイミングで集計したい」）。
+// 押すと GitHub Actions course-theme weekly を起動する（Gemini 従量）。重複して押されないよう、
+// 作成中（依頼から RUNNING_MS 以内で、まだ新しい回ができていない）は受け付けない。1日の上限も持つ。
+export const REBUILD_RUNNING_MS = 40 * 60 * 1000;
+export const REBUILD_DAILY_LIMIT = 5;
+export type RebuildRequest = { requested_by?: unknown; requested_at?: unknown; dispatched?: unknown };
+const ms = (v: unknown) => { const t = Date.parse(String(v ?? '')); return Number.isFinite(t) ? t : 0; };
+
+// 直近の依頼（新しい順）と最新の回の作成日時から、今の状態を決める。
+//  idle: 作り直せる / running: 作成中 / limit: 今日の上限に達した
+export function rebuildState(requests: RebuildRequest[], latestRoundAt: unknown, now: number) {
+  const ok = (Array.isArray(requests) ? requests : []).filter(r => r && r.dispatched === true && ms(r.requested_at) > 0)
+    .sort((a, b) => ms(b.requested_at) - ms(a.requested_at));
+  const last = ok[0];
+  const lastAt = last ? ms(last.requested_at) : 0;
+  const running = !!last && now - lastAt < REBUILD_RUNNING_MS && ms(latestRoundAt) < lastAt;
+  // 40分たっても新しい回ができていない時は、作れなかった可能性がある（もう一度押せる）。
+  const stale = !!last && !running && ms(latestRoundAt) < lastAt;
+  const today = ok.filter(r => now - ms(r.requested_at) < 24 * 60 * 60 * 1000).length;
+  const state = running ? 'running' : today >= REBUILD_DAILY_LIMIT ? 'limit' : 'idle';
+  return { state, last_requested_at: last ? new Date(lastAt).toISOString() : null, last_requested_by: last ? String(last.requested_by ?? '') : '', maybe_failed: stale, today };
+}

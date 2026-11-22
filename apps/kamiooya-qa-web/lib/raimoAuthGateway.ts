@@ -6,7 +6,7 @@ import {publicChangeLog} from './changeLog.ts';
 import {findTroubledChats, summarizeSignals, SIGNAL_LABELS} from './conversationSignals.ts';
 import {parseSourceClick, sourceClickRow, summarizeSourceClicks} from './sourceClicks.ts';
 import {matchPending} from './rosterMatch.ts';
-import {parseThemeDecision, shapeRound, decisionRow} from './rankingThemes.ts';
+import {parseThemeDecision, shapeRound, decisionRow, rebuildState, REBUILD_DAILY_LIMIT} from './rankingThemes.ts';
 import {shapeOpenchatRound} from './openchatRanking.ts';
 // Shared gateway: the production adapter supplies persistent sessions and live membership checks.
 type Member = { id: string; email: string; role: string; status: string; authVersion: string; name?: string; member_no?: string; prefecture?: string };
@@ -45,6 +45,9 @@ export type GatewayDependencies = {
   openchatRankings?(limit: number): Promise<unknown[]>;
   themeDecisions?(roundIds: string[]): Promise<unknown[]>;
   saveThemeDecision?(row: Record<string, unknown>): Promise<void>;
+  // 画面からランキングを作り直す（2026-11-23）。依頼の記録（新しい順）と、Actions の起動。
+  rebuildRequests?(limit: number): Promise<unknown[]>;
+  requestRankingRebuild?(userId: string): Promise<{ ok: boolean; error?: string }>;
   now?: () => number;
 };
 const approved = (u: Member | null): u is Member => !!u && u.status === 'approved' && ['user', 'admin', 'master_admin'].includes(u.role) && !!u.authVersion;
@@ -199,7 +202,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         return json({matches:await matchPending(users,h=>roster.has(h)),roster_count:meta.row_count??null,synced_at:meta.synced_at??null});
       }
       // (4) 質問ランキング＋講座テーマ案（運営分析）。管理者で、かつスイッチ ranking_themes で見える人だけ。
-      if((path==='/admin/ranking-themes/list'||path==='/admin/ranking-themes/decide') && req.method==='POST'){
+      if((path==='/admin/ranking-themes/list'||path==='/admin/ranking-themes/decide'||path==='/admin/ranking-themes/rebuild') && req.method==='POST'){
         let flags:FeatureFlag[]=[];
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
         requireFeature(Array.isArray(flags)?flags:[],'ranking_themes',{id:user.id,email:user.email});
@@ -212,9 +215,27 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
           await d.saveThemeDecision(decisionRow(user.id,t));
           return json({ok:true});
         }
+        // 画面から作り直す（2026-11-23 松野さん）。作成中・1日の上限は受け付けない。押した人の名前を返す（IDは返さない）。
+        const rebuildInfo=async(latestAt:unknown)=>{
+          if(!d.rebuildRequests||!d.requestRankingRebuild)return null;
+          let reqs:any[]=[];try{reqs=await d.rebuildRequests(20) as any[];}catch{reqs=[];}
+          const st=rebuildState(reqs,latestAt,d.now?d.now():Date.now());
+          let by:string|null=null;
+          if(st.last_requested_by){try{const m=await d.member(st.last_requested_by);by=m&&typeof m.name==='string'&&m.name?m.name:null;}catch{by=null;}}
+          return {state:st.state,last_requested_at:st.last_requested_at,last_requested_by_name:by,maybe_failed:st.maybe_failed,daily_limit:REBUILD_DAILY_LIMIT};
+        };
+        if(path==='/admin/ranking-themes/rebuild'){
+          if(!d.rebuildRequests||!d.requestRankingRebuild)return json({error:'feature_not_available'},404);
+          const latest=(await d.themeRounds(1) as any[])[0];
+          const before=await rebuildInfo(latest?.created_at);
+          if(before&&before.state!=='idle')return json({error:before.state==='running'?'in_progress':'daily_limit',rebuild:before},409);
+          const r=await d.requestRankingRebuild(String(user.id));
+          if(!r.ok)return json({error:r.error==='not_configured'?'not_configured':'dispatch_failed'},503);
+          return json({ok:true,rebuild:await rebuildInfo(latest?.created_at)});
+        }
         const rounds=(await d.themeRounds(5) as any[]).filter(r=>r&&typeof r.id==='string');
         const decisions=rounds.length?await d.themeDecisions(rounds.map(r=>r.id)) as any[]:[];
-        return json({latest:rounds[0]?shapeRound(rounds[0],decisions):null,
+        return json({latest:rounds[0]?shapeRound(rounds[0],decisions):null,rebuild:await rebuildInfo(rounds[0]?.created_at),
           history:rounds.slice(1).map(r=>{const s=shapeRound(r,decisions);return {id:s.id,created_at:s.created_at,themes:s.themes.map((x:any)=>({id:x.id,title:x.title,decision:x.decision}))};})});
       }
       // (4) の拡張: LINEオープンチャットの質問ランキング（運営分析）。管理者で、かつスイッチ openchat_ranking で見える人だけ。11/16
