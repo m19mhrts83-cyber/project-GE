@@ -107,6 +107,40 @@ class ZaimTests(unittest.TestCase):
         self.assertTrue(r["usage_caveat"])
 
 
+class ZaimTransferTests(unittest.TestCase):
+    HEAD = "日付,方法,支払元,入金先,お店,品目,支出,振替\n"
+    CFG = {"zaim_pay_contains": "FOO CARD", "zaim_exclude_keywords": ["年会費"],
+           "zaim_transfer_to_include": ["Shop.example"]}
+
+    def _csv(self, body):
+        import tempfile
+        d = tempfile.mkdtemp()
+        p = Path(d) / "z.csv"
+        p.write_text(self.HEAD + body, encoding="utf-8")
+        return p
+
+    def test_only_card_to_keyword_transfers(self):
+        p = self._csv(
+            "2026-04-01,transfer,FOO CARD 本会員,Shop.example,,,0,1000\n"
+            "2026-04-02,transfer,銀行,FOO CARD 本会員,,,0,50000\n"      # カード引落: 入れない
+            "2026-04-03,transfer,FOO CARD 本会員,Other,,,0,300\n"        # 別の入金先
+            "2026-04-04,balance,FOO CARD 本会員,,,,0,0\n"
+            "2026-04-05,payment,FOO CARD 本会員,,店,,700,0\n"            # payment は index 側
+            "2026-04-06,transfer,FOO CARD 本会員,Shop.example,,年会費,0,9000\n"
+            "2025-12-01,transfer,FOO CARD 本会員,Shop.example,,,0,400\n"  # 期間外
+            "2026-05-01,transfer,foo card,Shop.example,,,0,200\n"
+        )
+        period = (date(2026, 3, 1), date(2027, 2, 28))
+        r = c.aggregate_zaim_transfers(p, self.CFG, period)
+        self.assertEqual((r["usage_yen"], r["rows"], r["as_of"]), (1200, 2, "2026-05-01"))
+
+    def test_no_keyword_or_missing_file(self):
+        period = (date(2026, 3, 1), date(2027, 2, 28))
+        p = self._csv("2026-04-01,transfer,FOO CARD,Shop.example,,,0,1000\n")
+        self.assertEqual(c.aggregate_zaim_transfers(p, {"zaim_pay_contains": "FOO"}, period)["rows"], 0)
+        self.assertEqual(c.aggregate_zaim_transfers(Path("/nonexistent.csv"), self.CFG, period)["rows"], 0)
+
+
 class MailParseTests(unittest.TestCase):
     def test_parse(self):
         body = "本メールでは、2026年3月15日現在のお客さま…\n\n 1,234,567円（税込）\n"

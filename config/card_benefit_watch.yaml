@@ -59,6 +59,8 @@ cards:
     usage_basis: estimate
     zaim_pay_contains: "MARRIOTT BONVOY"
     zaim_exclude_keywords: ["年会費"]
+    # Amazon 購入は Zaim で「振替」（入金先=Amazon）として入る。支出行のインデックスには無いので CSV から足す
+    zaim_transfer_to_include: ["Amazon.co.jp"]
     counts_note: "家族カード分は基本カードに合算"
     grant_note: "特典の付与時期は未確認"
     tiers:

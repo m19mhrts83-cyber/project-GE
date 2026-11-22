@@ -23,6 +23,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import math
 import os
@@ -206,6 +207,49 @@ def aggregate_zaim(
     }
 
 
+def aggregate_zaim_transfers(
+    csv_path: Path, card_cfg: dict[str, Any], period: tuple[date, date]
+) -> dict[str, Any]:
+    """Zaim CSV の transfer 行のうち、支払元がカード・入金先が設定キーワードのもの（例: Amazon 購入）。
+
+    インデックス（zaim_learn 用）は payment 行だけなので、CSV を直接読む。
+    カード引落（銀行→カード）と balance 行は支払元/方法が違うので入らない。"""
+    needle = str(card_cfg.get("zaim_pay_contains") or "").upper()
+    kws = [str(k) for k in (card_cfg.get("zaim_transfer_to_include") or []) if str(k)]
+    excl = [str(k) for k in (card_cfg.get("zaim_exclude_keywords") or [])]
+    out = {"usage_yen": 0, "rows": 0, "as_of": ""}
+    if not needle or not kws or not csv_path.is_file():
+        return out
+    with csv_path.open(encoding="utf-8-sig", newline="") as f:
+        for r in csv.DictReader(f):
+            if (r.get("方法") or "") != "transfer":
+                continue
+            if needle not in str(r.get("支払元") or "").upper():
+                continue
+            if not any(k in str(r.get("入金先") or "") for k in kws):
+                continue
+            ds = str(r.get("日付") or "")[:10].replace("/", "-")
+            try:
+                dd = _d(ds)
+            except ValueError:
+                continue
+            if not (period[0] <= dd <= period[1]):
+                continue
+            text = f"{r.get('お店') or ''}{r.get('品目') or ''}"
+            if any(k in text for k in excl):
+                continue
+            try:
+                amt = int(round(float(r.get("振替") or 0)))
+            except ValueError:
+                continue
+            if amt <= 0:
+                continue
+            out["usage_yen"] += amt
+            out["rows"] += 1
+            out["as_of"] = max(out["as_of"], ds)
+    return out
+
+
 def refresh_bonvoy(state: dict[str, Any], cfg: dict[str, Any], today: date) -> str:
     p = zaim_index_path()
     if not p.is_file():
@@ -215,7 +259,21 @@ def refresh_bonvoy(state: dict[str, Any], cfg: dict[str, Any], today: date) -> s
     except (OSError, json.JSONDecodeError):
         return "Zaim 取込 index を読めない"
     card_cfg = cfg["cards"]["bonvoy"]
-    agg = aggregate_zaim(index, card_cfg, period_for(card_cfg, today))
+    period = period_for(card_cfg, today)
+    agg = aggregate_zaim(index, card_cfg, period)
+    csv_p = str(index.get("csv") or "")
+    if csv_p and card_cfg.get("zaim_transfer_to_include"):
+        try:
+            tr = aggregate_zaim_transfers(Path(csv_p).expanduser(), card_cfg, period)
+        except (OSError, csv.Error):
+            tr = {"rows": 0}
+        if tr["rows"]:
+            if agg is None:
+                agg = {"usage_yen": 0, "rows": 0, "as_of": "", "index_updated_at": index.get("updated_at")}
+            agg["usage_yen"] += tr["usage_yen"]
+            agg["rows"] += tr["rows"]
+            agg["as_of"] = max(agg["as_of"], tr["as_of"])
+            agg["transfer_rows"] = tr["rows"]
     if agg is None:
         return "期間内の該当行なし"
     agg["computed_at"] = datetime.now(JST).isoformat(timespec="seconds")
