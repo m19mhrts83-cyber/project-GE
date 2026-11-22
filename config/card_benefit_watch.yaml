@@ -18,6 +18,8 @@ pace:
 
 # Zaim 概算の注意（Bonvoy）
 zaim_note: "Zaim は取込日ベースの概算。アメックス画面の数字とずれる"
+# Zaim の基準日がこの日数より古いと「Zaim が古い」と短報・画面に出す
+zaim_stale_days: 10
 
 cards:
   olive:
@@ -29,6 +31,7 @@ cards:
       end: "2027-06-30"
     usage_source: gmail_monthly      # 三井住友カードの月次メール『各種特典条件達成状況』
     usage_basis: confirmed           # メール値は確定値（売上到着ベース）
+    stale_days: 45                   # 確定値の基準日がこれより古いと「古い」と短報・画面に出す
     counts_note: "デビット+クレジット合算。ポイント払い・年会費・つみたて投資・電子マネー等のチャージは対象外"
     grant_note: "付与は集計期間終了後の翌月末ごろ"
     tiers:

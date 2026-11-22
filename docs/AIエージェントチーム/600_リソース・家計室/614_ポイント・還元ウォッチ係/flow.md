@@ -25,7 +25,8 @@ flowchart TD
   T3[窓C 25-末日 Vポイント] --> A
   T4[朝オープン取りこぼし] --> A
   T5[人依頼] --> A
-  T6[月次 メール到着後 年間特典] --> A
+  T6[毎月28日 09:50 年間特典] --> A
+  T7[朝オープン取りこぼし 28日以降] --> A
   A --> B{種別}
   B -->|teiki| C1[jarvis_teiki_barai_chance --push]
   B -->|etc| C2[jarvis_etc_rebate_fetch --apply --push]
@@ -99,3 +100,5 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - 条件の金額は `threshold_status` を併記（確認済み／推定／要確認／未確認）。公式確認で `confirmed` に上げる。
 - 取り込み失敗（メール未着・Zaim 古い）は「データなし／基準日」で表示し、基準なしと扱って推奨を出さない。
 - 戻り条件: 条件の金額を公式で確認できたら config を直して計算へ戻る（無条件の反復なし）。
+- 起動: 毎月28日 09:50（launchd）＋朝オープンの取りこぼし（28日以降・今月未成功）。実行本体は `jarvis_card_benefit_monthly.py`（取り込み失敗・投稿失敗は `#ops`、成功時だけ月の印）。
+- Zaim の基準日が古い（既定10日超）ときは短報に「Zaim が古い（基準日◯）」を出し、概算は目安扱い。Olive の確定値が45日超なら「◯月◯日現在の確定値（古い）」も出す。

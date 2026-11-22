@@ -115,3 +115,20 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_agent_team_statu
 | 2026-10-17 | ビルダー組織図に追加（共有 `uksxiDIzE1AEckKH`）。`flow.md` 素案を613型で充填 |
 | 2026-10-29 | Vポイント Slack の文面を人の言葉に: 「要Jarvis確認」→「手で確認する項目: N件（一覧は下のページ）」、「窓C定例」→「月末の定例チェック（25日〜末日）」（松野FB） |
 | 2026-11-23 | **年間特典ウォッチ**を追加（親: 600 ラコ #25）。Olive は Gmail 月次メール『各種特典条件達成状況』＝**確定値**、Bonvoy は Zaim 取込行＝**概算**（取込日ベースで画面とずれる）。条件の金額は `threshold_status`（確認済み／推定／要確認／未確認）を画面と Slack に必ず併記し、公式で確かめるまで「確認済み」にしない。`/vpoint` に年間特典・Olive 履歴（達成済み＝入会特典／これから＝継続特典）・Vポイントの出口（確認済み／注意／未確認。**Vポイント投資を先頭・大きめ**に出し「元本割れの可能性・判断は松野さん」を注記、その下にPay・請求額充当・景品）。Slack `--kind card_benefit`（dry-run まで。実投稿と launchd は松野さんの了承後。停止は `JARVIS_CARD_BENEFIT_SLACK_REPORT_DISABLE=1`）。実額入りの控えは公開リポの `reports/` でなく state 側 |
+| 2026-11-23 | **年間特典の月次自動実行**を追加。毎月28日 09:50（Olive の月次メールが25〜27日ごろ届いたあと）＋朝オープンの取りこぼし（28日以降で今月まだ成功印なし）。本体 `jarvis_card_benefit_monthly.py`（取込 `--refresh` → Slack `--kind card_benefit --from-state`。失敗は `#ops`、成功した月だけ state に印）。Zaim の基準日が `zaim_stale_days`（既定10日）より古いと短報に「Zaim が古い（基準日◯）」。Olive の確定値が `stale_days`（45日）より古い月も「Olive は◯月◯日現在の確定値（古い）」。停止 `JARVIS_CARD_BENEFIT_DISABLE=1` |
+
+### 年間特典の月次 launchd（導入は松野さんの了承後に Mac で）
+
+```bash
+cd ~/git-repos
+# 先に投稿なしで確認（取込は行う・Slack は表示のみ）
+~/selenium_env/venv/bin/python scripts/jarvis_card_benefit_monthly.py --force --dry-run
+# 導入（毎月28日 09:50）
+zsh launchd/install_card_benefit_monthly_launchd.sh
+# 外す
+zsh launchd/uninstall_card_benefit_monthly_launchd.sh
+```
+
+- ログ: `~/Library/Logs/jarvis_card_benefit/`
+- 停止: `JARVIS_CARD_BENEFIT_DISABLE=1`（短報だけ止める時は `JARVIS_CARD_BENEFIT_SLACK_REPORT_DISABLE=1`）
+- 成功印: `.jarvis_state/card_benefit_watch.json` の `last_monthly_run`（月 `YYYY-MM`）。再投稿したい時は `--force`（同日・同文面は Slack 側の重複防止で止まる）

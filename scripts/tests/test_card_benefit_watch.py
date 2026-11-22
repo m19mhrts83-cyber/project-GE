@@ -166,5 +166,47 @@ class HistoryAndSlackTests(unittest.TestCase):
         self.assertIn("推定", text)  # 条件の確からしさを省かない
 
 
+class StaleAndMonthlyTests(unittest.TestCase):
+    def test_zaim_stale_flag_and_slack_line(self):
+        cfg = dict(CFG, zaim_stale_days=10)
+        state = {"bonvoy": {"zaim": {"usage_yen": 100000, "as_of": "2026-06-10"}}}
+        r = c.compute(cfg, state, date(2026, 7, 1))
+        b = [x for x in r["cards"] if x["id"] == "b"][0]
+        self.assertTrue(b["usage_stale"])
+        text = c.build_slack_text(r, header="H", dash_url="u", mask=True)
+        self.assertIn("Zaim が古い（基準日6/10）", text)
+
+    def test_olive_confirmed_stale(self):
+        cfg = {**CFG, "cards": {**CFG["cards"], "a": {**CFG["cards"]["a"], "stale_days": 45}}}
+        old = c.compute(cfg, st_a(1_000_000, "2026-05-15"), date(2026, 7, 1))
+        self.assertTrue(old["cards"][0]["usage_stale"])
+        self.assertIn("Aは5/15現在の確定値（古い）",
+                      c.build_slack_text(old, header="H", dash_url="u", mask=True))
+        fresh = c.compute(cfg, st_a(1_000_000, "2026-06-15"), date(2026, 7, 1))
+        self.assertFalse(fresh["cards"][0]["usage_stale"])
+
+    def test_zaim_fresh_no_line(self):
+        cfg = dict(CFG, zaim_stale_days=10)
+        state = {"bonvoy": {"zaim": {"usage_yen": 100000, "as_of": "2026-06-28"}}}
+        text = c.build_slack_text(c.compute(cfg, state, date(2026, 7, 1)), header="H", dash_url="u", mask=True)
+        self.assertNotIn("Zaim が古い", text)
+
+    def test_monthly_catchup(self):
+        import os
+        from datetime import datetime
+        import jarvis_card_benefit_monthly as m
+        old = dict(os.environ)
+        try:
+            os.environ.pop("JARVIS_CARD_BENEFIT_DISABLE", None)
+            os.environ["JARVIS_STATE_DIR"] = "/nonexistent-card-benefit-test"
+            self.assertFalse(m.needs_catchup(datetime(2026, 7, 27, 9, tzinfo=c.JST)))
+            self.assertTrue(m.needs_catchup(datetime(2026, 7, 28, 9, tzinfo=c.JST)))
+            os.environ["JARVIS_CARD_BENEFIT_DISABLE"] = "1"
+            self.assertFalse(m.needs_catchup(datetime(2026, 7, 29, 9, tzinfo=c.JST)))
+        finally:
+            os.environ.clear()
+            os.environ.update(old)
+
+
 if __name__ == "__main__":
     unittest.main()
