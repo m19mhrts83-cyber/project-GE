@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 318 Todoist消化係 毎朝 10:30（未登録の雛形）。このファイルは load しない。
+     登録は install_jarvis_todoist_318_launchd.sh に yes の確認を付けた時だけ（移管手順の 3 番目）。
+     手順: 318_Todoist消化係/移管手順_10時30分.md -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.matsunoma.jarvis.todoist-318</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd "__REPO__" &amp;&amp; "__REPO__/launchd/jarvis_todoist_318_runner.sh"</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__REPO__</string>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>10</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/jarvis_todoist_318/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/jarvis_todoist_318/launchd.err.log</string>
+</dict>
+</plist>

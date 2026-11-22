@@ -4,7 +4,7 @@
 
 | 項目 | 値 |
 |---|---|
-| task_id | orca task_1588877e6c3e（Phase 1 実装・PR #582 マージ済）／task_becb7616c903（Phase 2 実装） |
+| task_id | orca task_1588877e6c3e（Phase 1・PR #582 マージ済）／task_becb7616c903（Phase 2・PR #585 マージ済）／task_0036d777fe4a（Phase 3 準備） |
 | agent_id | 318 |
 | executor | claude_code（Miss Lemon・Orca worker） |
 | status | done（PR レビュー待ち。マージはラスカルが松野さんの了承後） |
@@ -34,12 +34,22 @@ Phase 1 実装（読むだけ・抽出・変化なし除外・3分類・内部�
 - [x] 317 の【318】除外とテスト
 - [x] 実データの掲載・送信はしない（`--publish`／`--send-slack` は松野さんが朝に決める）
 
+## Phase 3 準備 完了条件（有効化はすべて松野さんが朝に決める。全部既定オフ・未登録）
+
+- [x] 【318】コメント反映（ノード5-1・5-2）: 内部ログ保存成功後・変化のある件だけ・同一内容／同一処理IDの重複確認・応答不明は照合まで再送しない・完了／削除／期限変更はしない。`--write-comments` の時だけ
+- [x] 317 の除外を前提にテスト（除外が外れていたら書かない）
+- [x] 10:30 の準備: launchd の plist を未登録の雛形で置く（load しない）。313 の 0.5 との排他の取り決めを実装。移管手順書（止める順番・戻し方）
+- [x] 313 の予定タスク `todoist-daily-313` は変えない
+- [x] ①自律実行は作らない。① の「やる予定の内容」を内部ログに記録
+- [x] CLAUDE.md・TASK.md・PROGRESS.md（先頭に朝に決めること）
+
 ## 成果物
 
-- `scripts/jarvis_todoist_318_triage.py`・`scripts/jarvis_todoist_318_handoff.py`
+- `scripts/jarvis_todoist_318_triage.py`・`scripts/jarvis_todoist_318_handoff.py`・`scripts/jarvis_todoist_318_comment.py`（Phase 3 準備）・`scripts/jarvis_todoist_morning_slot.py`（朝枠の排他）
 - `config/todoist_318_criteria.yaml`
-- `scripts/tests/test_todoist_318_triage.py`
-- このフォルダの `CLAUDE.md`・`PROGRESS.md`・`flow.md`
+- `launchd/com.matsunoma.jarvis.todoist-318.plist.template`・`launchd/jarvis_todoist_318_runner.sh`・`launchd/install_jarvis_todoist_318_launchd.sh`・`launchd/uninstall_jarvis_todoist_318_launchd.sh`（未登録）
+- `scripts/tests/test_todoist_318_triage.py`・`test_todoist_318_phase2.py`・`test_todoist_318_phase3.py`
+- このフォルダの `CLAUDE.md`・`PROGRESS.md`・`flow.md`・`移管手順_10時30分.md`
 
 ## メモ・障害
 
