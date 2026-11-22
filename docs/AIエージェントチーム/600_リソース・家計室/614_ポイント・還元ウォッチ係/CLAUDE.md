@@ -132,3 +132,4 @@ zsh launchd/uninstall_card_benefit_monthly_launchd.sh
 - ログ: `~/Library/Logs/jarvis_card_benefit/`
 - 停止: `JARVIS_CARD_BENEFIT_DISABLE=1`（短報だけ止める時は `JARVIS_CARD_BENEFIT_SLACK_REPORT_DISABLE=1`）
 - 成功印: `.jarvis_state/card_benefit_watch.json` の `last_monthly_run`（月 `YYYY-MM`）。再投稿したい時は `--force`（同日・同文面は Slack 側の重複防止で止まる）
+| 2026-11-23 | **Bonvoy 概算にアメックスでの Amazon 購入を加算**。Zaim ではこれが「振替（支払元=アメックス、入金先=Amazon）」で入り、zaim_learn のインデックス（支出行のみ）に無く概算が過少だった。インデックスは学習の差分に使うため触らず、614 が index の `csv` パスの CSV を直接読む（`aggregate_zaim_transfers`）。対象は設定 `zaim_transfer_to_include`（入金先キーワード）に合う transfer 行のみ。カード引落（銀行→カード）・残高行は足さない。年会費除外は維持 |
