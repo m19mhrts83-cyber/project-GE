@@ -63,10 +63,39 @@ class SourcesTest(unittest.TestCase):
         module = SimpleNamespace(load_previous_health=lambda: {}, run_line_health_routine=run,
             build_health_snapshot=lambda inv: {'decode_seen': 25}, evaluate_alerts=lambda cur, prev: ['private'])
         with patch.dict(sys.modules, {'chrline_line_health': module}):
-            result = sources.chrline_snapshot()
+            result = sources.chrline_child()
         run.assert_called_once_with(save_baseline=False)
         self.assertEqual(result[0], '異常')
         self.assertNotIn('private', result[1])
+
+
+class ChrlineSubprocessTest(unittest.TestCase):
+    def snap(self, code, timeout=20):
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / 'py'
+            fake.write_text('#!/bin/sh\n' + code + '\n')
+            fake.chmod(0o755)
+            return sources.chrline_snapshot(fake, timeout)
+
+    def test_ok_result_is_passed_through(self):
+        r = self.snap('echo "noise /private/path"; echo \'@@["OK","detail"]\'')
+        self.assertEqual(r, ('OK', 'detail'))
+
+    def test_missing_venv(self):
+        r = sources.chrline_snapshot(Path('/nonexistent/py'))
+        self.assertEqual(r[0], '確認不能')
+        self.assertIn('venvなし', r[1])
+
+    def test_child_failure_hides_output(self):
+        r = self.snap('echo secret-path >&2; exit 3')
+        self.assertEqual(r[0], '確認不能')
+        self.assertIn('code=3', r[1])
+        self.assertNotIn('secret', r[1])
+
+    def test_timeout(self):
+        r = self.snap('sleep 5', timeout=1)
+        self.assertEqual(r[0], '確認不能')
+        self.assertIn('タイムアウト', r[1])
 
 
 class PipelineTest(unittest.TestCase):

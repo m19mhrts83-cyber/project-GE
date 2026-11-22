@@ -21,7 +21,7 @@ WeStudy／GitHub Actions の失敗、LINE オープンチャット取込、**Gma
 |---|---|
 | 開始トリガー 日曜21:00 | GHA `ops-health-315.yml`（cron UTC 日曜12:00） |
 | GHA実行結果取得 | 315自身のmain完了履歴＋既存 `jarvis_westudy_weekly_check.py` |
-| Square probe / CHRLINE health | **GHAではスキップ**。Mac日曜21:45に保存済みSquare結果（liveなし）とCHRLINE health（baseline保存なし）を参照 |
+| Square probe / CHRLINE health | **GHAではスキップ**。Mac日曜21:45に保存済みSquare結果（liveなし）とCHRLINE health（baseline保存なし。`line_unofficial_poc/.venv` のpythonを子プロセスで呼び読取のみ。失敗時は理由=モジュール不足/タイムアウト/venvなし等を説明に出す）を参照 |
 | Gmail token ヘルス | **GHAではスキップ**。Mac: `jarvis_gmail_token_health`（send欠落・refresh欠如を検知） |
 | 健全性レポート | `jarvis_ops_health_315.py` が本文生成 → `#ops` |
 | 1回トライ | Mac: オプチャ health push → recover_worker／watch resume。**Gmail・WeStudyは自動復旧しない** |

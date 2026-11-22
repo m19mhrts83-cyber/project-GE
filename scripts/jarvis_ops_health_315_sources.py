@@ -4,6 +4,8 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +13,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 # Weekly cadence + six hours of scheduling / collection allowance.
 MAX_AGE_HOURS = 174
+CHRLINE_PYTHON = REPO / "line_unofficial_poc" / ".venv" / "bin" / "python"
+CHRLINE_TIMEOUT = 90
 
 
 def recent(value: str, now: datetime | None = None) -> bool:
@@ -55,11 +59,13 @@ def square_snapshot(path: Path | None = None) -> tuple[str, str]:
         return "確認不能", "保存済みprobeを読取できない"
 
 
-def chrline_snapshot() -> tuple[str, str]:
+def chrline_child() -> tuple[str, str]:
+    """Runs inside the CHRLINE venv (needs CHRLINE/gevent). Read-only health."""
     # Existing health API is read-only with save_baseline=False. Do not render
     # its per-folder block: it contains private names / paths.
     try:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            sys.path.insert(0, str(REPO / "line_unofficial_poc" / "chrline-patchv2"))
             sys.path.insert(0, str(REPO / "line_unofficial_poc"))
             from chrline_line_health import (
                 build_health_snapshot, evaluate_alerts, load_previous_health,
@@ -74,9 +80,47 @@ def chrline_snapshot() -> tuple[str, str]:
                 return "確認不能", "CHRLINE直近decode標本なし"
             alerts = evaluate_alerts(current, previous)
             return ("異常" if alerts else "OK"), f"CHRLINE health: 警告{len(alerts)}件（baseline保存なし）"
+    except ModuleNotFoundError:
+        return "確認不能", "CHRLINE healthを取得できない（モジュール不足）"
     except Exception:
         # Never put exception text (paths, token values) into report/log.
-        return "確認不能", "CHRLINE healthを取得できない"
+        return "確認不能", "CHRLINE healthを取得できない（読取エラー）"
+
+
+_CHILD_CODE = (
+    "import json,sys;sys.path.insert(0,sys.argv[1]);"
+    "from jarvis_ops_health_315_sources import chrline_child;"
+    "print('@@'+json.dumps(chrline_child(),ensure_ascii=False))"
+)
+
+
+def chrline_snapshot(python: Path | None = None, timeout: int = CHRLINE_TIMEOUT) -> tuple[str, str]:
+    """Read CHRLINE health via the CHRLINE venv in a child process (read-only)."""
+    py = python or CHRLINE_PYTHON
+    if not Path(py).is_file():
+        return "確認不能", "CHRLINE healthを取得できない（CHRLINE用venvなし）"
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(REPO / "line_unofficial_poc" / "chrline-patchv2"), str(REPO / "line_unofficial_poc")]
+    )
+    try:
+        proc = subprocess.run(
+            [str(py), "-c", _CHILD_CODE, str(Path(__file__).resolve().parent)],
+            capture_output=True, text=True, timeout=timeout, env=env, cwd=str(REPO),
+        )
+    except subprocess.TimeoutExpired:
+        return "確認不能", f"CHRLINE healthを取得できない（タイムアウト{timeout}秒）"
+    except OSError:
+        return "確認不能", "CHRLINE healthを取得できない（起動失敗）"
+    # Only our marked line is trusted; child stderr/other stdout may hold paths.
+    for line in reversed(proc.stdout.splitlines()):
+        if line.startswith("@@"):
+            try:
+                level, detail = json.loads(line[2:])
+                return str(level), str(detail)
+            except (ValueError, TypeError):
+                break
+    return "確認不能", f"CHRLINE healthを取得できない（子プロセス失敗 code={proc.returncode}）"
 
 
 def collect(run, *, cloud: bool) -> dict[str, tuple[str, str]]:

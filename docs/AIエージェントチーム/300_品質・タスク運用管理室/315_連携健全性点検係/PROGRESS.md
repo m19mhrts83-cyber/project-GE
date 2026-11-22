@@ -31,3 +31,8 @@
 - 確定FlowForge読取・既存運用照合、専用worktreeで実装。工程差分と検証は [315a-alignment](docs/315a-alignment.md)。
 - 315自身の完了GHA履歴・保存済みSquare・CHRLINE healthを接続。正常週次#ops抑止を解除、dry-run mark無効化、専用Webhook以外への転送防止。
 - マージ・本番適用は未実施。schedule/plist/既存復旧1回を維持。状態の格上げなし。
+
+## 2026-11-22 315-A CHRLINE health 取得修正
+
+- 原因: 実行pythonにCHRLINE/geventが無く例外握りつぶしで「取得できない」。修正: `.venv` のpythonを子プロセスで呼びPYTHONPATHを付与、読取専用維持、失敗理由を説明に出す。テスト追加。
+- Squareは未変更（保存側の定期実行が無く古い結果のまま。112担当へ別途）。マージ・launchd変更・Slack送信なし。
