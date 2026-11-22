@@ -52,3 +52,15 @@ test('古さの表示', () => {
   assert.equal(ageText(5514), '3日前');
   assert.equal(ageText(null), '時刻不明');
 });
+
+test('月額はエージェントの道具と基盤に分ける。知らない id は基盤', async () => {
+  const { splitAiSubs } = await import('../lib/aiUsage.ts');
+  const r = splitAiSubs([
+    { id: 'claude', monthly_yen: 15973 }, { id: 'cursor', monthly_yen: 3195 },
+    { id: 'typeless', monthly_yen: 1952 }, { id: 'new_thing', monthly_yen: 100 },
+  ]);
+  assert.equal(r.toolsTotal, 19168);
+  assert.equal(r.baseTotal, 2052);
+  assert.equal(r.total, 21220);
+  assert.deepEqual(r.base.map((s) => s.id), ['typeless', 'new_thing']);
+});

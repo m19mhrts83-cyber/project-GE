@@ -5,6 +5,7 @@ import {
   ageText,
   historyRows,
   parseAiUsage,
+  splitAiSubs,
   viewRows,
   viewVerdicts,
   type AiUsageRowView,
@@ -77,7 +78,7 @@ export default async function AiUsagePage() {
   const rows = p ? viewRows(p, now) : [];
   const verdicts = p ? viewVerdicts(p, rows) : [];
   const aiSubs = (subs || []) as AiSub[];
-  const aiMonthly = aiSubs.reduce((a, s) => a + Number(s.monthly_yen || 0), 0);
+  const split = splitAiSubs(aiSubs);
   const a = p?.assumptions;
 
   return (
@@ -163,23 +164,46 @@ export default async function AiUsagePage() {
       {aiSubs.length === 0 ? (
         <p className="meta">契約の一覧が読めませんでした。「サブスク・課金」を見てください。</p>
       ) : (
-        <section className="billing-cursor-usage card">
-          <p className="cursor-usage-plan">合計 {fmtYen(aiMonthly)}／月</p>
-          <table className="prop-event-table">
-            <tbody>
-              {aiSubs.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.name}</td>
-                  <td>{fmtYen(Number(s.monthly_yen || 0))}／月</td>
-                  <td className="meta">{s.next_bill ? `次回 ${s.next_bill}` : ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <>
+          <div className="stats">
+            <div className="stat">
+              エージェントの道具 <strong>{fmtYen(split.toolsTotal)}</strong>
+            </div>
+            <div className="stat">
+              基盤の維持 <strong>{fmtYen(split.baseTotal)}</strong>
+            </div>
+            <div className="stat">
+              合計 <strong>{fmtYen(split.total)}</strong>
+            </div>
+          </div>
+          {[
+            { title: "エージェントの道具（使用量の枠がある契約）", list: split.tools, total: split.toolsTotal },
+            { title: "AI エージェントの基盤を保つ契約（入力・連絡・保管など）", list: split.base, total: split.baseTotal },
+          ].map((g) => (
+            <section key={g.title} className="billing-cursor-usage card">
+              <p className="billing-summary-kicker">{g.title}</p>
+              <p className="cursor-usage-plan">小計 {fmtYen(g.total)}／月</p>
+              {g.list.length === 0 ? (
+                <p className="meta">該当する契約はありません。</p>
+              ) : (
+                <table className="prop-event-table">
+                  <tbody>
+                    {g.list.map((s) => (
+                      <tr key={s.id}>
+                        <td>{s.name}</td>
+                        <td>{fmtYen(Number(s.monthly_yen || 0))}／月</td>
+                        <td className="meta">{s.next_bill ? `次回 ${s.next_bill}` : ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+          ))}
           <p className="meta cursor-usage-foot">
-            契約の正本は <a href="/billing">サブスク・課金</a>。
+            契約の正本は <a href="/billing">サブスク・課金</a>。プランの上げ下げで動くのは「エージェントの道具」の側です。
           </p>
-        </section>
+        </>
       )}
 
       <h2>目安の決め方</h2>
