@@ -33,14 +33,6 @@ ETC_STATE = REPO / ".jarvis_state" / "etc_monthly.json"
 VPOINT_MONTHLY = REPO / ".jarvis_state" / "vpoint_monthly.json"
 VPOINT_CADENCE = REPO / ".jarvis_state" / "vpoint_cadence.json"
 DEDUPE_STATE = REPO / ".jarvis_state" / "points_rebate_slack_dedupe.json"
-REPORTS_DIR = (
-    REPO
-    / "docs"
-    / "AIエージェントチーム"
-    / "600_リソース・家計室"
-    / "614_ポイント・還元ウォッチ係"
-    / "reports"
-)
 JST = ZoneInfo("Asia/Tokyo")
 AGENT_ID = "614"
 AGENT_NAME = "ポイント還元"
@@ -74,18 +66,25 @@ def _md(iso: object) -> str:
         return ""
 
 
-def _archive(text: str, tag: str) -> None:
+def reports_dir(tag: str) -> Path:
+    """控えの置き場。金額・基準日・券数を含み得るため、公開リポの docs ではなく
+    gitignore 済みの state 側（F8・2026-11-23）。JARVIS_STATE_DIR があればそちら。"""
+    sd = (os.environ.get("JARVIS_STATE_DIR") or "").strip()
+    base = Path(sd).expanduser() if sd else REPO / ".jarvis_state"
+    # 年間特典は従来の置き場を維持
+    return base / ("card_benefit_reports" if tag.startswith("card_benefit") else "points_rebate_reports")
+
+
+def _archive(text: str, tag: str, *, dry_run: bool = False) -> None:
     try:
-        # 年間特典の短報は実額入り。公開リポ（docs）に残さず gitignore 済みの state 側へ。
-        reports_dir = REPORTS_DIR
-        if tag.startswith("card_benefit"):
-            sd = (os.environ.get("JARVIS_STATE_DIR") or "").strip()
-            reports_dir = (Path(sd).expanduser() if sd else REPO / ".jarvis_state") / "card_benefit_reports"
-        reports_dir.mkdir(parents=True, exist_ok=True)
+        out_dir = reports_dir(tag)
+        out_dir.mkdir(parents=True, exist_ok=True)
         day = datetime.now(JST).strftime("%Y-%m-%d")
-        path = reports_dir / f"{day}_{tag}.md"
+        # dry-run の控えは別名（配信の証拠にしない・F8/n21）
+        suffix = "_dryrun" if dry_run else ""
+        path = out_dir / f"{day}_{tag}{suffix}.md"
         path.write_text(
-            f"# Slack #report 控え — {day} / {tag}\n\n```\n{text}\n```\n",
+            f"# Slack #report 控え{'（dry-run・未配信）' if dry_run else ''} — {day} / {tag}\n\n```\n{text}\n```\n",
             encoding="utf-8",
         )
         try:
@@ -305,7 +304,7 @@ def _post(
         print("--- dry-run ---")
         print(text)
         print("---")
-        _archive(text, archive_tag)
+        _archive(text, archive_tag, dry_run=True)
         return 0
     if not POST.is_file():
         print(f"❌ missing {POST}", file=sys.stderr)

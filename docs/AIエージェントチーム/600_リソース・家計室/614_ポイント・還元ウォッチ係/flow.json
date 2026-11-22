@@ -33,6 +33,13 @@
       "item": "テイチャンがメンテ停止中の扱い",
       "decision": "確認は3日間隔に戻し、短報は『メンテナンス停止中（最終確認日）』にする。再開を検知したら通常の間隔に戻す",
       "note": "再開の検知は3日ごとの確認で行う。排他も軽く入れる。停止スイッチ（*_DISABLE）は変えない。実装済み（2026-11-23）"
+    },
+    {
+      "id": "F8",
+      "date": "2026-11-23",
+      "item": "ETC 短報の控えを公開リポに書かない",
+      "decision": "控えを非公開側（.jarvis_state/ 以下・gitignore 済み）へ出す。ETC だけでなく、テイチャン・Vポイント・年間特典も同じ扱い",
+      "note": "実装済み。既存の公開側の控えは消していない"
     }
   ],
   "legend": {
@@ -568,23 +575,23 @@
       "id": "n21",
       "number": 21,
       "lane": "out",
-      "title": "Slack 控えを保存（dry-run でも作られる）",
+      "title": "Slack 控えを保存（非公開側・dry-run は別名）",
       "actor": "プログラム",
-      "executor": "jarvis_points_rebate_slack_report.py の _archive()",
+      "executor": "jarvis_points_rebate_slack_report.py の _archive()／reports_dir()",
       "trigger": "ノード19／20 の投稿成功後、または dry-run の実行時",
       "input": "投稿本文",
-      "process": "reports/<日付>_<種別>_<結果>.md に保存（年間特典は .jarvis_state/card_benefit_reports/）。dry-run でも同じ形で保存される",
-      "output": "公開リポ docs の reports/（実額なし）／年間特典は非公開 state 側",
+      "process": "投稿本文 → 非公開の state 側 .jarvis_state/points_rebate_reports/<日付>_<種別>_<結果>.md に保存（年間特典は従来どおり .jarvis_state/card_benefit_reports/）。dry-run は <日付>_<種別>_<結果>_dryrun.md の別名で、冒頭に『dry-run・未配信』と書く。JARVIS_STATE_DIR があればそちら",
+      "output": "保存: 非公開 state 側（gitignore 済み。公開リポ docs の reports/ には書かない）／画面: なし／報告: なし",
       "screen": "なし",
       "report": "なし",
       "success": "ファイルができた（配信成功の証拠にはしない）",
       "partial": "—",
       "failure": "保存失敗→stderr のみ",
       "decision": "なし",
-      "implementation": "実装済",
+      "implementation": "実装済（F8・2026-11-23）",
       "confirmed": "確認済み",
       "run_state": "確認済",
-      "evidence": "Mac の実体は47件、git（この worktree）は41件＝11/19〜11/23 分の6件は未取り込み。11/23 の年間特典の控え（state 側）は dry-run の産物",
+      "evidence": "F8 の決定（2026-11-23）で、ETC・テイチャン・Vポイントの控えを公開リポ docs から非公開 state 側へ移した（金額・基準日・券数を含み得るため全種別）。dry-run の控えは別名。既存の公開側の控え41件は消していない（履歴に残るため扱いは松野さんに確認）。単体テスト test_points_rebate_report_archive.py。以下は実装前: Mac の実体は47件、git（この worktree）は41件＝11/19〜11/23 分の6件は未取り込み。11/23 の年間特典の控え（state 側）は dry-run の産物",
       "source_id": "614-N21"
     },
     {
@@ -1554,7 +1561,7 @@
     },
     {
       "id": "F8",
-      "note": "Slack 控え（reports/）は dry-run でも作られ（slack_report.py:277-294）、配信の証拠にならない。さらに ETC の短報は『還元額=◯円』を含み、控えは公開リポの docs（reports/）に書かれる。10/17 の控え1件が既に git にあり、11/20 分は Mac 上で未コミット。公開リポに実額を書かない決まりと合わない（n19・n21・n31）"
+      "note": "【修正済み F8：控えは非公開側へ・dry-run は別名。既存の公開側の控え41件は未削除（松野さんに確認）】Slack 控え（reports/）は dry-run でも作られ（slack_report.py:277-294）、配信の証拠にならない。さらに ETC の短報は『還元額=◯円』を含み、控えは公開リポの docs（reports/）に書かれる。10/17 の控え1件が既に git にあり、11/20 分は Mac 上で未コミット。公開リポに実額を書かない決まりと合わない（n19・n21・n31）"
     },
     {
       "id": "F9",
@@ -1595,7 +1602,7 @@
       "nodes": "n21",
       "findings": "F8",
       "proposal": "控えの置き場：金額を含み得る控え（ETC など）を公開リポの docs でなく state 側へ。dry-run の控えは別名にする",
-      "when": "実装 TASK で。公開リポの既存控え1件の扱いは松野さん"
+      "when": "F8 決定済み（2026-11-23）。置き場の移動と dry-run 別名は実装済み。公開リポの既存控え41件（うち実額を含むのは ETC の1件）の扱いは松野さんに確認"
     },
     {
       "id": "P6",

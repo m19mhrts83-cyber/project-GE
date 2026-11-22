@@ -25,7 +25,7 @@
 |---|---|
 | **入口** | Vpass／smile-etc／Vポイント state（`teiki_*` / `etc_monthly` / `vpoint_*`） |
 | **確認** | 抽選・還元取得は自動。OTP・Wallet・規約未同意・ログイン失敗だけ人 |
-| **履歴** | Slack `#report` 控え `reports/`・各 state・ダッシュ `/vpoint` `/etc` |
+| **履歴** | Slack `#report` 控え（非公開 `.jarvis_state/points_rebate_reports/`）・各 state・ダッシュ `/vpoint` `/etc` |
 | **停止** | 各本線の `*_DISABLE` ／ `JARVIS_POINTS_REBATE_SLACK_REPORT_DISABLE=1` |
 
 ## 1. 役割
@@ -82,7 +82,7 @@
 |---|---|
 | state | `.jarvis_state/teiki_barai_chance.json` / `etc_monthly.json` / `vpoint_*.json` |
 | Mac ログ | `~/Library/Logs/jarvis_teiki/` 等 |
-| Slack 控え | 本フォルダ `reports/` |
+| Slack 控え | 非公開 `.jarvis_state/points_rebate_reports/`（年間特典は `card_benefit_reports/`）。本フォルダ `reports/` の既存分（2026-10〜11 の41件）は旧置き場で、新規は書かない |
 
 ## 6. 作業手順
 
@@ -138,3 +138,4 @@ zsh launchd/uninstall_card_benefit_monthly_launchd.sh
 | 2026-11-23 | **フロー第2稿（Codex レビュー反映・docs のみ）**。Codex の指摘（誤り6件・優先修正5件）を `flow.md`／`flow.json`／`flow.html` に反映: 『毎日・メンテ開始』を推定・未特定に直す／10/25 の run ログは0バイトで成功の証拠にならない／正常スキップ（新ノード32）と控え（dry-run でも作られる）を分離／全矢印に［現行］［提案］を付与／提案ノード25〜31（取得元別の成否・月印と再試行・基準日判定・保存検証・排他・再開検知・run 結果集約）を追加。判断点は D4→D6→D1/D2→D5→D7/D8→D3 の順。**決定: Slack の短報には実額を載せてよい（松野さん本人宛）／公開リポ（コード・docs・PR・テスト・reports）には実額を書かない**（D9 決定済み）。気づき F7〜F9（mask 指定の確認・ETC 控えに金額が入る・recommend が鮮度を見ない）。コードは未修正 |
 | 2026-11-23 | **D6 実装（Vポイント：履歴が古い時は『部分成功』）**。付与サマリの成否を基準日で判定（Tサイト履歴の取得日が対象月の末日以降＝成功／前・不明・監査フォールバック＝部分成功／履歴も行も無い＝失敗）。**月印 last_check_c は成功の時だけ**。部分成功は短報『部分成功（履歴が古い・基準日=…）』（Slack は本人通知なので具体値あり）・asks に『Tサイト取って』。付与サマリ以外の定例は止めない。F3（last_routine_at／asks が PDCA 後に消える）も保存順で修正。`scripts/tests/test_vpoint_grant_quality.py`。取得時期（6a）は決めない（松野さん決定） |
 | 2026-11-23 | **D4 実装（テイチャン：メンテ停止中は3日に1回・短報『メンテナンス停止中（最終確認日）』）**。画面本文の『メンテナンス＋停止』で `site_status=maintenance`（再開予定の行を保存・券数と規約は前回値のまま）。停止中は朝の取りこぼし（morning_refresh）も本線 `is_due` も券数>0 では起動せず、3日間隔。再開（通常画面に戻る）を検知したら通常の間隔に戻り、その回の短報に『メンテナンス明けを検知』。停止中の間隔内スキップは Slack に出さない。本線に flock の排他（`.jarvis_state/teiki_barai_chance/run.lock`）。停止スイッチ `*_DISABLE` は不変。`scripts/tests/test_teiki_maintenance.py` |
+| 2026-11-23 | **F8 実装（Slack 控えを非公開側へ）**。`jarvis_points_rebate_slack_report.py` の控えを、公開リポ docs の `reports/` ではなく `.jarvis_state/points_rebate_reports/`（gitignore 済み）へ。ETC・テイチャン・Vポイントとも（年間特典は従来どおり `card_benefit_reports/`）。dry-run の控えは `_dryrun` の別名で『未配信』と明記。本フォルダ `reports/` の既存41件は消していない（うち実額を含むのは ETC の1件・扱いは松野さんに確認）。`scripts/tests/test_points_rebate_report_archive.py` |
