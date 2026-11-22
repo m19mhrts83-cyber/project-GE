@@ -8,7 +8,7 @@ FlowForge flow_HMy15MUxWiSpw5QgAPYa_8e4 のノード対応:
     松野さんの選択は既存どおり owner_decisions（surface=todoist_313, target_type=todoist_task）に残る。
     → fetch_owner_answers で読み戻し、318 の判断履歴へ入れて次回に再判定する。
 - ③本人作業 … build_weekly_handoff → sync_meta.todoist_318_weekly_handoff
-    既存の scripts/jarvis_todoist_weekly_pick.py（日曜 snapshot）が候補に入れ、理由「318: 本人の操作が要る」を付ける。
+    既存の scripts/jarvis_todoist_weekly_pick.py（土曜 07:00 の snapshot）が候補に入れ、理由「318: 本人の操作が要る」を付ける。
 - node_znkxTG8H（#consult 通知）／end（#ai-hub 報告）… consult_text／hub_report_text（案。送るのはフラグを付けた時だけ）
 
 313 との二重質問の防止（同じタスクは片方だけ）:

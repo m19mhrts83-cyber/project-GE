@@ -1,5 +1,5 @@
 /**
- * 今週の9件（/week）。日曜の夜に、先週残ったものを振り返り、おすすめ9件を直して月・水・金に置く。
+ * 今週の9件（/week）。土曜の午前中に（2026-11-23〜。以前は日曜の夜）、この週に残ったものを振り返り、おすすめ9件を直して月・水・金に置く。
  * 材料は scripts/jarvis_todoist_weekly_pick.py（snapshot）が sync_meta.weekly_pick_snapshot に置く。
  * 確定すると owner_decisions（surface=weekly_pick）に判断を残し、action=commit の plan を
  * 同じスクリプト（reflect・30分ごと）が Todoist に反映する。

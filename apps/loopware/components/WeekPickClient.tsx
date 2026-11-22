@@ -143,7 +143,7 @@ export default function WeekPickClient() {
       <div className="glass wk-empty">
         <Icon name="calendar" size={28} />
         <strong>まだ今週の材料がありません</strong>
-        <p className="meta">日曜 17:00 に先週の結果とおすすめ9件が届きます。急ぐときは GitHub Actions の「今週の9件」を手動で動かしてください。</p>
+        <p className="meta">土曜 7:00 に、この週の結果と次の月曜からのおすすめ9件が届きます。急ぐときは GitHub Actions の「今週の9件」を手動で動かしてください。</p>
       </div>
     );
   }
@@ -356,8 +356,9 @@ function Review({
   const ids = Object.keys(st.left);
   return (
     <div className="wk-section">
+      <div className="eyebrow">{dayLabel(s.last.week)} からの週の結果</div>
       <div className="wk-stats">
-        <div className="wk-stat good"><b>{s.last.done}</b><span>先週の完了</span></div>
+        <div className="wk-stat good"><b>{s.last.done}</b><span>完了</span></div>
         <div className="wk-stat warn"><b>{s.last.left}</b><span>残った</span></div>
         <div className="wk-stat"><b>{s.last.added}</b><span>追加された</span></div>
         <div className="wk-stat"><b>{s.last.owner_open}</b><span>松野さん対応の残り</span></div>
@@ -376,7 +377,7 @@ function Review({
       )}
 
       <h2 className="wk-h">残ったもの <small>なぜ残ったか・次の手</small></h2>
-      {!ids.length && <p className="meta">先週の残りはありません。</p>}
+      {!ids.length && <p className="meta">この週の残りはありません。</p>}
       {ids.map((id) => {
         const c = byId.get(id);
         const a = st.left[id];
