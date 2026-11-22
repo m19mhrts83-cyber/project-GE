@@ -107,3 +107,20 @@ export function historyRows(p: AiUsagePayload, key: string, nowMs: number) {
     .map((e) => ({ ...e, closed: Date.parse(e.resets_at) <= nowMs }))
     .sort((a, b) => Date.parse(b.resets_at) - Date.parse(a.resets_at));
 }
+
+/**
+ * AI の月額を2つに分ける（2026-11-22 松野さん指定）。
+ *  - tools: エージェントとして使う道具（使用量の枠がある契約）
+ *  - base: AI エージェントの基盤を保つための契約（入力・連絡・保管など）
+ * 契約の一覧（subscription_services）の id で決める。ここに無い id は base に入る。
+ */
+export const AGENT_TOOL_IDS = new Set(["claude", "cursor", "chatgpt_plus", "genspark", "grok", "gemini", "antigravity"]);
+
+export type AiSubLite = { id: string; monthly_yen: number };
+
+export function splitAiSubs<T extends AiSubLite>(subs: T[]) {
+  const tools = subs.filter((s) => AGENT_TOOL_IDS.has(s.id));
+  const base = subs.filter((s) => !AGENT_TOOL_IDS.has(s.id));
+  const sum = (l: T[]) => l.reduce((a, s) => a + Number(s.monthly_yen || 0), 0);
+  return { tools, base, toolsTotal: sum(tools), baseTotal: sum(base), total: sum(subs) };
+}
