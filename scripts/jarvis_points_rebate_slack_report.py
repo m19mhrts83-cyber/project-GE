@@ -65,6 +65,15 @@ def _load_json(path: Path) -> dict:
         return {}
 
 
+def _md(iso: object) -> str:
+    """ISO 日時 → 『11/23』（読めなければ空）。"""
+    try:
+        dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        return f"{dt.month}/{dt.day}"
+    except (ValueError, TypeError):
+        return ""
+
+
 def _archive(text: str, tag: str) -> None:
     try:
         # 年間特典の短報は実額入り。公開リポ（docs）に残さず gitignore 済みの state 側へ。
@@ -102,9 +111,21 @@ def build_teiki(
     reason: str,
     error: str,
     note: str,
+    last_check: str = "",
+    maintenance_note: str = "",
 ) -> str:
     lines = _header("テイチャン")
     out = (outcome or "checked").strip()
+    if out == "maintenance":
+        # 停止中は『確認のみ・券=◯枚』と読ませない（券数は前回値で古い）。D4・2026-11-23
+        lines.append(f"・結果: メンテナンス停止中（最終確認 {last_check or '—'}）")
+        if maintenance_note:
+            lines.append(f"・サイト: {maintenance_note}")
+        lines.append("・次: 3日ごとに再開を確認します（再開したら通常に戻ります）")
+        if note:
+            lines.append(f"・特記: {note}")
+        lines.append(f"・見る: {DASH_VPOINT}#teiki-barai")
+        return "\n".join(lines)
     if out == "skipped":
         lines.append(f"・結果: スキップ（{reason or '間隔内'}）")
     elif out == "disabled":
@@ -306,7 +327,7 @@ def main() -> int:
     ap.add_argument(
         "--outcome",
         default="checked",
-        choices=("checked", "drew", "skipped", "failed", "disabled", "partial"),
+        choices=("checked", "drew", "skipped", "failed", "disabled", "partial", "maintenance"),
     )
     ap.add_argument("--from-state", action="store_true")
     ap.add_argument("--tickets", type=int, default=None)
@@ -362,6 +383,8 @@ def main() -> int:
             reason=args.reason,
             error=args.error,
             note=args.note,
+            last_check=_md(st.get("last_check_at")),
+            maintenance_note=str(st.get("maintenance_note") or ""),
         )
         return _post(
             channel,
