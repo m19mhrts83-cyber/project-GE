@@ -252,7 +252,7 @@ agents:
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_HMy15MUxWiSpw5QgAPYa_8e4
     status: 設計中
     trigger: 時間
-    note: 2026-11-22 フロー設計中（たたき台）。フォルダ・実装は未作成。
+    note: 2026-11-22 フロー設計（FlowForge 承認済み15ノード）。2026-11-23 フォルダ作成・Phase 1（読むだけ・手動）実装 scripts/jarvis_todoist_318_triage.py。定期起動は未登録
   '411':
     name: Grok材料取込係
     path: 400_ミックス・取捨判断室/411_Grok材料取込係
