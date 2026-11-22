@@ -142,3 +142,8 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 - FlowForge 315-B（`flow_ZQIfYZY4GJF2XspXY8i0sGWD`）の実装。毎日 08:20・18:20、既存の鮮度監視の launchd に相乗り（AI なし）
 - 対象 311・312・313・314・317。停止＋空回り（311・313）→ 異常の発生・回復だけ `#ops`、結果は `.jarvis_state/stall_watch_315b.json` と `/agent-team`「週次稼働」タブ
 - 実装の正・工程の対応・最終成功の取り方: [`315-B_停止空回り監視_20261122.md`](./315-B_停止空回り監視_20261122.md)
+
+## CHRLINE retry キュー exhausted の扱い（2026-11-22）
+
+- 警告は「前回から新しく増えた exhausted」で判定（baselineなしは残り件数）。固定の過去分は `line_unofficial_poc/chrline_retry_queue_archive.py` で退避（既定dry-run／`--apply`は人了承後。削除せず別ファイルへ、バックアップ付き。出力は件数のみ）。
+- 点検の「直近decode標本なし→確認不能」は、新着が無い週にも出うる。decode_stats は seen>0 の実行だけ追記する仕様（案: 標本なしでもsync成功が新しければ「新着なし」としてOK扱い。未実装）。

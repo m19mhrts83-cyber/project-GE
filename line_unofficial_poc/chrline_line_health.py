@@ -83,8 +83,14 @@ def evaluate_alerts(current: dict, previous: dict | None) -> list[str]:
         alerts.append(f"直近の本文取得率が低い（textual {rate}%）— E2EE 未復号の可能性")
 
     exhausted = int(current.get("queue_exhausted", 0))
-    if exhausted > 0:
-        alerts.append(f"retryキュー exhausted {exhausted} 件（MD未確定のまま枯渇）")
+    if previous is not None and "queue_exhausted" in previous:
+        # 前回との差（新しく枯渇した分）だけ警告。固定の既存分は退避コマンドで整理する。
+        new_exh = exhausted - int(previous.get("queue_exhausted", 0))
+        if new_exh > 0:
+            alerts.append(f"retryキュー exhausted が前回比 +{new_exh} 件（MD未確定のまま枯渇）")
+    elif exhausted > 0:
+        # baseline なし: 退避（chrline_retry_queue_archive.py）後の残り件数で判定
+        alerts.append(f"retryキュー exhausted {exhausted} 件（MD未確定のまま枯渇・baselineなし）")
 
     return alerts
 
