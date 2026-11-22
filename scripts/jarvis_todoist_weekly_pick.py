@@ -13,6 +13,11 @@
 - 外との約束・行事・支払いの期日（hard）は外さない。
 - 312 はタスクを閉じない（「やめる」はコメントだけ残し、片付けは 313）。
 - AI が作るタスクには 🦾依頼 を付ける（jarvis_todoist_mark）。
+- じっくり枠の社員のフロー磨き込みは Todoist に起票しない（判断ログに残すだけ。起票が要る時は 312 の了承の流れ）。
+- 判断の重さ（2026-11-23 松野さん）: 各件を A「すぐ決まる」／B「じっくり」／未判別 に分ける（config/todoist_weekly_weight.yaml。
+  AI は呼ばない）。B は週1件だけおすすめに入れ（2件目以降は翌週以降の候補へ・理由を残す）、A は月→水→金の順に前倒しで置く。
+  B の1件は週2回の「じっくり枠」（既定は火・金。config の deep_frame）に、同じ件の1回目・2回目として置く。
+  9件の上限は枠の回数も含めて数える（枠が2回なら月・水・金は7件まで）。枠には社員1名のフロー磨き込みも入れられる（本人が選ぶ）。
 
 試す: python3 scripts/jarvis_todoist_weekly_pick.py --mode snapshot --dry-run
 """
@@ -38,7 +43,11 @@ SURFACE = "weekly_pick"
 SNAPSHOT_KEY = "weekly_pick_snapshot"
 PICK_DAYS = (0, 2, 4)  # 月・水・金
 PER_DAY = 3
-RULE_VERSION = "rule-v1"  # おすすめと理由をルールで作った版。AI に替えたら上げる
+RULE_VERSION = "rule-v2"  # おすすめと理由をルールで作った版。AI に替えたら上げる（v2: 判断の重さ A/B のバランス）
+WEIGHT_PATH = Path(__file__).resolve().parents[1] / "config" / "todoist_weekly_weight.yaml"
+WEIGHTS = ("quick", "deep", "unknown")
+WEIGHT_LABEL_DEFAULT = {"quick": "すぐ決まる", "deep": "じっくり", "unknown": "未判別"}
+URL_RE = re.compile(r"https?://\S+")
 
 PARTNER_LABELS = {"properties", "Tcell", "kamiooya", "キャラメル", "GrandoleI", "ミニテック", "kodate"}
 FAMILY_LABELS = {"kazoku", "family"}
@@ -166,6 +175,188 @@ def reasons_for(
     return score, out
 
 
+# ---- 判断の重さ（A すぐ決まる／B じっくり） ------------------------------------
+
+
+class WeightConfigError(ValueError):
+    pass
+
+
+def load_weight(path: Path = WEIGHT_PATH) -> dict[str, Any]:
+    """基準を読む。読めない・形が違う時は WeightConfigError（呼び出し側で「未判別」にする。基準なしとは扱わない）。"""
+    try:
+        import yaml  # type: ignore  # noqa: PLC0415
+    except ImportError as e:
+        raise WeightConfigError("PyYAML が無い") from e
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as e:
+        raise WeightConfigError(f"{path.name} が無い") from e
+    except Exception as e:  # noqa: BLE001
+        raise WeightConfigError(f"{path.name} が壊れている（{type(e).__name__}）") from e
+    if not isinstance(data, dict) or not isinstance(data.get("signals"), dict):
+        raise WeightConfigError("signals が無い")
+    sig: dict[str, list[dict[str, Any]]] = {}
+    for side in ("deep", "quick"):
+        rows = data["signals"].get(side) or []
+        if not isinstance(rows, list):
+            raise WeightConfigError(f"signals.{side} の形が想定外")
+        keep = []
+        for r in rows:
+            if not isinstance(r, dict) or not isinstance(r.get("match"), dict):
+                raise WeightConfigError(f"signals.{side} の行の形が想定外")
+            if str(r.get("status") or "") not in ("adopted", "proposed"):
+                continue  # 未判断・見送り・取消は使わない
+            words = [str(w) for w in (r["match"].get("words_any") or [])]
+            if any(len(w) < 2 for w in words):
+                raise WeightConfigError(f"{r.get('id')} に1文字の語（誤判定のもと）")
+            if r["match"].get("options_re"):
+                try:
+                    re.compile(str(r["match"]["options_re"]))
+                except re.error as e:
+                    raise WeightConfigError(f"{r.get('id')} の options_re が壊れている") from e
+            keep.append({**r, "weight": int(r.get("weight") or 1)})
+        sig[side] = keep
+    th = data.get("thresholds") or {}
+    frame = data.get("deep_frame")
+    deep_frame = None
+    if frame is not None:
+        if not isinstance(frame, dict):
+            raise WeightConfigError("deep_frame の形が想定外")
+        wds = frame.get("weekdays") or []
+        if not isinstance(wds, list) or not wds or any(not isinstance(x, int) or not 0 <= x <= 6 for x in wds):
+            raise WeightConfigError("deep_frame.weekdays は 0〜6 の並び")
+        sf = frame.get("staff_flow") or {}
+        by_week = frame.get("staff_by_week") or {}
+        if not isinstance(by_week, dict):
+            raise WeightConfigError("deep_frame.staff_by_week の形が想定外")
+        staff: dict[str, dict[str, str]] = {}
+        for wk, v in by_week.items():
+            if not isinstance(v, dict) or not v.get("staff") or not v.get("decision_id") or _d(str(wk)) is None:
+                raise WeightConfigError(f"deep_frame.staff_by_week の {wk} に staff・decision_id が無い")
+            staff[str(wk)[:10]] = {"staff": str(v["staff"]), "decision_id": str(v["decision_id"])}
+        deep_frame = {"weekdays": sorted(set(wds)), "staff_label": str(sf.get("label") or "社員のフロー磨き込み"),
+                      "staff_steps": [str(x) for x in (sf.get("steps") or [])], "staff_by_week": staff}
+    labels = {**WEIGHT_LABEL_DEFAULT, **{k: str(v) for k, v in (data.get("labels") or {}).items() if k in WEIGHTS}}
+    return {
+        "decision_id": str((data.get("decision") or {}).get("decision_id") or ""),
+        "labels": labels,
+        "deep_per_week": int(data.get("deep_per_week") if data.get("deep_per_week") is not None else 1),
+        "deep_min": int(th.get("deep_min") or 2),
+        "quick_min": int(th.get("quick_min") or 1),
+        "deep_frame": deep_frame,
+        "signals": sig,
+    }
+
+
+def _signal_hit(m: dict[str, Any], *, title: str, text: str, labels: set[str], facts: dict[str, Any]) -> int | None:
+    """当たったら表示用の数（無ければ 0）、外れたら None。"""
+    if m.get("words_any"):
+        hay = title if m.get("where") == "title" else text
+        if any(str(w) in hay for w in m["words_any"]):
+            return 0
+    if m.get("labels_any") and labels & {str(x) for x in m["labels_any"]}:
+        return 0
+    if m.get("options_re") and re.search(str(m["options_re"]), text):
+        return 0
+    if m.get("handoff_kind") and facts.get("handoff_kind") == m["handoff_kind"]:
+        return 0
+    for key, fact in (("note_count_min", "note_count"), ("children_min", "children"),
+                      ("weeks_carried_min", "weeks_carried"), ("description_len_min", "description_len")):
+        if m.get(key) is not None and int(facts.get(fact) or 0) >= int(m[key]):
+            return int(facts.get(fact) or 0)
+    return None
+
+
+def classify_weight(
+    t: dict[str, Any], cfg: dict[str, Any] | None, *, weeks_carried: int = 0, children: int = 0,
+    handoff_kind: str | None = None, error: str = "",
+) -> tuple[str, str]:
+    """(quick|deep|unknown, 根拠1行)。AI は呼ばない。過去の判断理由は書き足さない（手がかりの名前だけ）。"""
+    if cfg is None:
+        return "unknown", f"基準が読めない（{error or '未設定'}）"
+    title = strip_mark(t.get("content") or "")
+    desc = URL_RE.sub(" ", str(t.get("description") or ""))
+    text = f"{title}\n{desc}"
+    labels = {str(x) for x in (t.get("labels") or [])}
+    try:
+        nc = int(t.get("note_count") or 0)
+    except (TypeError, ValueError):
+        nc = 0
+    facts = {"note_count": nc, "children": children, "weeks_carried": weeks_carried,
+             "description_len": len(desc.strip()), "handoff_kind": handoff_kind}
+    score = {"deep": 0, "quick": 0}
+    why: dict[str, list[str]] = {"deep": [], "quick": []}
+    for side in ("deep", "quick"):
+        for r in cfg["signals"].get(side) or []:
+            n = _signal_hit(r["match"], title=title, text=text, labels=labels, facts=facts)
+            if n is None:
+                continue
+            score[side] += r["weight"]
+            why[side].append(str(r.get("text") or r.get("id") or "").format(n=n))
+    d, q = score["deep"], score["quick"]
+    if d > q and d >= cfg["deep_min"]:
+        return "deep", "／".join(why["deep"][:2])
+    if q > d and q >= cfg["quick_min"]:
+        return "quick", "／".join(why["quick"][:2])
+    if d and q:
+        return "unknown", "手がかりが割れている: " + "／".join((why["deep"][:1] + why["quick"][:1]))
+    if d or q:
+        return "unknown", "手がかりが弱い: " + "／".join((why["deep"] + why["quick"])[:2])
+    return "unknown", "手がかりなし"
+
+
+def weight_counts(cands: list[dict[str, Any]], ids: list[str] | None = None) -> dict[str, int]:
+    pick = set(ids) if ids is not None else None
+    out = {k: 0 for k in WEIGHTS}
+    for c in cands:
+        if pick is None or c["id"] in pick:
+            out[c.get("weight") or "unknown"] = out.get(c.get("weight") or "unknown", 0) + 1
+    return out
+
+
+def select_for_week(
+    cands: list[dict[str, Any]], *, cap: int, deep_per_week: int | None, week_end: date | None = None,
+    frame: bool = False,
+    frame_taken_by: str = "",
+) -> tuple[list[dict[str, Any]], list[dict[str, str]], list[dict[str, Any]]]:
+    """おすすめに入れる件（点数順）→ (月水金に置く件, 翌週以降へ回した B と理由, じっくり枠に入れる B)。
+
+    じっくり（B）は deep_per_week 件まで。2件目以降は翌週以降へ（理由つき）。
+    frame=True なら、B はじっくり枠へ（月水金の cap には数えない。cap は呼び出し側で枠の回数を引いておく）。
+    締切・約束の日付がこの週までにある B は外さない（外の約束を動かさない決まりが先）。枠が埋まっていれば月水金へ。
+    frame_taken_by: 本人がこの週の枠を社員のフロー磨き込みに決めている時の社員名（B のタスクは全部翌週以降へ）。
+    deep_per_week=None（基準が読めない）なら今までどおり上から cap 件。
+    """
+    tasks = [c for c in cands if c["kind"] == "task"]
+    if deep_per_week is None:
+        return tasks[:cap], [], []
+    picked: list[dict[str, Any]] = []
+    deferred: list[dict[str, str]] = []
+    framed: list[dict[str, Any]] = []
+    deep = deep_per_week if frame_taken_by else 0
+    why_later = (f"じっくり枠は今週「{frame_taken_by}」に決まっている。翌週以降の候補へ" if frame_taken_by
+                 else f"じっくりは週{deep_per_week}件まで。翌週以降の候補へ")
+    for c in tasks:
+        room = len(picked) < cap
+        if c.get("weight") == "deep":
+            if deep < deep_per_week:
+                deep += 1
+                if frame:
+                    framed.append(c)
+                    continue
+            else:
+                lim = c.get("deadline") or (c["due"] if c.get("hard") else None)
+                if lim and week_end and lim <= week_end.isoformat() and room:
+                    picked.append(c)  # 締切がこの週の B は、枠の外でも月水金に置く
+                else:
+                    deferred.append({"id": c["id"], "reason": why_later})
+                continue
+        if room:
+            picked.append(c)
+    return picked, deferred, framed
+
+
 def candidate(
     t: dict[str, Any], *, today: date, weeks_carried: int, left_from_last: bool, week: tuple[date, date] | None = None
 ) -> dict[str, Any]:
@@ -190,10 +381,18 @@ def candidate(
     }
 
 
-def recommend(cands: list[dict[str, Any]], days: list[str], per_day: int = PER_DAY) -> list[dict[str, str]]:
-    """上から per_day×日数 件を曜日に置く。締切がある物はその前の日に、パートナー・お金は月曜に寄せる。"""
+def recommend(
+    cands: list[dict[str, Any]], days: list[str], per_day: int = PER_DAY, picked: list[dict[str, Any]] | None = None
+) -> list[dict[str, str]]:
+    """上から per_day×日数 件を曜日に置く。締切がある物はその前の日に、パートナー・お金は月曜に寄せる。
+
+    判断の重さ: 締切のある物の次に、すぐ決まる（A）を月→水→金で前倒しに詰め、じっくり（B）は水曜から置く
+    （月曜を A に空け、週の残りでラリーできるように）。未判別は今までどおり。
+    """
     slots: dict[str, list[str]] = {d: [] for d in days}
-    picked = [c for c in cands if c["kind"] == "task"][: per_day * len(days)]
+    if picked is None:
+        picked = [c for c in cands if c["kind"] == "task"][: per_day * len(days)]
+    group = {"quick": 0, "unknown": 1, "deep": 2}
 
     def place(c: dict[str, Any], prefer: list[str]) -> None:
         for d in prefer:
@@ -201,13 +400,18 @@ def recommend(cands: list[dict[str, Any]], days: list[str], per_day: int = PER_D
                 slots[d].append(c["id"])
                 return
 
-    limit_first = sorted(picked, key=lambda c: (c.get("deadline") or (c["due"] if c["hard"] else None) or "9999"))
+    limit_first = sorted(picked, key=lambda c: (c.get("deadline") or (c["due"] if c["hard"] else None) or "9999",
+                                                group.get(c.get("weight") or "unknown", 1)))
     for c in limit_first:
         lim = c.get("deadline") or (c["due"] if c["hard"] else None)
         tags = {r["tag"] for r in c["reasons"]}
         if lim:
             before = [d for d in days if d <= lim] or days[:1]
             place(c, before + [d for d in days if d not in before])
+        elif c.get("weight") == "quick":
+            place(c, days)  # 前倒し
+        elif c.get("weight") == "deep":
+            place(c, days[1:] + days[:1])
         elif "partner_money" in tags or "waiting_other" in tags:
             place(c, days)
         else:
@@ -231,6 +435,11 @@ def inlet_candidate(topic: dict[str, Any], *, today: date) -> dict[str, Any]:
     }
 
 
+def _with_weight(c: dict[str, Any], w: tuple[str, str]) -> dict[str, Any]:
+    c["weight"], c["weight_why"] = w
+    return c
+
+
 def build_snapshot(
     *,
     tasks: list[dict[str, Any]],
@@ -240,7 +449,10 @@ def build_snapshot(
     today: date,
     now: datetime,
     handoff: dict[str, dict[str, Any]] | None = None,
+    weight_cfg: dict[str, Any] | None = None,
+    weight_error: str = "",
 ) -> dict[str, Any]:
+    """weight_cfg=None は「基準が読めない」。全件 未判別 にして、B の週1件・A の前倒しは掛けない。"""
     monday = target_monday(today)
     days = pick_dates(monday)
     prev_mon = monday - timedelta(days=7)
@@ -254,9 +466,19 @@ def build_snapshot(
         if du and du < monday:
             left_ids.add(str(t["id"]))
 
+    children: dict[str, int] = {}
+    for t in tasks:
+        if t.get("parent_id") and not t.get("checked") and not t.get("is_deleted"):
+            children[str(t["parent_id"])] = children.get(str(t["parent_id"]), 0) + 1
+    if weight_cfg is None and not weight_error:
+        weight_error = "未設定"
     cands = [
-        candidate(t, today=today, weeks_carried=pick_history.get(str(t["id"]), 0), left_from_last=str(t["id"]) in left_ids,
-                  week=(monday, monday + timedelta(days=6)))
+        _with_weight(
+            candidate(t, today=today, weeks_carried=pick_history.get(str(t["id"]), 0), left_from_last=str(t["id"]) in left_ids,
+                      week=(monday, monday + timedelta(days=6))),
+            classify_weight(t, weight_cfg, weeks_carried=pick_history.get(str(t["id"]), 0), children=children.get(str(t["id"]), 0),
+                            handoff_kind=(handoff.get(str(t["id"])) or {}).get("kind"), error=weight_error),
+        )
         for t in owner
     ]
     for c in cands:
@@ -266,13 +488,38 @@ def build_snapshot(
             c["reasons"] = ([{"tag": tag, "text": PICK_TEXT[tag]}] + c["reasons"])[:3]
             c["from_318"] = True
     cands.sort(key=lambda c: (-c["score"], c["title"]))
-    inlet = sorted((inlet_candidate(x, today=today) for x in inlet_topics), key=lambda c: -c["score"])
-
-    rec = recommend(cands, days)
-    rec_ids = {r["id"] for r in rec}
-    next_preview = [c["id"] for c in cands if c["id"] not in rec_ids][:9]
+    inlet = sorted(
+        (_with_weight(inlet_candidate(x, today=today),
+                      classify_weight({"content": x.get("topic_text") or ""}, weight_cfg, error=weight_error))
+         for x in inlet_topics),
+        key=lambda c: -c["score"],
+    )
 
     week_end = monday + timedelta(days=6)
+    frame_cfg = (weight_cfg or {}).get("deep_frame")
+    deep_days = [(monday + timedelta(days=d)).isoformat() for d in frame_cfg["weekdays"]] if frame_cfg else []
+    cap = PER_DAY * len(days) - len(deep_days)  # 9件の上限は、じっくり枠の回数も含めて数える
+    staff = (frame_cfg or {}).get("staff_by_week", {}).get(monday.isoformat())
+    picked, deferred, framed = select_for_week(
+        cands, cap=cap, deep_per_week=weight_cfg["deep_per_week"] if weight_cfg else None, week_end=week_end,
+        frame=bool(frame_cfg), frame_taken_by=(staff or {}).get("staff", ""),
+    )
+    rec = recommend(cands, days, picked=picked)
+    rec_ids = {r["id"] for r in rec} | {c["id"] for c in framed}
+    deferred_ids = [x["id"] for x in deferred]
+    next_preview = (deferred_ids + [c["id"] for c in cands if c["id"] not in rec_ids and c["id"] not in set(deferred_ids)])[:9]
+    deep_frame = None
+    if frame_cfg:
+        deep_frame = {
+            "days": deep_days,
+            "recommended": framed[0]["id"] if framed else None,
+            "staff_label": frame_cfg["staff_label"],
+            "staff_steps": frame_cfg["staff_steps"],
+            # 本人が決めた社員（config）。無い週は null（/week で本人が選ぶ。自動で決めない）
+            "staff": ({**staff, "title": f"{staff['staff']}: 作業フローの磨き込み（{'→'.join(frame_cfg['staff_steps'])}）"}
+                      if staff else None),
+        }
+
     dated_in_week = [
         {"id": c["id"], "title": c["title"], "date": c["due"], "hard": c["hard"]}
         for c in cands
@@ -308,6 +555,17 @@ def build_snapshot(
         "next_preview": next_preview,
         "dated_in_week": dated_in_week,
         "hard_ahead": hard_ahead[:20],
+        "weight": {
+            "ok": weight_cfg is not None,
+            "error": "" if weight_cfg is not None else weight_error,
+            "decision_id": (weight_cfg or {}).get("decision_id") or "",
+            "labels": (weight_cfg or {}).get("labels") or dict(WEIGHT_LABEL_DEFAULT),
+            "deep_per_week": (weight_cfg or {}).get("deep_per_week"),
+            "recommended": weight_counts(cands, [r["id"] for r in rec] + [c["id"] for c in framed]),
+            "candidates": weight_counts(cands),
+            "deferred": deferred,
+        },
+        "deep_frame": deep_frame,
     }
 
 
@@ -390,14 +648,29 @@ def snapshot(*, dry: bool, now: datetime, notify: bool) -> int:
     done = completed_between(monday - timedelta(days=7), monday - timedelta(days=1))
     import jarvis_todoist_318_handoff as ho  # noqa: PLC0415
 
+    try:
+        weight_cfg, weight_error = load_weight(), ""
+    except WeightConfigError as e:
+        weight_cfg, weight_error = None, str(e)
+        print(f"::warning::判断の重さの基準が読めない（{e}）。全件 未判別・バランスなしで作る")
     snap = build_snapshot(
         tasks=tasks, completed_last_week=done, pick_history=pick_counts(),
         inlet_topics=open_inlet_topics(), today=today, now=now,
         handoff=ho.handoff_map(ho.read_meta(c.sb, ho.HANDOFF_KEY), now),
+        weight_cfg=weight_cfg, weight_error=weight_error,
     )
     last = snap["last"]
+    wr, wc = snap["weight"]["recommended"], snap["weight"]["candidates"]
     print(f"週 {snap['week']}: 候補 {len(snap['candidates'])} 件（入口 {len(snap['inlet'])}）、おすすめ {len(snap['recommended'])} 件、"
           f"先週 完了 {last['done']}／残り {last['left']}／追加 {last['added']}")
+    print(f"判断の重さ: おすすめ A {wr['quick']}／B {wr['deep']}／未判別 {wr['unknown']}、"
+          f"候補全体 A {wc['quick']}／B {wc['deep']}／未判別 {wc['unknown']}、B を翌週以降へ {len(snap['weight']['deferred'])} 件")
+    frame = snap.get("deep_frame")
+    frame_text = ""
+    if frame:
+        what = (frame["staff"] or {}).get("staff") or ("じっくりのタスク1件" if frame["recommended"] else "空き（本人が選ぶ）")
+        frame_text = f"じっくり枠 {'・'.join(d[5:] for d in frame['days'])}: {what}"
+        print(frame_text)
     if dry:
         print(json.dumps({k: snap[k] for k in ("week", "days", "last", "recommended", "hard_ahead")}, ensure_ascii=False, indent=1))
         return 0
@@ -407,6 +680,8 @@ def snapshot(*, dry: bool, now: datetime, notify: bool) -> int:
         text = (
             f"🟡 *今週の9件を選ぶ準備ができました*（{snap['week']} の週）\n"
             f"先週: 完了 {last['done']} 件／残り {last['left']} 件／追加 {last['added']} 件。松野さん対応の残り {last['owner_open']} 件\n"
+            f"おすすめの内訳: すぐ決まる {wr['quick']}／じっくり {wr['deep']}／未判別 {wr['unknown']}\n"
+            + (f"{frame_text}\n" if frame_text else "") +
             f"残った理由を選んでから、おすすめ9件を直して月・水・金に置いてください。\n<{url}|Nody で開く>"
         )
         c.post_consult(text, dry=False)

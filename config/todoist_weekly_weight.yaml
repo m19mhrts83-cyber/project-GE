@@ -1,0 +1,118 @@
+# 今週の9件 — 判断の重さ（A すぐ決まる／B じっくり）の手がかり（2026-11-23）
+#
+# 読むのは scripts/jarvis_todoist_weekly_pick.py（日曜の snapshot）。
+# 読めない・壊れている時は週次を止めず、全件「未判別（基準が読めない）」にしてバランスは掛けない
+# （読取失敗を「基準なし＝全部 A」とは扱わない）。
+#
+# 決まり（adopted）: 2026-11-23 松野さんの依頼
+#   - 本人の判断が要るものを A「すぐ決まる」（判断すれば進む・終わる）／B「じっくり」（ラリーして形にしていく）に分ける
+#   - B は週1件ペースで具体化。2件目以降は翌週以降の候補へ回す（理由を表示）
+#   - B の1件は週2回の「じっくり枠」（火・金。deep_frame）に置く。枠には社員1名のフロー磨き込みも入れられる（本人が選ぶ）
+#   - A は前倒し中心（月→水→金の順に詰める）。件数の負担を減らすため A を先に潰す
+# 手がかり（signals）: proposed（Miss Lemon 案）。AI は呼ばず、題・説明・コメント数・サブタスク・残り週数・318 の受け渡しだけで決める。
+#   本人が画面で直した結果（判断ログ payload.weight）を見て、週1レビューで語を足し引きする。採用したら status を adopted に。
+#
+# 判定: deep の点 > quick の点 かつ deep_min 以上 → B／quick の点 > deep の点 かつ quick_min 以上 → A／それ以外 → 未判別
+# match（どれか1つ当たればその signal の点）:
+#   words_any（2文字以上）… where: title（題だけ）／text（題＋説明。既定）
+#   labels_any（ラベル完全一致）／note_count_min（コメント数）／children_min（サブタスク数）
+#   weeks_carried_min（今週やるに置かれた週数）／description_len_min（説明の文字数）
+#   handoff_kind（318 の受け渡し: owner＝③本人の操作／large＝大規模）／options_re（説明に選択肢が並んでいる）
+#
+# 取引先名・個人名・金額は書かない（公開リポ）。
+
+version: 1
+decision:
+  status: adopted
+  decision_id: D-20261123-weekly-weight-ab
+  source: "2026-11-23 松野さん依頼: 本人の判断を A すぐ決まる／B じっくり に分け、B は週1件、A は前倒し"
+labels:
+  quick: すぐ決まる
+  deep: じっくり
+  unknown: 未判別
+deep_per_week: 1
+# じっくり枠（2026-11-23 松野さん追加）: 週1件のじっくりを、週2回の枠に分けて進める（毎日・常時には流さない）。
+#   同じ件の1回目・2回目を weekdays に置く（0=月 … 6=日）。9件の上限はこの枠の回数も含めて数える。
+#   枠には「その週に育てる社員1名の作業フロー磨き込み」も入れられる。どの社員かは本人が決める（自動で決めない）。
+#   本人が決めた週は staff_by_week に書く（キーは割り付ける週の月曜）。書いた週は枠がその社員で埋まり、じっくりのタスクは翌週以降へ。
+#   書いていない週は、点数がいちばん上のじっくりのタスクを枠の案にする（/week で本人が入れ替え・空けられる）。
+#   Todoist へのタスク起票はしない（判断ログに残すだけ。起票が要る時は 312 の了承の流れで）。
+deep_frame:
+  weekdays: [1, 4] # 火・金
+  staff_flow:
+    label: 社員のフロー磨き込み
+    steps: ["チャッピー相談", "図で確認", "本人判断", "運用で確認"]
+  staff_by_week:
+    "2026-11-23": # 11/24(火)・11/27(金)
+      staff: 317 コメント拾い
+      decision_id: D-20261123-deep-frame-317
+      source: "2026-11-23 松野さん決定（コーディネーター経由）: 今週のじっくり枠で育てる社員は 317 コメント拾い"
+thresholds:
+  deep_min: 2
+  quick_min: 1
+
+signals:
+  deep:
+    - id: D-WORDS
+      status: proposed
+      weight: 2
+      text: "検討・設計・方針などの語"
+      match:
+        words_any: ["検討", "設計", "方針", "相談", "構想", "戦略", "企画", "見直し", "考える", "考えて", "整理する", "どうするか", "どうする", "あり方", "仕組み", "計画を", "ロードマップ"]
+    - id: D-SUBTASKS
+      status: proposed
+      weight: 2
+      text: "サブタスク {n}件"
+      match:
+        children_min: 1
+    - id: D-318-LARGE
+      status: proposed
+      weight: 2
+      text: "318: 大規模（進め方から決める）"
+      match:
+        handoff_kind: large
+    - id: D-NOTES
+      status: proposed
+      weight: 1
+      text: "コメントのやり取り {n}件"
+      match:
+        note_count_min: 4
+    - id: D-CARRIED
+      status: proposed
+      weight: 1
+      text: "{n}週続けて残っている"
+      match:
+        weeks_carried_min: 2
+    - id: D-LONG
+      status: proposed
+      weight: 1
+      text: "説明が長い（{n}字）"
+      match:
+        description_len_min: 400
+
+  quick:
+    - id: Q-OPTIONS
+      status: proposed
+      weight: 2
+      text: "選択肢が出ている"
+      match:
+        options_re: "(選択肢|A案|B案|案1|案2|案①|案②|どちらか|どれにするか|はい／いいえ|はい/いいえ|Yes/No)"
+    - id: Q-WORDS
+      status: proposed
+      weight: 2
+      text: "はい・いいえで決まる語（承認・可否など）"
+      match:
+        where: title
+        words_any: ["承認", "了承", "可否", "OKか", "OK？", "選ぶ", "決裁", "押す", "返事", "回答", "許可", "マージ判断", "要判断"]
+    - id: Q-LABEL
+      status: proposed
+      weight: 2
+      text: "quick ラベル"
+      match:
+        labels_any: ["quick"]
+    - id: Q-318-OWNER
+      status: proposed
+      weight: 1
+      text: "318: 本人の操作1つで進む"
+      match:
+        handoff_kind: owner
