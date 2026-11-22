@@ -54,3 +54,10 @@ class CommunityDailyTest(unittest.TestCase):
             self.assertEqual(len(mod.candidates(root)),1)
             (root/'empty.csv').write_text('irrelevant\n')
             self.assertEqual(len(mod.candidates(root)),1)
+
+    def test_no_harvest_csv_fails_unless_allow_empty(self):
+        # force なしの実行は全トピック skip で raw CSV が出ない。--allow-empty のときだけ 0 件で通す。
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            with self.assertRaises(ValueError):mod.candidates(root)
+            self.assertEqual(mod.candidates(root,allow_empty=True),{})
