@@ -19,6 +19,13 @@
       "item": "Slack の短報に実額を載せるか",
       "decision": "載せる。Slack は松野さん本人への通知なので、年間特典の短報などに実額（残り・月必要額を含む）を載せてよい（具体的に知りたい）",
       "note": "公開リポ（コード・docs・PR・テスト）に実額を書かない決まりは変わらない。実装は今の動き（年間特典の短報に金額を含む）が仕様に一致。mask 指定の有無はコード側の確認事項（F7）"
+    },
+    {
+      "id": "D6",
+      "date": "2026-11-23",
+      "item": "Vポイント Tサイト履歴の扱い",
+      "decision": "取得時期（6a）は決めない。Tサイト履歴が古い時は『部分成功』と読む線だけ先に実装（6b）",
+      "note": "基準日が対象月の末日以降でなければ月印を付けず、短報は『部分成功（履歴が古い・基準日=…）』。実装済み（PR で記録・2026-11-23）"
     }
   ],
   "legend": {
@@ -340,7 +347,7 @@
       "implementation": "実装済",
       "confirmed": "確認済み",
       "run_state": "一部",
-      "evidence": "疑い（コード読解＋state で一致。Codex も同コードを確認 jarvis_vpoint_routine.py:427-440・**再現試験なし**）: pdca 実行後に state を読み直してから保存するため last_routine_at と jarvis_asks が上書きされて残らない。state の last_routine_at は 2026-09-10 のまま（10/27〜31 に定例は動いている）。結果語は常に checked の短報（同:475-501）",
+      "evidence": "【D6 で修正済み】疑い（コード読解＋state で一致。Codex も同コードを確認 jarvis_vpoint_routine.py:427-440・**再現試験なし**）: pdca 実行後に state を読み直してから保存するため last_routine_at と jarvis_asks が上書きされて残らない。state の last_routine_at は 2026-09-10 のまま（10/27〜31 に定例は動いている）。結果語は常に checked の短報（同:475-501）",
       "source_id": "614-N11"
     },
     {
@@ -694,9 +701,9 @@
       "id": "n27",
       "number": 27,
       "lane": "vpoint",
-      "title": "【提案】基準日の判定と部分成功",
+      "title": "基準日の判定と部分成功（D6 実装済み）",
       "actor": "プログラム",
-      "executor": "jarvis_vpoint_monthly_check.py に追加する判定（提案）",
+      "executor": "jarvis_vpoint_monthly_check.py（assess_grant_quality）／jarvis_vpoint_routine.py／jarvis_points_rebate_slack_report.py",
       "trigger": "ノード10の後（第2稿追加）",
       "input": "Tサイト履歴・監査の日付（基準日）と対象月",
       "process": "基準日が対象月の末日以降なら『成功』、それ以前・監査フォールバック・履歴なしなら『部分成功／失敗』とし、基準日と出どころ（source_note）を保存。月印(last_check_c)は成功の時だけ。部分成功は印を付けず、asks に『Tサイト取得』を出す。短報の結果語は成功／部分成功／失敗に分ける",
@@ -707,10 +714,10 @@
       "partial": "古い履歴／フォールバックで作成（印なし）",
       "failure": "履歴なし・例外",
       "decision": "D6（6b 品質基準）",
-      "implementation": "未実装(提案)",
-      "confirmed": "提案",
+      "implementation": "実装済（D6・2026-11-23。実環境での初回は 11/25 窓C）",
+      "confirmed": "確認済み（単体テスト・dry-run）",
       "run_state": "未実行",
-      "evidence": "現行は履歴の古さ検査なしに月印を書ける（monthly_check.py:543-559）。短報は結果にかかわらず checked（routine.py:475-501）。最新のTサイト履歴は 9/10 のみ。Codex 確認",
+      "evidence": "D6 の決定（2026-11-23）：取得時期は決めず、履歴が古い時は『部分成功』と読む線だけ先に実装。基準日=Tサイト履歴の fetched_at（日付）が対象月の末日以降なら成功、前・不明・監査フォールバックは部分成功、履歴も行も無ければ失敗。月印(last_check_c)は成功の時だけ。部分成功は短報に『部分成功（履歴が古い・基準日=…）』（Slack は本人通知なので具体値あり）、asks に『Tサイト取って』。付与サマリ以外の定例（cadence・テイチャン・PDCA）は止めない。dry-run（現行の state の写し・対象10月）で部分成功・基準日 9/10・月印なしを確認。",
       "source_id": "614-N27",
       "added_in": "第2稿"
     },
@@ -731,10 +738,10 @@
       "partial": "一部の項目だけ一致",
       "failure": "不一致→ノード20",
       "decision": "なし",
-      "implementation": "未実装(提案)",
+      "implementation": "一部（F3 の保存順は修正済み D6。照合・不一致通知は未実装）",
       "confirmed": "提案",
       "run_state": "未実行",
-      "evidence": "現行コードは pdca 後の再読込で last_routine_at と asks が失われる（routine.py:427-440。Codex 確認・再現試験なし）。state の last_routine_at は 9/10 のまま",
+      "evidence": "D6 で保存の順を直した（routine.py：PDCA の子プロセスの前に last_routine_at／asks を保存し、後でも再適用）。単体テストで『子が state を書き直しても残る』を確認。読み直しての照合・不一致の #ops 通知は未実装（提案のまま）。旧記述: 現行コードは pdca 後の再読込で last_routine_at と asks が失われていた（Codex 確認）",
       "source_id": "614-N28",
       "added_in": "第2稿"
     },
@@ -1520,11 +1527,11 @@
     },
     {
       "id": "F3",
-      "note": "Vポイント定例：last_routine_at／asks が保存前の再読込で失われるコード（routine.py:427-440。Codex 確認・再現試験なし。n11・n28）"
+      "note": "【修正済み D6】Vポイント定例：last_routine_at／asks が保存前の再読込で失われるコード（routine.py:427-440。Codex 確認・再現試験なし。n11・n28）"
     },
     {
       "id": "F4",
-      "note": "Vポイント定例：履歴の古さ検査なしに月印を書け（monthly_check.py:543-559）、短報は結果にかかわらず checked（routine.py:475-501）。Tサイト履歴が 9/10 のままでも『定例ウォッチ更新』を窓C7日間出す（n10・n19・n27）"
+      "note": "【修正済み D6】Vポイント定例：履歴の古さ検査なしに月印を書け（monthly_check.py:543-559）、短報は結果にかかわらず checked（routine.py:475-501）。Tサイト履歴が 9/10 のままでも『定例ウォッチ更新』を窓C7日間出す（n10・n19・n27）"
     },
     {
       "id": "F5",
@@ -1560,7 +1567,7 @@
       "nodes": "n27・n28",
       "findings": "F3・F4",
       "proposal": "Vポイント：基準日判定・部分成功・月印は成功時だけ・保存後の読み直し・結果語を成功／部分成功／失敗に",
-      "when": "D6 の回答後"
+      "when": "D6 決定済み（2026-11-23）。基準日判定・部分成功・月印・結果語・保存順（F3）は実装済み。保存後の照合・不一致通知は未実装"
     },
     {
       "id": "P3",

@@ -150,6 +150,8 @@ def build_jarvis_asks(
     now: datetime,
     grant_built: bool,
     grant_source: str,
+    grant_quality: str = "",
+    grant_quality_reason: str = "",
 ) -> list[dict[str, str]]:
     """プログラム化できない／人手確認が必要な項目。"""
     asks: list[dict[str, str]] = []
@@ -187,6 +189,15 @@ def build_jarvis_asks(
                 "id": "grant_fallback",
                 "level": "suggest",
                 "text": "今月の付与サマリは監査フォールバック／古いデータ依存です。Tサイト更新後に `--force` で再生成できます。",
+            }
+        )
+
+    if grant_quality in ("partial", "failed"):
+        asks.append(
+            {
+                "id": "grant_partial",
+                "level": "ask",
+                "text": f"付与サマリは{'部分成功' if grant_quality == 'partial' else '失敗'}（{grant_quality_reason}）。月印は付けていません。『Tサイト取って』で履歴を取り直すと次の定例で成功にできます。",
             }
         )
 
@@ -302,6 +313,9 @@ def main() -> int:
     do_window = args.force_window_c or in_window_c(now)
     grant_built = False
     grant_source = ""
+    grant_quality = ""  # success / partial / failed（付与サマリを今回作った時だけ）
+    grant_quality_reason = ""
+    grant_run_failed = False
 
     # --- Auto A: grant summary ---
     need_grant = do_window and (
@@ -339,8 +353,15 @@ def main() -> int:
                 rc = monthly.get("last_result_c") or {}
                 gs = rc.get("grant_summary") or {}
                 grant_source = str(gs.get("source_note") or "")
+                grant_quality = str(gs.get("quality") or "")
+                grant_quality_reason = str(gs.get("quality_reason") or "")
                 report["auto"]["grant_summary"]["total_pt"] = gs.get("total_pt")
                 report["auto"]["grant_summary"]["source_note"] = grant_source
+                report["auto"]["grant_summary"]["quality"] = grant_quality
+                report["auto"]["grant_summary"]["history_asof"] = gs.get("history_asof")
+                report["auto"]["grant_summary"]["quality_reason"] = grant_quality_reason
+            else:
+                grant_run_failed = True
 
     # --- Auto B: cadence (state-only, no browser) ---
     if not args.skip_cadence and not cadence.get("disabled"):
@@ -406,6 +427,8 @@ def main() -> int:
         now=now,
         grant_built=grant_built,
         grant_source=grant_source,
+        grant_quality=grant_quality,
+        grant_quality_reason=grant_quality_reason,
     )
     report["manual"]["jarvis_asks"] = asks
     report["manual"]["split"] = {
@@ -425,10 +448,16 @@ def main() -> int:
     }
 
     if args.apply and not args.dry_run:
+        routine_fields = {
+            "last_routine_at": now_iso(),
+            "jarvis_asks": asks,
+            "routine_split": report["manual"]["split"],
+        }
+        # F3: PDCA は子プロセスが state を読み直して書く。先に保存しておかないと
+        # 直後の load_json で last_routine_at／asks が消える（11/23 に確認）。
         monthly = load_json(MONTHLY_PATH)
-        monthly["last_routine_at"] = now_iso()
-        monthly["jarvis_asks"] = asks
-        monthly["routine_split"] = report["manual"]["split"]
+        monthly.update(routine_fields)
+        save_json(MONTHLY_PATH, monthly)
         # PDCA ボード（良かった点／要改善／次の一手）
         pdca_r = run_py(
             [str(REPO / "scripts" / "jarvis_vpoint_pdca.py"), "--apply"],
@@ -436,6 +465,7 @@ def main() -> int:
         )
         report["auto"]["pdca"] = {"ok": pdca_r.get("ok")}
         monthly = load_json(MONTHLY_PATH)
+        monthly.update(routine_fields)  # 子の書き込みで落ちていても保つ
         report["manual"]["pdca_board"] = monthly.get("pdca_board")
         save_json(MONTHLY_PATH, monthly)
 
@@ -447,6 +477,10 @@ def main() -> int:
             f"- ウィンドウC: {'該当' if in_window_c(now) else '対象外'}",
             f"- 付与サマリ自動: {'実施' if grant_built else ('予定のみ' if need_grant else 'スキップ')}",
         ]
+        if grant_quality in ("partial", "failed"):
+            lines.append(
+                f"- 付与サマリの結果: {'部分成功' if grant_quality == 'partial' else '失敗'}（{grant_quality_reason}）"
+            )
         if asks:
             lines.append("- Jarvis確認が必要なこと:")
             for a in asks[:8]:
@@ -484,12 +518,25 @@ def main() -> int:
         note_bits = ["月末の定例チェック（25日〜末日）"]
         if report.get("auto", {}).get("grant_summary", {}).get("status"):
             note_bits.append(f"付与={report['auto']['grant_summary']['status']}")
+        # 結果語は成功(checked)／部分成功(partial)／失敗(failed)（D6・n27）。
+        # 月印が付かなかった日を『定例ウォッチ更新』と読ませない。
+        slack_outcome, slack_extra = "checked", []
+        if grant_run_failed or grant_quality == "failed":
+            slack_outcome = "failed"
+            slack_extra = [
+                "--error",
+                (grant_quality_reason or "付与サマリの生成に失敗")[:150],
+            ]
+        elif grant_quality == "partial":
+            slack_outcome = "partial"
+            slack_extra = ["--reason", grant_quality_reason[:150]]
         slack_cmd = [
             str(REPO / "scripts" / "jarvis_points_rebate_slack_report.py"),
             "--kind",
             "vpoint",
             "--outcome",
-            "checked",
+            slack_outcome,
+            *slack_extra,
             "--asks",
             str(len(asks)),
             "--note",

@@ -17,7 +17,8 @@ import math
 import re
 import sys
 from collections import defaultdict
-from datetime import datetime
+import calendar
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -97,6 +98,69 @@ def latest_history() -> dict | None:
             data["_path"] = str(p)
             return data
     return None
+
+
+def month_end_date(target_month: str) -> date | None:
+    """対象月 YYYY-MM の末日。形式が違えば None。"""
+    m = re.fullmatch(r"(\d{4})-(\d{2})", target_month or "")
+    if not m:
+        return None
+    y, mo = int(m.group(1)), int(m.group(2))
+    if not 1 <= mo <= 12:
+        return None
+    return date(y, mo, calendar.monthrange(y, mo)[1])
+
+
+def history_asof(hist: dict | None) -> date | None:
+    """Tサイト履歴の基準日（取得日）。fetched_at が読めなければ None（古い扱いにする）。"""
+    if not hist:
+        return None
+    raw = str(hist.get("fetched_at") or "").strip()
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(JST)
+    return dt.date()
+
+
+def assess_grant_quality(
+    *,
+    target_month: str,
+    asof: date | None,
+    has_history: bool,
+    used_fallback: bool,
+    entry_count: int,
+) -> dict[str, Any]:
+    """付与サマリの成否（614 flow.md §8・F4・ノード27）。
+
+    成功: 基準日が対象月の末日以降で、Tサイト履歴の当月行から作れた
+    部分成功: 基準日が対象月の末日より前／基準日が読めない／監査フォールバック
+    失敗: 履歴も監査フォールバックも無く、集計できる行が0件
+    月印(last_check_c)を付けてよいのは成功の時だけ。
+    """
+    asof_s = asof.isoformat() if asof else None
+    end = month_end_date(target_month)
+    if not has_history and entry_count == 0:
+        return {"quality": "failed", "history_asof": None, "quality_reason": "履歴なし・集計できる行が0件"}
+    if asof is None:
+        return {"quality": "partial", "history_asof": None, "quality_reason": "履歴の基準日が読めない"}
+    if end is not None and asof < end:
+        return {
+            "quality": "partial",
+            "history_asof": asof_s,
+            "quality_reason": f"履歴が古い・基準日={asof_s}（対象月末 {end.isoformat()} より前）",
+        }
+    if used_fallback:
+        return {
+            "quality": "partial",
+            "history_asof": asof_s,
+            "quality_reason": f"監査フォールバック（Tサイト当月行なし）・基準日={asof_s}",
+        }
+    return {"quality": "success", "history_asof": asof_s, "quality_reason": "ok"}
 
 
 def _to_int(v: Any) -> int | None:
@@ -366,8 +430,17 @@ def upsert_grant_history(state: dict, summary: dict) -> None:
         "condition_grants_ok": summary.get("condition_grants_ok"),
         "at": summary.get("at"),
         "source_note": summary.get("source_note"),
+        "quality": summary.get("quality"),
+        "history_asof": summary.get("history_asof"),
     }
     hist = [h for h in (state.get("grant_history") or []) if isinstance(h, dict)]
+    prev = next((h for h in hist if h.get("target_month") == target), None)
+    if (
+        prev
+        and prev.get("quality") == "success"
+        and summary.get("quality") != "success"
+    ):
+        return  # 成功済みの月を、後から来た部分成功で上書きしない
     hist = [h for h in hist if h.get("target_month") != target]
     hist.append(entry)
     hist.sort(key=lambda h: str(h.get("target_month") or ""), reverse=True)
@@ -443,7 +516,10 @@ def format_block(s: dict, grant: dict | None = None) -> str:
     return "\n".join(lines)
 
 
-def collect_entries_for_month(audit: dict, target_month: str) -> tuple[list[dict], str]:
+def collect_entries_for_month(
+    audit: dict, target_month: str
+) -> tuple[list[dict], str, dict[str, Any]]:
+    """(行, 出どころ, 品質メタ) を返す。品質メタは assess_grant_quality の入力。"""
     hist = latest_history()
     entries: list[dict] = []
     note = ""
@@ -459,10 +535,19 @@ def collect_entries_for_month(audit: dict, target_month: str) -> tuple[list[dict
             or str(e.get("date") or "").startswith(target_month)
         )
     ]
+    asof = history_asof(hist)
     if month_entries:
-        return month_entries, note
+        return month_entries, note, {
+            "asof": asof,
+            "has_history": bool(hist),
+            "used_fallback": False,
+        }
     fb = entries_from_audit_fallback(audit, target_month)
-    return fb, "監査結果フォールバック（Tサイト当月行なし）"
+    return fb, "監査結果フォールバック（Tサイト当月行なし）", {
+        "asof": asof,
+        "has_history": bool(hist),
+        "used_fallback": True,
+    }
 
 
 def main() -> int:
@@ -497,13 +582,22 @@ def main() -> int:
     result = load_json(RESULT_PATH)
     summary = build_report(state, result, env, now)
     target = args.target_month.strip() or prev_month_key(now)
-    entries, src_note = collect_entries_for_month(result, target)
+    entries, src_note, qmeta = collect_entries_for_month(result, target)
     grant = build_grant_summary(
         entries,
         result,
         target,
         tsumitate_yen=_to_int(summary.get("tsumitate_yen")),
         source_note=src_note,
+    )
+    grant.update(
+        assess_grant_quality(
+            target_month=target,
+            asof=qmeta["asof"],
+            has_history=qmeta["has_history"],
+            used_fallback=qmeta["used_fallback"],
+            entry_count=int(grant.get("entry_count") or 0),
+        )
     )
 
     if args.status:
@@ -517,6 +611,8 @@ def main() -> int:
                     "should_run": summary["in_window"] and not summary["already_done"],
                     "grant_target": target,
                     "grant_total_pt": grant.get("total_pt"),
+                    "grant_quality": grant.get("quality"),
+                    "history_asof": grant.get("history_asof"),
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -541,7 +637,9 @@ def main() -> int:
     )
 
     if args.mark_done or args.build_summary_only:
-        if args.mark_done:
+        # 月印は「成功」の時だけ。部分成功・失敗では付けず、翌日以降の定例で取り直す。
+        stamp = args.mark_done and grant.get("quality") == "success"
+        if stamp:
             state["last_check_c"] = summary["month"]
         state["last_result_c"] = {
             "at": now.isoformat(timespec="seconds"),
@@ -553,13 +651,25 @@ def main() -> int:
             "note": "; ".join(summary["warnings"]) if summary["warnings"] else "ok",
             "target_month": target,
             "grant_summary": grant,
+            "grant_quality": grant.get("quality"),
+            "history_asof": grant.get("history_asof"),
+            "quality_reason": grant.get("quality_reason"),
+            "marked_last_check_c": bool(stamp),
         }
         upsert_grant_history(state, grant)
         # ack は触らない
         save_state(state)
-        print(f"\n✅ grant_summary target={target} total_pt={grant.get('total_pt')}")
-        if args.mark_done:
+        print(
+            f"\n{'✅' if grant.get('quality') == 'success' else '⚠️'} grant_summary "
+            f"target={target} total_pt={grant.get('total_pt')} "
+            f"quality={grant.get('quality')} history_asof={grant.get('history_asof')}"
+        )
+        if stamp:
             print(f"✅ marked last_check_c={summary['month']}")
+        elif args.mark_done:
+            print(
+                f"⚠️ 月印は付けません（{grant.get('quality')}: {grant.get('quality_reason')}）"
+            )
 
     return 0
 
