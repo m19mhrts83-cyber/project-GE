@@ -89,6 +89,91 @@ type PdcaBoard = {
   user_intent_note?: string | null;
 };
 
+type BenefitTier = {
+  id?: string;
+  label?: string;
+  threshold_yen?: number;
+  reward?: string;
+  threshold_status?: string;
+  threshold_status_label?: string;
+  source_note?: string | null;
+  achieved_pct?: number | null;
+  remaining_yen?: number | null;
+  need_per_month_yen?: number | null;
+  verdict?: string;
+};
+
+type BenefitCard = {
+  id?: string;
+  name?: string;
+  short?: string;
+  period_start?: string;
+  period_end?: string;
+  days_left?: number;
+  months_left?: number;
+  usage_yen?: number | null;
+  usage_as_of?: string | null;
+  usage_kind?: string | null;
+  usage_source?: string | null;
+  usage_caveat?: string | null;
+  usage_stale_days?: number | null;
+  pace_per_month_yen?: number | null;
+  counts_note?: string | null;
+  grant_note?: string | null;
+  note?: string | null;
+  tiers?: BenefitTier[];
+};
+
+type BenefitGrant = {
+  label?: string;
+  pt?: number;
+  status?: string;
+  granted_on?: string;
+  period_start?: string;
+  period_end?: string;
+  source?: string;
+};
+
+type ExitItem = {
+  label?: string;
+  status?: string;
+  status_label?: string;
+  checked_on?: string;
+  source?: string;
+  featured?: boolean;
+  note?: string | null;
+  extra_notes?: string[];
+};
+
+type CardBenefit = {
+  today?: string;
+  cards?: BenefitCard[];
+  recommendation?: { line?: string };
+  scope_note?: string;
+  olive_history?: {
+    achieved?: BenefitGrant[];
+    upcoming?: {
+      label?: string;
+      period_start?: string;
+      period_end?: string;
+      grant_timing?: string;
+      mail_status?: { as_of?: string; text?: string; source?: string } | null;
+    };
+  };
+  vpoint_exits?: { items?: ExitItem[]; official_sources?: string[] };
+};
+
+function fmtYen(n: number | null | undefined) {
+  if (n == null || Number.isNaN(n)) return "—";
+  return `${Math.round(n).toLocaleString("ja-JP")}円`;
+}
+
+function verdictMark(v: string | undefined) {
+  if (v === "届く" || v === "達成") return "○";
+  if (v === "厳しい") return "△";
+  return "×";
+}
+
 function fmtPt(n: number | null | undefined) {
   if (n == null || Number.isNaN(n)) return "—";
   return `${Math.round(n).toLocaleString("ja-JP")}pt`;
@@ -162,6 +247,17 @@ export default async function VpointPage() {
   const bc = summary.by_cadence || {};
   const byRate = Array.isArray(summary.by_rate) ? summary.by_rate : [];
   const insights = Array.isArray(summary.insights) ? summary.insights : [];
+  const cb =
+    payload.card_benefit && typeof payload.card_benefit === "object"
+      ? (payload.card_benefit as CardBenefit)
+      : null;
+  const cbCards = Array.isArray(cb?.cards) ? cb!.cards! : [];
+  const cbGranted = Array.isArray(cb?.olive_history?.achieved) ? cb!.olive_history!.achieved! : [];
+  const cbUpcoming = cb?.olive_history?.upcoming || null;
+  const cbExits = Array.isArray(cb?.vpoint_exits?.items) ? cb!.vpoint_exits!.items! : [];
+  const cbSources = Array.isArray(cb?.vpoint_exits?.official_sources)
+    ? cb!.vpoint_exits!.official_sources!
+    : [];
   const teikiServices = Array.isArray(teiki?.services) ? teiki!.services! : [];
   const pdca =
     payload.pdca_board && typeof payload.pdca_board === "object"
@@ -330,6 +426,187 @@ export default async function VpointPage() {
           </p>
         </article>
       )}
+
+      <section id="card-benefit" className="etc-guide" aria-label="年間特典ウォッチ">
+        <h2>年間特典ウォッチ（Olive Infinite / Marriott Bonvoy）</h2>
+        <p className="sub" style={{ marginTop: 4 }}>
+          2枚の年間特典が届くペースかを見て、今月どちらに支払いを寄せるかの判断材料にします。
+          決めるのはご本人です。Olive は<strong>確定値</strong>（三井住友カードの月次メール）、
+          Bonvoy は <strong>Zaim 取込行の概算</strong>（アメックス画面の数字とずれます）。
+          条件の金額は［確認済み／推定／要確認／未確認］を併記します。
+        </p>
+        {!cb || cbCards.length === 0 ? (
+          <p className="empty">
+            まだ年間特典のデータがありません。Mac で
+            <code> jarvis_card_benefit_watch.py --refresh </code>
+            のあと situation_watch → push してください。
+          </p>
+        ) : (
+          <>
+            {cbCards.map((c) => (
+              <article className="card level-info" key={c.id || c.name}>
+                <header>
+                  <span className="lvl">{c.short}</span>
+                  <strong>{c.name}</strong>
+                </header>
+                <p className="meta">
+                  期間 {c.period_start}〜{c.period_end} · 残り{c.days_left}日（約{c.months_left}か月）
+                </p>
+                {c.usage_yen == null ? (
+                  <p className="empty">{c.note || "実額がまだありません"}</p>
+                ) : (
+                  <p className="sum">
+                    利用額 <strong>{fmtYen(c.usage_yen)}</strong>（
+                    {c.usage_kind === "confirmed" ? "確定値" : "概算"} · {c.usage_as_of} 時点）
+                    · 月ペース {fmtYen(c.pace_per_month_yen)}
+                  </p>
+                )}
+                {c.usage_source ? (
+                  <p className="meta">
+                    出どころ: {c.usage_source}
+                    {c.usage_caveat ? ` ／ ${c.usage_caveat}` : ""}
+                  </p>
+                ) : null}
+                {(c.tiers || []).length > 0 ? (
+                  <div className="vpoint-rate-table-wrap">
+                    <table className="vpoint-rate-table">
+                      <thead>
+                        <tr>
+                          <th>特典の線</th>
+                          <th>条件の金額</th>
+                          <th>達成率</th>
+                          <th>あと</th>
+                          <th>月あたり必要</th>
+                          <th>判定</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(c.tiers || []).map((t) => (
+                          <tr key={t.id || t.label}>
+                            <td>
+                              {t.label}
+                              <br />
+                              <span className="meta">{t.reward}</span>
+                            </td>
+                            <td>
+                              {fmtYen(t.threshold_yen)}
+                              <br />
+                              <span className="meta">［{t.threshold_status_label}］</span>
+                            </td>
+                            <td>{t.achieved_pct != null ? `${t.achieved_pct}%` : "—"}</td>
+                            <td>{fmtYen(t.remaining_yen)}</td>
+                            <td>{fmtYen(t.need_per_month_yen)}</td>
+                            <td>
+                              <strong>
+                                {verdictMark(t.verdict)} {t.verdict}
+                              </strong>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+                {c.counts_note ? <p className="meta">集計: {c.counts_note}</p> : null}
+                {c.grant_note ? <p className="meta">付与: {c.grant_note}</p> : null}
+              </article>
+            ))}
+            <p className="sum">
+              <strong>今月はこちらを使うのがおすすめ:</strong> {cb.recommendation?.line || "—"}
+              （判断材料。決めるのはご本人）
+            </p>
+            <p className="meta">
+              月ペースは期間開始からの平均。まとまった支払いがあると実態より高く出ます。{cb.scope_note}
+            </p>
+
+            <h3 className="vpoint-subh">Olive の特典履歴</h3>
+            <div style={{ display: "grid", gap: "1rem", gridTemplateColumns: "1fr 1fr" }}>
+              <div>
+                <strong>達成済み（入会特典）</strong>
+                <ul>
+                  {cbGranted.length === 0 ? <li>—</li> : null}
+                  {cbGranted.map((g, i) => (
+                    <li key={`${g.label}-${i}`}>
+                      {g.label} {fmtPt(g.pt)} — 進呈済み（{g.granted_on}）
+                      <br />
+                      <span className="meta">
+                        集計期間 {g.period_start}〜{g.period_end}
+                        {g.source ? ` · ${g.source}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <strong>これから（継続特典）</strong>
+                <ul>
+                  <li>
+                    {cbUpcoming?.label || "継続特典"} — 集計期間 {cbUpcoming?.period_start}〜
+                    {cbUpcoming?.period_end}
+                    <br />
+                    <span className="meta">
+                      付与: {cbUpcoming?.grant_timing || "未確認"}
+                      {cbUpcoming?.mail_status
+                        ? ` · ${cbUpcoming.mail_status.as_of} 時点『${cbUpcoming.mail_status.text}』`
+                        : ""}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <h3 className="vpoint-subh" id="vpoint-exit">
+              Vポイントの出口
+            </h3>
+            {cbExits
+              .filter((x) => x.featured)
+              .map((x, i) => (
+                <article className="card level-info" key={`f-${x.label}-${i}`}>
+                  <header>
+                    <span className="lvl">最優先</span>
+                    <strong style={{ fontSize: "1.15em" }}>
+                      ［{x.status_label}］ {x.label}
+                    </strong>
+                  </header>
+                  {x.note ? <p className="sum">{x.note}</p> : null}
+                  {(x.extra_notes || []).map((n) => (
+                    <p className="sum" key={n}>
+                      ［未確認］ {n}
+                    </p>
+                  ))}
+                  <p className="meta">
+                    確認日 {x.checked_on || "—"} · 出どころ: {x.source || "—"}
+                  </p>
+                </article>
+              ))}
+            <ul>
+              {cbExits
+                .filter((x) => !x.featured)
+                .map((x, i) => (
+                  <li key={`${x.label}-${i}`}>
+                    <strong>［{x.status_label}］</strong> {x.label}
+                    <br />
+                    <span className="meta">
+                      確認日 {x.checked_on || "—"} · 出どころ: {x.source || "—"}
+                    </span>
+                  </li>
+                ))}
+            </ul>
+            {cbSources.length > 0 ? (
+              <p className="meta">
+                公式:{" "}
+                {cbSources.map((u) => (
+                  <span key={u}>
+                    <a href={u} target="_blank" rel="noreferrer">
+                      {u}
+                    </a>{" "}
+                  </span>
+                ))}
+              </p>
+            ) : null}
+          </>
+        )}
+      </section>
 
       <section id="teiki-barai" className="etc-guide" aria-label="定期払いチャンス">
         <h2>定期払いチャンス（テイチャン）</h2>

@@ -25,10 +25,12 @@ flowchart TD
   T3[窓C 25-末日 Vポイント] --> A
   T4[朝オープン取りこぼし] --> A
   T5[人依頼] --> A
+  T6[月次 メール到着後 年間特典] --> A
   A --> B{種別}
   B -->|teiki| C1[jarvis_teiki_barai_chance --push]
   B -->|etc| C2[jarvis_etc_rebate_fetch --apply --push]
   B -->|vpoint| C3[jarvis_vpoint_routine --apply --push]
+  B -->|card_benefit| C4[jarvis_card_benefit_watch --refresh]
   C1 --> D[jarvis_points_rebate_slack_report]
   C2 --> D
   C3 --> D
@@ -52,10 +54,11 @@ flowchart TD
 | 3 | state 更新 | CLI | AI | `teiki_*` / `etc_monthly` / `vpoint_*` |
 | 4 | ダッシュ投影 | CLI | AI | `jarvis_dashboard_push.py --watch-only`（`--push` 内） |
 | 5 | Slack 短報 | Webhook | AI | `jarvis_points_rebate_slack_report.py` |
+| 2d | 年間特典（Olive／Bonvoy）: Olive=Gmail 月次メール→確定値、Bonvoy=Zaim 行→概算。達成率・月あたり必要額・届くペースか | CLI | AI | `jarvis_card_benefit_watch.py --refresh` |
 | 6 | 人が Slack／`/vpoint`／`/etc` で把握 | Web | **人が確かめる** | ダッシュ・Slack |
 | 7 | 失敗・ログイン不能 → `#ops` | Webhook | AI→人 | `SLACK_WEBHOOK_OPS` |
 
-**人が確かめる印**: 6＝数値の妥当性、2a＝規約／迷うサービス追加、2c＝TサイトOTP・Wallet。  
+**人が確かめる印**: 6＝数値の妥当性（年間特典は条件の金額が推定／要確認のうちは目安。寄せ先を決めるのは人）、2a＝規約／迷うサービス追加、2c＝TサイトOTP・Wallet。  
 **やらない**: 年会費退会操作（**612**）、Zaim鮮度・費目（**613**）、秘密の Slack 再掲、対外送信。
 
 ## FlowForge 作り込みメモ（別チャットへ渡す用）
@@ -82,3 +85,17 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ```
 
 （FlowForge 各ノードの磨きはここに追記）
+
+## 年間特典ウォッチ（2026-11-23 追加・Olive／Bonvoy の2枚だけ）
+
+| 段 | 内容 | 成功の線 |
+|---|---|---|
+| 取り込み | Olive: `orca gmail` で三井住友カードの月次メール（15日現在・約10日後に届く）→ 確定値。Bonvoy: Zaim 取込行（年会費は除く）→ 概算（基準日つき） | state に保存できた＝取込成功（画面反映とは別） |
+| 計算 | 達成率・残り日数／月数・月あたり必要額・判定（届く／厳しい／届かない見込み）。月ペースは期間開始からの平均 | state だけで再計算できる |
+| 画面 | `jarvis_situation_watch.py` → push → `/vpoint#card-benefit` | 画面に出たのを人が見て確認（保存とは別） |
+| Slack | `--kind card_benefit`。番号＋短い役割語、末尾に「今月はこちらを使うのがおすすめ」1行 | dry-run で確認→実投稿は了承後 |
+
+- 判断点: 寄せ先を決めるのは松野さん。方針メモ＝定期払いは Olive に寄せ済み／今後の支払いを Bonvoy に寄せて狙い、狙えなければ打ち切り（年会費の前に判断）。
+- 条件の金額は `threshold_status` を併記（確認済み／推定／要確認／未確認）。公式確認で `confirmed` に上げる。
+- 取り込み失敗（メール未着・Zaim 古い）は「データなし／基準日」で表示し、基準なしと扱って推奨を出さない。
+- 戻り条件: 条件の金額を公式で確認できたら config を直して計算へ戻る（無条件の反復なし）。

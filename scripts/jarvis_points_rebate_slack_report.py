@@ -7,11 +7,12 @@ Slack でも「自動で動いた」と把握できるようにする。
   python scripts/jarvis_points_rebate_slack_report.py --kind teiki --from-state --dry-run
   python scripts/jarvis_points_rebate_slack_report.py --kind etc --from-state --dry-run
   python scripts/jarvis_points_rebate_slack_report.py --kind vpoint --note '窓Cサマリ' --dry-run
+  python scripts/jarvis_points_rebate_slack_report.py --kind card_benefit --dry-run   # 年間特典（Olive／Bonvoy）
 
 投稿: jarvis_slack_webhook_post.py（#report／失敗時 #ops）
 無効化: JARVIS_POINTS_REBATE_SLACK_REPORT_DISABLE=1
   種別だけ切る: JARVIS_TEIKI_SLACK_REPORT_DISABLE / JARVIS_ETC_SLACK_REPORT_DISABLE /
-                JARVIS_VPOINT_SLACK_REPORT_DISABLE
+                JARVIS_VPOINT_SLACK_REPORT_DISABLE / JARVIS_CARD_BENEFIT_SLACK_REPORT_DISABLE
 """
 from __future__ import annotations
 
@@ -50,6 +51,7 @@ KIND_DISABLE = {
     "teiki": "JARVIS_TEIKI_SLACK_REPORT_DISABLE",
     "etc": "JARVIS_ETC_SLACK_REPORT_DISABLE",
     "vpoint": "JARVIS_VPOINT_SLACK_REPORT_DISABLE",
+    "card_benefit": "JARVIS_CARD_BENEFIT_SLACK_REPORT_DISABLE",
 }
 
 
@@ -65,14 +67,23 @@ def _load_json(path: Path) -> dict:
 
 def _archive(text: str, tag: str) -> None:
     try:
-        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        # 年間特典の短報は実額入り。公開リポ（docs）に残さず gitignore 済みの state 側へ。
+        reports_dir = REPORTS_DIR
+        if tag.startswith("card_benefit"):
+            sd = (os.environ.get("JARVIS_STATE_DIR") or "").strip()
+            reports_dir = (Path(sd).expanduser() if sd else REPO / ".jarvis_state") / "card_benefit_reports"
+        reports_dir.mkdir(parents=True, exist_ok=True)
         day = datetime.now(JST).strftime("%Y-%m-%d")
-        path = REPORTS_DIR / f"{day}_{tag}.md"
+        path = reports_dir / f"{day}_{tag}.md"
         path.write_text(
             f"# Slack #report 控え — {day} / {tag}\n\n```\n{text}\n```\n",
             encoding="utf-8",
         )
-        print(f"📎 report archive: {path.relative_to(REPO)}")
+        try:
+            shown = path.relative_to(REPO)
+        except ValueError:
+            shown = path
+        print(f"📎 report archive: {shown}")
     except OSError as e:
         print(f"⚠️ report archive failed: {e}", file=sys.stderr)
 
@@ -185,6 +196,27 @@ def build_vpoint(*, outcome: str, reason: str, error: str, note: str, asks_n: in
     return "\n".join(lines)
 
 
+def build_card_benefit(*, outcome: str, error: str, note: str) -> str:
+    """年間特典ウォッチ（Olive Infinite／Marriott Bonvoy）。実額は state（gitignore）から。"""
+    header = _header("年間特典")[0]
+    out = (outcome or "checked").strip()
+    if out == "disabled":
+        return "\n".join([header, "・結果: 無効化のため未実行"])
+    if out == "failed":
+        return "\n".join(
+            [header, f"・結果: 失敗 — {error or '不明'}", "・次: 年間特典の state／Gmail 取込を確認 or #ops"]
+        )
+    sys.path.insert(0, str(REPO / "scripts"))
+    import jarvis_card_benefit_watch as cbw  # noqa: E402
+
+    text = cbw.build_slack_text(
+        cbw.compute_from_files(), header=header, dash_url=f"{DASH_VPOINT}#card-benefit"
+    )
+    if note:
+        text += f"\n特記: {note}"
+    return text
+
+
 def _text_fingerprint(text: str) -> str:
     norm = "\n".join(line.rstrip() for line in (text or "").splitlines()).strip()
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()[:20]
@@ -266,7 +298,7 @@ def _post(
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--kind", required=True, choices=("teiki", "etc", "vpoint"))
+    ap.add_argument("--kind", required=True, choices=("teiki", "etc", "vpoint", "card_benefit"))
     ap.add_argument(
         "--outcome",
         default="checked",
@@ -377,6 +409,17 @@ def main() -> int:
             dry_run=args.dry_run,
             archive_tag=f"etc_{args.outcome}",
             kind="etc",
+            force=args.force,
+        )
+
+    if args.kind == "card_benefit":
+        text = build_card_benefit(outcome=args.outcome, error=args.error, note=args.note)
+        return _post(
+            channel,
+            text,
+            dry_run=args.dry_run,
+            archive_tag=f"card_benefit_{args.outcome}",
+            kind="card_benefit",
             force=args.force,
         )
 
