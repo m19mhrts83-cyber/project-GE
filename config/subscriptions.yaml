@@ -105,13 +105,16 @@ services:
   - id: chatgpt_plus
     name: ChatGPT Plus
     category: ai
-    status: ending
-    billing: none
-    amount_yen: 0
-    next_bill: "2026-08-26 期間終了・以降更新なし"
-    watch: false
+    status: active
+    billing: monthly
+    amount_yen: 3000
+    next_bill: "毎月（App Store の更新日が正）"
+    watch: true
+    watch_reason: "金額が仮（月3,000円）。App Store の領収書で確定額と更新日に直す"
     cancel_candidate: false
-    note: "解約済・期間残"
+    billing_url: "https://apps.apple.com/account/subscriptions"
+    usage_note: "チャッピー（Codex）。Orca での実装・設計の割り振り先"
+    note: "2026-11-22 松野さん連絡: 有料版を利用中。iPhone で契約し、支払いは App Store 経由。金額は Miss Lemon の仮値で未確認（Web 直契約は 2026-08-26 で終了済み。その後 App Store で再契約した時期は未確認）。Jarvis Dashboard /ai-usage では「エージェントの道具」に入る"
 
   - id: onepassword
     name: 1Password（Individual）
