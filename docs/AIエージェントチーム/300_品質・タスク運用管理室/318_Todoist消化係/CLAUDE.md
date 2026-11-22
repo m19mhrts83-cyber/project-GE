@@ -4,7 +4,7 @@
 
 Todoist の未完了タスクを優先順に拾い、前回から変わっていない件は飛ばし、①AIのみ／②松野さんの判断／③本人操作に仕分ける。
 ② は `/313/bulk` で判断してもらい（本人回答は翌回に読み戻して再判定）、③ は 312「今週の9件」へ渡す（Phase 2・**載せる／送るはフラグを付けた時だけ**）。
-Phase 3 準備として【318】コメント（`--write-comments`）と 10:30 の定時（未登録の雛形・313 0.5 との排他）を用意した。
+Phase 3 準備として【318】コメント（`--write-comments`）と 10:30 の定時（313 0.5 との排他）を用意し、**2026-11-23 に 10:30 の枠を 313 から 318 へ移管済み**（松野さん了承。launchd 登録・担当 318・フラグ `--publish --send-slack --write-comments --execute-auto`。313 予定タスクは 2・3 段目に差し替え）。
 ① の自律実行（ノード2-1・2-2）は `--execute-auto` の時だけ。範囲は調査・資料確認・文面下書きまでで、成果物は内部（`work/`）に保存する。
 **有効にするかは松野さんが決める**（[`PROGRESS.md`](./PROGRESS.md) の先頭の表）。
 
@@ -12,7 +12,7 @@ Phase 3 準備として【318】コメント（`--write-comments`）と 10:30 �
 - 設計の正本: FlowForge [flow_HMy15MUxWiSpw5QgAPYa_8e4](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_HMy15MUxWiSpw5QgAPYa_8e4)（承認済み 15 ノード・11 接続）。各ノードの説明文が仕様。読み方は [`flow.md`](./flow.md)
 - 仕様を変えたい時は独断で変えない。300 BL（ラスカル）に相談する
 - 実装: `scripts/jarvis_todoist_318_triage.py`（本体）・`scripts/jarvis_todoist_318_handoff.py`（Phase 2 の部品）・`scripts/jarvis_todoist_318_comment.py`（【318】コメント）・`scripts/jarvis_todoist_morning_slot.py`（朝枠の排他）／基準: `config/todoist_318_criteria.yaml`／テスト: `scripts/tests/test_todoist_318_triage.py`・`test_todoist_318_phase2.py`・`test_todoist_318_phase3.py`
-- 10:30 の移管: [`移管手順_10時30分.md`](./移管手順_10時30分.md)（止める順番・戻し方。launchd は未登録）
+- 10:30 の移管: [`移管手順_10時30分.md`](./移管手順_10時30分.md)（止める順番・戻し方。launchd は 2026-11-23 登録済み）
 - 関係: 起票は [312](../312_Todoist起票整理係/CLAUDE.md)、完了・片付け・毎朝の 0.5 は [313](../313_完了候補確認係/CLAUDE.md)、コメント起動は [317](../317_コメント起動係/CLAUDE.md)
 
 ## 1. 役割
@@ -49,13 +49,13 @@ Phase 3 準備として【318】コメント（`--write-comments`）と 10:30 �
   - Todoist への書き込み一切（完了・削除・期限変更は今後も作らない。コメントは Phase 3 準備で `--write-comments` の時だけ）
   - Slack 送信（#consult・#ai-hub とも「案」の保存だけ）、`/313/bulk` への登録
   - ① の自律実行（`--execute-auto` の時だけ。コード修正・テスト・PR 作成は将来）、他エージェントへの新規依頼
-  - 定期起動の登録（10:30 の launchd・GHA・cloud 予定タスク）、313 の起動設定の変更（313 の 0.5 はそのまま動かす。松野さん了承済み）。雛形と手順はあるが登録・移管は松野さんが決めてから
+  - 定期起動の新規登録（10:30 の launchd は 2026-11-23 登録済み。GHA・cloud 予定タスクの追加はしない）。313 の 0.5 は止め、予定タスクを 318 の 2・3 段目に差し替え済み（戻し方は移管手順 §4）
   - 外部送信・削除・支払い・契約・マージ・デプロイ
 
 ## 2. 動き出す合図
 
 - [x] 人が頼む（手動実行だけ。Phase 1）
-- [ ] 時間（毎朝 10:30。**未登録**。雛形 `launchd/com.matsunoma.jarvis.todoist-318.plist.template`・取り決め `jarvis_todoist_morning_slot.py` は用意済み。移管は [`移管手順_10時30分.md`](./移管手順_10時30分.md)）
+- [ ] 時間（毎朝 10:30。**2026-11-23 登録済み**。雛形 `launchd/com.matsunoma.jarvis.todoist-318.plist.template`・取り決め `jarvis_todoist_morning_slot.py` は用意済み。移管の結果・戻し方は [`移管手順_10時30分.md`](./移管手順_10時30分.md)）
 
 ## 3. 実行権限
 
