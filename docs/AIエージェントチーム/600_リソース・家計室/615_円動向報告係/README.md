@@ -9,7 +9,7 @@ USD/JPY の推移をグラフ付きで報告する係。**売買推奨・ポジ�
 | Slack | `#report` `【615 円動向報告｜USDJPY】`（番号＋短い役割語。「係」不要） |
 | ダッシュ | `/yen`（Supabase `yen_rate_daily`＋`watch_status.yen_rate`。`--apply` で投影） |
 | 見立て | 確率表現の円換算感度コメントのみ（あかつき／Bloomo 文脈。売買指図なし） |
-| 定期 | GHA 月・木 08:00 JST（`yen-rate-watch.yml`） |
+| 定期 | GHA 月・木 08:00 JST（`yen-rate-watch.yml`）。稼働の見方は [`CLAUDE.md`](./CLAUDE.md) §8（リポの reports/ は GHA ではコミットされない） |
 | 組織図 | [ビルダー共有](https://agent-team-builder-teal.vercel.app/s/uksxiDIzE1AEckKH) |
 | 作業フロー素案 | [`flow.md`](./flow.md)（FlowForge 未作成） |
 | 指示書 | [`CLAUDE.md`](./CLAUDE.md) |
