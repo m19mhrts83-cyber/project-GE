@@ -82,6 +82,33 @@ class SourcesTest(unittest.TestCase):
         self.assertNotIn('private', result[1])
 
 
+class ChrlineNoSampleTest(unittest.TestCase):
+    def _child(self, age):
+        from types import SimpleNamespace
+        module = SimpleNamespace(load_previous_health=lambda: {}, run_line_health_routine=lambda save_baseline: ({'md_reports': [{'exists': True}]}, ''),
+            build_health_snapshot=lambda inv: {'decode_seen': 0}, evaluate_alerts=lambda cur, prev: [])
+        with patch.dict(sys.modules, {'chrline_line_health': module}), patch.object(sources, 'sync_age_hours', return_value=age):
+            return sources.chrline_child()
+
+    def test_no_sample_but_recent_sync_is_ok_with_reason(self):
+        level, text = self._child(3.2)
+        self.assertEqual(level, 'OK')
+        self.assertIn('新着なし', text)
+
+    def test_no_sample_and_old_or_unknown_sync_is_unconfirmed(self):
+        for age in (49, None):
+            self.assertEqual(self._child(age)[0], '確認不能')
+
+    def test_sync_age_uses_newest_marker(self):
+        import os, time
+        with tempfile.TemporaryDirectory() as d:
+            self.assertIsNone(sources.sync_age_hours(Path(d)))
+            q = Path(d) / sources.SYNC_MARKERS[0]
+            q.write_text('{}')
+            os.utime(q, (time.time() - 7200, time.time() - 7200))
+            self.assertAlmostEqual(sources.sync_age_hours(Path(d)), 2.0, delta=0.1)
+
+
 class ChrlineSubprocessTest(unittest.TestCase):
     def snap(self, code, timeout=20):
         with tempfile.TemporaryDirectory() as tmp:

@@ -36,3 +36,10 @@
 
 - 原因: 実行pythonにCHRLINE/geventが無く例外握りつぶしで「取得できない」。修正: `.venv` のpythonを子プロセスで呼びPYTHONPATHを付与、読取専用維持、失敗理由を説明に出す。テスト追加。
 - Square: 手動probe保存（7/5以降更新なし）をやめ、常駐watchの状態ファイル（state・heartbeat 24h以内・書込エラー）で自動判定。probeは外した。マージ・launchd変更・Slack送信なし。
+
+## 2026-11-22 CHRLINE exhausted 警告の整理（PR）
+
+- 原因調査: retry キューの exhausted 146件は、書込先MDの親フォルダ名変更で書き込めず本文も未復号のまま枯渇した過去分（最後の枯渇は10月中旬、直近24hの増加は0）。新しい障害ではない。
+- 対応: `line_unofficial_poc/chrline_retry_queue_archive.py`（既定dry-run、`--apply`で退避。削除せず `.chrline_sync_retry_queue.archive.json` へ、実行前にバックアップ）。exhausted 警告は「前回から増えた分」で判定（baselineなしは残り件数）。
+- 退避の実行はマージ後に松野さん了承を確認してから。active は触らない。
+- decode_stats が止まって見える件: 新着の本文取得が1件も無い日は記録を追記しない仕様のため。点検側は、標本0でもsync最終成功が48時間以内なら「新着なし＝OK」と判定（実装済み）。syncも古い時は確認不能。

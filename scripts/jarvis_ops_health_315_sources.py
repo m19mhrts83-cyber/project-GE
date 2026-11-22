@@ -18,6 +18,8 @@ CHRLINE_TIMEOUT = 90
 # Resident watch (com.matsunoma.line.openchat.watch) rewrites heartbeat_at about
 # every minute, so 24h tolerates sleep/restart without waiting a week.
 WATCH_MAX_AGE_HOURS = 24
+SYNC_MAX_AGE_HOURS = 48
+SYNC_MARKERS = (".chrline_sync_retry_queue.json", ".chrline_line_health_last.json")
 WATCH_STATUS = REPO / "line_unofficial_poc" / ".line_auth" / ".chrline_open_chat_watch_status.json"
 
 
@@ -82,6 +84,20 @@ def square_snapshot(path: Path | None = None, now: datetime | None = None) -> tu
     return "OK", f"常駐稼働中・最終確認{int(age)}時間前（最終追記 {appended}）"
 
 
+def sync_age_hours(auth_dir: Path, now: float | None = None) -> float | None:
+    """sync最終成功の目安（キュー/healthの最新更新時刻）からの経過時間。無ければNone。"""
+    import time
+    times = []
+    for name in SYNC_MARKERS:
+        try:
+            times.append((auth_dir / name).stat().st_mtime)
+        except OSError:
+            pass
+    if not times:
+        return None
+    return ((now if now is not None else time.time()) - max(times)) / 3600.0
+
+
 def chrline_child() -> tuple[str, str]:
     """Runs inside the CHRLINE venv (needs CHRLINE/gevent). Read-only health."""
     # Existing health API is read-only with save_baseline=False. Do not render
@@ -99,10 +115,14 @@ def chrline_child() -> tuple[str, str]:
             if not inv.get("md_reports") or not all(r.get("exists") for r in inv["md_reports"]):
                 return "確認不能", "CHRLINE入力資料が不足"
             current = build_health_snapshot(inv)
+            note = ""
             if current["decode_seen"] == 0:
-                return "確認不能", "CHRLINE直近decode標本なし"
+                age = sync_age_hours(REPO / "line_unofficial_poc" / ".line_auth")
+                if age is None or age > SYNC_MAX_AGE_HOURS:
+                    return "確認不能", "CHRLINE直近decode標本なし（syncも古い/不明）"
+                note = f"・新着なし（sync最終成功{int(age)}時間前）"
             alerts = evaluate_alerts(current, previous)
-            return ("異常" if alerts else "OK"), f"CHRLINE health: 警告{len(alerts)}件（baseline保存なし）"
+            return ("異常" if alerts else "OK"), f"CHRLINE health: 警告{len(alerts)}件（baseline保存なし）{note}"
     except ModuleNotFoundError:
         return "確認不能", "CHRLINE healthを取得できない（モジュール不足）"
     except Exception:
