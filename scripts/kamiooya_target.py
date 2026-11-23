@@ -1,7 +1,7 @@
 """神大家 AI ナビ（kamiooya-qa）の Supabase 接続先を 1 か所で決める（2026-11-20）。
 
 東京リージョンへの移設に備え、プロジェクト ref の直書きをここへ集める。
-切替は環境変数 KAMIOOYA_PROJECT_REF を新しい ref にするだけ（未設定なら現行のムンバイ）。
+切替は環境変数 KAMIOOYA_PROJECT_REF を新しい ref にするだけ（未設定なら東京）。
 鍵は扱わない。URL だけを返す。
 """
 from __future__ import annotations
@@ -9,8 +9,8 @@ from __future__ import annotations
 import os
 import re
 
-# 現行（ムンバイ ap-south-1）。切替後もしばらく戻し先として残す。
-DEFAULT_REF = "mwubzgefkkjjbingrmqu"
+# 東京（ap-northeast-1）。2026-11-21 にムンバイから移設、旧は 11-24 に削除。
+DEFAULT_REF = "sufbsyddqgekvcgadhpv"
 _REF_RE = re.compile(r"^[a-z0-9]{20}$")
 
 

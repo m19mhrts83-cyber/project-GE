@@ -19,7 +19,7 @@ Phase 14 フェーズ2（日次上限の数値など）は、意味検索が数�
 コード再デプロイ不要。
 
 1. Supabase Dashboard → Project `kamiooya-qa` → **Edge Functions** → Secrets  
-   または CLI: `supabase secrets set SEMANTIC_SEARCH_DISABLED=1 --project-ref mwubzgefkkjjbingrmqu`
+   または CLI: `supabase secrets set SEMANTIC_SEARCH_DISABLED=1 --project-ref sufbsyddqgekvcgadhpv`
 2. ユーザーには「意味検索は一時停止中。通常検索（意味検索モードOFF）を」と出る（HTTP 503）
 3. **通常検索はそのまま使える**
 4. 再開: `SEMANTIC_SEARCH_DISABLED` を削除するか `0` にする

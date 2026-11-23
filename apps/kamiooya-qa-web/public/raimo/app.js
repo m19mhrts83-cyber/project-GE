@@ -2,7 +2,7 @@ const App = {
   // Offline repair candidate: stay on the existing backend until an approved cutover.
   authGatewayBase: '', // Release publisher sets the verified gateway URL.
   // 公開 Edge URL（シークレットは /semantic-search-config から取得）
-  semanticEdgeUrl: 'https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/semantic-search',
+  semanticEdgeUrl: 'https://sufbsyddqgekvcgadhpv.supabase.co/functions/v1/semantic-search',
   _semanticSecret: null,
 
   state: {
@@ -4345,7 +4345,7 @@ const App = {
   },
 
   attachmentRequest: async (body, token) => {
-    const response=await fetch('https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/community-attachments',{
+    const response=await fetch('https://sufbsyddqgekvcgadhpv.supabase.co/functions/v1/community-attachments',{
       method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+(token||App.state.attachmentToken||'')},body:JSON.stringify(body)
     });
     if(!response.ok){const error=new Error('attachment_request_failed');error.httpStatus=response.status;throw error;}
@@ -4436,7 +4436,7 @@ const App = {
           const result = await App.attachmentRequest({ operation: 'open', source:isOpenchat?'openchat':'community', attachment_id: item.id });
           if (generation !== App.state.attachmentGeneration) throw new Error('ログイン状態が変わりました。開き直してください。');
           const url = new URL(result.url);
-          if (url.origin !== 'https://mwubzgefkkjjbingrmqu.supabase.co' ||
+          if (url.origin !== 'https://sufbsyddqgekvcgadhpv.supabase.co' ||
               !url.pathname.startsWith('/storage/v1/object/sign/'+(isOpenchat?'openchat-attachments':'community-attachments')+'/')) throw new Error('添付リンクを確認できませんでした。');
           if (!target) throw new Error('ポップアップを許可して、もう一度リンクを押してください。');
           target.location.replace(url.href);

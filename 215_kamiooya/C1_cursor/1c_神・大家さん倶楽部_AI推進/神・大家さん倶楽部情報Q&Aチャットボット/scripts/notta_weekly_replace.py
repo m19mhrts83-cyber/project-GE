@@ -99,7 +99,7 @@ def main() -> int:
     from transcript_corrections import fix_text
 
     load_env()
-    if os.environ.get("SUPABASE_URL", "").rstrip("/") != ("https://" + (os.environ.get("KAMIOOYA_PROJECT_REF") or "mwubzgefkkjjbingrmqu") + ".supabase.co"):
+    if os.environ.get("SUPABASE_URL", "").rstrip("/") != ("https://" + (os.environ.get("KAMIOOYA_PROJECT_REF") or "sufbsyddqgekvcgadhpv") + ".supabase.co"):
         raise RuntimeError("kamiooya-qa以外への接続を拒否")
     client = get_client()
     base_url = os.environ.get("RAIMO_APP_URL") or os.environ.get("LIMO_APP_URL") or ""

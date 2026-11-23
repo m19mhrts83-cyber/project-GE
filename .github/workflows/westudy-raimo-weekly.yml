@@ -75,7 +75,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       # 東京切替後は repo 変数と Secrets の URL を揃える（未設定なら現行ムンバイ）。
       # 無いと attachments の Store が wrong_supabase_project で落ちる（2026-11-21）。
-      KAMIOOYA_PROJECT_REF: ${{ vars.KAMIOOYA_PROJECT_REF || 'mwubzgefkkjjbingrmqu' }}
+      KAMIOOYA_PROJECT_REF: ${{ vars.KAMIOOYA_PROJECT_REF || 'sufbsyddqgekvcgadhpv' }}
       RAIMO_NOTIFY_MACOS: "0"
       RAIMO_FAIL_OPEN: "0"
       # Raimo 取込は巨大 CSV を JS ヒープに載せるため、GHA では分割・スクショなし・最新化スキップ

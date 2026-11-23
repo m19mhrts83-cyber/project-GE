@@ -13,7 +13,7 @@
 | プロジェクト | ref | 既存表 | 10/30 以降の新規表 |
 |---|---|---|---|
 | **jarvis-dashboard** | `idkdqneutpvkhxhpjtgc` | 監査済・Data API 到達可（下記） | CREATE と同 migration に GRANT |
-| **kamiooya-qa**（prompt-share 含む） | `mwubzgefkkjjbingrmqu` | 全表 `service_role` 明示済 | 同上（主に `service_role`） |
+| **kamiooya-qa**（prompt-share 含む） | `sufbsyddqgekvcgadhpv` | 全表 `service_role` 明示済 | 同上（主に `service_role`） |
 
 **既存テーブルへの緊急作業は不要。** 残作業は「今後の migration 習慣」と reset 耐性の明示 GRANT。
 
@@ -69,7 +69,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 
 # kamiooya-qa（必要時 --ref）
 ~/selenium_env/venv/bin/python scripts/jarvis_supabase_apply_sql.py \
-  --ref mwubzgefkkjjbingrmqu \
+  --ref sufbsyddqgekvcgadhpv \
   apps/kamiooya-qa-web/supabase/migrations/20261021_data_api_grants_verify.sql
 ```
 
