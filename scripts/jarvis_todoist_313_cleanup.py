@@ -20,6 +20,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import jarvis_todoist_313_http as http313  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 import jarvis_todoist_313_judgment as jd  # noqa: E402
@@ -57,12 +59,7 @@ def _api(path: str) -> dict:
     tok = _token()
     if not tok:
         raise SystemExit("TODOIST_API_TOKEN がありません")
-    req = urllib.request.Request(
-        "https://api.todoist.com/api/v1" + path,
-        headers={"Authorization": f"Bearer {tok}"},
-    )
-    with urllib.request.urlopen(req, timeout=40) as r:
-        return json.loads(r.read().decode() or "{}")
+    return http313.request("GET", path, tok)
 
 
 def _propose_due(days_over: int, today: date) -> str:

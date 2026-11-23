@@ -20,6 +20,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import jarvis_todoist_313_http as http313  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[1]
 JST = ZoneInfo("Asia/Tokyo")
 STATE = REPO / ".jarvis_state" / "todoist_313_stage0.json"
@@ -39,19 +41,9 @@ def _token() -> str:
 
 def _api(method: str, path: str, body: dict | None = None) -> dict:
     tok = _token()
-    data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(
-        "https://api.todoist.com/api/v1" + path,
-        data=data,
-        headers={
-            "Authorization": f"Bearer {tok}",
-            "Content-Type": "application/json",
-        },
-        method=method,
-    )
-    with urllib.request.urlopen(req, timeout=40) as r:
-        raw = r.read().decode()
-        return json.loads(raw) if raw.strip() else {}
+    if not tok:
+        raise SystemExit("TODOIST_API_TOKEN がありません（.env.jarvis_private を source）")
+    return http313.request(method, path, tok, body)
 
 
 def _propose(days: int, title: str) -> dict:
