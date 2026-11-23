@@ -75,6 +75,8 @@ export default function TaskDedupeClient({
     setRate({});
     setEditIndex(null);
     setMsg("");
+    // お題が変わったら、いつも題名（いちばん上）から始める
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, left: 0 });
   }, [topicId, allTopics]);
 
   const topic: SeedTopic | null = useMemo(() => {
@@ -226,6 +228,15 @@ export default function TaskDedupeClient({
     );
   }
 
+  if (allClear && !saved) {
+    return (
+      <div>
+        {tabsEl}
+        <AllClear />
+      </div>
+    );
+  }
+
   const doneRec = results.find((r) => r.topicId === topic.id);
   const doneIdx = topicIndexOf(allTopics, topic.id);
   const decidedProposal = doneRec?.chosenIndex
@@ -260,6 +271,7 @@ export default function TaskDedupeClient({
           onClose={() => {
             setSaved(null);
             if (nextPending) setTopicId(nextPending.id);
+            if (typeof window !== "undefined") window.scrollTo({ top: 0, left: 0 });
           }}
           onUndo={() => {
             setSaved(null);
@@ -267,7 +279,6 @@ export default function TaskDedupeClient({
           }}
         />
       ) : null}
-      {allClear ? <AllClear /> : null}
       {tabsEl}
 
       <div className="glass card topic">
@@ -587,12 +598,15 @@ function AllClear() {
           <circle className="ac-ring-fg" cx="42" cy="42" r="36" />
           <path className="ac-check" d="M27 43 L38 54 L58 31" />
         </svg>
-        {Array.from({ length: 10 }, (_, i) => (
-          <i key={i} className={`ac-spark c${i % 4}`} style={{ ["--a" as string]: `${i * 36}deg` }} />
+        {Array.from({ length: 16 }, (_, i) => (
+          <i key={i} className={`ac-spark c${i % 4}`} style={{ ["--a" as string]: `${i * 22.5}deg` }} />
         ))}
       </div>
-      <strong className="ac-title">判断するタスクなし</strong>
-      <span className="ac-sub">ぜんぶ片づいています。すばらしい！</span>
+      <span aria-hidden="true">{Array.from({ length: 12 }, (_, i) => (
+          <i key={`f${i}`} className={`ac-fall c${i % 4}`} style={{ left: `${4 + i * 8}%`, animationDelay: `${(i % 6) * 0.25}s` }} />
+        ))}</span>
+      <strong className="ac-title">今、新規で考えるお題はありません</strong>
+      <span className="ac-sub">ぜんぶ終わったよ、おめでとう！🎉</span>
     </div>
   );
 }
