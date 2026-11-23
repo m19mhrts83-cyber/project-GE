@@ -5452,7 +5452,10 @@ const App = {
     }
   },
   // (4) 質問ランキング＋講座テーマ案。見えない人には枠ごと出さない。2026-11-11
-  themeChoiceLabel: { adopt: '✅ 採用', revise: '✏️ 直して採用', reject: '❌ 不採用' },
+  themeChoiceLabel: { adopt: '✅ 採用', revise: '✏️ 直して採用', consider: '🤔 検討案として採用', reject: '❌ 不採用' },
+  // 理由の欄の案内。判断ごとに「なぜ」を聞く（2026-11-23 松野さん「なぜ採用／不採用かも判断ログに」）。
+  themeReasonHint: { adopt: 'なぜ採用にしたか（例：会員の需要が多く、既存講座が少ない）', revise: 'なぜ直したか（例：題名をもっと具体的にしたい）',
+    consider: 'なぜ検討したいか、次の案で何を深めてほしいか（例：対象を1棟目購入前に絞ってほしい）', reject: 'なぜ不採用か（例：既に同じ講座がある）' },
   loadRankingThemes: async () => {
     const box = document.getElementById('rankingThemes');
     if (!box) return;
@@ -5547,18 +5550,22 @@ const App = {
       '<br><span class="text-xs">直近 ' + esc(String(latest.period_days || 120)) + ' 日の Q&Aチャットへの質問 ' + (st.chatbot || 0) + ' 回' + (st.chatbot_users ? '・' + st.chatbot_users + ' 人' : '') +
       '（テーマ案の材料には、コミュニティ ' + (st.forum || 0) + ' 件・オプチャ ' + (st.openchat || 0) + ' 件・既存講座 ' + (st.courses || 0) + ' 本も使っています）</span>';
     const exact = (latest.ranking || []).some(function (x) { return x.people != null; });
-    const rows = (latest.ranking || []).slice(0, 15);
+    // トップ5だけ見せ、6位から下は「もっと見る」で開く（2026-11-23 松野さん「ランキングが長すぎる」）。
+    const rows = (latest.ranking || []).slice(0, 30), SHOW = 5;
     const top = Math.max(1, ...rows.map(function (x) { return Number(x.count) || 0; }));
-    list.innerHTML = !exact
-      ? '<p class="text-slate-500">この回は数え方を見直す前のものです。作り直すと、Q&Aチャットで聞かれた回数・人数で並びます。</p>'
-      : rows.length === 0 ? '<p class="text-slate-500">まだ質問がありません。</p>'
-      : '<ol class="ab-rank">' + rows.map(function (x, i) {
+    const rankItem = function (x, i) {
         return '<li><span class="ab-rank-no' + (i < 3 ? ' is-top' : '') + '">' + (i + 1) + '</span>' +
           '<div class="ab-rank-main"><div class="ab-rank-q">' + esc(x.topic) + '</div>' +
           '<div class="ab-rank-bar"><i style="width:' + (((Number(x.count) || 0) / top) * 100).toFixed(1) + '%"></i></div>' +
           (x.examples && x.examples.length ? '<details class="text-xs text-slate-600 mt-0.5"><summary>実際の質問' + (x.variants > 1 ? '（言い方 ' + x.variants + ' 通り）' : '') + '</summary><ul class="list-disc ml-4">' + x.examples.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></details>' : '') +
           '</div><span class="ab-rank-n">' + (Number(x.count) || 0) + '<small>回</small><em>' + (Number(x.people) || 0) + '人</em></span></li>';
-      }).join('') + '</ol>';
+    };
+    list.innerHTML = !exact
+      ? '<p class="text-slate-500">この回は数え方を見直す前のものです。作り直すと、Q&Aチャットで聞かれた回数・人数で並びます。</p>'
+      : rows.length === 0 ? '<p class="text-slate-500">まだ質問がありません。</p>'
+      : '<ol class="ab-rank">' + rows.slice(0, SHOW).map(rankItem).join('') + '</ol>' +
+        (rows.length > SHOW ? '<details class="rt-more mt-1"><summary class="cursor-pointer text-sm text-slate-600 py-1">▼ もっと見る（' + (SHOW + 1) + '位〜' + rows.length + '位）</summary>' +
+          '<ol class="ab-rank" start="' + (SHOW + 1) + '">' + rows.slice(SHOW).map(function (x, i) { return rankItem(x, i + SHOW); }).join('') + '</ol></details>' : '');
     cards.innerHTML = (latest.themes || []).map(function (t) {
       const d = t.decision;
       return '<div class="border rounded p-2" data-theme="' + esc(t.id) + '">' +
@@ -5566,13 +5573,15 @@ const App = {
         (t.target || t.format ? '<div class="text-xs text-slate-500">' + esc([t.target, t.format].filter(Boolean).join(' ／ ')) + '</div>' : '') +
         (t.why ? '<div class="mt-1"><span class="text-slate-500">なぜ今：</span>' + esc(t.why) + '</div>' : '') +
         (t.evidence ? '<div class="text-xs text-slate-600"><span class="text-slate-500">根拠：</span>' + esc(t.evidence) + '</div>' : '') +
-        (d ? '<div class="mt-1 text-xs bg-slate-50 rounded p-1">' + esc(App.themeChoiceLabel[d.choice] || d.choice) + (d.revised_title ? '：' + esc(d.revised_title) : '') + (d.reason ? ' ― ' + esc(d.reason) : '') + '</div>' : '') +
-        '<div class="mt-2 flex flex-wrap gap-1">' + ['adopt', 'revise', 'reject'].map(function (c) {
+        (t.follows ? '<div class="mt-1 text-xs text-sky-800 bg-sky-50 rounded px-1">🤔 検討案「' + esc(t.follows) + '」を踏まえた案</div>' : '') +
+        (d ? '<div class="mt-1 text-xs bg-slate-50 rounded p-1">' + esc(App.themeChoiceLabel[d.choice] || d.choice) + (d.revised_title ? '：' + esc(d.revised_title) : '') + (d.reason ? '<br><span class="text-slate-500">理由：</span>' + esc(d.reason) : '') + '</div>' : '') +
+        '<div class="mt-2 flex flex-wrap gap-1">' + ['adopt', 'revise', 'consider', 'reject'].map(function (c) {
           return '<button type="button" class="px-2 py-0.5 rounded border text-xs" data-choice="' + c + '">' + App.themeChoiceLabel[c] + '</button>';
         }).join('') + '</div>' +
         '<div class="theme-form hidden mt-2 space-y-1">' +
         '<input type="text" maxlength="200" class="theme-title w-full border rounded px-2 py-1 text-sm hidden" placeholder="直した題名">' +
         '<textarea maxlength="1000" rows="2" class="theme-reason w-full border rounded px-2 py-1 text-sm" placeholder="理由（次の案づくりに使います）"></textarea>' +
+        '<p class="text-xs text-slate-500">理由は必ず書いてください。次に作り直すとき、AIがこの理由を読んで案を作ります。</p>' +
         '<div class="flex gap-2 items-center"><button type="button" class="theme-save px-3 py-1 rounded bg-slate-800 text-white text-xs">保存</button><span class="theme-msg text-xs text-slate-500"></span></div></div></div>';
     }).join('');
     cards.querySelectorAll('[data-theme]').forEach(function (card) {
@@ -5587,11 +5596,13 @@ const App = {
           title.classList.toggle('hidden', choice !== 'revise');
           if (choice === 'revise' && !title.value) title.value = (theme.decision && theme.decision.revised_title) || theme.title || '';
           if (!reason.value && theme.decision) reason.value = theme.decision.reason || '';
+          reason.placeholder = App.themeReasonHint[choice] || '理由（次の案づくりに使います）';
         });
       });
       card.querySelector('.theme-save').addEventListener('click', async function () {
         const msg = card.querySelector('.theme-msg');
         if (choice === 'revise' && !title.value.trim()) { msg.textContent = '直した題名を入れてください'; return; }
+        if (!reason.value.trim()) { msg.textContent = '理由を書いてください（次の案づくりに使います）'; reason.focus(); return; }
         msg.textContent = '保存中…';
         try {
           await App.apiClient('POST', '/admin/ranking-themes/decide', { round_id: latest.id, theme_id: theme.id, choice: choice, revised_title: title.value, reason: reason.value });
@@ -5602,10 +5613,17 @@ const App = {
         }
       });
     });
+    // 判断ログ: 判断した案だけを、判断と理由つきで新しい順に並べる（未判断は件数だけ）。
     hist.innerHTML = (r.history || []).map(function (h) {
-      return '<div><span class="font-medium">' + esc(String(h.created_at || '').slice(0, 10)) + '</span>：' + (h.themes || []).map(function (t) {
-        return esc(t.title) + (t.decision ? '（' + esc(App.themeChoiceLabel[t.decision.choice] || '') + '）' : '（未判断）');
-      }).join('、') + '</div>';
+      const done = (h.themes || []).filter(function (t) { return t.decision; });
+      const rest = (h.themes || []).length - done.length;
+      return '<div class="border-l-2 border-slate-200 pl-2"><div class="font-medium">' + esc(String(h.created_at || '').slice(0, 10)) + ' の回' +
+        (rest ? '<span class="font-normal text-xs text-slate-500">（未判断 ' + rest + ' 件）</span>' : '') + '</div>' +
+        (done.length ? '<ul class="space-y-1 mt-0.5">' + done.map(function (t) {
+          const d = t.decision;
+          return '<li>' + esc(App.themeChoiceLabel[d.choice] || d.choice) + '　' + esc(d.revised_title || t.title) +
+            (d.reason ? '<div class="text-xs text-slate-500 ml-4">理由：' + esc(d.reason) + '</div>' : '<div class="text-xs text-slate-400 ml-4">理由：（未記入）</div>') + '</li>';
+        }).join('') + '</ul>' : '') + '</div>';
     }).join('') || '<div>まだありません。</div>';
   },
 
