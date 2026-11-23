@@ -7,7 +7,7 @@
   "runtime_ai_nodes": 0,
   "flowforge": "未登録（54b の決まりにより FlowForge の画面は触らない・登録しない）",
   "review": {
-    "reviewer": "Codex（チャッピー）",
+    "reviewer": "Codex（Orca の worker。任意の別の目・補助。チャッピーとの確認の代わりではない）",
     "date": "2026-11-23",
     "verdict": "そのまま運用せず修正が必要",
     "note": "誤り指摘6件・優先修正5件を第2稿に反映。JSON と HTML の埋め込みは一致（Codex 確認）"
