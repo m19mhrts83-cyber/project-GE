@@ -181,7 +181,9 @@ def _build_text(args: argparse.Namespace, total: int) -> str:
     if total <= 0 and fail_ok and not note and not next_:
         return f"【{AGENT_ID} {AGENT_NAME}・{frame_ja}】更新なし（生存確認）"
 
-    lines = [f"【{AGENT_ID} {AGENT_NAME}・{frame_ja}】"]
+    # 失敗がある晩は先頭に ⚠️（気づける形）。失敗なしの文面は変えない。
+    mark = "" if fail_ok else "⚠️"
+    lines = [f"{mark}【{AGENT_ID} {AGENT_NAME}・{frame_ja}】"]
     if total > 0:
         parts = [f"Gmail+{args.gmail}", f"Chatwork+{args.chatwork}"]
         if int(args.line) or frame in ("night", "manual"):
