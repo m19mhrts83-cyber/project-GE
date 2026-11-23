@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20261123a" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
+    <link rel="stylesheet" href="style.css?v=20261123b" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
   <!-- (5) ロゴに合わせた配色: この端末で見えていた人は、ログイン画面から同じ色で出す（applyTheme が覚える） -->
   <!-- 2026-11-20 新しい配色は全員に公開済み（design_theme=all）。初めて開く人も新しい配色で出す。スイッチで外れた人だけ '0' を覚えて旧配色 -->
   <script>try{var dt=null;try{dt=localStorage.getItem('qa_design_theme');}catch(e){}if(dt!=='0'){document.documentElement.classList.add('theme-a');document.title='神大家AIナビ';}}catch(e){}</script>
@@ -808,6 +808,55 @@
               </div>
               <!-- 運営分析の新しい見た目（design_theme の人だけ。2026-11-11）。中身は app.js の renderAnalyticsBrand -->
               <div id="analyticsBrand" class="brand-only analytics-brand"></div>
+              <!-- (4) 質問ランキング＋講座テーマ案（段階公開スイッチ ranking_themes が見える管理者だけ）。
+                   2026-11-23 松野さん: Q&Aチャット／キーワード検索のランキングのすぐ下に置き、「まとめたランキング → 講座テーマ案」の順に -->
+              <div id="rankingThemes" class="hidden bg-white rounded border p-4">
+                <div class="flex items-center justify-between gap-2">
+                  <h3 class="font-semibold">似た質問をまとめたランキングと講座テーマ案</h3>
+                  <button id="reloadRankingThemesBtn" type="button" class="shrink-0 whitespace-nowrap px-3 py-1 rounded border text-sm">再取得</button>
+                </div>
+                <p id="rankingThemesStatus" class="text-sm text-slate-600 mt-1"></p>
+                <!-- 画面から作り直す（2026-11-23 松野さん「好きなタイミングで集計したい」）。AI の費用がかかることを押す前に必ず見せる。 -->
+                <div id="rankingRebuild" class="hidden mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-sm">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button id="rankingRebuildBtn" type="button" class="px-3 py-1.5 rounded border border-amber-400 bg-white font-medium">🔄 ランキングを今すぐ作り直す</button>
+                    <span id="rankingRebuildMsg" class="text-xs text-slate-700"></span>
+                  </div>
+                  <div id="rankingRebuildConfirm" class="hidden mt-2 rounded bg-white border p-2">
+                    <p class="font-medium">作り直すと、AI処理の費用がかかります。よろしいですか？</p>
+                    <p class="text-xs text-slate-600 mt-1">できるまで10〜20分ほどかかります。LINEオープンチャットのランキングも一緒に作り直します。</p>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                      <button id="rankingRebuildYes" type="button" class="px-3 py-1.5 rounded bg-amber-600 text-white">作り直す（費用がかかります）</button>
+                      <button id="rankingRebuildNo" type="button" class="px-3 py-1.5 rounded border">やめる</button>
+                    </div>
+                  </div>
+                  <p class="text-xs text-slate-600 mt-1">AI（Gemini）で質問をまとめ直すため、1回ごとにAI処理の費用がかかります。作成中は重ねて押せません（1日 5 回まで）。</p>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">上の「Q&Aチャットの質問ランキング」は、同じ文の質問を数えた今の数字です（期間の選択に合わせて変わります）。こちらは、言い方が違っても同じ趣旨の質問をAIで1つにまとめ、聞かれた回数と人数を数えたものです（作り直した時点の数字。同じ人が何度聞いても人数は1人）。</p>
+                <div class="mt-3 space-y-4">
+                  <div>
+                    <h4 class="font-medium text-sm mb-1">① 似た質問をまとめたランキング（回数の多い順）</h4>
+                    <div id="rankingList" class="rt-rank analytics-brand is-in text-sm"></div>
+                  </div>
+                  <div>
+                    <h4 class="font-medium text-sm mb-1">② そこから考えた講座・グルコンのテーマ案</h4>
+                    <p class="text-xs text-slate-500 mb-1">テーマ案はランキングに加えて、コミュニティ・LINEオプチャ・既存講座も見て作ります。「採用／直して採用／不採用」と理由を残すと、次に作り直したときの案はその判断を読んで作ります。</p>
+                    <div id="themeCards" class="space-y-2 text-sm"></div>
+                  </div>
+                </div>
+                <details class="mt-3 text-sm"><summary class="text-slate-600">これまでの判断</summary><div id="themeHistory" class="mt-1 space-y-1 text-slate-600"></div></details>
+              </div>
+              <!-- (4) の拡張: LINEオープンチャットの質問ランキング（段階公開スイッチ openchat_ranking が見える管理者だけ）。2026-11-16 -->
+              <div id="openchatRanking" class="hidden oc-rank">
+                <div class="oc-head">
+                  <h3 class="oc-title"><i class="fa-brands fa-line" aria-hidden="true"></i> LINEオープンチャットの質問ランキング<small>（上の「作り直す」で一緒に更新）</small></h3>
+                  <button id="reloadOpenchatRankingBtn" type="button" class="oc-reload">再取得</button>
+                </div>
+                <p id="openchatRankingStatus" class="oc-status"></p>
+                <div id="openchatRankingBody"></div>
+                <p class="oc-note">オープンチャットの投稿から、質問とみられるもの（「？」「教えて」「でしょうか」など）を選び、同じ趣旨の質問をAIでまとめています。件数・人数・返信の数はプログラムが数えた値です（同じ人が何度聞いても人数は1人）。サポート担当・物件紹介担当・運営の投稿と、「運営より全体周知」「YouTube集中学習」は数えていません。</p>
+              </div>
+
               <!-- (2) 回答の評価（段階公開スイッチ answer_feedback が見える管理者だけ） -->
               <div id="feedbackAnalytics" class="hidden bg-white rounded border p-4">
                 <div class="flex items-center justify-between gap-2">
@@ -830,53 +879,6 @@
                 <p id="signalsSummary" class="text-sm text-slate-600 mt-1"></p>
                 <div id="signalsList" class="mt-2 space-y-2 text-sm"></div>
               </div>
-              <!-- (4) 質問ランキング＋講座テーマ案（段階公開スイッチ ranking_themes が見える管理者だけ） -->
-              <div id="rankingThemes" class="hidden bg-white rounded border p-4">
-                <div class="flex items-center justify-between gap-2">
-                  <h3 class="font-semibold">質問ランキングと講座テーマ案</h3>
-                  <button id="reloadRankingThemesBtn" type="button" class="px-3 py-1 rounded border text-sm">再取得</button>
-                </div>
-                <p id="rankingThemesStatus" class="text-sm text-slate-600 mt-1"></p>
-                <!-- 画面から作り直す（2026-11-23 松野さん「好きなタイミングで集計したい」）。AI の費用がかかることを押す前に必ず見せる。 -->
-                <div id="rankingRebuild" class="hidden mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-sm">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <button id="rankingRebuildBtn" type="button" class="px-3 py-1.5 rounded border border-amber-400 bg-white font-medium">🔄 ランキングを今すぐ作り直す</button>
-                    <span id="rankingRebuildMsg" class="text-xs text-slate-700"></span>
-                  </div>
-                  <div id="rankingRebuildConfirm" class="hidden mt-2 rounded bg-white border p-2">
-                    <p class="font-medium">作り直すと、AI処理の費用がかかります。よろしいですか？</p>
-                    <p class="text-xs text-slate-600 mt-1">できるまで10〜20分ほどかかります。LINEオープンチャットのランキングも一緒に作り直します。</p>
-                    <div class="mt-2 flex flex-wrap gap-2">
-                      <button id="rankingRebuildYes" type="button" class="px-3 py-1.5 rounded bg-amber-600 text-white">作り直す（費用がかかります）</button>
-                      <button id="rankingRebuildNo" type="button" class="px-3 py-1.5 rounded border">やめる</button>
-                    </div>
-                  </div>
-                  <p class="text-xs text-slate-600 mt-1">AI（Gemini）で質問をまとめ直すため、1回ごとにAI処理の費用がかかります。作成中は重ねて押せません（1日 5 回まで）。</p>
-                </div>
-                <p class="text-xs text-slate-500 mt-1">「よく聞かれていること」は、Q&Aチャットに届いた質問を同じ趣旨のものでまとめ、聞かれた回数と人数を数えています（同じ人が何度聞いても人数は1人）。テーマ案はこれに加えてコミュニティ・LINEオプチャ・既存講座も見て作ります。テーマ案には「採用／直して採用／不採用」と理由を残してください。次の回の案はその判断を読んで作ります。</p>
-                <div class="mt-3 grid gap-4 md:grid-cols-2">
-                  <div>
-                    <h4 class="font-medium text-sm mb-1">Q&Aチャットでよく聞かれていること（回数の多い順）</h4>
-                    <ol id="rankingList" class="list-decimal ml-5 space-y-1 text-sm"></ol>
-                  </div>
-                  <div>
-                    <h4 class="font-medium text-sm mb-1">講座・グルコンのテーマ案</h4>
-                    <div id="themeCards" class="space-y-2 text-sm"></div>
-                  </div>
-                </div>
-                <details class="mt-3 text-sm"><summary class="text-slate-600">これまでの判断</summary><div id="themeHistory" class="mt-1 space-y-1 text-slate-600"></div></details>
-              </div>
-              <!-- (4) の拡張: LINEオープンチャットの質問ランキング（段階公開スイッチ openchat_ranking が見える管理者だけ）。2026-11-16 -->
-              <div id="openchatRanking" class="hidden oc-rank">
-                <div class="oc-head">
-                  <h3 class="oc-title"><i class="fa-brands fa-line" aria-hidden="true"></i> LINEオープンチャットの質問ランキング<small>（上の「作り直す」で一緒に更新）</small></h3>
-                  <button id="reloadOpenchatRankingBtn" type="button" class="oc-reload">再取得</button>
-                </div>
-                <p id="openchatRankingStatus" class="oc-status"></p>
-                <div id="openchatRankingBody"></div>
-                <p class="oc-note">オープンチャットの投稿から、質問とみられるもの（「？」「教えて」「でしょうか」など）を選び、同じ趣旨の質問をAIでまとめています。件数・人数・返信の数はプログラムが数えた値です（同じ人が何度聞いても人数は1人）。サポート担当・物件紹介担当・運営の投稿と、「運営より全体周知」「YouTube集中学習」は数えていません。</p>
-              </div>
-
               <div id="analyticsSummaryCards" class="grid grid-cols-2 md:grid-cols-5 gap-3 analytics-classic"></div>
 
               <div class="bg-white rounded border p-4 analytics-cost">

@@ -1266,3 +1266,8 @@ html.theme-a .admin-btn-main { background: #FE910B; }
 .admin-import > summary::after { content: "▾"; margin-left: auto; color: #64748b; transition: transform .2s; }
 .admin-import:not([open]) > summary { margin-bottom: 0; }
 .admin-import:not([open]) > summary::after { transform: rotate(-90deg); }
+
+/* 似た質問をまとめたランキング（運営分析・2026-11-23）: 上のランキングと同じ棒の見た目。まとめた題は短いので折り返して全部見せる */
+.rt-rank .ab-rank-q { white-space: normal; overflow: visible; }
+.rt-rank .ab-rank li { align-items: flex-start; }
+.rt-rank .ab-rank-bar i { transform: none; }
