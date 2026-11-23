@@ -17,18 +17,18 @@ NEW = "abcdefghijklmnopqrst"
 
 
 class TargetTest(unittest.TestCase):
-    def test_default_is_current_mumbai(self):
+    def test_default_is_tokyo(self):
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("KAMIOOYA_PROJECT_REF", None)
-            self.assertEqual(kt.base_url(), "https://mwubzgefkkjjbingrmqu.supabase.co")
-            self.assertEqual(kt.rewrite("x https://mwubzgefkkjjbingrmqu.supabase.co/y"), "x https://mwubzgefkkjjbingrmqu.supabase.co/y")
+            self.assertEqual(kt.base_url(), "https://sufbsyddqgekvcgadhpv.supabase.co")
+            self.assertEqual(kt.rewrite("x https://sufbsyddqgekvcgadhpv.supabase.co/y"), "x https://sufbsyddqgekvcgadhpv.supabase.co/y")
 
     def test_switch_by_env(self):
         with mock.patch.dict(os.environ, {"KAMIOOYA_PROJECT_REF": NEW}):
             self.assertEqual(kt.storage_url(), f"https://{NEW}.storage.supabase.co")
             self.assertTrue(kt.is_target_url(f"https://{NEW}.supabase.co/"))
-            self.assertFalse(kt.is_target_url("https://mwubzgefkkjjbingrmqu.supabase.co"))
-            self.assertEqual(kt.rewrite("'https://mwubzgefkkjjbingrmqu.supabase.co/functions/v1/a'"),
+            self.assertFalse(kt.is_target_url("https://sufbsyddqgekvcgadhpv.supabase.co"))
+            self.assertEqual(kt.rewrite("'https://sufbsyddqgekvcgadhpv.supabase.co/functions/v1/a'"),
                              f"'https://{NEW}.supabase.co/functions/v1/a'")
 
     def test_bad_ref_rejected(self):

@@ -1,7 +1,7 @@
 # kamiooya-qa / Supabase
 
 プロジェクト: `kamiooya-qa`（運営提供・引き渡し対象。Free 2本のうちの1つ）  
-ref: `mwubzgefkkjjbingrmqu`
+ref: `sufbsyddqgekvcgadhpv`
 
 prompt-share（`prompts` / `prompt_groups` / `prompt_usage_events`）も**このプロジェクト**に載せる。
 
@@ -29,7 +29,7 @@ grant usage, select on sequence public.your_table_id_seq to service_role;
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ~/selenium_env/venv/bin/python scripts/jarvis_supabase_apply_sql.py \
-  --ref mwubzgefkkjjbingrmqu \
+  --ref sufbsyddqgekvcgadhpv \
   apps/kamiooya-qa-web/supabase/migrations/20261021_data_api_grants_verify.sql
 ```
 

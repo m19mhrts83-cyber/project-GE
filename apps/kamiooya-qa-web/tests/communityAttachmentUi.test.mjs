@@ -48,7 +48,7 @@ for (const source of sources) {
     app.testWindow.open=()=>{const t={opener:{},location:{replace:url=>{t.url=url;}},close(){t.closed=true;}};targets.push(t);return t;};
     app.showToast=message=>errors.push(message);
     let wrong=false;
-    app.attachmentRequest=async(body)=>{requests.push(body);return {url:'https://mwubzgefkkjjbingrmqu.supabase.co/storage/v1/object/sign/'+(wrong?'community-attachments':'openchat-attachments')+'/objects/'+id+'?token=fixture'};};
+    app.attachmentRequest=async(body)=>{requests.push(body);return {url:'https://sufbsyddqgekvcgadhpv.supabase.co/storage/v1/object/sign/'+(wrong?'community-attachments':'openchat-attachments')+'/objects/'+id+'?token=fixture'};};
     await host.children[0].children[1].listeners.click({preventDefault(){}});
     assert.equal(requests[0].source,'openchat');assert.equal(requests[0].attachment_id,id);
     assert.match(targets[0].url,/\/openchat-attachments\/objects\//);assert.equal(targets[0].opener,null);
