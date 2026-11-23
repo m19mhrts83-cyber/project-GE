@@ -1,7 +1,8 @@
 // (4) 質問ランキング＋講座テーマ提案（2026-11-11）。段階公開スイッチ ranking_themes が見える管理者だけ。
 // 週次の Actions（scripts/course_theme/weekly_round.py）が qa_theme_rounds に案を入れ、
-// 運営分析で 採用／直して採用／不採用＋理由 を残す。次の回はその判断を読んで案を作る（ループウェア）。
-export const CHOICES = ['adopt', 'revise', 'reject'] as const;
+// 運営分析で 採用／直して採用／検討案として採用／不採用＋理由 を残す。次の回はその判断を読んで案を作る（ループウェア）。
+// consider＝「検討案として採用」（2026-11-23 松野さん）。次の作り直しで、その案を踏まえたより具体的な案を出す。
+export const CHOICES = ['adopt', 'revise', 'consider', 'reject'] as const;
 export type Choice = typeof CHOICES[number];
 export class ThemeError extends Error {
   code: string; status: number;
@@ -20,6 +21,8 @@ export function parseThemeDecision(input: Record<string, unknown>): ThemeDecisio
   if (reason.length > 1000 || revised_title.length > 200) throw new ThemeError('invalid_request');
   // 「直して採用」は直した題名が要る。ほかの選択では題名は持たない。
   if (choice === 'revise' && !revised_title) throw new ThemeError('invalid_request');
+  // 理由は必ず残す（なぜ採用／なぜ不採用か。次の案づくりの精度に使う。2026-11-23 松野さん）。
+  if (!reason) throw new ThemeError('reason_required');
   return { round_id, theme_id, choice: choice as Choice, revised_title: choice === 'revise' ? revised_title : '', reason };
 }
 
@@ -40,7 +43,7 @@ export function shapeRound(r: any, decisions: any[]) {
   const themes = (Array.isArray(r?.themes) ? r.themes : []).slice(0, 8).map((t: any) => {
     const d = byTheme.get(String(t?.id));
     return { id: str(t?.id, 4), title: str(t?.title, 120), why: str(t?.why, 400), evidence: str(t?.evidence, 400),
-      format: str(t?.format, 120), target: str(t?.target, 120),
+      format: str(t?.format, 120), target: str(t?.target, 120), follows: str(t?.follows, 120),
       decision: d ? { choice: d.choice, revised_title: str(d.revised_title, 200), reason: str(d.reason, 1000), decided_at: d.decided_at } : null };
   });
   const s = r?.stats && typeof r.stats === 'object' ? r.stats : {};

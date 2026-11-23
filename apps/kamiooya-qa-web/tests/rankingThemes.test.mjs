@@ -17,6 +17,16 @@ test('判断の入力は決まった形だけ通す', () => {
   assert.throws(() => parseThemeDecision({ round_id: 'r20261116', theme_id: 't1', choice: 'reject', reason: 'x'.repeat(1001) }));
 });
 
+test('検討案として採用を選べ、どの判断も理由が要る（2026-11-23）', () => {
+  assert.equal(parseThemeDecision({ round_id: 'r20261116', theme_id: 't1', choice: 'consider', reason: '次回もう少し具体的に' }).choice, 'consider');
+  for (const choice of ['adopt', 'consider', 'reject']) {
+    assert.throws(() => parseThemeDecision({ round_id: 'r20261116', theme_id: 't1', choice, reason: '  ' }), e => e.code === 'reason_required');
+  }
+  assert.throws(() => parseThemeDecision({ round_id: 'r20261116', theme_id: 't1', choice: 'revise', revised_title: '題' }), e => e.code === 'reason_required');
+  const s = shapeRound({ ...round, themes: [{ id: 't1', title: 'A', follows: '修繕見積もりの読み方' }] }, []);
+  assert.equal(s.themes[0].follows, '修繕見積もりの読み方');
+});
+
 test('画面に返すのは決まった項目だけで、判断が付く', () => {
   const s = shapeRound(round, [{ round_id: 'r20261116', theme_id: 't2', choice: 'reject', reason: '既にある', revised_title: '' }]);
   assert.equal(s.ranking[0].examples.length, 3);

@@ -233,7 +233,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
           if(!r.ok)return json({error:r.error==='not_configured'?'not_configured':'dispatch_failed'},503);
           return json({ok:true,rebuild:await rebuildInfo(latest?.created_at)});
         }
-        const rounds=(await d.themeRounds(5) as any[]).filter(r=>r&&typeof r.id==='string');
+        const rounds=(await d.themeRounds(10) as any[]).filter(r=>r&&typeof r.id==='string');
         const decisions=rounds.length?await d.themeDecisions(rounds.map(r=>r.id)) as any[]:[];
         return json({latest:rounds[0]?shapeRound(rounds[0],decisions):null,rebuild:await rebuildInfo(rounds[0]?.created_at),
           history:rounds.slice(1).map(r=>{const s=shapeRound(r,decisions);return {id:s.id,created_at:s.created_at,themes:s.themes.map((x:any)=>({id:x.id,title:x.title,decision:x.decision}))};})});
@@ -319,7 +319,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       return json(req.method === 'GET' && ['/admin/users','/admin/users/pending'].includes(path) ? safeUsers(result) : stripPrivate(result));
     } catch (err) {
       const e=err as {code?:string;status?:number};
-      if(e && ['feature_not_available','invalid_feedback','invalid_request','email_taken','not_on_roster','already_registered','invalid_token','not_approved','user_not_found','forbidden','member_not_found','invalid_password','try_later','route_not_reviewed','operation_failed','invalid_answer_request','answer_request_conflict','answer_in_progress','answer_not_found','answer_unavailable'].includes(e.code||'')) return json({error:e.code,errorCode:e.code},[400,403,404,409,429,503].includes(e.status||0)?e.status:400);
+      if(e && ['feature_not_available','invalid_feedback','invalid_request','reason_required','email_taken','not_on_roster','already_registered','invalid_token','not_approved','user_not_found','forbidden','member_not_found','invalid_password','try_later','route_not_reviewed','operation_failed','invalid_answer_request','answer_request_conflict','answer_in_progress','answer_not_found','answer_unavailable'].includes(e.code||'')) return json({error:e.code,errorCode:e.code},[400,403,404,409,429,503].includes(e.status||0)?e.status:400);
       // Neither upstream response bodies nor credential/session values are exposed.
       return json({ error: 'service_unavailable' }, 503);
     }

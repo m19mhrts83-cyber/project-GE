@@ -1271,3 +1271,7 @@ html.theme-a .admin-btn-main { background: #FE910B; }
 .rt-rank .ab-rank-q { white-space: normal; overflow: visible; }
 .rt-rank .ab-rank li { align-items: flex-start; }
 .rt-rank .ab-rank-bar i { transform: none; }
+/* ランキングの「もっと見る」（2026-11-23） */
+.rt-more > summary { list-style: none; }
+.rt-more > summary::-webkit-details-marker { display: none; }
+.rt-more[open] > summary { color: #475569; }

@@ -3,7 +3,8 @@
 
 1. DB 関数 qa_theme_source_digest(120) で、質問ログ・コミュニティ・オプチャ・既存講座を DB の中で小さく集計して受け取る
    （全件は取らない。無料プランの通信量対策で 1 回 百KB前後）。
-2. 直近の回の「採用／直して採用／不採用＋理由」を読む（ループウェアの判断ログ）。
+2. 直近の回の「採用／直して採用／検討案として採用／不採用＋理由」を読む（ループウェアの判断ログ）。
+   検討案は、次の回でその案を踏まえたより具体的な案を出す（2026-11-23 松野さん）。
 3. Gemini に「似た質問のまとまりランキング」と「講座・グルコンのテーマ案5つ」を JSON で作らせる。
 4. qa_theme_rounds に1行入れる。運営分析（スイッチ ranking_themes）で見る。
 
@@ -46,7 +47,7 @@ GROUP_SCHEMA = {"type": "OBJECT", "required": ["groups"], "properties": {
         "topic": STR, "ids": {"type": "ARRAY", "items": STR}}}}}}
 THEME_SCHEMA = {"type": "OBJECT", "required": ["themes"], "properties": {
     "themes": {"type": "ARRAY", "items": {"type": "OBJECT", "required": ["id", "title", "why", "evidence"], "properties": {
-        "id": STR, "title": STR, "why": STR, "evidence": STR, "format": STR, "target": STR}}}}}
+        "id": STR, "title": STR, "why": STR, "evidence": STR, "format": STR, "target": STR, "follows": STR}}}}}
 
 
 def gemini(prompt: str, schema: dict, tries: int = 3) -> dict:
@@ -76,20 +77,24 @@ def _gemini_once(prompt: str, schema: dict) -> dict:
 
 
 def past_decisions() -> list[dict]:
-    rounds = rest("qa_theme_rounds?select=id,themes&order=created_at.desc&limit=4") or []
+    """判断ログ。作り直しが1日に何回もあると回が増えるので、直近20回の判断済みの案はすべて、
+    未判断の案は直近2回だけを渡す（未判断を大量に渡して判断の重みが薄まらないように）。"""
+    rounds = rest("qa_theme_rounds?select=id,themes&order=created_at.desc&limit=20") or []
     if not rounds:
         return []
     ids = ",".join(r["id"] for r in rounds)
     decs = rest(f"qa_theme_decisions?select=round_id,theme_id,choice,revised_title,reason&round_id=in.({ids})") or []
     by = {(d["round_id"], d["theme_id"]): d for d in decs}
     out = []
-    for r in rounds:
+    for n, r in enumerate(rounds):
         for t in r.get("themes") or []:
             d = by.get((r["id"], t.get("id")))
+            if not d and n >= 2:
+                continue
             out.append({"round": r["id"], "title": t.get("title"),
                         "choice": d["choice"] if d else "undecided",
                         "revised_title": (d or {}).get("revised_title", ""), "reason": (d or {}).get("reason", "")})
-    return out
+    return out[:80]
 
 
 GROUP_PROMPT = """神大家Q&Aチャット（不動産投資家コミュニティの会員がAIに質問するチャット）に届いた質問の一覧です。
@@ -116,13 +121,18 @@ THEME_PROMPT = """あなたは不動産投資家コミュニティ「神・大�
 決まりごと:
 - 需要（ranking の回数・人数、コミュニティ・オプチャで多い話題）に対して既存講座が少ない「すき間」を優先する。
 - 既存講座が多いテーマは、新しい切り口（最新動向・事例・実務の手順）がある場合だけにする。
-- 過去の判断（decisions）を必ず反映する。不採用の理由に当てはまる案は出さない。直して採用された題名の傾向
-  （具体さ・言い回し）に合わせる。採用済みと同じ案は繰り返さない。
+- 過去の判断（decisions）を必ず反映する。choice は adopt=採用、revise=直して採用（revised_title が直した題名）、
+  consider=検討案として採用、reject=不採用、undecided=未判断。reason は判断した人が書いた理由。
+  - reject: その理由に当てはまる案は出さない。
+  - adopt / revise: 同じ案は繰り返さない。採用の理由と、直した題名の傾向（具体さ・言い回し）に合わせる。
+  - consider: 検討中の案。理由を踏まえ、最新の ranking の数字で深掘りした、より具体的な案を1つ以上含める
+    （題名をそのまま繰り返さない）。その案の follows に、元の検討案の題名を入れる。
+  - follows は consider を踏まえた案だけに入れ、ほかは空文字にする。
 - title は30字以内、why は「なぜ今これか」を2文以内、evidence は根拠の数字（どこで何回・何人・何件）を1文、
   format は形式（例: 60分講座、グルコン、連載3回）、target は対象（例: 1棟目購入前、築古戸建の保有者）。
 - 個人名・会社名・物件の住所・電話番号などは書かない。
 
-出力は次の形の JSON だけ: {"themes":[{"id":"t1","title":"","why":"","evidence":"","format":"","target":""}]}
+出力は次の形の JSON だけ: {"themes":[{"id":"t1","title":"","why":"","evidence":"","format":"","target":"","follows":""}]}
 
 decisions:
 %s
@@ -172,7 +182,8 @@ def build_ranking(top: list[dict], groups: list[dict]) -> list[dict]:
 
 def clean_themes(res: dict) -> list:
     themes = [{"id": f"t{i + 1}", "title": s_(t.get("title"), 120), "why": s_(t.get("why"), 400),
-               "evidence": s_(t.get("evidence"), 400), "format": s_(t.get("format"), 120), "target": s_(t.get("target"), 120)}
+               "evidence": s_(t.get("evidence"), 400), "format": s_(t.get("format"), 120), "target": s_(t.get("target"), 120),
+               "follows": s_(t.get("follows"), 120)}
               for i, t in enumerate([t for t in (res.get("themes") or []) if isinstance(t, dict) and t.get("title")][:5])]
     if len(themes) < 3:
         raise SystemExit("テーマ案が足りません（Gemini の応答が想定と違う）")
