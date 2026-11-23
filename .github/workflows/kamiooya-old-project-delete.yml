@@ -1,0 +1,36 @@
+name: kamiooya-old-project-delete
+
+# AIナビ東京移設の後始末（2026-11-24 松野さん了承「削除する」）: 旧ムンバイの kamiooya-qa を削除する。手動実行のみ。
+# 消せるのは旧 ref だけ。確認欄に旧 ref をそのまま入れないと動かない。先に東京側が動いていることを確かめる。
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_ref:
+        description: "削除する旧 ref をそのまま入力（mwubzgefkkjjbingrmqu）"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OLD_REF: mwubzgefkkjjbingrmqu
+      NEW_REF: sufbsyddqgekvcgadhpv
+      CONFIRM: ${{ github.event.inputs.confirm_ref }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_KAMIOOYA }}
+    steps:
+      - name: Delete old project
+        run: |
+          set -euo pipefail
+          [[ "$CONFIRM" == "$OLD_REF" ]] || { echo "::error::確認欄が旧 ref と一致しません"; exit 1; }
+          new=$(curl -sS -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" "https://api.supabase.com/v1/projects/${NEW_REF}" | jq -r '.status // empty')
+          echo "東京: ${new}" | tee -a "$GITHUB_STEP_SUMMARY"
+          [[ "$new" == "ACTIVE_HEALTHY" ]] || { echo "::error::東京が正常でないので止めます"; exit 1; }
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            "https://api.supabase.com/v1/projects/${OLD_REF}")
+          echo "旧 ${OLD_REF} の削除: HTTP ${code}" | tee -a "$GITHUB_STEP_SUMMARY"
+          [[ "$code" == "200" ]] || exit 1
