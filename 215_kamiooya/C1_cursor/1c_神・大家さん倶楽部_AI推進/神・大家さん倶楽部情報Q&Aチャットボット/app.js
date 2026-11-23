@@ -5494,9 +5494,12 @@ const App = {
       conf.classList.add('hidden');
     } else {
       btn.textContent = '🔄 ランキングを今すぐ作り直す';
+      btn.classList.toggle('ring-2', !!App.rankingThemesStale);
+      btn.classList.toggle('ring-amber-400', !!App.rankingThemesStale);
       msg.textContent = rb.state === 'limit' ? '今日はもう作り直せません（1日 ' + (rb.daily_limit || 5) + ' 回まで）。'
         : rb.maybe_failed ? '前回（' + when(rb.last_requested_at) + '）の作り直しが、うまくできなかったようです。もう一度押してください。'
-        : rb.last_requested_at ? '前回の作り直し: ' + when(rb.last_requested_at) + (who ? '（' + who + '）' : '') : '';
+        : (App.rankingThemesStale ? '数字が古くなっています。最新にするには押してください。' : '') +
+          (rb.last_requested_at ? '前回の作り直し: ' + when(rb.last_requested_at) + (who ? '（' + who + '）' : '') : '');
     }
     clearTimeout(App.rankingRebuildTimer);
     // 作成中は2分ごとに見直し、新しい回ができたら表示を差し替える
@@ -5534,14 +5537,28 @@ const App = {
       return;
     }
     const st = latest.stats || {};
-    status.textContent = String(latest.created_at || '').slice(0, 10) + ' の回（直近 ' + (latest.period_days || 120) + ' 日）／ Q&Aチャットへの質問 ' + (st.chatbot || 0) +
-      ' 回' + (st.chatbot_users ? '・' + st.chatbot_users + ' 人' : '') + '（テーマ案の材料には、コミュニティ ' + (st.forum || 0) + ' 件・オプチャ ' + (st.openchat || 0) + ' 件・既存講座 ' + (st.courses || 0) + ' 本も使っています）';
+    // いつ時点の数字かを先に見せる。7日を過ぎたら「古くなっています」と出し、作り直しを促す（2026-11-23 松野さん）
+    const made = new Date(latest.created_at || '');
+    const ageDays = isNaN(made.getTime()) ? null : Math.floor((Date.now() - made.getTime()) / 86400000);
+    App.rankingThemesStale = ageDays != null && ageDays >= 7;
+    const madeLabel = isNaN(made.getTime()) ? '' : (made.getFullYear() + '/' + (made.getMonth() + 1) + '/' + made.getDate() + ' ' + made.getHours() + ':' + String(made.getMinutes()).padStart(2, '0'));
+    status.innerHTML = '<b>' + esc(madeLabel) + ' 時点</b>' + (ageDays != null ? '（' + (ageDays === 0 ? '今日' : ageDays + '日前') + 'に作成）' : '') +
+      (App.rankingThemesStale ? ' <span class="inline-block rounded bg-amber-100 text-amber-800 px-1.5 text-xs font-medium">古くなっています</span>' : '') +
+      '<br><span class="text-xs">直近 ' + esc(String(latest.period_days || 120)) + ' 日の Q&Aチャットへの質問 ' + (st.chatbot || 0) + ' 回' + (st.chatbot_users ? '・' + st.chatbot_users + ' 人' : '') +
+      '（テーマ案の材料には、コミュニティ ' + (st.forum || 0) + ' 件・オプチャ ' + (st.openchat || 0) + ' 件・既存講座 ' + (st.courses || 0) + ' 本も使っています）</span>';
     const exact = (latest.ranking || []).some(function (x) { return x.people != null; });
-    list.innerHTML = exact ? (latest.ranking || []).map(function (x) {
-      return '<li><span class="font-medium">' + esc(x.topic) + '</span> <span class="text-slate-600">' + x.count + ' 回・' + x.people + ' 人</span>' +
-        (x.examples && x.examples.length ? '<details class="text-xs text-slate-600"><summary>実際の質問' + (x.variants > 1 ? '（言い方 ' + x.variants + ' 通り）' : '') + '</summary><ul class="list-disc ml-4">' + x.examples.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></details>' : '') + '</li>';
-    }).join('') || '<li class="list-none text-slate-500">まだ質問がありません。</li>'
-      : '<li class="list-none text-slate-500">この回は数え方を見直す前のものです。次の回（または再集計）から、Q&Aチャットで聞かれた回数・人数で並びます。</li>';
+    const rows = (latest.ranking || []).slice(0, 15);
+    const top = Math.max(1, ...rows.map(function (x) { return Number(x.count) || 0; }));
+    list.innerHTML = !exact
+      ? '<p class="text-slate-500">この回は数え方を見直す前のものです。作り直すと、Q&Aチャットで聞かれた回数・人数で並びます。</p>'
+      : rows.length === 0 ? '<p class="text-slate-500">まだ質問がありません。</p>'
+      : '<ol class="ab-rank">' + rows.map(function (x, i) {
+        return '<li><span class="ab-rank-no' + (i < 3 ? ' is-top' : '') + '">' + (i + 1) + '</span>' +
+          '<div class="ab-rank-main"><div class="ab-rank-q">' + esc(x.topic) + '</div>' +
+          '<div class="ab-rank-bar"><i style="width:' + (((Number(x.count) || 0) / top) * 100).toFixed(1) + '%"></i></div>' +
+          (x.examples && x.examples.length ? '<details class="text-xs text-slate-600 mt-0.5"><summary>実際の質問' + (x.variants > 1 ? '（言い方 ' + x.variants + ' 通り）' : '') + '</summary><ul class="list-disc ml-4">' + x.examples.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></details>' : '') +
+          '</div><span class="ab-rank-n">' + (Number(x.count) || 0) + '<small>回</small><em>' + (Number(x.people) || 0) + '人</em></span></li>';
+      }).join('') + '</ol>';
     cards.innerHTML = (latest.themes || []).map(function (t) {
       const d = t.decision;
       return '<div class="border rounded p-2" data-theme="' + esc(t.id) + '">' +
@@ -6232,8 +6249,9 @@ const App = {
       '<div class="ab-hints"><b><i class="fa-solid fa-lightbulb"></i> 読み取りと次の手</b><ul>' + hints.map((h) => '<li>' + h + '</li>').join('') + '</ul></div>' +
       '</div>';
 
-    root.innerHTML = lead + kpis + '<div class="ab-row">' + donut + compareCard + '</div>' +
-      '<div class="ab-row ab-row-even">' + rankCard + kwRankCard + '</div>' + dailyCard;
+    // ランキング2つを最後に置き、すぐ下の「似た質問をまとめたランキングと講座テーマ案」へ続ける（2026-11-23 松野さん）
+    root.innerHTML = lead + kpis + '<div class="ab-row">' + donut + compareCard + '</div>' + dailyCard +
+      '<div class="ab-row ab-row-even">' + rankCard + kwRankCard + '</div>';
     // ランキングの質問が「…」で切れているときは、押すと全文を開く／閉じる（2026-11-22 松野さん）
     // 切れているかは表示中でないと測れないので、描いた直後と、画面の大きさが変わったとき（タブを開いた・向きを変えた）に測り直す
     const markCut = () => root.querySelectorAll('.ab-rank-q:not(.is-open)').forEach((q) => {
