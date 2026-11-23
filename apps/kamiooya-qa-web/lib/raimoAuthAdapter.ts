@@ -282,12 +282,12 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       try{
         const flags=await deps.featureFlags!();const list=Array.isArray(flags)?flags:[];
         // オフ・全員公開のときは本人を引き直さない（会員情報の読み出しを増やさない）
-        let me:{id:string;email:string}|null|undefined;
+        let me:{id:string;email:string;role:string}|null|undefined;
         const allowed=async(name:string)=>{
           const flag=list.find((f:any)=>f.feature===name);
-          if(!flag||!['owner','reviewers','all'].includes(flag.stage))return false;
+          if(!flag||!['owner','reviewers','admins','all'].includes(flag.stage))return false;
           if(flag.stage==='all')return true;
-          if(me===undefined){const u=await deps.member(job.user_id);me=u?{id:u.id,email:u.email}:null;}
+          if(me===undefined){const u=await deps.member(job.user_id);me=u?{id:u.id,email:u.email,role:u.role}:null;}
           return !!me&&featureAllowed(flag,me);
         };
         saving=await allowed('cost_saving');
