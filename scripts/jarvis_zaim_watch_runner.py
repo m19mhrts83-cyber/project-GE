@@ -260,6 +260,19 @@ def safe_actions_from_watch() -> list[dict[str, Any]]:
     return out
 
 
+def is_dup_exclude_action(a: dict[str, Any]) -> bool:
+    """カード側を『集計に含めない』にする重複除外（型A）。jarvis_zaim_dup_exclude.py に移管済み。
+
+    画面で『ちょうど1件』に絞って明細IDを記録しながら直す専用ツールの担当。
+    ここで自動適用すると記録（zaim_dup_exclusions.json）が残らず、戻せなくなるため runner では触らない。
+    """
+    return (
+        a.get("action") == "set_aggregate"
+        and a.get("target") == "card"
+        and a.get("value") == "exclude"
+    )
+
+
 def category_actions_from_watch() -> list[dict[str, Any]]:
     if not WATCH_PATH.is_file():
         return []
@@ -605,6 +618,13 @@ def main(argv: list[str] | None = None) -> int:
         actions = [
             a for a in safe_actions_from_watch() if not already_applied(cl, a)
         ]
+        delegated = [a for a in actions if is_dup_exclude_action(a)]
+        actions = [a for a in actions if not is_dup_exclude_action(a)]
+        if delegated:
+            print(
+                f"# dup exclude delegated to jarvis_zaim_dup_exclude.py: {len(delegated)}",
+                flush=True,
+            )
         print(f"# safe actions pending apply: {len(actions)}", flush=True)
         new_entries = apply_actions(actions, dry_run=args.dry_run, limit=args.limit)
         if new_entries and not args.dry_run:
