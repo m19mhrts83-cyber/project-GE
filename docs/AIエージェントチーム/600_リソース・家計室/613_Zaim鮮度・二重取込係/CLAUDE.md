@@ -155,3 +155,4 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_agent_team_statu
 | 2026-10-14 | 指示書を本線配線で充填。役割に費目学習を明記。FlowForge 作り込み用に手順・4点・スクリプト対応を固定（status は候補のまま） |
 | 2026-10-22 | 費目学習を店＋金額キー＋CSV前後差分に変更。食費等の自信あり誤分類も high 不一致なら自動直し。成功時 `#report` 短報 |
 | 2026-10-22 | その他系は店名キー、それ以外は店+金額の二段に。Amazon／アオキ等は店名キー除外 |
+| 2026-11-24 | 作業フロー第1稿を作成（flow.md 全面改訂・flow.json・flow.html・chatgpt_review_pack.md）。重複（型A・型B・拡張＝判断キュー）と費目・内訳の学習を Loopware の判断ログへ。決定済み: 重複の既定対象・置き場=Loopware・既存773件の一括採用→新規は提案→承認・内訳の学習。docs のみ（コード・Zaim・実データは未変更）。status は変えていない |
