@@ -140,7 +140,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ## 315-B 300番台 停止・空回り監視（日次・2026-11-22）
 
 - FlowForge 315-B（`flow_ZQIfYZY4GJF2XspXY8i0sGWD`）の実装。毎日 08:20・18:20、既存の鮮度監視の launchd に相乗り（AI なし）
-- 対象 311・312・313・314・317。停止＋空回り（311・313）→ 異常の発生・回復だけ `#ops`、結果は `.jarvis_state/stall_watch_315b.json` と `/agent-team`「週次稼働」タブ
+- 対象 311・312・313・314・317（312 は collect の実行だけを 80h で見る。reflect の成功は数えない＝workflow の run-name と config の `title_contains`）。停止＋空回り（311・313）→ 異常の発生・回復だけ `#ops`、結果は `.jarvis_state/stall_watch_315b.json` と `/agent-team`「週次稼働」タブ
 - 実装の正・工程の対応・最終成功の取り方: [`315-B_停止空回り監視_20261122.md`](./315-B_停止空回り監視_20261122.md)
 
 ## CHRLINE retry キュー exhausted の扱い（2026-11-22）

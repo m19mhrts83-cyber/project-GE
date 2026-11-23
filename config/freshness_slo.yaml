@@ -150,7 +150,7 @@ products:
 # 315-B 300番台 停止・空回り監視（日次・AI なし）— scripts/jarvis_stall_watch_315b.py
 # 設計の正本: FlowForge 315-B（flow_ZQIfYZY4GJF2XspXY8i0sGWD）。上の products とは別の通知状態
 # （.jarvis_state/stall_watch_315b.json）で、異常の発生・回復のときだけ #ops。対象は 311・312・313・314・317 だけ。
-# stop: 最終成功の取り方（kind は上と同じ＋ log_last_match）。ref は上の products の設定をそのまま使う
+# stop: 最終成功の取り方（kind は上と同じ＋ log_last_match。gha は任意の title_contains で実行を絞れる）。ref は上の products の設定をそのまま使う
 # idle: 空回りの判定（gate_draft_repeat=311／candidate_repeat=313／skip=判定なし）
 stall_watch_315b:
   targets:
@@ -176,10 +176,14 @@ stall_watch_315b:
       owner: 312 Todoist起票整理係
       action: "gh run list -w todoist-312-collect.yml → 失敗なら --log-failed"
       # 本線は Nody の GHA（collect 月水金＋reflect）。旧 todoist_312_digest.json は 10/21 で役目を終えたので見ない
+      # collect だけを数える: 同じ workflow の reflect（30分ごと）の成功では生きていると見なさない。
+      # 実行の title（workflow の run-name）に title_contains が入る成功だけを見る（任意項目。無ければ今まで通り全部）。
+      # 月水金 20:30 JST の間隔は最大 72h（金→月）＋GHA の遅れの余裕で 80h
       stop:
         kind: gha
         workflow: todoist-312-collect.yml
-        max_age_h: 192
+        title_contains: "312 collect"
+        max_age_h: 80
     - id: "313"
       label: 313 完了候補確認
       owner: 313 完了候補確認係
