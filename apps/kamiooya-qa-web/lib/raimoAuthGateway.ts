@@ -149,13 +149,13 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       if(path==='/features' && req.method==='GET'){
         let flags:FeatureFlag[]=[];
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
-        return json(featuresFor(Array.isArray(flags)?flags:[],{id:user.id,email:user.email}));
+        return json(featuresFor(Array.isArray(flags)?flags:[],{id:user.id,email:user.email,role:user.role}));
       }
       // 改善履歴。スイッチ change_log が見える人だけ（11/11）。
       if(path==='/change-log' && req.method==='GET'){
         let flags:FeatureFlag[]=[];
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
-        requireFeature(Array.isArray(flags)?flags:[],'change_log',{id:user.id,email:user.email});
+        requireFeature(Array.isArray(flags)?flags:[],'change_log',{id:user.id,email:user.email,role:user.role});
         if(!d.listChangeLog)return json({error:'feature_not_available'},404);
         return json({entries:publicChangeLog(await d.listChangeLog() as any[])});
       }
@@ -163,7 +163,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       if(path==='/answer-feedback' && req.method==='POST'){
         let flags:FeatureFlag[]=[];
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
-        requireFeature(Array.isArray(flags)?flags:[],'answer_feedback',{id:user.id,email:user.email});
+        requireFeature(Array.isArray(flags)?flags:[],'answer_feedback',{id:user.id,email:user.email,role:user.role});
         if(!d.saveFeedback)return json({error:'feature_not_available'},404);
         const f=parseFeedback(input);
         if(await d.chatOwner(f.chat_id)!==user.id)return json({error:'forbidden'},403);
@@ -180,7 +180,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       if(path==='/answer-source-click' && req.method==='POST'){
         let flags:FeatureFlag[]=[];
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
-        requireFeature(Array.isArray(flags)?flags:[],'answer_feedback',{id:user.id,email:user.email});
+        requireFeature(Array.isArray(flags)?flags:[],'answer_feedback',{id:user.id,email:user.email,role:user.role});
         if(!d.saveSourceClick)return json({error:'feature_not_available'},404);
         const s=parseSourceClick(input);
         if(await d.chatOwner(s.chat_id)!==user.id)return json({error:'forbidden'},403);
@@ -193,7 +193,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       if(path==='/admin/users/pending/roster-match' && req.method==='POST'){
         let flags:FeatureFlag[]=[];
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
-        requireFeature(Array.isArray(flags)?flags:[],'auto_approval',{id:user.id,email:user.email});
+        requireFeature(Array.isArray(flags)?flags:[],'auto_approval',{id:user.id,email:user.email,role:user.role});
         if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
         if(!d.roster)return json({error:'feature_not_available'},404);
         const roster=d.roster;
@@ -205,7 +205,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       if((path==='/admin/ranking-themes/list'||path==='/admin/ranking-themes/decide'||path==='/admin/ranking-themes/rebuild') && req.method==='POST'){
         let flags:FeatureFlag[]=[];
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
-        requireFeature(Array.isArray(flags)?flags:[],'ranking_themes',{id:user.id,email:user.email});
+        requireFeature(Array.isArray(flags)?flags:[],'ranking_themes',{id:user.id,email:user.email,role:user.role});
         if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
         if(!d.themeRounds||!d.themeDecisions||!d.saveThemeDecision)return json({error:'feature_not_available'},404);
         if(path==='/admin/ranking-themes/decide'){
@@ -242,7 +242,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       if(path==='/admin/openchat-ranking/list' && req.method==='POST'){
         let flags:FeatureFlag[]=[];
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
-        requireFeature(Array.isArray(flags)?flags:[],'openchat_ranking',{id:user.id,email:user.email});
+        requireFeature(Array.isArray(flags)?flags:[],'openchat_ranking',{id:user.id,email:user.email,role:user.role});
         if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
         if(!d.openchatRankings)return json({error:'feature_not_available'},404);
         const rounds=(await d.openchatRankings(1) as any[]).filter(r=>r&&typeof r.id==='string');
@@ -251,7 +251,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       if(path==='/admin/answer-feedback/list' && req.method==='POST'){
         let flags:FeatureFlag[]=[];
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
-        requireFeature(Array.isArray(flags)?flags:[],'answer_feedback',{id:user.id,email:user.email});
+        requireFeature(Array.isArray(flags)?flags:[],'answer_feedback',{id:user.id,email:user.email,role:user.role});
         if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
         if(!d.listFeedback)return json({error:'feature_not_available'},404);
         let clicks:unknown[]=[];
@@ -270,7 +270,7 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       if(path==='/admin/conversation-signals/list' && req.method==='POST'){
         let flags:FeatureFlag[]=[];
         try{flags=d.featureFlags?await d.featureFlags():[];}catch{flags=[];}
-        requireFeature(Array.isArray(flags)?flags:[],'conversation_signals',{id:user.id,email:user.email});
+        requireFeature(Array.isArray(flags)?flags:[],'conversation_signals',{id:user.id,email:user.email,role:user.role});
         if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
         if(!d.listRecentJobs)return json({error:'feature_not_available'},404);
         const safe=async(f?:()=>Promise<unknown[]>)=>{try{const r=f?await f():[];return Array.isArray(r)?r as any[]:[];}catch{return [];}};

@@ -59,3 +59,16 @@ test('確認用の帯(preview)は名指しの人だけ。全員公開の機能�
   assert.deepEqual(Object.keys(member.features), ['cost_saving', 'design_theme']);
   assert.equal(featuresFor(flags, { id: 'o1', email: '' }).preview, true); // 全部 all でも名指しの本人は帯が見える
 });
+
+test('admins の段階: 管理者の役割の人には会員と同じ見え方で出し、会員・役割不明には出さない', async () => {
+  const { featureAllowed, featuresFor } = await import('../lib/featureFlags.ts');
+  const flag = { feature: 'change_log', stage: 'admins', owner_ids: ['owner@example.test'], reviewer_ids: [] };
+  assert.equal(featureAllowed(flag, { id: '5', email: 'a@example.test', role: 'admin' }), true);
+  assert.equal(featureAllowed(flag, { id: '6', email: 'm@example.test', role: 'master_admin' }), true);
+  assert.equal(featureAllowed(flag, { id: '7', email: 'u@example.test', role: 'user' }), false);
+  assert.equal(featureAllowed(flag, { id: '8', email: 'x@example.test' }), false);
+  assert.equal(featureAllowed(flag, { id: '1', email: 'owner@example.test' }), true);
+  const r = featuresFor([flag], { id: '5', email: 'a@example.test', role: 'admin' });
+  assert.deepEqual(r.features.change_log, { members: true });
+  assert.equal(r.preview, false);
+});

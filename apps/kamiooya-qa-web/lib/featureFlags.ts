@@ -1,11 +1,14 @@
 // 改善機能の段階公開スイッチ（2026-11-10）。
-// 段階: off（誰にも出さない）→ owner（松野さんだけ）→ reviewers（指定した確認者も）→ all（会員全員）。
-// 「管理者かどうか」では判定しない。了承前は同じ管理者の運営にも見せないため、名指しの一覧だけで決める。
+// 段階: off（誰にも出さない）→ owner（松野さんだけ）→ reviewers（指定した確認者も）→ admins（管理者全員）→ all（会員全員）。
+// 了承前は同じ管理者の運営にも見せないため、off〜reviewers は名指しの一覧だけで決める。
+// admins（2026-11-23 松野さん「メールで名指しせず、管理者権限の人に見せる」）は、管理者の役割を持つ人に会員と同じ見え方で出す。
+// 役割はサーバーが会員情報から渡す（画面の申告は使わない）。役割が分からない呼び出しでは admins は見えない（安全側）。
 // 判定は必ずサーバー側。画面の表示は /features の結果に従うだけで、機能の API も requireFeature で止める。
-export const FEATURE_STAGES = ['off', 'owner', 'reviewers', 'all'] as const;
+export const FEATURE_STAGES = ['off', 'owner', 'reviewers', 'admins', 'all'] as const;
 export type FeatureStage = typeof FEATURE_STAGES[number];
 export type FeatureFlag = { feature: string; stage: string; owner_ids?: unknown; reviewer_ids?: unknown };
-export type FeatureUser = { id: string; email: string };
+export type FeatureUser = { id: string; email: string; role?: string };
+const STAFF_ROLES = ['admin', 'master_admin'];
 
 const list = (v: unknown): string[] => Array.isArray(v) ? v.map(x => String(x).trim().toLowerCase()).filter(Boolean) : [];
 const named = (ids: unknown, u: FeatureUser) => {
@@ -19,6 +22,7 @@ export function featureAllowed(flag: FeatureFlag | undefined, u: FeatureUser): b
   if (flag.stage === 'all') return true;
   if (flag.stage === 'off') return false;
   if (named(flag.owner_ids, u)) return true;
+  if (flag.stage === 'admins') return STAFF_ROLES.includes(String(u.role ?? ''));
   return flag.stage === 'reviewers' && named(flag.reviewer_ids, u);
 }
 
@@ -31,7 +35,8 @@ export function featuresFor(flags: FeatureFlag[], u: FeatureUser) {
   let preview = false;
   for (const f of flags) {
     if (!/^[a-z0-9_]{1,40}$/.test(f.feature)) continue;
-    if (featureAllowed(f, u)) features[f.feature] = { members: f.stage === 'all' };
+    // admins の段階は、見える人には確認用の切り替えなしでそのまま出す（members: true）。
+    if (featureAllowed(f, u)) features[f.feature] = { members: f.stage === 'all' || f.stage === 'admins' };
     if (named(f.owner_ids, u) || named(f.reviewer_ids, u)) preview = true;
   }
   return { features, preview };
