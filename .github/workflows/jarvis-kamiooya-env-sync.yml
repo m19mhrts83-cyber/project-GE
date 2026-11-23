@@ -1,0 +1,44 @@
+name: jarvis-kamiooya-env-sync
+
+# AIナビ東京移設の後始末（2026-11-23）: Jarvis ダッシュボード（Vercel）の SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY を、
+# GitHub Secret（11/21 に東京へ切替済み）と同じ値に揃える。値はログに出さない。手動実行のみ。
+# 反映には Vercel の再デプロイが要る（このワークフローの後に行う）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_ref:
+        description: "SUPABASE_URL が指すべき ref（取り違え防止）"
+        required: true
+        default: "sufbsyddqgekvcgadhpv"
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      NEW_URL: ${{ secrets.SUPABASE_URL }}
+      NEW_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      EXPECTED_REF: ${{ github.event.inputs.expected_ref }}
+      TEAM: team_NJph8Tc5cSqw7rZSrPOQMp00
+      PROJECT: prj_3rP2c8CCYIhRFyECBycV8Y3gFluG
+    steps:
+      - name: Update Vercel env (production + preview)
+        run: |
+          set -euo pipefail
+          [[ -n "$VERCEL_TOKEN" && -n "$NEW_KEY" ]] || { echo "::error::秘密が足りません"; exit 1; }
+          [[ "${NEW_URL%/}" == "https://${EXPECTED_REF}.supabase.co" ]] || { echo "::error::GitHub Secret SUPABASE_URL が想定の ref ではありません"; exit 1; }
+          # 既存の変数 id（SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY の production・preview）
+          for pair in "GnZPXSeR75SQcDDL:NEW_URL" "Q2Kv2y0M2fiIMaIp:NEW_URL" "H6AKGtwDc9J6Trs3:NEW_KEY" "t816h4xzkNKqDG7y:NEW_KEY"; do
+            id="${pair%%:*}"; var="${pair#*:}"
+            body=$(jq -n --arg v "${!var}" '{value:$v}')
+            code=$(curl -sS -o /dev/null -w '%{http_code}' -X PATCH \
+              -H "Authorization: Bearer ${VERCEL_TOKEN}" -H "Content-Type: application/json" \
+              "https://api.vercel.com/v9/projects/${PROJECT}/env/${id}?teamId=${TEAM}" --data "$body")
+            echo "env ${id}: HTTP ${code}" | tee -a "$GITHUB_STEP_SUMMARY"
+            [[ "$code" == "200" ]] || exit 1
+          done
