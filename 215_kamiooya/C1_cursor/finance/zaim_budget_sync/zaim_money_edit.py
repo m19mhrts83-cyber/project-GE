@@ -8,21 +8,26 @@ Web版 Zaim で家計明細の集計設定／費目を変更する。
   cd ~/git-repos/215_kamiooya/C1_cursor/finance/zaim_budget_sync
   python zaim_money_edit.py --from-watch --dry-run
   python zaim_money_edit.py --from-watch --apply --yes
+
+行の特定は zaim_row_match.select_row（金額完全一致＋出金元＋お店でちょうど1件）。0件・複数件は何もしない。
+保存後は日別を再読み込みし、同じ明細IDの行の集計アイコンが変わったかで成功判定する（2026-11-24 画面診断に基づく）。
+重複除外の専用ツール: scripts/jarvis_zaim_dup_exclude.py
 """
 from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from playwright.sync_api import Page
 
 import zaim_budget_apply as zaim
 import zaim_money_create as zcreate
+import zaim_row_match as zmatch
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO = SCRIPT_DIR.parents[3]  # .../git-repos (finance -> C1 -> 215 -> git-repos)
@@ -92,166 +97,228 @@ def print_dry_run(actions: list[dict[str, Any]]) -> None:
         )
 
 
+ROWS_SEL = "div[class*='SearchResult-module__body']"
+MODAL_SEL = ".modal.in"
+# 日別／期間表示は最大31行で切れる（2026-11-24 診断）。30行以上なら検索フォームで絞る
+LIST_CAP_GUARD = 30
+WAIT_ROWS_MS = 20_000
+WAIT_MODAL_MS = 15_000
+
+ROWS_JS = r"""
+() => {
+  const g = (r, k) => r.querySelector(`[class*='SearchResult-module__${k}']`);
+  const t = (e) => (e ? (e.textContent || '').trim() : '');
+  return [...document.querySelectorAll("div[class*='SearchResult-module__body']")].map((r, i) => {
+    const calc = g(r, 'calc') ? g(r, 'calc').querySelector('i') : null;
+    const edit = g(r, 'edit') ? g(r, 'edit').querySelector('i') : null;
+    const acct = g(r, 'fromAccount') ? g(r, 'fromAccount').querySelector('img') : null;
+    return {
+      index: i,
+      price: t(g(r, 'price')),
+      calc: t(calc),
+      calc_title: calc ? (calc.getAttribute('title') || '') : '',
+      acct: acct ? (acct.getAttribute('alt') || '') : '',
+      place: t(g(r, 'place')),
+      name: t(g(r, 'name')),
+      comment: t(g(r, 'comment')),
+      category: t(g(r, 'category')),
+      edit_url: edit ? (edit.getAttribute('data-url') || '') : '',
+    };
+  });
+}
+"""
+
+MODAL_JS = r"""
+() => {
+  const m = document.querySelector('.modal.in');
+  if (!m) return {open: false};
+  const c = m.querySelector('.modal-body.content');
+  const s = m.querySelector('.modal-body.spinner');
+  return {
+    open: true,
+    spinner_visible: s ? getComputedStyle(s).display !== 'none' : false,
+    content_children: c ? c.children.length : 0,
+    form_actions: [...m.querySelectorAll('form')].map((f) => f.getAttribute('action') || ''),
+  };
+}
+"""
+
+
+class EditError(RuntimeError):
+    """画面操作の失敗（何も保存していない／確認できなかった）。"""
+
+
 def _goto_day(page: Page, day: str) -> None:
-    # day: YYYY-MM-DD
-    y, m, d = day.split("-")
+    """日別一覧を開き、行（body）が1件以上出るまで待つ。0行は失敗（固定待ちはしない）。"""
     url = f"{MONEY_URL}?start_date={day}&end_date={day}"
     page.goto(url, wait_until="domcontentloaded", timeout=60_000)
-    page.wait_for_timeout(1500)
-    # fallback: calendar style
-    if "login" in page.url or "id.zaim.net" in page.url:
-        raise RuntimeError(f"未ログイン: {page.url}")
+    if "login" in page.url or "id.zaim.net" in page.url or "kufu.jp" in page.url:
+        raise EditError(f"未ログイン: {page.url}")
+    try:
+        page.wait_for_function(
+            "(sel) => document.querySelectorAll(sel).length > 0",
+            arg=ROWS_SEL,
+            timeout=WAIT_ROWS_MS,
+        )
+    except Exception as e:
+        raise EditError(zmatch.R_NO_ROWS) from e
 
 
-def _find_and_open_row(page: Page, amount: float, shop: str) -> bool:
-    """明細行をクリックして編集を開く。成功で True。"""
-    amt_int = int(round(amount))
-    # 金額テキストのゆれ
-    patterns = [
-        f"{amt_int:,}",
-        str(amt_int),
-        f"-{amt_int:,}",
-        f"¥{amt_int:,}",
-    ]
-    shop_frag = (shop or "").strip()
-    if len(shop_frag) > 12:
-        shop_frag = shop_frag[:12]
+def read_rows(page: Page) -> list[dict[str, Any]]:
+    return page.evaluate(ROWS_JS)
 
-    # 現行 UI（2026-10 確認）: 明細は div の仮想リスト。行の「編集」セルを押すとモーダルが開く
-    rows = page.locator("div[class*='SearchResult-module__body']").filter(
-        has_text=f"{amt_int:,}"
+
+def _narrow_by_form(page: Page, amount: int, agg_value: str | None) -> None:
+    """検索フォームの「金額 下限=上限」（＋集計設定）で絞る。多数日用。"""
+    before = page.locator(ROWS_SEL).count()
+    opener = page.get_by_text("オプションを表示する")
+    if opener.count() > 0:
+        opener.first.click()
+        page.wait_for_timeout(300)
+    form = page.locator("[class*='MoneySearchForm-module__moneySearchForm']")
+    amts = form.locator("input[placeholder='指定しない']")
+    if amts.count() < 2:
+        raise EditError("検索フォームの金額欄が見つからない")
+    amts.nth(0).fill(str(amount))
+    amts.nth(1).fill(str(amount))
+    if agg_value is not None:
+        agg = form.locator("select").filter(has=page.locator("option[value='6']")).first
+        agg.select_option(agg_value)
+    form.get_by_text("この条件で絞り込む").first.click()
+    # 再検索の反映待ち: 件数が変わって6回(約1秒)安定したら確定（上限6秒）
+    prev, stable = before, 0
+    for _ in range(40):
+        page.wait_for_timeout(150)
+        n = page.locator(ROWS_SEL).count()
+        if n != before:
+            stable = stable + 1 if n == prev else 0
+            if stable >= 6:
+                break
+        prev = n
+    n = page.locator(ROWS_SEL).count()
+    if n == 0:
+        raise EditError(zmatch.R_NO_ROWS)
+    if n == before and before >= LIST_CAP_GUARD:
+        raise EditError("検索フォームの絞り込みが反映されない")
+
+
+def rows_for_day(
+    page: Page, day: str, amount: int, *, agg_value: str | None = None
+) -> list[dict[str, Any]]:
+    """日別ページを（再）読み込みして行を返す。30行以上ならフォームで絞る。"""
+    _goto_day(page, day)
+    rows = read_rows(page)
+    if len(rows) >= LIST_CAP_GUARD:
+        _narrow_by_form(page, amount, agg_value)
+        rows = read_rows(page)
+    return rows
+
+
+def _expected_calc(action: dict[str, Any]) -> str | None:
+    """この変更の前提になる集計アイコン。集計除外は『含める(緑)』の行だけが対象。"""
+    if str(action.get("action") or "set_aggregate") != "set_aggregate":
+        return None
+    value = VALUE_MAP.get(str(action.get("value") or "exclude"), str(action.get("value")))
+    if value == "exclude":
+        return zmatch.CALC_INCLUDE
+    if value == "include":
+        return zmatch.CALC_EXCLUDE
+    return None
+
+
+def locate_target(page: Page, action: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    """action の行を日別一覧で『ちょうど1件』に特定する。絞れなければ (None, 理由)。"""
+    day = str(action.get("date") or "")
+    amount = int(round(float(action.get("amount") or 0)))
+    expect_calc = _expected_calc(action)
+    agg_filter = "10" if expect_calc == zmatch.CALC_INCLUDE else None
+    try:
+        rows = rows_for_day(page, day, amount, agg_value=agg_filter)
+    except EditError as e:
+        return None, str(e)
+    return zmatch.select_row(
+        rows,
+        amount=amount,
+        pay=str(action.get("pay") or ""),
+        shop=str(action.get("shop") or ""),
+        expect_calc=expect_calc,
+        described=action.get("described"),
+        group_size=action.get("group_size", 1),
     )
-    if rows.count() > 1 and shop_frag:
-        rows = rows.filter(has_text=shop_frag[:6])
-    if rows.count() == 1:
-        try:
-            rows.first.locator("div[class*='SearchResult-module__edit']").first.click(timeout=3000)
-            page.wait_for_timeout(1500)
-            return True
-        except Exception:
-            pass
-    elif rows.count() > 1:
-        # 同額が複数あるときは誤編集を避けて止める
-        return False
 
-    # 旧 UI のフォールバック（list items / table rows）
-    candidates = page.locator("a, tr, li, div").filter(has_text=re.compile(str(amt_int)))
-    n = min(candidates.count(), 40)
-    for i in range(n):
-        el = candidates.nth(i)
-        try:
-            text = el.inner_text(timeout=500)
-        except Exception:
-            continue
-        if str(amt_int) not in text.replace(",", ""):
-            # allow formatted
-            if f"{amt_int:,}" not in text:
-                continue
-        if shop_frag and shop_frag not in text and shop_frag[:6] not in text:
-            # still try if amount unique
-            pass
-        try:
-            el.click(timeout=2000)
-            page.wait_for_timeout(800)
-            return True
-        except Exception:
-            continue
-    # try link with money edit
-    for pat in patterns:
-        loc = page.get_by_text(pat, exact=False)
-        if loc.count() == 0:
-            continue
-        try:
-            loc.first.click(timeout=2000)
-            page.wait_for_timeout(800)
-            return True
-        except Exception:
-            continue
-    return False
+
+def _modal_snapshot(page: Page) -> dict[str, Any]:
+    return page.evaluate(MODAL_JS)
+
+
+def open_edit_modal(page: Page, zaim_id: str) -> None:
+    """行の edit セルの i[data-url=/money/{ID}/edit] を直接押し、その明細のモーダルが整うまで待つ。"""
+    icon = page.locator(
+        f"[class*='SearchResult-module__edit'] i[data-url='/money/{zaim_id}/edit']"
+    )
+    if icon.count() != 1:
+        raise EditError(zmatch.R_ID_NOT_FOUND)
+    icon.first.click(timeout=5000)
+    waited = 0
+    while waited < WAIT_MODAL_MS:
+        if zmatch.modal_ready(_modal_snapshot(page), zaim_id):
+            return
+        page.wait_for_timeout(150)
+        waited += 150
+    close_modal(page)
+    raise EditError("編集モーダルが開かない（読み込み待ち切れ）")
+
+
+def close_modal(page: Page) -> None:
+    """保存せずに閉じる。"""
+    try:
+        btn = page.locator(f"{MODAL_SEL} .close")
+        if btn.count() > 0 and btn.first.is_visible():
+            btn.first.click(timeout=2000)
+        else:
+            page.keyboard.press("Escape")
+        page.wait_for_timeout(500)
+    except Exception:
+        pass
+
+
+def _agg_select(page: Page):
+    return page.locator(f"{MODAL_SEL} select").filter(
+        has=page.locator("option", has_text="常に含めない")
+    )
+
+
+def read_modal_agg(page: Page) -> str | None:
+    sel = _agg_select(page)
+    if sel.count() != 1:
+        return None
+    return sel.first.input_value()
 
 
 def _set_aggregate_in_dialog(page: Page, value: str) -> bool:
-    """
-    編集 UI で集計フラグを設定。
-    Zaim は『集計に含めない』チェック／トグルが多い。
-    value: include | exclude
-    """
-    want_exclude = value == "exclude"
-    # 現行 UI（2026-10 確認）: 「常に含める（標準）=10／月ごと・年ごとのみ=6／年ごとのみ=3／常に含めない=0」の select
-    agg = page.locator("select").filter(has=page.locator("option", has_text="常に含めない"))
-    if agg.count() > 0:
-        try:
-            agg.first.select_option(value="0" if want_exclude else "10")
-            page.wait_for_timeout(300)
-            return True
-        except Exception:
-            return False
-
-    # 旧 UI のフォールバック（checkbox labels）
-    labels = [
-        "集計に含めない",
-        "集計から除外",
-        "合計に含めない",
-        "この支出を集計に含めない",
-    ]
-    for lab in labels:
-        loc = page.get_by_text(lab, exact=False)
-        if loc.count() == 0:
-            continue
-        # find associated checkbox
-        box = page.locator(
-            f'label:has-text("{lab}") input[type="checkbox"], '
-            f'input[type="checkbox"][name*="exclude"], '
-            f'input[type="checkbox"][id*="exclude"]'
-        )
-        try:
-            if box.count() > 0:
-                checked = box.first.is_checked()
-                if want_exclude and not checked:
-                    box.first.check()
-                elif not want_exclude and checked:
-                    box.first.uncheck()
-                return True
-            # click label to toggle
-            loc.first.click()
-            page.wait_for_timeout(300)
-            return True
-        except Exception:
-            continue
-
-    # select option
-    sel = page.locator("select").filter(has_text=re.compile("集計"))
-    if sel.count() > 0:
-        try:
-            if want_exclude:
-                sel.first.select_option(label=re.compile("含めない"))
-            else:
-                sel.first.select_option(label=re.compile("含める"))
-            return True
-        except Exception:
-            pass
-    return False
+    """モーダルの集計 select（10=標準／6=月ごと・年ごと／3=年ごと／0=含めない）。value: include|exclude。"""
+    sel = _agg_select(page)
+    if sel.count() != 1:
+        return False
+    want = "0" if value == "exclude" else "10"
+    sel.first.select_option(value=want)
+    page.wait_for_timeout(200)
+    return sel.first.input_value() == want
 
 
 def _save_dialog(page: Page) -> bool:
-    for text in ("更新する", "変更", "保存", "更新", "OK", "完了"):
-        btn = page.get_by_role("button", name=re.compile(text))
-        if btn.count() > 0:
-            try:
-                btn.first.click(timeout=3000)
-                page.wait_for_timeout(1000)
-                return True
-            except Exception:
-                continue
-    inp = page.locator('input[type="submit"]')
-    if inp.count() > 0:
-        try:
-            inp.first.click()
-            page.wait_for_timeout(1000)
+    """モーダル内の『更新する』（input[type=submit]）を押し、モーダルが閉じるまで待つ。"""
+    btn = page.locator(f"{MODAL_SEL} input[type='submit'][value='更新する']")
+    if btn.count() != 1:
+        return False
+    btn.first.click(timeout=5000)
+    waited = 0
+    while waited < WAIT_MODAL_MS:
+        if page.locator(MODAL_SEL).count() == 0:
             return True
-        except Exception:
-            pass
-    return False
+        page.wait_for_timeout(200)
+        waited += 200
+    return False  # 閉じない＝入力エラー等。保存は確認できていない
 
 
 def _set_category_in_dialog(page: Page, category: str, genre: str) -> bool:
@@ -262,46 +329,193 @@ def _set_category_in_dialog(page: Page, category: str, genre: str) -> bool:
         return False
 
 
-def apply_one(page: Page, action: dict[str, Any], *, shot_prefix: str) -> tuple[bool, str]:
-    day = str(action.get("date") or "")
-    amount = float(action.get("amount") or 0)
-    shop = str(action.get("shop") or "")
-    kind = str(action.get("action") or "set_aggregate")
-
-    SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+def verify_by_id(
+    page: Page, day: str, amount: int, zaim_id: str, expected_calc: str
+) -> tuple[bool, str]:
+    """日別ページを再読み込みし、同じ明細IDの行の集計アイコンが期待どおりかで成功判定する。"""
     try:
-        _goto_day(page, day)
-    except Exception as e:
-        page.screenshot(path=str(SCREENSHOT_DIR / f"{shot_prefix}_nav_fail.png"))
-        return False, f"nav: {e}"
+        rows = rows_for_day(page, day, amount)
+    except EditError as e:
+        return False, str(e)
+    return zmatch.verify_calc(rows, zaim_id, expected_calc)
 
-    if not _find_and_open_row(page, amount, shop):
-        page.screenshot(path=str(SCREENSHOT_DIR / f"{shot_prefix}_row_fail.png"), full_page=True)
-        return False, "明細行が見つからない／クリックできない"
+
+def change_aggregate_by_id(
+    page: Page,
+    *,
+    day: str,
+    amount: int,
+    zaim_id: str,
+    value: str,
+    expect_prev_value: str,
+    shot_prefix: str = "",
+) -> dict[str, Any]:
+    """
+    明細IDを指して集計設定を変える（日別一覧が開いていて、その行が見える前提で呼ぶ）。
+    value: include|exclude。expect_prev_value: 変更前に画面の select が示すはずの値（10 or 0 など）。
+    戻り値: {ok, message, zaim_id, prev_agg, verified}
+    """
+    out: dict[str, Any] = {
+        "ok": False,
+        "message": "",
+        "zaim_id": zaim_id,
+        "prev_agg": None,
+        "verified": False,
+    }
+    try:
+        open_edit_modal(page, zaim_id)
+    except EditError as e:
+        out["message"] = str(e)
+        return out
+    prev = read_modal_agg(page)
+    out["prev_agg"] = prev
+    if prev != expect_prev_value:
+        close_modal(page)
+        out["message"] = f"変更前の集計設定が想定と違う（{prev}）— 変更せず中止"
+        return out
+    if not _set_aggregate_in_dialog(page, value):
+        close_modal(page)
+        out["message"] = "集計設定コントロールが見つからない（UI要調整）"
+        return out
+    if not _save_dialog(page):
+        _shot(page, f"{shot_prefix}_save_fail")
+        close_modal(page)
+        out["message"] = "保存（更新する）が完了しない"
+        return out
+    want_calc = zmatch.CALC_EXCLUDE if value == "exclude" else zmatch.CALC_INCLUDE
+    ok, why = verify_by_id(page, day, amount, zaim_id, want_calc)
+    out["verified"] = ok
+    out["ok"] = ok
+    out["message"] = "ok" if ok else f"保存後の確認で反映を確認できない: {why}"
+    return out
+
+
+def _shot(page: Page, name: str) -> None:
+    try:
+        SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(SCREENSHOT_DIR / f"{name}.png"), full_page=True)
+    except Exception:
+        pass
+
+
+def apply_one_ex(page: Page, action: dict[str, Any], *, shot_prefix: str) -> dict[str, Any]:
+    """1件を特定→変更→再読み込みで確認。ちょうど1件に絞れなければ何もしない。"""
+    day = str(action.get("date") or "")
+    amount = int(round(float(action.get("amount") or 0)))
+    kind = str(action.get("action") or "set_aggregate")
+    res: dict[str, Any] = {"ok": False, "message": "", "zaim_id": None, "prev_agg": None, "verified": False}
+
+    row, why = locate_target(page, action)
+    if row is None:
+        _shot(page, f"{shot_prefix}_row_fail")
+        res["message"] = f"行を1件に絞れない: {why}"
+        return res
+    zaim_id = zmatch.edit_id_from_url(row.get("edit_url")) or ""
+    res["zaim_id"] = zaim_id
+    if action.get("dry_run_only"):
+        res["message"] = "dry-run: 特定のみ"
+        res["prev_agg"] = zmatch.agg_value_from_title(row.get("calc_title"))
+        res["ok"] = True
+        return res
 
     if kind == "set_category":
         category = str(action.get("value") or action.get("suggest") or "").strip()
         genre = str(action.get("genre") or action.get("suggest_genre") or "").strip()
         if not category or category == "review":
-            return False, "category empty"
+            res["message"] = "category empty"
+            return res
+        before_cat = row.get("category") or ""
+        try:
+            open_edit_modal(page, zaim_id)
+        except EditError as e:
+            res["message"] = str(e)
+            return res
         if not _set_category_in_dialog(page, category, genre):
-            page.screenshot(path=str(SCREENSHOT_DIR / f"{shot_prefix}_cat_fail.png"), full_page=True)
-            return False, f"費目コントロールが見つからない: {category}"
-    else:
-        raw_val = str(action.get("value") or "exclude")
-        value = VALUE_MAP.get(raw_val, raw_val)
-        if value not in ("include", "exclude"):
-            return False, f"unknown value={raw_val}"
-        if not _set_aggregate_in_dialog(page, value):
-            page.screenshot(path=str(SCREENSHOT_DIR / f"{shot_prefix}_agg_fail.png"), full_page=True)
-            return False, "集計設定コントロールが見つからない（UI要調整）"
+            _shot(page, f"{shot_prefix}_cat_fail")
+            close_modal(page)
+            res["message"] = f"費目コントロールが見つからない: {category}"
+            return res
+        if not _save_dialog(page):
+            _shot(page, f"{shot_prefix}_save_fail")
+            close_modal(page)
+            res["message"] = "保存（更新する）が完了しない"
+            return res
+        try:
+            rows = rows_for_day(page, day, amount)
+        except EditError as e:
+            res["message"] = f"保存後の確認で行を読めない: {e}"
+            return res
+        after = zmatch.find_by_id(rows, zaim_id)
+        if after is None:
+            res["message"] = f"保存後の確認: {zmatch.R_ID_NOT_FOUND}"
+            return res
+        if zmatch.nf(after.get("category")) == zmatch.nf(before_cat):
+            res["message"] = "保存後の確認で費目が変わっていない"
+            return res
+        res.update(ok=True, verified=True, message="ok")
+        return res
 
-    if not _save_dialog(page):
-        page.screenshot(path=str(SCREENSHOT_DIR / f"{shot_prefix}_save_fail.png"), full_page=True)
-        return False, "保存ボタンが見つからない"
+    raw_val = str(action.get("value") or "exclude")
+    value = VALUE_MAP.get(raw_val, raw_val)
+    if value not in ("include", "exclude"):
+        res["message"] = f"unknown value={raw_val}"
+        return res
+    expect_prev = "10" if value == "exclude" else "0"
+    return change_aggregate_by_id(
+        page,
+        day=day,
+        amount=amount,
+        zaim_id=zaim_id,
+        value=value,
+        expect_prev_value=expect_prev,
+        shot_prefix=shot_prefix,
+    )
 
-    page.screenshot(path=str(SCREENSHOT_DIR / f"{shot_prefix}_ok.png"), full_page=True)
-    return True, "ok"
+
+def apply_one(page: Page, action: dict[str, Any], *, shot_prefix: str) -> tuple[bool, str]:
+    """互換 API（zaim_money_create などが使用）。"""
+    r = apply_one_ex(page, action, shot_prefix=shot_prefix)
+    return bool(r["ok"]), str(r["message"])
+
+
+@contextmanager
+def web_session(
+    *,
+    headless: bool = True,
+    connect_cdp: str | None = None,
+    login_method: str = "email",
+    login_email: str = zaim.DEFAULT_LOGIN_EMAIL,
+    login_password: str = zaim.DEFAULT_LOGIN_PASSWORD,
+    google_email: str = zaim.DEFAULT_GOOGLE_EMAIL,
+) -> Iterator[Page]:
+    """既存のログイン流儀（storage state → 失効ならメール+パスワード）で Zaim を開く。"""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as pw:
+        browser, ctx, _ = zaim.open_browser_context(
+            pw,
+            headless=headless,
+            connect_cdp=connect_cdp,
+            storage_state=zaim.STORAGE_STATE if not connect_cdp else None,
+        )
+        try:
+            page = zaim.get_work_page(ctx)
+            zaim.ensure_logged_in(
+                page,
+                email=login_email,
+                password=login_password,
+                google_email=google_email,
+                login_method=login_method,
+                manual=False,
+            )
+            yield page
+        finally:
+            try:
+                zaim.save_storage_state(ctx)
+            except Exception:
+                pass
+            if browser and not connect_cdp:
+                browser.close()
 
 
 def run_apply(actions: list[dict[str, Any]], args: argparse.Namespace) -> int:
@@ -324,26 +538,16 @@ def run_apply(actions: list[dict[str, Any]], args: argparse.Namespace) -> int:
         )
         return 1
 
-    from playwright.sync_api import sync_playwright
-
     ok_n = fail_n = 0
     results: list[dict[str, Any]] = []
-    with sync_playwright() as pw:
-        browser, ctx, _ = zaim.open_browser_context(
-            pw,
-            headless=args.headless,
-            connect_cdp=args.connect_cdp,
-            storage_state=zaim.STORAGE_STATE if not args.connect_cdp else None,
-        )
-        page = zaim.get_work_page(ctx)
-        zaim.ensure_logged_in(
-            page,
-            email=args.login_email,
-            password=args.login_password,
-            google_email=args.google_email,
-            login_method=args.login_method,
-            manual=False,
-        )
+    with web_session(
+        headless=args.headless,
+        connect_cdp=args.connect_cdp,
+        login_method=args.login_method,
+        login_email=args.login_email,
+        login_password=args.login_password,
+        google_email=args.google_email,
+    ) as page:
         limit = args.limit if args.limit and args.limit > 0 else len(actions)
         for i, action in enumerate(actions[:limit]):
             dest = action.get("value") or action.get("suggest") or ""
@@ -351,17 +555,24 @@ def run_apply(actions: list[dict[str, Any]], args: argparse.Namespace) -> int:
                 f"▶ {i+1}/{limit} [{action.get('action')}] "
                 f"{action.get('date')} ¥{action.get('amount')} → {dest}"
             )
-            ok, msg = apply_one(page, action, shot_prefix=f"{i+1:02d}")
+            r = apply_one_ex(page, action, shot_prefix=f"{i+1:02d}")
+            ok, msg = bool(r["ok"]), str(r["message"])
             print(f"  {'OK' if ok else 'NG'}: {msg}")
-            results.append({**action, "ok": ok, "message": msg})
+            results.append(
+                {
+                    **action,
+                    "ok": ok,
+                    "message": msg,
+                    "zaim_id": r.get("zaim_id"),
+                    "prev_agg": r.get("prev_agg"),
+                    "verified": r.get("verified"),
+                }
+            )
             if ok:
                 ok_n += 1
             else:
                 fail_n += 1
             time.sleep(0.8)
-        zaim.save_storage_state(ctx)
-        if browser and not args.connect_cdp:
-            browser.close()
     out_path = REPO / ".jarvis_state" / "zaim_money_apply_last.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
