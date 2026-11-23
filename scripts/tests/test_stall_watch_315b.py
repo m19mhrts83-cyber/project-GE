@@ -200,6 +200,65 @@ class CriteriaTests(Base):
             sw.fetch_criteria(self.fx.config)
 
 
+class GhaCollectOnlyTests(unittest.TestCase):
+    """312: reflect（30分ごと）の成功では collect の停止を隠さない。gh はモック。"""
+
+    SPEC = {"kind": "gha", "workflow": "todoist-312-collect.yml", "title_contains": "312 collect", "max_age_h": 80.0}
+
+    def judge(self, runs, spec=None, rc=0):
+        from unittest import mock
+        out = mock.Mock(returncode=rc, stdout=json.dumps(runs), stderr="")
+        with mock.patch.object(sw.subprocess, "run", return_value=out) as m:
+            res = sw.judge_stop({"stop": spec or self.SPEC}, NOW)
+        return res, m
+
+    @staticmethod
+    def run_(title, age_h):
+        t = (NOW - timedelta(hours=age_h)).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return {"displayTitle": title, "updatedAt": t}
+
+    def test_only_reflect_recent_and_collect_old_is_stale(self):
+        runs = [self.run_("312 reflect（定期）", 0.3), self.run_("312 reflect（定期）", 0.8), self.run_("312 collect（定期）", 100)]
+        res, _ = self.judge(runs)
+        self.assertEqual(res["status"], "stale")
+        self.assertAlmostEqual(res["age_h"], 100, delta=0.1)
+
+    def test_recent_collect_is_ok_even_manual(self):
+        for title in ("312 collect（定期）", "312 collect（手動）"):
+            res, _ = self.judge([self.run_("312 reflect（定期）", 0.3), self.run_(title, 60)])
+            self.assertEqual(res["status"], "ok", title)
+
+    def test_no_collect_run_at_all_is_unknown_not_ok(self):
+        res, _ = self.judge([self.run_("312 reflect（定期）", 0.3)])
+        self.assertEqual(res["status"], "unknown")
+
+    def test_gh_failure_is_unknown(self):
+        res, _ = self.judge([], rc=1)
+        self.assertEqual(res["status"], "unknown")
+
+    def test_without_title_contains_behaves_as_before(self):
+        # 絞り込みは任意。無ければ従来の鮮度監視と同じ gh 呼び出し（-L 1）
+        spec = {k: v for k, v in self.SPEC.items() if k != "title_contains"}
+        from unittest import mock
+        out = mock.Mock(returncode=0, stdout=(NOW - timedelta(hours=1)).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), stderr="")
+        with mock.patch.object(fw.subprocess, "run", return_value=out) as m:
+            res = sw.judge_stop({"stop": spec}, NOW)
+        self.assertEqual(res["status"], "ok")
+        self.assertIn("1", m.call_args[0][0])
+
+    def test_real_config_312_is_collect_only_80h(self):
+        by = {t["id"]: t for t in sw.fetch_criteria(sw.CONFIG)["targets"]}
+        self.assertEqual(by["312"]["stop"]["max_age_h"], 80)
+        self.assertEqual(by["312"]["stop"]["title_contains"], "312 collect")
+        for other in ("311", "313", "314", "317"):
+            self.assertNotIn("title_contains", by[other]["stop"])
+
+    def test_workflow_run_name_matches_config(self):
+        wf = (sw.REPO / ".github/workflows/todoist-312-collect.yml").read_text(encoding="utf-8")
+        self.assertIn("run-name:", wf)
+        self.assertIn("'collect'", wf)
+
+
 class StopTests(Base):
     def test_all_fresh_is_success_and_silent(self):
         rc, st = self.fx.run()

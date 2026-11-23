@@ -95,7 +95,7 @@ def fetch_criteria(config_path: Path = CONFIG) -> dict[str, Any]:
             ref = products.get(stop["ref"])
             if not ref:
                 raise CriteriaError(f"{tid}: 参照先 {stop['ref']} が products にない")
-            stop = {**{k: v for k, v in ref.items() if k in ("kind", "glob", "file", "path", "workflow", "max_age_h")}, "ref": stop["ref"]}
+            stop = {**{k: v for k, v in ref.items() if k in ("kind", "glob", "file", "path", "workflow", "max_age_h", "title_contains")}, "ref": stop["ref"]}
         if not stop.get("kind") or stop.get("max_age_h") in (None, ""):
             raise CriteriaError(f"{tid}: stop.kind／max_age_h がない")
         try:
@@ -181,9 +181,31 @@ def _log_last_match(spec: dict[str, Any], repo: Path) -> tuple[datetime | None, 
     return (best, "") if best else (None, "実行の記録なし")
 
 
+def _gha_last_titled(spec: dict[str, Any], repo: Path) -> tuple[datetime | None, str]:
+    """gha で title_contains があるとき、その文字を title に含む成功実行の最新時刻。
+    312 は collect と reflect が同じ workflow なので、run-name で見分けた collect だけを数える。"""
+    needle = str(spec["title_contains"])
+    r = subprocess.run(
+        ["gh", "run", "list", "-w", str(spec["workflow"]), "-s", "success", "-L", "100",
+         "--json", "updatedAt,displayTitle"],
+        capture_output=True, text=True, timeout=60, cwd=repo,
+    )
+    if r.returncode != 0:
+        return None, f"gh 失敗: {r.stderr.strip()[:80]}"
+    try:
+        runs = json.loads(r.stdout or "[]")
+    except ValueError:
+        return None, "gh の出力を読めない"
+    times = [fw._parse_ts(x.get("updatedAt")) for x in runs if needle in str(x.get("displayTitle") or "")]
+    times = [t for t in times if t]
+    return (max(times), "") if times else (None, f"成功履歴なし（title に「{needle}」を含む実行）")
+
+
 def last_success(spec: dict[str, Any], *, repo: Path = REPO) -> tuple[datetime | None, str]:
     if spec.get("kind") == "log_last_match":
         return _log_last_match(spec, repo)
+    if spec.get("kind") == "gha" and spec.get("title_contains"):
+        return _gha_last_titled(spec, repo)
     return fw.last_time(spec, repo=repo)
 
 

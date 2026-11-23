@@ -5,6 +5,13 @@ name: 312 Todoist起票整理 — 起こりを拾う／Todoistへ反映
 # 止める: リポジトリ変数 JARVIS_TODOIST_312_COLLECT_DISABLE=1（collect の #consult 投稿だけ止める）
 # 台帳（comm_items）から拾う: リポジトリ変数 JARVIS_312_COMM_MAX（未設定・0＝止め。お試しは 5。水曜の回だけ拾う）
 
+# run-name: 315-B 停止監視が collect の実行だけを数えるための印（実行一覧の title に collect／reflect が出る）。
+# 変えるときは config/freshness_slo.yaml の 312 の title_contains も合わせる
+run-name: >-
+  ${{ github.event_name == 'schedule'
+  && format('312 {0}（定期）', github.event.schedule == '30 11 * * 1,3,5' && 'collect' || 'reflect')
+  || format('312 {0}（手動）', github.event.inputs.mode || 'collect') }}
+
 on:
   schedule:
     - cron: "30 11 * * 1,3,5" # 月・水・金 20:30 JST: collect
