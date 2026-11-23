@@ -20,7 +20,7 @@ concurrency:
 jobs:
   round:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45  # 2026-11-23 オプチャ集計込みで約26分かかり25分で打ち切られたため
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
