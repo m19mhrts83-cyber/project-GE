@@ -422,6 +422,80 @@ def existing_by_dedupe_key(sb, since_iso: str) -> dict[tuple[str, str, str, str,
     return out
 
 
+def sync_chat_entries(
+    entries: list[dict[str, Any]],
+    candidates: list[dict[str, Any]],
+    *,
+    apply: bool,
+    lookback_days: int,
+    window_days: int = 30,
+    sb=None,
+) -> dict[str, Any]:
+    """夜の Mac トリアージの LINE／iMessage 分を台帳へ書く（既定は dry-run＝DB に触れない）。
+
+    entries=md の全エントリ、candidates=未返信候補（要返信印をつける）。
+    同じ元ID・同じ鍵は1件。リンクは link_pending（既存関数）経由のみ。件数と種類だけ返す。
+    """
+    from datetime import timedelta
+
+    now = datetime.now(JST)
+    window = now - timedelta(days=window_days)
+    recent = now - timedelta(days=lookback_days)
+
+    def _is_chat(e: dict[str, Any]) -> bool:
+        return _channel_of(str(e.get("channel") or "")) in ("line", "imessage")
+
+    items: dict[str, dict[str, Any]] = {}
+    seen: set[tuple[str, str, str, str, str]] = set()
+    for e in entries:
+        if not _is_chat(e):
+            continue
+        row = item_from_md_entry(e, recent_cutoff=recent)
+        if row is None or row["occurred_at"] < window.isoformat():
+            continue
+        dk = dedupe_key(row)
+        if row["external_id"] in items or dk in seen:
+            continue
+        seen.add(dk)
+        items[row["external_id"]] = row
+    kinds: dict[str, int] = {}
+    for r in items.values():
+        kinds[r["channel"]] = kinds.get(r["channel"], 0) + 1
+    cand_rows = [
+        r
+        for r in (
+            item_from_md_entry({**c, "channel": c.get("channel_raw") or c.get("channel")})
+            for c in candidates
+            if _is_chat(c)
+        )
+        if r
+    ]
+    out: dict[str, Any] = {
+        "apply": apply,
+        "items": len(items),
+        "by_channel": kinds,
+        "needs_reply_candidates": len(cand_rows),
+    }
+    if not apply:
+        return out
+    sb = sb or client()
+    existing = existing_by_dedupe_key(sb, window.isoformat())
+    new_rows = {x: r for x, r in items.items() if dedupe_key(r) not in existing}
+    ids = insert_items(sb, list(new_rows.values()))
+    ids_by_dk = {dedupe_key(r): ids[x] for x, r in new_rows.items() if x in ids}
+    ids_by_dk.update(existing)
+    needs = [ids_by_dk[dedupe_key(r)] for r in cand_rows if dedupe_key(r) in ids_by_dk]
+    mark_needs_reply(sb, needs)
+    out.update(new=len(new_rows), known=len(items) - len(new_rows), needs_reply=len(needs))
+    try:  # triage_item へのリンクは既存関数だけが作る
+        lp = link_pending(sb, apply=True)
+        lp.pop("_closed_items", None)
+        out["link_pending"] = lp
+    except Exception as ex:  # noqa: BLE001
+        out["link_pending_error"] = type(ex).__name__
+    return out
+
+
 def lookup_ids(sb, external_ids: list[str]) -> dict[str, str]:
     out: dict[str, str] = {}
     ids = sorted(set(external_ids))

@@ -1597,6 +1597,11 @@ def main() -> int:
     ap.add_argument("--apply-draft", metavar="ID", help="partner: 4.送信下書きへ / general: プレビュー表示")
     ap.add_argument("--send-gmail", metavar="ID", help="general のみ・承認後に Gmail Reply 送信")
     ap.add_argument("--list", action="store_true")
+    ap.add_argument(
+        "--comm-hub",
+        action="store_true",
+        help="LINE／iMessage を台帳へ書く（または JARVIS_NIGHT_COMM_HUB=1）。無指定は件数だけ出す dry-run",
+    )
     args = ap.parse_args()
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -1676,6 +1681,7 @@ def main() -> int:
     )
 
     all_cands: list[dict[str, Any]] = []
+    chat_md_entries: list[dict[str, Any]] = []
     activities: list[dict[str, Any]] = []
     activity_lookback = int(cfg.get("activity_lookback_days") or ACTIVITY_LOOKBACK_DEFAULT)
     if do_partner:
@@ -1694,6 +1700,7 @@ def main() -> int:
         for folder, md in list_partner_mds(base):
             name = folder.split("_", 1)[-1] if "_" in folder else folder
             entries = parse_yoritoori(md, folder, name)
+            chat_md_entries.extend(e for e in entries if chat_channel_kind(e.get("channel") or "") in ("LINE", "iMessage"))
             if not skip_pg:
                 all_cands.extend(find_unreplied(entries, lookback))
             chat_cands = find_unreplied_chat(entries, lookback)
@@ -1764,6 +1771,21 @@ def main() -> int:
             limit=limit,
             judge_only=args.judge_only,
         )
+
+    if do_partner:
+        comm_apply = (
+            args.comm_hub
+            or (os.environ.get("JARVIS_NIGHT_COMM_HUB") or "").strip().lower() in ("1", "true", "yes", "on")
+        ) and not args.dry_run
+        try:
+            import jarvis_comm_hub as hub
+
+            r = hub.sync_chat_entries(
+                chat_md_entries, all_cands, apply=comm_apply, lookback_days=lookback
+            )
+            print(f"# comm hub chat ({'apply' if comm_apply else 'dry-run'}): {r}", file=sys.stderr)
+        except Exception as e:  # 台帳側の失敗で本線を止めない
+            print(f"# comm hub chat soft-fail: {type(e).__name__}", file=sys.stderr)
 
     # Gmail: Dashboard 取込時点で既読（閉じ待ちにしない）。物件紹介は general に載らないため未読のまま → KURASHIFT 取込時。
     mail_items = [
