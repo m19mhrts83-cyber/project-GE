@@ -527,14 +527,43 @@ def mark_needs_reply(sb, item_ids: list[str]) -> int:
     return n
 
 
-def link_items(sb, links: list[dict[str, Any]]) -> int:
+def _existing_triage_ids(sb, ids: list[str]) -> set[str]:
+    """triage_items に実在する id（双子 gha-p-… / gha-cw-… / ハッシュだけ の読み替えも実在として数える）。"""
+    want = sorted(set(ids))
+    found: set[str] = set()
+    for i in range(0, len(want), 100):
+        for t in sb.table("triage_items").select("id").in_("id", want[i : i + 100]).execute().data or []:
+            found.add(str(t["id"]))
+    missing = [t for t in want if t not in found]
+    twin_of: dict[str, list[str]] = {t: triage_twin_ids(t) for t in missing}
+    twins = sorted({v for vs in twin_of.values() for v in vs})
+    twin_found: set[str] = set()
+    for i in range(0, len(twins), 100):
+        for t in sb.table("triage_items").select("id").in_("id", twins[i : i + 100]).execute().data or []:
+            twin_found.add(str(t["id"]))
+    for t, vs in twin_of.items():
+        if any(v in twin_found for v in vs):
+            found.add(t)
+    return found
+
+
+def link_items(sb, links: list[dict[str, Any]], *, verify: bool = True) -> int:
+    """comm_links を書く。triage_item のリンク先が triage_items に無ければ書かない（dangling を作らない）。"""
     if not links:
         return 0
-    for chunk in _chunks(links):
+    tids = [str(l["target_id"]) for l in links if l.get("target_type") == "triage_item"] if verify else []
+    ok_ids = _existing_triage_ids(sb, tids) if tids else set()
+    kept: list[dict[str, Any]] = []
+    for l in links:
+        if verify and l.get("target_type") == "triage_item" and str(l["target_id"]) not in ok_ids:
+            print(f"⚠️ comm link skip（triage 行なし）: item={l.get('item_id')} triage={l['target_id']}", file=sys.stderr)
+            continue
+        kept.append(l)
+    for chunk in _chunks(kept):
         sb.table("comm_links").upsert(
             chunk, on_conflict="item_id,target_type,target_id", ignore_duplicates=True
         ).execute()
-    return len(links)
+    return len(kept)
 
 
 def _triage_entry(t: dict[str, Any]) -> dict[str, Any]:
@@ -759,7 +788,93 @@ def close_resolved(sb, *, apply: bool) -> dict[str, Any]:
     return stats
 
 
-def reconcile_counts(sb) -> dict[str, int]:
+# 台帳が閉じ側（または未着手）なのに /partner が pending のとき、台帳を needs_reply へ戻してよい状態。
+# waiting / drafted は人の途中判断なので触らず、一覧に出すだけ。
+REVERSE_REOPEN_FROM = ("new", "done", "no_action")
+
+
+def reopen_reverse(sb, *, apply: bool) -> dict[str, Any]:
+    """逆向き（triage lane=partner が pending なのに台帳が needs_reply 以外）を台帳側へ戻す。
+
+    triage が pending = 人はまだ判断していない（判断すれば DB トリガーが両側を閉じる）。台帳だけ閉じていたら
+    「片側更新」なので、台帳を needs_reply に戻して両側を揃える。waiting / drafted は触らず items に残す。
+    """
+    pend = _paged(
+        lambda: sb.table("triage_items").select("id,comm_item_id")
+        .eq("status", "pending").eq("lane", "partner").order("id")
+    )
+    by_item: dict[str, str] = {str(t["comm_item_id"]): str(t["id"]) for t in pend if t.get("comm_item_id")}
+    ids = sorted(by_item)
+    ws: dict[str, str] = {}
+    for i in range(0, len(ids), 100):
+        for r in sb.table("comm_items").select("id,work_status").in_("id", ids[i : i + 100]).execute().data or []:
+            ws[str(r["id"])] = str(r.get("work_status") or "")
+    items = [
+        {"item_id": iid, "triage_id": by_item[iid], "from": ws[iid]}
+        for iid in ids if iid in ws and ws[iid] != "needs_reply"
+    ]
+    fixable = [x for x in items if x["from"] in REVERSE_REOPEN_FROM]
+    if apply:
+        fix_ids = [x["item_id"] for x in fixable]
+        for i in range(0, len(fix_ids), 100):
+            (
+                sb.table("comm_items").update({"work_status": "needs_reply"})
+                .in_("id", fix_ids[i : i + 100]).in_("work_status", list(REVERSE_REOPEN_FROM)).execute()
+            )
+    return {"reverse": len(items), "reopened": len(fixable) if apply else 0, "would_reopen": len(fixable), "items": items}
+
+
+def dangling_links(sb, *, exact: bool = False) -> list[dict[str, str]]:
+    """comm_links（triage_item）のうち、リンク先が triage_items に無い（双子にも無い）もの。読み取りのみ。
+
+    exact=True は双子への読み替えをせず、id が完全一致しないものすべて（双子で救われている分を含む棚卸し用）。
+    """
+    rows = _paged(
+        lambda: sb.table("comm_links").select("item_id,target_id").eq("target_type", "triage_item").order("id")
+    )
+    tids = [str(r["target_id"]) for r in rows]
+    if exact:
+        ok = set()
+        for i in range(0, len(tids), 100):
+            for t in sb.table("triage_items").select("id").in_("id", tids[i : i + 100]).execute().data or []:
+                ok.add(str(t["id"]))
+    else:
+        ok = _existing_triage_ids(sb, tids)
+    return sorted(
+        ({"item_id": str(r["item_id"]), "target_id": str(r["target_id"])} for r in rows if str(r["target_id"]) not in ok),
+        key=lambda x: (x["target_id"], x["item_id"]),
+    )
+
+
+CLOSE_PAIR_STATUS_TO_WORK = {"sent": "done", "todoist": "done", "skipped": "no_action", "info": "no_action"}
+
+
+def close_pair(sb, triage_id: str, status: str, *, apply: bool) -> dict[str, Any]:
+    """1件の triage と、つながる台帳の行を同時に閉じる（片側だけ閉じない）。
+
+    台帳の work_status は needs_reply / new / drafted / waiting / done / no_action のどれからでも
+    status に対応する値へ揃える（DB トリガーは new・needs_reply・drafted だけなので、その外も拾う）。
+    """
+    if status not in CLOSE_PAIR_STATUS_TO_WORK:
+        raise ValueError(f"status は {sorted(CLOSE_PAIR_STATUS_TO_WORK)} のどれか: {status}")
+    rows = sb.table("triage_items").select("id,status,comm_item_id").eq("id", triage_id).execute().data or []
+    if not rows:
+        return {"ok": False, "reason": "triage 行なし", "triage_id": triage_id}
+    t = rows[0]
+    item_ids = {str(t["comm_item_id"])} if t.get("comm_item_id") else set()
+    for l in sb.table("comm_links").select("item_id").eq("target_type", "triage_item").eq("target_id", triage_id).execute().data or []:
+        item_ids.add(str(l["item_id"]))
+    out = {"ok": True, "triage_id": triage_id, "triage_from": t.get("status"), "item_ids": sorted(item_ids),
+           "to_work": CLOSE_PAIR_STATUS_TO_WORK[status]}
+    if apply:
+        if t.get("status") == "pending":
+            sb.table("triage_items").update({"status": status}).eq("id", triage_id).execute()
+        for i in sorted(item_ids):
+            sb.table("comm_items").update({"work_status": CLOSE_PAIR_STATUS_TO_WORK[status]}).eq("id", i).execute()
+    return out
+
+
+def reconcile_details(sb) -> tuple[dict[str, int], dict[str, list[str]]]:
     """毎朝の突き合わせ用の数え方（読み取りのみ）。
 
     a = /partner の未返信（triage lane=partner・status=pending）
@@ -789,8 +904,8 @@ def reconcile_counts(sb) -> dict[str, int]:
         iid: [(info.get(t) or {}).get("status", "missing") for t in ts] for iid, ts in targets.items()
     }
     nr_ids = {str(r["id"]) for r in nr}
-    pend_items = {str(t["comm_item_id"]) for t in pend if t.get("comm_item_id")}
-    return {
+    pend_items = {str(t["comm_item_id"]): str(t["id"]) for t in pend if t.get("comm_item_id")}
+    counts = {
         "a": len(pend),
         "b": sum(1 for i in nr_ids if "partner" in pending_lanes(i)),
         "b_general": sum(1 for i in nr_ids if pending_lanes(i) and "partner" not in pending_lanes(i)),
@@ -798,8 +913,31 @@ def reconcile_counts(sb) -> dict[str, int]:
         "a_unlinked": sum(1 for t in pend if not t.get("comm_item_id")),
         "stale": sum(1 for v in statuses.values() if resolved_work_status(v)),
         "unlinked": sum(1 for v in statuses.values() if not v),
-        "reverse": len(pend_items - nr_ids),
+        "reverse": len(set(pend_items) - nr_ids),
     }
+    # 食い違う組の ID（triage id ／ 台帳 item id）。Slack・ログに添える
+    detail = {
+        "reverse": sorted(f"{tid}↔{iid}" for iid, tid in pend_items.items() if iid not in nr_ids),
+        "stale": sorted(iid for iid, v in statuses.items() if resolved_work_status(v)),
+        "a_unlinked": sorted(str(t["id"]) for t in pend if not t.get("comm_item_id")),
+    }
+    return counts, detail
+
+
+def reconcile_counts(sb) -> dict[str, int]:
+    return reconcile_details(sb)[0]
+
+
+def format_mismatch_ids(detail: dict[str, list[str]], *, limit: int = 5) -> list[str]:
+    """不一致の組の ID 一覧（1行1種類・iPhone 前提で各 limit 件まで）。"""
+    labels = {"reverse": "逆向き(triage↔台帳)", "stale": "閉じ残し(台帳)", "a_unlinked": "つながり無し(triage)"}
+    out: list[str] = []
+    for k, label in labels.items():
+        ids = detail.get(k) or []
+        if ids:
+            more = f" ほか{len(ids) - limit}件" if len(ids) > limit else ""
+            out.append(f"{label}: {', '.join(ids[:limit])}{more}")
+    return out
 
 
 def reconcile_ok(c: dict[str, int]) -> bool:
@@ -989,7 +1127,9 @@ def _source_label(source: str) -> str:
     return {"gha": "GHA", "backup": "予備"}.get(source, source)
 
 
-def reconcile_slack_text(c: dict[str, int], *, source: str, last_write: dict[str, Any] | None) -> str:
+def reconcile_slack_text(
+    c: dict[str, int], *, source: str, last_write: dict[str, Any] | None, detail: dict[str, list[str]] | None = None
+) -> str:
     """#ai-hub 用の3行（iPhone 前提・空行なし）。1行目が「台帳 ✅／⚠️」の目印。"""
     ok = reconcile_ok(c)
     now = datetime.now(JST).strftime("%m/%d %H:%M")
@@ -1004,7 +1144,10 @@ def reconcile_slack_text(c: dict[str, int], *, source: str, last_write: dict[str
         l3 = f"3 台帳の最終書き込み {w}（{_source_label(last_write['source'])}）"
     else:
         l3 = "3 台帳の最終書き込み 記録なし"
-    return "\n".join([l1, l2, l3])
+    lines = [l1, l2, l3]
+    if not ok and detail:
+        lines += [f"{4 + i} {t}" for i, t in enumerate(format_mismatch_ids(detail))]
+    return "\n".join(lines)
 
 
 def post_slack(text: str, channel: str = "hub") -> int:
@@ -1020,12 +1163,16 @@ def post_slack(text: str, channel: str = "hub") -> int:
 
 
 def link_pending(sb, *, apply: bool) -> dict[str, Any]:
-    """未返信を台帳へつなぎ（_link_unlinked）、続けて閉じ残しを戻す（close_resolved）。"""
+    """未返信を台帳へつなぎ（_link_unlinked）、閉じ残しを戻し（close_resolved）、逆向きを揃える（reopen_reverse）。"""
     stats: dict[str, Any] = dict(_link_unlinked(sb, apply=apply))
     cr = close_resolved(sb, apply=apply)
     stats["closed_done"] = cr["to_done"]
     stats["closed_no_action"] = cr["to_no_action"]
     stats["_closed_items"] = cr["items"]
+    rv = reopen_reverse(sb, apply=apply)
+    stats["reverse"] = rv["reverse"]
+    stats["reopened"] = rv["reopened"]
+    stats["_reverse_items"] = rv["items"]
     return stats
 
 
@@ -1198,8 +1345,11 @@ def cmd_link_pending(args: argparse.Namespace) -> int:
     print(
         f"📒 comm link-pending {mode} pending_unlinked={stats['pending_unlinked']} "
         f"matched={stats['matched']} created={stats['created']} skipped={stats['skipped']} "
-        f"closed_done={stats['closed_done']} closed_no_action={stats['closed_no_action']}"
+        f"closed_done={stats['closed_done']} closed_no_action={stats['closed_no_action']} "
+        f"reverse={stats['reverse']} reopened={stats['reopened']}"
     )
+    for x in stats["_reverse_items"]:
+        print(f"  逆向き triage={x['triage_id']} item={x['item_id']} 台帳={x['from']}")
     if args.list:
         for t in stats["_closed_items"]:
             print(
@@ -1216,16 +1366,41 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
         if hb and hb["at"].astimezone(JST).date() == datetime.now(JST).date():
             print(f"⏭ comm reconcile: 今日はもう済み（{hb['at'].astimezone(JST):%H:%M} {hb['source']}）")
             return 0
-    c = reconcile_counts(sb)
+    c, detail = reconcile_details(sb)
     ok = reconcile_ok(c)
     print(f"📒 comm reconcile {'一致' if ok else '不一致'} " + " ".join(f"{k}={v}" for k, v in c.items()))
+    if not ok:
+        for line in format_mismatch_ids(detail, limit=50):
+            print("  " + line)
     if getattr(args, "slack", False):
-        text = reconcile_slack_text(c, source=args.source, last_write=read_heartbeat(sb, "comm_write"))
+        text = reconcile_slack_text(
+            c, source=args.source, last_write=read_heartbeat(sb, "comm_write"), detail=detail
+        )
         rc = post_slack(text)
         if rc != 0:
             return rc
         write_heartbeat(sb, "comm_reconcile", args.source)
     return 0
+
+
+def cmd_dangling(args: argparse.Namespace) -> int:
+    sb = client()
+    rows = dangling_links(sb)
+    print(f"📒 comm dangling {len(rows)}件（双子にも無い・読み取りのみ・削除しない）")
+    for r in rows:
+        print(f"  triage={r['target_id']} item={r['item_id']}")
+    if args.exact:
+        loose = dangling_links(sb, exact=True)
+        print(f"  id 完全一致なし {len(loose)}件（双子で救われている分を含む）")
+        for r in loose:
+            print(f"  triage={r['target_id']} item={r['item_id']}")
+    return 0
+
+
+def cmd_close_pair(args: argparse.Namespace) -> int:
+    r = close_pair(client(), args.triage_id, args.status, apply=bool(args.apply))
+    print(f"📒 comm close-pair {'apply' if args.apply else 'dry-run'} {r}")
+    return 0 if r.get("ok") else 1
 
 
 def cmd_ingest_intake(args: argparse.Namespace) -> int:
@@ -1284,6 +1459,18 @@ def main(argv: list[str] | None = None) -> int:
     s6.add_argument("--source", default="gha", help="gha / backup / gha:<押した人>")
     s6.add_argument("--once-per-day", action="store_true", help="今日の job_ok:comm_reconcile があれば何もしない")
     s6.set_defaults(func=cmd_reconcile)
+
+    s9 = sub.add_parser("dangling", help="リンク先の triage 行が無い comm_links を一覧（読み取りのみ）")
+    s9.add_argument("--exact", action="store_true", help="双子の読み替えをしない一覧も出す（棚卸し用）")
+    s9.set_defaults(func=cmd_dangling)
+
+    s10 = sub.add_parser("close-pair", help="triage と台帳の行を同時に閉じる（片側だけ閉じない）")
+    s10.add_argument("--triage-id", required=True)
+    s10.add_argument("--status", required=True, choices=sorted(CLOSE_PAIR_STATUS_TO_WORK))
+    g10 = s10.add_mutually_exclusive_group()
+    g10.add_argument("--dry-run", action="store_true")
+    g10.add_argument("--apply", action="store_true")
+    s10.set_defaults(func=cmd_close_pair)
 
     s8 = sub.add_parser("ingest-intake", help="受付の表（comm_intake）の new を台帳へ本登録（失敗しても exit 0）")
     s8.add_argument("--limit", type=int, default=200)
