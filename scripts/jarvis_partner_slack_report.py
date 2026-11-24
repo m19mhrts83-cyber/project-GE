@@ -207,6 +207,14 @@ def _build_text(args: argparse.Namespace, total: int) -> str:
     return "\n".join(lines)
 
 
+def _post_cmd(text: str) -> list[str]:
+    """POST コマンド。失敗がある晩（先頭 ⚠️）だけ黄色を明示する。"""
+    cmd = [PY, str(POST), "--channel", "report", "--text", text]
+    if text.startswith("⚠️"):
+        cmd += ["--signal", "yellow"]
+    return cmd
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -254,7 +262,7 @@ def main() -> int:
         return 2
 
     proc = subprocess.run(
-        [PY, str(POST), "--channel", "report", "--text", text],
+        _post_cmd(text),
         cwd=str(REPO),
         check=False,
     )
