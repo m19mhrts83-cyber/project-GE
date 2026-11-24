@@ -58,13 +58,17 @@ export VERCEL_PROJECT_ID="$PROJECT_ID"
 npx --yes vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
 npx --yes vercel build --prod --token "$VERCEL_TOKEN"
 DEPLOY_OUT="$(npx --yes vercel deploy --prebuilt --prod --yes --token "$VERCEL_TOKEN" 2>&1 | tee /dev/stderr)"
-DEPLOY_URL="$(printf '%s\n' "$DEPLOY_OUT" | rg -o 'https://jarvis-loopware[^ ]+\.vercel\.app' | head -1 || true)"
+DEPLOY_URL="$(printf '%s\n' "$DEPLOY_OUT" | grep -Eo 'https://jarvis-loopware[^ ]+\.vercel\.app' | head -1 || true)"
 if [[ -z "$DEPLOY_URL" ]]; then
-  DEPLOY_URL="$(printf '%s\n' "$DEPLOY_OUT" | rg -o 'https://[^ ]+\.vercel\.app' | head -1 || true)"
+  DEPLOY_URL="$(printf '%s\n' "$DEPLOY_OUT" | grep -Eo 'https://[^ ]+\.vercel\.app' | head -1 || true)"
 fi
 if [[ -n "$DEPLOY_URL" ]]; then
   npx --yes vercel alias set "$DEPLOY_URL" "$PROD_HOST" --token "$VERCEL_TOKEN" --scope "$SCOPE"
 fi
 
 echo "📎 本番: https://$PROD_HOST"
-[[ -n "${DEPLOY_URL:-}" ]] && echo "📎 デプロイURL: $DEPLOY_URL"
+if [[ -n "${DEPLOY_URL:-}" ]]; then
+  echo "📎 デプロイURL: $DEPLOY_URL"
+else
+  echo "⚠️ デプロイURLを出力から拾えず、alias は付けていません" >&2
+fi
