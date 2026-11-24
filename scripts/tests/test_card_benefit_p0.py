@@ -257,6 +257,29 @@ class VerifiedSaveTests(Base):
         vs.save_json_verified(p, {"v": 3})
         self.assertEqual(json.loads((self.dir / "s.json.bak").read_text()), {"v": 1})
 
+    def test_failed_attempt_does_not_overwrite_backup_and_leaves_no_tmp(self):
+        p = self.dir / "s.json"
+        vs.save_json_verified(p, {"v": 1})
+        vs.save_json_verified(p, {"v": 2})  # .bak = v1
+        real = vs._write_atomic
+
+        def bad(path, data):
+            real(path, {"v": "bad"} if path == p else data)
+
+        with mock.patch.object(vs, "_write_atomic", bad):
+            r = vs.save_json_verified(p, {"v": 3})
+        self.assertFalse(r["ok"])
+        self.assertEqual(json.loads((self.dir / "s.json.bak").read_text()), {"v": 2})  # 検証失敗後の再試行で壊れた版に更新されない
+        with mock.patch.object(vs.os, "replace", side_effect=OSError("disk")):
+            r = vs.save_json_verified(p, {"v": 4})
+        self.assertFalse(r["ok"])
+        self.assertEqual([x.name for x in self.dir.glob(".*.tmp")], [])  # tmp を残さない
+
+    def test_state_file_is_owner_only(self):
+        p = self.dir / "s.json"
+        vs.save_json_verified(p, {"v": 1})
+        self.assertEqual(p.stat().st_mode & 0o777, 0o600)
+
     def test_lock_blocks_second_holder(self):
         lp = self.dir / "x.lock"
         with vs.file_lock(lp):
@@ -314,6 +337,22 @@ class MonthlyFlowTests(Base):
         self.assertNotIn("last_monthly_run", st)
         self.assertEqual(st["sources"]["olive"]["status"], c.SRC_FAILED)
         self.assertTrue(any("Olive取込に失敗" in x[x.index("--error") + 1] for x in self.ops()))
+
+    def test_unexpected_exception_becomes_failed_not_crash(self):
+        with mock.patch.object(c, "refresh_bonvoy_checked", side_effect=KeyError("x")):
+            self.assertEqual(self.run_m(), 1)
+        st = self.state()
+        self.assertEqual(st["sources"]["bonvoy"]["status"], c.SRC_FAILED)
+        self.assertEqual(st["sources"]["bonvoy"]["error_code"], "unexpected_KeyError")
+        self.assertNotIn("last_monthly_run", st)
+        self.assertTrue(self.ops())
+
+    def test_all_sources_failed_posts_no_report_but_notifies_ops(self):
+        self.orca.search_ok = False
+        (self.dir / "zaim_learn_csv_index.json").unlink()
+        self.assertEqual(self.run_m(), 1)
+        self.assertEqual(self.posted(), [])
+        self.assertEqual(len(self.ops()), 2)
 
     def test_good_side_result_is_kept_when_other_fails(self):
         self.orca.search_ok = False

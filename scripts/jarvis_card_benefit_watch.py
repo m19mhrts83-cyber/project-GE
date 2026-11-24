@@ -17,6 +17,9 @@
   # 両方
   python scripts/jarvis_card_benefit_watch.py --refresh
 
+終了コード（--refresh 系）: 0=成功／部分成功／取得待ち、2=いずれかの取得元が失敗（state は保存済み）、
+3=state が読めない・別の取込が実行中（何も書かない）、4=保存の読み戻しを確認できない。
+
 確定値（メール由来）と概算（Zaim 由来）は区別して持つ。Zaim は取込日ベースで、
 アメックスの画面の数字とずれる。基準日と「概算」を必ず付ける。
 """
@@ -106,8 +109,13 @@ def lock_path() -> Path:
     return state_dir() / "card_benefit_watch.lock"
 
 
+def _pending_for(p: Path) -> Path:
+    return p.with_name(p.stem + ".pending.json")
+
+
 def pending_path() -> Path:
-    return state_dir() / "card_benefit_watch.pending.json"
+    """保存の読み戻しに失敗した時、取得済みデータを一時保持する非公開の場所。"""
+    return _pending_for(state_path())
 
 
 def load_state_strict(path: Path | None = None) -> dict[str, Any]:
@@ -119,8 +127,7 @@ def save_state_verified(data: dict[str, Any], path: Path | None = None) -> dict[
     """tmp→置換→読み戻し照合。失敗時は pending に残し、保存だけ1回やり直す（外部は取り直さない）。"""
     p = path or state_path()
     data["updated_at"] = datetime.now(JST).isoformat(timespec="seconds")
-    pend = p.with_name(p.stem + ".pending.json")
-    return vs.save_json_verified(p, data, pending_path=pend)
+    return vs.save_json_verified(p, data, pending_path=_pending_for(p))
 
 
 def save_state(data: dict[str, Any], path: Path | None = None) -> Path:
@@ -441,11 +448,17 @@ def refresh_sources(
     for sid in SOURCE_IDS:
         if only is not None and sid not in only:
             continue
-        r = (
-            fetch_olive_checked(state, cfg=cfg, today=today)
-            if sid == "olive"
-            else refresh_bonvoy_checked(state, cfg, today)
-        )
+        try:
+            r = (
+                fetch_olive_checked(state, cfg=cfg, today=today)
+                if sid == "olive"
+                else refresh_bonvoy_checked(state, cfg, today)
+            )
+        except Exception as e:  # noqa: BLE001 — 想定外の形のデータでも『失敗』として残す（落ちて無言にしない）
+            r = _src_record(
+                SRC_FAILED, as_of=None, error_code=f"unexpected_{type(e).__name__}",
+                note="取込中に想定外のエラー（詳細はログ・コードで確認。値は記録しない）",
+            )
         out[sid] = r
         sources[sid] = {k: v for k, v in r.items() if k != "added"}
     return out

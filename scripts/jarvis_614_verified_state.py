@@ -57,11 +57,17 @@ def _write_atomic(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
-    with tmp.open("w", encoding="utf-8") as f:
-        f.write(payload)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, path)
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)  # 実額を含み得るので本人のみ
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(payload)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except OSError:
+        with contextlib.suppress(OSError):
+            tmp.unlink()  # 失敗した tmp を残さない
+        raise
 
 
 def _write_pending(pending: Path | None, data: dict[str, Any]) -> None:
@@ -94,7 +100,7 @@ def save_json_verified(
     for attempt in range(retries + 1):
         attempts = attempt + 1
         try:
-            if path.is_file():
+            if attempt == 0 and path.is_file():  # 検証に失敗した書き込みで .bak を上書きしない
                 try:
                     json.loads(path.read_text(encoding="utf-8"))
                     shutil.copy2(path, path.with_name(path.name + ".bak"))

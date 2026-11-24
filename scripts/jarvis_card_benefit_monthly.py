@@ -12,7 +12,8 @@
 
   --force    28日前でも動かす（成功済みの取得元は取り直さない）
   --all      成功済みの取得元も取り直す（手動の全再取得）
-  --dry-run  取り込みは行い Slack は投稿せず表示だけ。月印・月の進み具合は記録しない（本番成功に数えない）
+  --dry-run  取り込みは行い（取込結果は state に保存する）、Slack は投稿せず表示だけ。
+             月印・月の進み具合は記録しない（本番成功に数えない）
 
 停止: JARVIS_CARD_BENEFIT_DISABLE=1（短報だけ止める時は JARVIS_CARD_BENEFIT_SLACK_REPORT_DISABLE=1）
 """
@@ -166,7 +167,10 @@ def run(args: argparse.Namespace) -> int:
     # Slack 短報: 状態が変わった時だけ。投稿だけ失敗しても取得し直さず、月印も触らない
     fp = _fingerprint(month, fetched, st.get("sources") or {})
     rc = 0
-    if args.all or dry or mon.get("slack_fp") != fp:
+    if all(fetched.get(sid) == cbw.SRC_FAILED for sid in cbw.SOURCE_IDS):
+        # 全取得元が失敗なら、前回値だけの短報は出さない（#ops に失敗を出し済み。取れたら次回に出す）
+        print("# 短報なし（全取得元が失敗）")
+    elif args.all or dry or mon.get("slack_fp") != fp:
         rc = _slack("--from-state", *(["--dry-run"] if dry else []))
         if rc != 0:
             _ops_failed(f"短報の投稿に失敗（exit {rc}）。取得・保存・月印は済み。投稿だけ再試行", dry)
