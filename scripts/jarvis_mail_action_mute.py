@@ -433,7 +433,9 @@ def cmd_health(reg: dict[str, Any], *, notify_ops: bool) -> int:
                 )
             else:
                 print("# notify skipped: jarvis_slack_webhook_post.py なし", file=sys.stderr)
-    return 0 if not issues else 2
+    # 件数だけの 🟡 は正常終了（0）。2 を返すと朝バンドルが毎朝 soft-fail rc=2 を
+    # stderr に出し、本物の失敗と見分けがつかなかった（2026-11-25 切り分け）。
+    return 0
 
 
 def main() -> int:
