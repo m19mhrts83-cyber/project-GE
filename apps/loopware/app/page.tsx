@@ -17,6 +17,17 @@ export default function HubPage() {
 
       <FocusCard />
 
+      <Link className="glass nav-card" href="/all">
+        <span className="ico">
+          <Icon name="list" size={22} />
+        </span>
+        <span className="txt">
+          <strong>まとめて判断</strong>
+          <span className="meta">メール・片付け・お題を1画面で。重要度の順に、提案どおりをまとめて確定</span>
+        </span>
+        <Icon name="next" size={18} />
+      </Link>
+
       <div className="eyebrow">メール</div>
       <Link className="glass nav-card" href="/desk?surface=triage">
         <span className="ico">

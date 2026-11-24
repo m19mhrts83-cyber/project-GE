@@ -27,6 +27,8 @@ test('鍵なしで開いてよいのは従来の画面だけ', () => {
   assert.equal(a.isLegacyOpenPath('/313'), true);
   assert.equal(a.isLegacyOpenPath('/api/decide'), true);
   assert.equal(a.isLegacyOpenPath('/desk'), false);
+  assert.equal(a.isLegacyOpenPath('/all'), false);
+  assert.equal(a.isLegacyOpenPath('/api/all'), false);
   assert.equal(a.isLegacyOpenPath('/api/log'), false);
   assert.equal(a.isLegacyOpenPath('/api/misses'), true);
   assert.equal(a.isLegacyOpenPath('/api/misses', new URLSearchParams('surface=triage')), false);
