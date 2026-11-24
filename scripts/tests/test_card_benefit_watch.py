@@ -247,7 +247,8 @@ class HistoryAndSlackTests(unittest.TestCase):
         self.assertEqual(items[1]["status_label"], "未確認")
 
     def test_slack_text_shape_and_mask(self):
-        state = st_a(1_200_000)
+        state = st_a(1_200_000, as_of="2026-06-28")
+        state["bonvoy"] = {"zaim": {"usage_yen": 100000, "as_of": "2026-06-28"}}  # 両カード揃い＋鮮度内
         res = c.compute(CFG, state, date(2026, 7, 1))
         text = c.build_slack_text(res, header="【見出し】", dash_url="https://example.invalid/x", mask=True)
         self.assertIn("今月はこちらを使うのがおすすめ", text.splitlines()[-1])
