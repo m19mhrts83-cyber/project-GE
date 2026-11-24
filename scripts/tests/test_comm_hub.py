@@ -374,13 +374,63 @@ class CloseResolvedTests(unittest.TestCase):
         self.assertEqual(ws["i3"], "needs_reply")  # general の pending は残す
         self.assertEqual(ws["i4"], "needs_reply")  # つながり無しは触らない
         self.assertEqual(ws["i5"], "needs_reply")  # triage 行が見つからないものは触らない
-        self.assertEqual(ws["i7"], "done")  # 逆向きは直さない
+        self.assertEqual(ws["i7"], "done")  # close_resolved 単体では逆向きは直さない
 
     def test_link_pending_runs_close(self):
         sb = self._sb()
         st = hub.link_pending(sb, apply=True)
         self.assertEqual((st["closed_done"], st["closed_no_action"]), (2, 1))
         self.assertEqual(self._ws(sb)["i2"], "no_action")
+        # 逆向き（t7 が pending・i7 が done）は台帳を needs_reply に戻して揃える
+        self.assertEqual((st["reverse"], st["reopened"]), (1, 1))
+        self.assertEqual(self._ws(sb)["i7"], "needs_reply")
+
+    def test_reopen_reverse_dry_run_and_protected_states(self):
+        sb = self._sb()
+        sb.db["comm_items"].append({"id": "i8", "work_status": "waiting", "party_id": "p", "subject": "待ち"})
+        sb.db["triage_items"].append({"id": "t8", "status": "pending", "lane": "partner", "comm_item_id": "i8"})
+        st = hub.reopen_reverse(sb, apply=False)
+        self.assertEqual((st["reverse"], st["would_reopen"], st["reopened"]), (2, 1, 0))
+        self.assertEqual(self._ws(sb)["i7"], "done")
+        hub.reopen_reverse(sb, apply=True)
+        self.assertEqual(self._ws(sb)["i7"], "needs_reply")
+        self.assertEqual(self._ws(sb)["i8"], "waiting")  # 人の途中判断は触らない
+
+    def test_reconcile_details_lists_ids(self):
+        c, d = hub.reconcile_details(self._sb())
+        self.assertEqual(d["reverse"], ["t7↔i7"])
+        self.assertEqual(d["stale"], ["i1", "i2", "i6"])
+        lines = hub.format_mismatch_ids(d)
+        self.assertTrue(lines[0].startswith("逆向き(triage↔台帳): t7↔i7"))
+        text = hub.reconcile_slack_text(c, source="gha", last_write=None, detail=d)
+        self.assertIn("4 逆向き(triage↔台帳): t7↔i7", text)
+        ok_c = {"a": 1, "b": 1, "b_general": 0, "a_unlinked": 0, "stale": 0, "reverse": 0}
+        self.assertEqual(len(hub.reconcile_slack_text(ok_c, source="gha", last_write=None, detail=d).splitlines()), 3)
+
+    def test_dangling_links(self):
+        sb = self._sb()
+        self.assertEqual(hub.dangling_links(sb), [{"item_id": "i5", "target_id": "gone"}])
+
+    def test_link_items_skips_dangling(self):
+        sb = self._sb()
+        n = hub.link_items(sb, [
+            {"item_id": "i1", "target_type": "triage_item", "target_id": "t1"},
+            {"item_id": "i1", "target_type": "triage_item", "target_id": "nothing"},
+            {"item_id": "i1", "target_type": "todoist_task", "target_id": "x"},
+        ])
+        self.assertEqual(n, 2)
+        targets = {l["target_id"] for l in sb.db["comm_links"] if l["item_id"] == "i1"}
+        self.assertEqual(targets, {"t1", "x"})
+
+    def test_close_pair_closes_both_sides(self):
+        sb = self._sb()
+        r = hub.close_pair(sb, "t7", "skipped", apply=False)
+        self.assertEqual(r["item_ids"], ["i7"])
+        self.assertEqual(next(t for t in sb.db["triage_items"] if t["id"] == "t7")["status"], "pending")
+        hub.close_pair(sb, "t7", "skipped", apply=True)
+        self.assertEqual(next(t for t in sb.db["triage_items"] if t["id"] == "t7")["status"], "skipped")
+        self.assertEqual(self._ws(sb)["i7"], "no_action")
+        self.assertFalse(hub.close_pair(sb, "nope", "sent", apply=True)["ok"])
 
     def test_reconcile_counts(self):
         c = hub.reconcile_counts(self._sb())
@@ -392,6 +442,24 @@ class CloseResolvedTests(unittest.TestCase):
         self.assertEqual(c["reverse"], 1)  # t7 → i7 は done
         self.assertFalse(hub.reconcile_ok(c))
         self.assertTrue(hub.reconcile_ok({"a": 2, "b": 2, "a_unlinked": 0, "stale": 0, "reverse": 0}))
+
+
+class DeferredLinkTests(unittest.TestCase):
+    def test_comm_hub_sync_defers_links_until_after_push(self):
+        now = datetime.now(JST)
+        entries = parse_yoritoori_text(_md(now), "102_ミニテック", "ミニテック")
+        cands = find_unreplied(entries, 14)
+        row = pt.row_from_candidate(cands[0], pt.heuristic_judge(cands[0]))
+        sb = _FakeSB()
+        out: list = []
+        with mock.patch.object(hub, "client", return_value=sb):
+            pt.comm_hub_sync(entries, [(cands[0], row)], lookback_days=14, links_out=out)
+        self.assertEqual(sb.db.get("comm_links", []), [])  # push 前は書かない
+        self.assertEqual(out[0]["target_id"], row["id"])
+        # push されなかった（双子トリガーで弾かれた）行へのリンクは書かれない
+        self.assertEqual(hub.link_items(sb, out), 0)
+        sb.db["triage_items"] = [{"id": row["id"], "status": "pending"}]
+        self.assertEqual(hub.link_items(sb, out), 1)
 
 
 class TwinLinkTests(unittest.TestCase):

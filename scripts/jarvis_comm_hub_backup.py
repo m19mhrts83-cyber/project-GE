@@ -87,11 +87,12 @@ def main(argv: list[str] | None = None) -> int:
     if "link_pending" in acts:
         st = hub.link_pending(sb, apply=True)
         st.pop("_closed_items", None)
+        st.pop("_reverse_items", None)
         print(f"# comm backup link-pending: {st}")
         hub.write_heartbeat(sb, "comm_write_backup", "backup")
     if "reconcile" in acts:
-        c = hub.reconcile_counts(sb)
-        r = hub.post_slack(hub.reconcile_slack_text(c, source="backup", last_write=write_hb))
+        c, detail = hub.reconcile_details(sb)
+        r = hub.post_slack(hub.reconcile_slack_text(c, source="backup", last_write=write_hb, detail=detail))
         if r == 0:
             hub.write_heartbeat(sb, "comm_reconcile", "backup")
         rc = rc or r

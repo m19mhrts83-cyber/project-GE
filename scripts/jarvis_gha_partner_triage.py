@@ -273,10 +273,13 @@ def comm_hub_sync(
     *,
     lookback_days: int,
     window_days: int = 30,
+    links_out: list[dict[str, Any]] | None = None,
 ) -> int:
     """Phase 1 並走書き込み。pairs = (候補, triage 行)。triage 行に comm_item_id を足す。
 
     例外は呼び出し側で握りつぶす（本線を止めない）。戻り値は台帳に存在する件数。
+    links_out を渡すと comm_links はここでは書かず、そこへ積む（triage を push した後で実在を確かめて書く。
+    push 前に書くと、双子トリガーで入らなかった行へのリンクが dangling になる）。
     """
     from datetime import timedelta
 
@@ -322,10 +325,14 @@ def comm_hub_sync(
         if row.get("status") == "pending":
             needs.append(iid)
     hub.mark_needs_reply(sb, needs)
-    hub.link_items(sb, links)
+    if links_out is None:
+        hub.link_items(sb, links, verify=False)
+    else:
+        links_out.extend(links)
     try:  # 前の回や夜の Mac トリアージ由来の未返信もつなぐ（/partner と台帳の件数をそろえる）
         lp = hub.link_pending(sb, apply=True)  # 閉じ残し（triage 側で閉じた needs_reply）も戻す
         lp.pop("_closed_items", None)  # 件名などはログに出さない
+        lp.pop("_reverse_items", None)
         print(f"# comm hub link-pending: {lp}", file=sys.stderr)
     except Exception as e:  # noqa: BLE001
         print(f"# comm hub link-pending soft-fail: {e}", file=sys.stderr)
@@ -466,9 +473,10 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(rows[0], ensure_ascii=False, indent=2)[:800])
         return 0
 
+    pending_links: list[dict[str, Any]] = []
     if use_comm_hub:
         try:
-            comm_hub_sync(md_entries, pairs, lookback_days=args.lookback_days)
+            comm_hub_sync(md_entries, pairs, lookback_days=args.lookback_days, links_out=pending_links)
         except Exception as e:  # noqa: BLE001 — 台帳は書き足すだけ。本線は続行
             for row in rows:
                 row.pop("comm_item_id", None)
@@ -476,6 +484,13 @@ def main(argv: list[str] | None = None) -> int:
 
     n = push_rows(rows)
     print(f"📎 partner triage pushed={n}")
+    if pending_links:
+        try:  # push 後に実在を確かめてリンクを書く（無い行へは書かない）
+            import jarvis_comm_hub as hub
+
+            print(f"# comm hub links written={hub.link_items(hub.client(), pending_links)}/{len(pending_links)}", file=sys.stderr)
+        except Exception as e:  # noqa: BLE001
+            print(f"# comm hub link soft-fail: {type(e).__name__}: {e}", file=sys.stderr)
     return 0
 
 
