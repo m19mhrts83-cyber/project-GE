@@ -399,6 +399,17 @@ def _run_sync(cl, local_revision: int, count: int, sync_reason: int | None) -> l
         calls[0] += 1
         if calls[0] > SYNC_MAX_RESYNC + 1:
             raise _ResyncLimit(k.get("revision", a[0] if a else None))
+        if calls[0] > 1:
+            # CHRLINE は再呼び出し時も最初の fullSyncRequestReason を引き継ぐため、
+            # サーバが毎回「全同期して」と返し続ける。やり直し側では理由を外し、
+            # サーバ指定の revision / lastPartialFullSyncs だけで続きを取る。
+            k["fullSyncRequestReason"] = None
+            # 原因切り分け用（本文・ID・トークンは出さない。revision と引数名のみ）
+            print(
+                f"# CHRLINE sync やり直し#{calls[0] - 1}: revision={k.get('revision')}"
+                f" keys={sorted(k)}",
+                file=sys.stderr,
+            )
         return orig_sync(*a, **k)
 
     # CHRLINE の sync() は内部で self.sync(...) を呼び直すので、インスタンス属性で差し替えて回数を数える
