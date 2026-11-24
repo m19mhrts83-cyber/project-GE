@@ -19,6 +19,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import jarvis_todoist_313_http as http313  # noqa: E402
+
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 STATE_PATH = REPO / ".jarvis_state" / "todoist_313_overdue.json"
@@ -47,23 +49,7 @@ def _token() -> str:
 
 
 def _api(method: str, path: str, body: dict | None = None) -> dict:
-    tok = _token()
-    if not tok:
-        raise SystemExit("TODOIST_API_TOKEN がありません（.env.jarvis_private を source）")
-    url = "https://api.todoist.com/api/v1" + path
-    data = json.dumps(body).encode("utf-8") if body is not None else None
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={
-            "Authorization": f"Bearer {tok}",
-            "Content-Type": "application/json",
-        },
-        method=method,
-    )
-    with urllib.request.urlopen(req, timeout=40) as r:
-        raw = r.read().decode("utf-8")
-    return json.loads(raw) if raw.strip() else {}
+    return http313.request(method, path, _token(), body)
 
 
 def _fetch_overdue(limit: int = 200) -> list[dict]:

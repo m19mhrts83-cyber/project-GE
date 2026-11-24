@@ -14,7 +14,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 CHATBOT = Path(__file__).resolve().parents[1]
-_DEFAULT_REF = "mwubzgefkkjjbingrmqu"  # 現行ムンバイ。東京切替は KAMIOOYA_PROJECT_REF
+_DEFAULT_REF = "sufbsyddqgekvcgadhpv"  # 東京（11/21 移設）。別の ref に向けるときは KAMIOOYA_PROJECT_REF
 
 
 def _kamiooya_base() -> str:
