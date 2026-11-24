@@ -74,9 +74,13 @@ class Base(unittest.TestCase):
         os.environ.pop("JARVIS_CARD_BENEFIT_SLACK_REPORT_DISABLE", None)
         os.environ.pop("JARVIS_POINTS_REBATE_SLACK_REPORT_DISABLE", None)
 
-    def write_index(self, as_of="2026-11-25", pay="FOO CARD", amount=1000):
+    def write_index(self, as_of="2026-11-25", pay="FOO CARD", amount=1000, updated_at="x"):
         rows = {"k1": {"pay": pay, "date": as_of, "amount": amount, "shop": "s", "item": "i"}}
-        (self.dir / "zaim_learn_csv_index.json").write_text(json.dumps({"rows": rows, "updated_at": "x"}))
+        (self.dir / "zaim_learn_csv_index.json").write_text(
+            json.dumps({"rows": rows, "updated_at": updated_at}))
+
+    def write_weekly(self, **kw):
+        (self.dir / "zaim_csv_weekly.json").write_text(json.dumps(kw))
 
     def state(self):
         return json.loads(c.state_path().read_text(encoding="utf-8"))
@@ -145,6 +149,64 @@ class BonvoyQualityTests(Base):
         self.assertEqual((r["status"], r["error_code"]), (c.SRC_PARTIAL, "zaim_stale"))
         self.write_index(as_of="2026-11-25")
         self.assertEqual(self.run_bonvoy()["status"], c.SRC_OK)
+
+
+class ZaimFreshnessByCsvRangeTests(Base):
+    """Zaim の鮮度は『取込CSVの範囲の終了日』で見る。Bonvoy 行の最新日（最終利用日）は補足。"""
+
+    def run_bonvoy(self):
+        st = {}
+        return c.refresh_bonvoy_checked(st, CFG, TODAY), st
+
+    def test_old_last_use_but_fresh_csv_is_success(self):
+        self.write_index(as_of="2026-11-12", updated_at="2026-11-27T12:00:59+0900")
+        self.write_weekly(last_ok=True, end_date="2026-11-27", last_success_at="2026-11-27T12:00:05+0900")
+        r, st = self.run_bonvoy()
+        self.assertEqual(r["status"], c.SRC_OK)
+        self.assertEqual(r["as_of"], "2026-11-27")  # 基準日=CSV範囲の終了日
+        z = st["bonvoy"]["zaim"]
+        self.assertEqual((z["last_use_date"], z["csv_range_end"]), ("2026-11-12", "2026-11-27"))
+        self.assertIn("最終利用日 2026-11-12", r["note"])
+
+    def test_old_csv_range_is_partial(self):
+        self.write_index(as_of="2026-11-12", updated_at="2026-11-12T12:00:00+0900")
+        self.write_weekly(last_ok=True, end_date="2026-11-12", last_success_at="2026-11-12T12:00:05+0900")
+        r, _ = self.run_bonvoy()
+        self.assertEqual((r["status"], r["error_code"]), (c.SRC_PARTIAL, "zaim_stale"))
+
+    def test_failed_weekly_export_does_not_count_its_end_date(self):
+        # 失敗した run も end_date は今日で書かれる。最後に成功した日（11/05）で見る
+        self.write_index(as_of="2026-11-04", updated_at="2026-11-27T12:00:59+0900")
+        self.write_weekly(last_ok=False, end_date="2026-11-27", last_success_at="2026-11-05T12:00:05+0900")
+        r, _ = self.run_bonvoy()
+        self.assertEqual((r["status"], r["as_of"]), (c.SRC_PARTIAL, "2026-11-05"))
+
+    def test_index_rebuilt_late_but_weekly_export_old_follows_the_older(self):
+        self.write_index(as_of="2026-11-04", updated_at="2026-11-27T12:00:59+0900")
+        self.write_weekly(last_ok=True, end_date="2026-11-10", last_success_at="2026-11-10T12:00:05+0900")
+        self.assertEqual(self.run_bonvoy()[0]["status"], c.SRC_PARTIAL)
+
+    def test_no_csv_range_info_falls_back_to_last_use_date(self):
+        self.write_index(as_of="2026-11-12")  # updated_at 不明・weekly なし
+        r, st = self.run_bonvoy()
+        self.assertEqual((r["status"], r["as_of"]), (c.SRC_PARTIAL, "2026-11-12"))
+        self.assertNotIn("csv_range_end", st["bonvoy"]["zaim"])
+
+    def test_future_dated_csv_end_is_capped_at_today(self):
+        self.write_index(as_of="2026-11-12", updated_at="2027-01-01T00:00:00+0900")
+        self.assertEqual(self.run_bonvoy()[0]["as_of"], "2026-11-28")
+
+    def test_recommendation_not_withheld_and_last_use_shown(self):
+        self.write_index(as_of="2026-11-12", updated_at="2026-11-27T12:00:59+0900")
+        self.write_weekly(last_ok=True, end_date="2026-11-27")
+        st = {"olive": {"snapshots": [{"as_of": "2026-11-15", "usage_yen": 1_000_000}]}}
+        c.refresh_bonvoy_checked(st, CFG, TODAY)
+        r = c.compute(CFG, st, TODAY)
+        self.assertTrue(r["cards"][1]["reliable"])
+        self.assertFalse(r["recommendation"].get("withheld"))
+        txt = c.build_slack_text(r, header="H", dash_url="u", mask=True)
+        self.assertIn("・Bの最終利用日は11/12（Zaim は11/27まで取込）", txt)
+        self.assertNotIn("Zaim が古い", txt)
 
 
 class RecommendStopTests(Base):

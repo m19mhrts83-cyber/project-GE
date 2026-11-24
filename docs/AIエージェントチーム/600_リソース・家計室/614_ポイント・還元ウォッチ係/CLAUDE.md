@@ -133,6 +133,7 @@ zsh launchd/uninstall_card_benefit_monthly_launchd.sh
 - 停止: `JARVIS_CARD_BENEFIT_DISABLE=1`（短報だけ止める時は `JARVIS_CARD_BENEFIT_SLACK_REPORT_DISABLE=1`）
 - 成功印: `.jarvis_state/card_benefit_watch.json` の `last_monthly_run`（月 `YYYY-MM`）。**PR-P0a（2026-11-24〜）**: 全取得元（Olive・Bonvoy）が『成功』かつ保存の読み戻し成功の時だけ付く（Slack の成否とは独立。Slack より先に確定し、投稿失敗でも消えない）。取得元ごとの成否・基準日・error_code は同 state の `sources`、月の進み（取得済み・最後に試した日・短報済みの目印）は `monthly`
 - 成功・部分成功・取得待ち・失敗・未確認の5状態。成功以外は月印なし・寄せ先推奨は保留（取れた方の達成率は表示）。失敗は #ops、`jarvis_card_benefit_watch.py --refresh` の終了コードは失敗で 2（state 破損 3・保存の読み戻し不一致 4）
+- **Zaim の鮮度**: Bonvoy 行の最新日ではなく『取込CSVの範囲の終了日』（`zaim_csv_weekly.json` の `end_date`＝週次エクスポート成功時／失敗時は最後に成功した日、と取込 index の更新日のうち古い方）で10日判定。Bonvoy 行の最新日は `last_use_date`（最終利用日）として補足表示。Olive の45日基準は変更なし
 - 再試行: 28日〜月末の翌朝に1日1回、未成功の取得元だけ。短報は状態が変わった時だけ・投稿だけ失敗したら投稿だけやり直す。保存の読み戻しに失敗したら取得済みデータを `.jarvis_state/card_benefit_watch.pending.json` に残す（自動復元は未実装＝再起動後の扱いは未決）
 - `--force` は『28日前でも動かす』だけ（成功済みの取得元は取り直さない）。全部取り直す時は `--all`。launchd の入れ直しは不要（runner は変えていない）。同時起動は排他（`card_benefit_watch.lock`）
 | 2026-11-23 | **Bonvoy 概算にアメックスでの Amazon 購入を加算**。Zaim ではこれが「振替（支払元=アメックス、入金先=Amazon）」で入り、zaim_learn のインデックス（支出行のみ）に無く概算が過少だった。インデックスは学習の差分に使うため触らず、614 が index の `csv` パスの CSV を直接読む（`aggregate_zaim_transfers`）。対象は設定 `zaim_transfer_to_include`（入金先キーワード）に合う transfer 行のみ。カード引落（銀行→カード）・残高行は足さない。年会費除外は維持 |

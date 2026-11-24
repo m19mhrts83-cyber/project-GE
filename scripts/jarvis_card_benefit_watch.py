@@ -369,6 +369,41 @@ def aggregate_zaim_transfers(
     return out
 
 
+def zaim_csv_weekly_path() -> Path:
+    return state_dir() / "zaim_csv_weekly.json"
+
+
+def _iso_date(v: Any) -> date | None:
+    try:
+        return _d(str(v)[:10])
+    except ValueError:
+        return None
+
+
+def zaim_csv_range_end(index: dict[str, Any], today: date) -> date | None:
+    """取込CSVの範囲の終了日（＝Zaim 側の鮮度の基準日）。Bonvoy 行の最新日ではない。
+
+    Bonvoy をあまり使わない期間は、CSV が新しくても Bonvoy 行の最新日は古いまま。
+    それを『Zaim が古い』と誤判定しないよう、CSV 全体がどこまで取り込まれているかで見る。
+      - zaim_csv_weekly.json: 直近の週次エクスポートが成功(last_ok)なら end_date、失敗なら
+        最後に成功した日（last_success_at。失敗した run の end_date は使わない）
+      - 取込 index の updated_at（index を作り直した日）
+    両方あれば古い方（どちらかが遅れていれば遅れている方に合わせる）。読めなければ None。"""
+    cands: list[date] = []
+    idx = _iso_date(index.get("updated_at"))
+    if idx:
+        cands.append(idx)
+    try:
+        w = json.loads(zaim_csv_weekly_path().read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        w = None
+    if isinstance(w, dict):
+        wd = _iso_date(w.get("end_date")) if w.get("last_ok") is True else _iso_date(w.get("last_success_at"))
+        if wd:
+            cands.append(wd)
+    return min(min(cands), today) if cands else None
+
+
 def refresh_bonvoy_checked(
     state: dict[str, Any], cfg: dict[str, Any], today: date
 ) -> dict[str, Any]:
@@ -415,6 +450,12 @@ def refresh_bonvoy_checked(
         return _src_record(SRC_UNCONFIRMED, as_of=prev, error_code="zaim_no_rows",
                            note="期間内の該当行なし（Zaim の取込を確認）")
     agg["computed_at"] = datetime.now(JST).isoformat(timespec="seconds")
+    # 基準日(as_of)は CSV の範囲の終了日。Bonvoy 行の最新日は『最終利用日』として別に持つ（表示用）
+    agg["last_use_date"] = agg["as_of"]
+    csv_end = zaim_csv_range_end(index, today)
+    if csv_end is not None:
+        agg["csv_range_end"] = csv_end.isoformat()
+        agg["as_of"] = max(csv_end.isoformat(), agg["as_of"])
     state.setdefault("bonvoy", {})["zaim"] = agg
     note = ""
     transfers_unchecked = bool(card_cfg.get("zaim_transfer_to_include")) and not agg.get("transfers_checked")
@@ -424,13 +465,16 @@ def refresh_bonvoy_checked(
             if agg.get("transfers_checked")
             else "・振替行は読めず未加算（Zaim CSV を確認）"
         )
-    memo = f"Zaim 該当 {agg['rows']} 行（基準日 {agg['as_of']}）{note}"
+    last_use = (
+        f"・最終利用日 {agg['last_use_date']}" if agg.get("last_use_date") != agg["as_of"] else ""
+    )
+    memo = f"Zaim 該当 {agg['rows']} 行（基準日 {agg['as_of']}）{last_use}{note}"
     age = _age_days(agg["as_of"], today)
     if transfers_unchecked:
         return _src_record(SRC_PARTIAL, as_of=agg["as_of"], error_code="zaim_transfers_unchecked", note=memo)
     if age is not None and age > stale_days:
         return _src_record(SRC_PARTIAL, as_of=agg["as_of"], error_code="zaim_stale",
-                           note=memo + f"・基準日が{age}日前（基準{stale_days}日）")
+                           note=memo + f"・CSV の取込範囲が{age}日前まで（基準{stale_days}日）")
     return _src_record(SRC_OK, as_of=agg["as_of"], note=memo)
 
 
@@ -493,6 +537,7 @@ def _latest_usage(card_cfg: dict[str, Any], state: dict[str, Any]) -> dict[str, 
             "transfer_rows": tr,
             "other_transfer_rows": int(z.get("other_transfer_rows") or 0),
             "transfers_checked": bool(z.get("transfers_checked")),
+            "last_use_date": z.get("last_use_date"),
         }
     return None
 
@@ -544,7 +589,7 @@ def _apply_reliability(out: dict[str, Any], card_id: str, state: dict[str, Any])
         reason = (
             f"{short}の確定値が古い（{_md_label(out.get('usage_as_of'))}現在）"
             if out.get("usage_kind") == "confirmed"
-            else f"{short}の Zaim が古い（基準日{_md_label(out.get('usage_as_of'))}）"
+            else f"{short}の Zaim が古い（取込CSVは{_md_label(out.get('usage_as_of'))}まで）"
         )
     elif out.get("usage_kind") == "estimate" and out.get("usage_transfers_expected") and not out.get("usage_transfers_checked"):
         reason = f"{short}の振替が未加算"
@@ -603,6 +648,7 @@ def compute_card(
         out["usage_transfer_rows"] = usage.get("transfer_rows", 0)
         out["usage_other_transfer_rows"] = usage.get("other_transfer_rows", 0)
         out["usage_transfers_checked"] = usage.get("transfers_checked", False)
+        out["usage_last_use_date"] = usage.get("last_use_date")
         out["usage_stale"] = (today - as_of).days > int(cfg.get("zaim_stale_days", 10))
     else:
         out["usage_stale"] = (today - as_of).days > int(c.get("stale_days", 45))
@@ -823,6 +869,11 @@ def build_slack_text(result: dict[str, Any], *, header: str, dash_url: str, mask
             lines.append(f"・{c['short']}の振替は未加算（要再取込）")
         elif c.get("usage_transfer_rows"):
             lines.append(f"・{c['short']}は振替{c['usage_transfer_rows']}件を含む概算")
+    # CSV の基準日と Bonvoy 行の最終利用日が違う時は、補足として最終利用日を出す（実額は書かない）
+    for c in result["cards"]:
+        lu, ao = c.get("usage_last_use_date"), c.get("usage_as_of")
+        if c.get("usage_kind") == "estimate" and lu and ao and lu != ao:
+            lines.append(f"・{c['short']}の最終利用日は{_md_label(lu)}（Zaim は{_md_label(ao)}まで取込）")
     # 概算元（Zaim）が古いときは必ず知らせる
     for c in result["cards"]:
         if not c.get("usage_stale"):
