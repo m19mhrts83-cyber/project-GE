@@ -7,7 +7,10 @@
   - item:completed … 要フォロー完了 → ホームから外す（表示:抑制不要）
 確認: Jarvis 分身トークンでコメント返信（対外メールではない）
 履歴: Todoist コメント + `processed_at` + watch payload.user_ack
+  58_ 段階2: 境界時刻より後の行は status（new→claimed→done/failed/skipped）も回す
+  （jarvis_todoist_event_lifecycle.py。3回失敗で failed＋#ops 1通）
 停止: JARVIS_TODOIST_WEBHOOK_HANDLE_DISABLE=1 / 自分投稿はスキップ
+  段階2だけ止める: JARVIS_TODOIST_EVENT_LIFECYCLE_DISABLE=1
 
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
   ~/selenium_env/venv/bin/python scripts/jarvis_todoist_webhook_handle.py
@@ -22,12 +25,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from jarvis_todoist_event_lifecycle import Lifecycle, build_ops_text  # noqa: E402
 
 JST = timezone(timedelta(hours=9))
 DEFAULT_API = "https://api.todoist.com/api/v1"
@@ -113,17 +121,79 @@ def _jarvis_uids() -> set[str]:
     return {x.strip() for x in raw.split(",") if x.strip()}
 
 
-def _fetch_unprocessed(*, limit: int, event_name: str = "note:added") -> list[dict[str, Any]]:
+_SELECT = "id,delivery_id,event_name,user_id,event_data,initiator,created_at,processed_at"
+
+
+def _fetch_unprocessed(
+    *, limit: int, event_name: str = "note:added", lc: Lifecycle | None = None
+) -> list[dict[str, Any]]:
+    """境界より前（legacy: processed_at だけ）＋境界より後（段階2: status つき）。"""
     qs = (
         "todoist_webhook_events"
-        "?select=id,delivery_id,event_name,user_id,event_data,initiator,created_at,processed_at"
+        f"?select={_SELECT}"
         f"&event_name=eq.{urllib.parse.quote(event_name)}"
         "&processed_at=is.null"
+        f"{lc.legacy_filter() if lc else ''}"
         "&order=created_at.asc"
         f"&limit={limit}"
     )
     rows = _sb_req("GET", qs) or []
-    return list(rows) if isinstance(rows, list) else []
+    out = list(rows) if isinstance(rows, list) else []
+    if lc and lc.active:
+        try:
+            out += lc.fetch(event_name=event_name, limit=limit, select=_SELECT)
+        except Exception as exc:  # noqa: BLE001
+            print(f"{LOG}: lifecycle fetch FAIL {event_name}: {exc}", file=sys.stderr)
+    return out
+
+
+def _begin(row: dict[str, Any], lc: Lifecycle | None) -> bool:
+    """書く前に取る（段階2の行だけ）。取れない・同じ event_id が done なら False。"""
+    if not (lc and lc.is_tracked(row)):
+        return True
+    if not lc.claim(row):
+        return False
+    if lc.already_done(row):
+        lc.skipped(row)
+        print(f"{LOG}: skipped id={row.get('id')}（同じ event_id が処理済み）")
+        return False
+    return True
+
+
+def _ok(row: dict[str, Any], lc: Lifecycle | None) -> None:
+    if lc and lc.is_tracked(row):
+        lc.done(row)
+    else:
+        _mark_processed(int(row["id"]))
+
+
+def _ng(row: dict[str, Any], lc: Lifecycle | None, err: str, *, legacy_mark: bool) -> None:
+    """失敗。段階2の行は attempts+1（3回目で failed）。legacy はこれまでどおり。"""
+    if lc and lc.is_tracked(row):
+        res = lc.fail(row, err)
+        print(f"{LOG}: {res} id={row.get('id')} attempts={row.get('attempts')}", file=sys.stderr)
+    elif legacy_mark:
+        _mark_processed(int(row["id"]))
+
+
+def _post_ops(text: str) -> int:
+    post = Path(__file__).resolve().parent / "jarvis_slack_webhook_post.py"
+    r = subprocess.run(
+        [
+            sys.executable,
+            str(post),
+            "--channel",
+            "ops",
+            "--username",
+            "317 コメント起動",
+            "--signal",
+            "red",
+            "--text",
+            text,
+        ],
+        timeout=60,
+    )
+    return int(r.returncode)
 
 
 def _mark_processed(row_id: int) -> None:
@@ -162,7 +232,7 @@ def _summarize(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _process_item_completed(*, limit: int) -> int:
+def _process_item_completed(*, limit: int, lc: Lifecycle | None = None) -> int:
     """要フォロータスクの完了 → ホームから外す（表示:抑制不要）。"""
     try:
         from jarvis_watch_todoist_sync import (
@@ -186,9 +256,10 @@ def _process_item_completed(*, limit: int) -> int:
     }
 
     n = 0
-    for row in _fetch_unprocessed(limit=max(1, limit), event_name="item:completed"):
+    for row in _fetch_unprocessed(limit=max(1, limit), event_name="item:completed", lc=lc):
+        if not _begin(row, lc):
+            continue
         s = _summarize(row)
-        rid = int(s["row_id"])
         tid = s["task_id"]
         title = s["task_title"]
         if not title and tid:
@@ -212,13 +283,13 @@ def _process_item_completed(*, limit: int) -> int:
             wid = tid_to_wid.get(tid)
         if not wid:
             # 要フォロー以外の完了 → そのまま消化
-            _mark_processed(rid)
+            _ok(row, lc)
             continue
         try:
             res = ack_watch_on_todoist_complete(
                 wid, task_id=tid or None, quiet_days=quiet
             )
-            _mark_processed(rid)
+            _ok(row, lc)
             n += 1
             print(
                 f"{LOG}: item:completed → home外し watch={wid} "
@@ -226,6 +297,8 @@ def _process_item_completed(*, limit: int) -> int:
             )
         except Exception as exc:
             print(f"{LOG}: complete FAIL {wid}: {exc}", file=sys.stderr)
+            # legacy は processed にしない（次回また拾う）＝これまでどおり
+            _ng(row, lc, f"item:completed: {exc}", legacy_mark=False)
     return n
 
 
@@ -253,8 +326,11 @@ def main() -> int:
     )
     args = ap.parse_args()
 
+    # 58_ 段階2: 境界時刻より後の行だけ status を回す（読めなければこの回は legacy だけ）
+    lc = Lifecycle.load(_sb_req, init_if_missing=True, log=lambda m: print(f"{LOG}: {m}"))
+
     # 要フォロー完了 → ホームから外す（何もしなくてよい本線）
-    completed_n = _process_item_completed(limit=max(1, args.limit))
+    completed_n = _process_item_completed(limit=max(1, args.limit), lc=lc)
     if completed_n:
         print(f"{LOG}: 完了連動 {completed_n}件")
 
@@ -279,21 +355,25 @@ def main() -> int:
         print(f"{LOG}: display_hint import skip: {exc}", file=sys.stderr)
 
     skip_uids = set() if args.include_self else _jarvis_uids()
-    rows = _fetch_unprocessed(limit=max(1, args.limit), event_name="note:added")
+    rows = _fetch_unprocessed(limit=max(1, args.limit), event_name="note:added", lc=lc)
     items: list[dict[str, Any]] = []
     for row in rows:
         s = _summarize(row)
+        s["_row"] = row
+        s["_claimed"] = False
         if s["posted_uid"] in skip_uids:
             # 自分の配信は既定で処理済み扱いにして溜めない（--reply / --mark-only を待たない）
-            _mark_processed(int(s["row_id"]))
+            if _begin(row, lc):
+                _ok(row, lc)
             continue
         if is_agent_comment(s["comment"]):
             # AI 社員の記録（【318】など）は受領も返さず処理済みにする（循環防止）
-            _mark_processed(int(s["row_id"]))
+            if _begin(row, lc):
+                _ok(row, lc)
             continue
         if not s["comment"]:
-            if args.mark_only or args.reply:
-                _mark_processed(int(s["row_id"]))
+            if (args.mark_only or args.reply) and _begin(row, lc):
+                _ok(row, lc)
             continue
 
         # 定型「表示: …」→ display_hints（要フォロータスクのみ）
@@ -322,6 +402,9 @@ def main() -> int:
                     pass
             wid = watch_id_from_task_title(title) if action else None
             if action and wid:
+                if not _begin(row, lc):
+                    continue
+                s["_claimed"] = True
                 try:
                     apply_display_hint(wid, action=action, quiet_days=hint_quiet)
                     if args.reply and s["task_id"]:
@@ -329,7 +412,7 @@ def main() -> int:
                             s["task_id"],
                             f"サマリ: 表示ヒントを反映しました（{action} / {wid}）",
                         )
-                    _mark_processed(int(s["row_id"]))
+                    _ok(row, lc)
                     print(
                         f"{LOG}: display_hint {action} watch={wid} "
                         f"task={s['task_id']}"
@@ -340,13 +423,17 @@ def main() -> int:
                         f"{LOG}: display_hint FAIL {wid}: {exc}",
                         file=sys.stderr,
                     )
+                    if not (args.reply or args.mark_only) and lc.is_tracked(row):
+                        # 一覧だけの回は取ったまま残さない（再試行に回す）
+                        _ng(row, lc, f"display_hint: {exc}", legacy_mark=False)
+                        continue
 
         items.append(s)
 
     if not items:
         if not completed_n:
             print(f"{LOG}: 未処理の人コメントなし")
-        return 0
+        return _finish_lifecycle(lc, 0)
 
     print(f"{LOG}")
     print(f"- 件数: {len(items)}")
@@ -358,14 +445,18 @@ def main() -> int:
 
     if not args.reply and not args.mark_only:
         print("次: --reply で Todoist 返信＋processed／既対応なら --mark-only")
-        return 0
+        return _finish_lifecycle(lc, 0)
 
     # 1件の返信失敗でバッチ全体を止めない（未処理滞留→317 #report 連投の真因）
     reply_fail = 0
     for s in items:
         rid = int(s["row_id"])
+        row = s["_row"]
+        if not s["_claimed"] and not _begin(row, lc):
+            continue
         tid = s["task_id"]
         replied = False
+        err = ""
         if args.reply and tid:
             try:
                 from jarvis_slack_report_fb_lib import build_todoist_seen_text
@@ -396,6 +487,7 @@ def main() -> int:
                     )
                 else:
                     reply_fail += 1
+                    err = f"reply HTTP {e.code}"
                     print(
                         f"{LOG}: FAIL reply task={tid} HTTP {e.code} "
                         f"— processed にして滞留させない",
@@ -403,16 +495,36 @@ def main() -> int:
                     )
             except Exception as exc:
                 reply_fail += 1
+                err = f"reply {type(exc).__name__}"
                 print(
                     f"{LOG}: FAIL reply task={tid} {exc} "
                     f"— processed にして滞留させない",
                     file=sys.stderr,
                 )
-        _mark_processed(rid)
+        if err:
+            # legacy はこれまでどおり processed にして滞留させない／段階2は再試行（3回で failed）
+            _ng(row, lc, err, legacy_mark=True)
+        else:
+            _ok(row, lc)
         tag = " +reply" if replied else (" +reply_fail" if args.reply and tid else "")
-        print(f"- processed id={rid}{tag}")
+        st = row.get("status") if lc.is_tracked(row) else "processed"
+        print(f"- {st} id={rid}{tag}")
 
-    return 1 if reply_fail else 0
+    return _finish_lifecycle(lc, 1 if reply_fail else 0)
+
+
+def _finish_lifecycle(lc: Lifecycle | None, rc: int) -> int:
+    """段階2の集計と、3回失敗した行の #ops 1通。"""
+    if not (lc and lc.active):
+        return rc
+    print(f"{LOG}: lifecycle {json.dumps(lc.counts, ensure_ascii=False)}")
+    if lc.failed:
+        try:
+            _post_ops(build_ops_text(lc.failed))
+        except Exception as exc:  # noqa: BLE001
+            print(f"{LOG}: #ops 投稿 FAIL: {exc}", file=sys.stderr)
+        return 1
+    return rc
 
 
 if __name__ == "__main__":

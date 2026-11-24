@@ -12,7 +12,7 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 - 一覧・進捗: [`15_FlowForge全体系_進捗_20261010.md`](../../15_FlowForge全体系_進捗_20261010.md)
 - 設計の流れ図: [`flow.md`](./flow.md)
 - CLI: `scripts/jarvis_comment_dispatch.py`
-- 部品: `jarvis_todoist_webhook_handle.py`／`jarvis_slack_report_fb_poll.py`
+- 部品: `jarvis_todoist_webhook_handle.py`／`jarvis_todoist_event_lifecycle.py`（58_ 段階2の status）／`jarvis_slack_report_fb_poll.py`
 - 枠: [`813_代行指揮枠切替係`](../../800_俯瞰UI・投影更新室/813_代行指揮枠切替係/CLAUDE.md)
 
 ## 1. 役割
@@ -102,6 +102,7 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 | 2026-10-25 | 名乗りを `【AIチーム】` に。FB の「ラベルを付けて再送」依頼と投稿末尾の FB 案内をやめる。毎日の FB 対応（`slack-fb-daily`・`--pending`／`--done`）を追加。記録は `output/YYYYMMDD_FB対応.md` |
 | 2026-10-30 | `#consult` ルートの要ボス／Jarvis依頼がTodoistに落ちない穴を確認。`slack-fb-daily` の当日スキャンと重複確認付き判断用起票を追加 |
 | 2026-11-23 | AI 社員の記録コメントの除外: 本文が `【318】` で始まるコメントは、本人トークンで書かれて投稿者 uid では見分けられないため、受領を返さず処理済みにする（`jarvis_todoist_webhook_handle.is_agent_comment`。dispatch の報告・Phase B 起動にも数えない）。318 の Phase 3（Todoist コメント）の前提。足すときは `AGENT_COMMENT_PREFIXES` に足す |
+| 2026-11-25 | 58_ 段階2: 境界時刻（`sync_meta.todoist_event_lifecycle_since`）より後の Todoist イベントは `status` を回す（claimed→done／同じ event_id は skipped／3回失敗で failed＋`#ops` 1通）。部品 `jarvis_todoist_event_lifecycle.py`。境界より前は processed_at だけ（従来どおり）。止める: `JARVIS_TODOIST_EVENT_LIFECYCLE_DISABLE=1` |
 
 ## 4. #report の形（2026-10-25 iPhone 見直し）
 
