@@ -352,7 +352,33 @@ def summarize_note(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def post_slack_report(text: str, *, dry_run: bool) -> int:
+_PHASE_B_OK_PREFIXES = ("local_ok", "cloud_ok", "skip_not_allowlisted", "dry-run", "hook_rc=0")
+
+
+def report_signal(
+    *,
+    path: str,
+    fb_rc: int,
+    wh_rc: int,
+    notes: list[dict[str, Any]],
+    phase_b: list[str],
+) -> str:
+    """#report の判定色（共通部品の推定は report を常に🟢にするため、呼び出し側で明示）。
+
+    red   = 処理できなかった・止まった（Phase B 失敗／Cloud枠なし／下流スクリプト rc≠0）
+    yellow= 未処理メモ・要判断が残る、または Mac停止で GHA に切替（failover）
+    green = 完了だけ
+    """
+    if fb_rc != 0 or wh_rc != 0:
+        return "red"
+    if any(not str(r).startswith(_PHASE_B_OK_PREFIXES) for r in phase_b):
+        return "red"
+    if notes or path == "failover":
+        return "yellow"
+    return "green"
+
+
+def post_slack_report(text: str, *, dry_run: bool, signal: str | None = None) -> int:
     post = SCRIPTS / "jarvis_slack_webhook_post.py"
     if not post.is_file():
         print(text)
@@ -368,6 +394,7 @@ def post_slack_report(text: str, *, dry_run: bool) -> int:
             "report",
             "--username",
             "317 コメント起動",
+            *(["--signal", signal] if signal else []),
             "--text",
             text,
         ],
@@ -532,6 +559,7 @@ def run_phase_b_hook(item: dict[str, Any], *, dry_run: bool, path: str) -> str:
             post_slack_report(
                 _done_text("対応したよ（Local）", item),
                 dry_run=False,
+                signal="green",
             )
             return local_res
         # Local 不可 → コメントキュー＋相談
@@ -554,6 +582,7 @@ def run_phase_b_hook(item: dict[str, Any], *, dry_run: bool, path: str) -> str:
         post_slack_report(
             _done_text("対応したよ（Cloud・冗長）", item),
             dry_run=False,
+            signal="green",
         )
         return cloud_res
     if cloud_res == "cloud_limit":
@@ -891,7 +920,13 @@ def main() -> int:
     if args.no_slack:
         print(f"{LOG}: slack skip (--no-slack) fp_reason={post_reason}")
     elif do_post:
-        post_slack_report(report, dry_run=args.dry_run)
+        post_slack_report(
+            report,
+            dry_run=args.dry_run,
+            signal=report_signal(
+                path=path, fb_rc=fb_rc, wh_rc=wh_rc, notes=notes, phase_b=phase_b_results
+            ),
+        )
         st["last_slack_fingerprint"] = fp
         st["last_slack_at"] = _now_iso()
         _save_slack_fp_meta(

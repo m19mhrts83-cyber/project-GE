@@ -373,6 +373,12 @@ def collect_workflow_deps() -> list[str]:
 # ---- 出力 --------------------------------------------------------------------
 
 
+def slack_signal(facts: dict[str, Any]) -> str:
+    """判定色は呼び出し側で明示する（共通部品の推定は失敗語頼みで、指摘があっても🟢になる）。
+    指摘（flags）が1つでもあれば red（ops 投稿）、無ければ green（report 投稿）。"""
+    return "red" if facts.get("flags") else "green"
+
+
 def build_flags(facts: dict[str, Any]) -> list[str]:
     flags: list[str] = []
     for f in facts["gha"]["failures"]:
@@ -550,7 +556,8 @@ def main() -> int:
         ok = post_slack(
             [
                 sys.executable, str(REPO / "scripts" / "jarvis_slack_webhook_post.py"),
-                "--channel", ch, "--username", "314 業務品質監査", "--text", slack_text(facts),
+                "--channel", ch, "--username", "314 業務品質監査",
+                "--signal", slack_signal(facts), "--text", slack_text(facts),
             ]
         )
         # 9:30 のレビューが「Slack に出ていない回」だと分かるように残す
