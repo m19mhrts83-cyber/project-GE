@@ -6,6 +6,8 @@
 # time: JST "HH:MM" / weekdays: 1=月 … 7=日（省略で毎日）/ grace_min: これを過ぎたら今日は諦めて schedule に任せる
 repo: m19mhrts83-cyber/project-GE
 jobs:
+  - workflow: jarvis-dashboard-gmail-triage.yml
+    time: "05:00"  # 本便（dispatch 既定 daytime=false）。日中便の schedule は対象外
   - workflow: kurashift-grok-mail-noon.yml
     time: "11:00"
   - workflow: jarvis-partner-day-report.yml
