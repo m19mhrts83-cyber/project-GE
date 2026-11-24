@@ -20,6 +20,7 @@ Jarvis: 夜間メールトリアージ（パートナー + admin Gmail 全般）
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -41,6 +42,38 @@ from jarvis_thread_context import compact_context
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 STATE_DIR = REPO / ".jarvis_state" / "night_triage"
+
+
+T3_LOCK_PATH = STATE_DIR / "mail_action_t3.lock"
+
+
+def run_mail_action_slack_locked(
+    ma: Path, *, lock_path: Path | None = None, runner: Any = None
+) -> subprocess.CompletedProcess | None:
+    """T3（116 の #consult 投稿）を同時に1本だけ走らせる。
+
+    RunAtLoad や定刻の重なりで night_triage が2本同時に走っても、digest の重複防止
+    （check-then-act）をすり抜けて2通出さないよう flock で直列化する（2026-11-25）。
+    取れなければ None（別の本が投稿中）。プロセスが落ちれば OS がロックを外す。
+    """
+    path = lock_path or T3_LOCK_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = open(path, "a+", encoding="utf-8")
+    try:
+        try:
+            fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return None
+        run = runner or subprocess.run
+        return run(
+            [sys.executable, str(ma), "--from-triage", "--limit", "5"],
+            cwd=str(REPO),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    finally:
+        fd.close()
 QUEUE_PATH = STATE_DIR / "queue.json"
 CONFIG_PATH = STATE_DIR / "config.json"
 LOG_DIR = Path.home() / "Library" / "Logs" / "jarvis_night_triage"
@@ -1867,23 +1900,14 @@ def main() -> int:
             if ma.is_file() and not (
                 os.environ.get("JARVIS_MAIL_ACTION_SLACK_DISABLE") or ""
             ).strip():
-                m = subprocess.run(
-                    [
-                        sys.executable,
-                        str(ma),
-                        "--from-triage",
-                        "--limit",
-                        "5",
-                    ],
-                    cwd=str(REPO),
-                    capture_output=True,
-                    text=True,
-                    timeout=120,
-                )
-                print(
-                    f"# mail_action_slack: exit={m.returncode} "
-                    f"{(m.stderr or m.stdout or '')[-200:]}"
-                )
+                m = run_mail_action_slack_locked(ma)
+                if m is None:
+                    print("# mail_action_slack: skip（別の night_triage が投稿中・ロック）")
+                else:
+                    print(
+                        f"# mail_action_slack: exit={m.returncode} "
+                        f"{(m.stderr or m.stdout or '')[-200:]}"
+                    )
         except Exception as e:
             print(f"# mail_action_slack soft-fail: {e}")
         # ops: pending が多い／queue が止まったときだけ #ops に1日1回（Todoist には起票しない）
