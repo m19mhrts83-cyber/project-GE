@@ -36,6 +36,9 @@ SNAPSHOT_KEY = "todoist_cleanup_snapshot"
 CLEAN_LABELS = {"スター起票"}
 HOLD_DAYS = 14
 MAX_CARDS = 120
+# 313 週の整理（scripts/jarvis_todoist_313_weekly.py）が金曜に置く B の待ち
+QUEUE_313_KEY = "todoist_313_weekly_queue"
+QUEUE_313_STALE_DAYS = 8
 
 PROMO_RE = re.compile(r"(セミナー|キャンペーン|イベント案内|おすすめイベント|新製品|特典|優待|ポイント|紹介|ご案内|応募|アンケート|動画)")
 MONEY_RE = re.compile(r"(入金|着金|送金|振込|支払|納付|引落|請求)")
@@ -125,6 +128,34 @@ def build_snapshot(*, tasks: list[dict[str, Any]], held: set[str], today: date, 
     }
 
 
+def merge_313_cards(
+    cards: list[dict[str, Any]], queue: Any, *, active_by_id: dict[str, dict[str, Any]], held: set[str], now: datetime
+) -> list[dict[str, Any]]:
+    """313 週の整理の B を 318 の後・スター起票の前に入れる。古い（8日超）・未公開・閉じた件・「残す」中・重複は出さない。"""
+    if not isinstance(queue, dict) or not queue.get("published"):
+        return cards
+    try:
+        at = datetime.fromisoformat(str(queue.get("generated_at") or ""))
+    except ValueError:
+        return cards
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=JST)
+    if now - at > timedelta(days=QUEUE_313_STALE_DAYS):
+        return cards
+    have = {str(x.get("id")) for x in cards}
+    extra = []
+    for x in queue.get("cards") or []:
+        tid = str((x or {}).get("id") or "")
+        t = active_by_id.get(tid)
+        if not tid or tid in have or tid in held or not t:
+            continue
+        extra.append({**x, "origin": "313", "title": str(t.get("content") or x.get("title") or "")})
+        have.add(tid)
+    head = [x for x in cards if x.get("origin") == "318"]
+    rest = [x for x in cards if x.get("origin") != "318"]
+    return head + extra + rest
+
+
 def held_ids(now: datetime) -> set[str]:
     """最近「残す」を選んだタスク（候補から外す）。"""
     c = _io()
@@ -184,6 +215,16 @@ def snapshot(*, dry: bool, now: datetime) -> int:
         snap["total"] += n318
         snap["from_318"] = n318
         print(f"318 の判断依頼 {n318} 件を足した")
+    # 313 週の整理の B（済み？／やめてもいいのでは）。金曜に 313 が置いた時だけ載る。318 と同じ件は 318 側で聞く
+    n_before = len(snap["cards"])
+    merged = merge_313_cards(snap["cards"], ho.read_meta(c.sb, QUEUE_313_KEY),
+                             active_by_id={str(t["id"]): t for t in tasks}, held=held, now=now)
+    n313 = len(merged) - n_before
+    if n313:
+        snap["cards"] = merged[:MAX_CARDS]
+        snap["total"] += n313
+        snap["from_313"] = n313
+        print(f"313 週の整理 {n313} 件を足した")
     by: dict[str, int] = {}
     for x in snap["cards"]:
         by[x["suggest"]] = by.get(x["suggest"], 0) + 1
@@ -205,8 +246,17 @@ def apply_one(row: dict[str, Any], *, dry: bool) -> str:
     if dry:
         print(f"dry: {action} {tid} {due or ''}")
         return "dry"
+    origin = str((row.get("payload") or {}).get("origin") or "")
     try:
-        if action == "close":
+        if origin == "313" and action in ("close", "drop"):
+            # 313 週の整理のカード: 済み・やめるとも完了にする（削除しない）。本人が選んだことをコメントに残す
+            word = "済み" if action == "close" else "やめる"
+            c.todoist("comments", method="POST", body={
+                "task_id": tid,
+                "content": f"【313】タスク完了したよ（週の整理・本人が「{word}」を選択）\nサマリ: /313/bulk で選んだ結果を反映",
+            })
+            c.todoist(f"tasks/{tid}/close", method="POST")
+        elif action == "close":
             c.todoist(f"tasks/{tid}/close", method="POST")
         elif action == "drop":
             c.todoist(f"tasks/{tid}", method="DELETE")
@@ -247,7 +297,7 @@ def reflect(*, dry: bool, now: datetime) -> int:
     for r in todo:
         last[str(r["target_id"])] = str(r["id"])
     n = {"ok": 0, "gone": 0, "failed": 0, "superseded": 0}
-    by_action = {"close": 0, "drop": 0, "reschedule": 0}
+    by_action = {"close": 0, "drop": 0, "reschedule": 0, "stop": 0}
     for r in todo:
         rid = str(r["id"])
         if last[str(r["target_id"])] != rid:
@@ -257,7 +307,8 @@ def reflect(*, dry: bool, now: datetime) -> int:
         key = "failed" if res.startswith("failed") else ("superseded" if res == "superseded" else ("gone" if res == "gone" else "ok"))
         n[key] += 1
         if key == "ok" and not dry:
-            by_action[r["action"]] += 1
+            is313 = str((r.get("payload") or {}).get("origin") or "") == "313"
+            by_action["stop" if (is313 and r["action"] == "drop") else r["action"]] += 1
         if dry or res.startswith("failed"):
             continue  # 失敗は次回また試す
         c.sb("owner_decisions", method="POST", prefer="return=minimal", body=contract_row(
@@ -272,6 +323,7 @@ def reflect(*, dry: bool, now: datetime) -> int:
             c.post_consult(
                 f"{'🟡' if n['failed'] else '🟢'} *Todoist の片付けを反映しました*\n"
                 f"完了 {by_action['close']}／削除 {by_action['drop']}／日を変更 {by_action['reschedule']}"
+                + (f"／やめる（完了扱い） {by_action['stop']}" if by_action["stop"] else "")
                 + (f"／失敗 {n['failed']}（次回また試します）" if n["failed"] else ""),
                 dry=False,
             )

@@ -11,10 +11,10 @@
 | 合図 | `/todoist-batch`・Todoist掃除・完了相当・313 digest |
 | 権限の境界 | 確認のみ＝自動 close 可／方針・金・対外＝人 |
 | 報告 | Slack `#report` |
-| 相談 | Slack `#consult`（L1ダイジェスト） |
+| 相談 | Slack `#consult`（金曜「313 週の整理」1通） |
 | 指示書 | [CLAUDE.md](./CLAUDE.md) |
 | フロー | [flow.md](./flow.md)（微修正はここ） |
-| CLI | `scripts/jarvis_todoist_313_digest.py` |
+| CLI | `scripts/jarvis_todoist_313_weekly.py`（本線・金曜 20:00 週の整理）／旧 `jarvis_todoist_313_digest.py` |
 | 状態 | Phase1 実装済・運用A〜B（定時はC） |
 | 対になる係 | [312 Todoist起票整理係](../312_Todoist起票整理係/) |
 

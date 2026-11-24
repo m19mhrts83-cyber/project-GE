@@ -28,9 +28,20 @@
 - Cursor ルール: `jarvis-todoist-batch-sweep.mdc` / `jarvis-todoist-owner-confirm.mdc` / `jarvis-chat-open-complete-313.mdc`
 - 起票側: [`312_Todoist起票整理係`](../312_Todoist起票整理係/CLAUDE.md)
 
-## 0. 片付け（2026-11-07〜・段階1本線）
+## 0. 週の整理（本線・2026-11-24〜・松野さん了承 Orca 項目50）
 
-- 毎日20:00 **1通**「313 片付け」。上位5件に **✅済んだ／📅いつ・優先／🗑やめる**（推し★）
+- **毎晩の期日ずらし（20:00 片付け3択）はやめた**。期日は土曜 07:00 の「今週の9件」（loopware `/week`）で決める
+- 313 の仕事は2つだけ。**金曜 20:00** に1回（土曜 07:00 の今週の9件の材料づくりの前）。フロー: [`flow.md`](./flow.md)「週の整理」W1〜W10
+  - **A 済みました**: 説明・コメントに貼られた PR・Issue が**すべて**済み（タスク作成後に・その後に「済み」報告以外のコメントなし・保留語なし・子タスクなし）の件だけ、313 が**先に閉じて**知らせる。Todoist コメントに根拠1行＋リンク。**7日間は戻せる**（`--undo list` → `--undo N`、または Todoist の完了済みから戻す）。根拠が弱い件は閉じずに B で「済み？」
+  - **B やめてもいいのでは**: 21日以上 題・説明・コメントが動いていない件（先の期日・今週の9件・318 の待ち・「残す」4週内・繰り返しは除く）。理由1行を付けて **/313/bulk**（「313 週の整理」の見出し）に載せる。松野さんが **済み／やめる／残す** を選ぶ → GHA reflect が閉じる（**やめるも完了扱い・削除しない**）。残すは4週出さない
+- Slack は **#consult に1通**「【相談】313 週の整理」（済みました n件／やめる提案 n件／画面リンク）
+- 閾値・日数・保留語は `config/todoist_313_weekly.yaml`（読めなければ止まる）。CLI: `scripts/jarvis_todoist_313_weekly.py`
+- 318 との分担: 318＝やり切る・判断を聞く（毎朝 10:30・②→/313/bulk）、313＝済み・やめるの整理だけ。カードは見出しで分け、同じ件は片方だけ（318 が載せた件は 313 が出さない／313 が載せた件は8日 318 が載せない）
+- 閉じない: 繰り返しタスク・318 が聞いている件・根拠が読めない件。削除はしない
+
+## 0'. 片付け（2026-11-07〜11-24・**停止**。手動 `cleanup.py` だけ残す）
+
+- 旧: 毎日20:00 **1通**「313 片付け」。上位5件に **✅済んだ／📅いつ・優先／🗑やめる**（推し★）
 - やめる＝物理削除せず完了＋コメント。要判断は「済んだ」に載せない
 - アプリ: loopware `/313?task=`（Chrome）
 - 段階0棚卸し後に超過≤10を目指す。旧 ✅／📅 2通は互換残置
@@ -83,7 +94,7 @@
 - 目安: 実装・会話で完了相当／Todoist掃除・並列モード依頼
 - [x] 人が頼む（`/todoist-batch`・「Todoist掃除」「確認だけで消せるものは完了」「閉じて N」）
 - [x] ダイジェスト（`jarvis_todoist_313_digest.py` → `#consult`）
-- [x] 時間（**毎日20:00** launchd `com.matsunoma.jarvis.todoist-313-digest` → L1 `#consult`。自動closeなし＝ソフト運用）
+- [x] 時間（**金曜 20:00** launchd `com.matsunoma.jarvis.todoist-313-digest` → 週の整理。2026-11-24 に毎日→金曜だけに変更。plist 入れ替え前でも runner が金曜以外は何もしない）
 - [x] 何かが届いたら（hawk `owner_confirm` / `done` → スキャン合流）
 - [x] 変化・失敗を見回ったら（表確認カード・要フォローの事実確認）
 
@@ -187,6 +198,13 @@
 
 ```bash
 cd ~/git-repos && set -a && source .env.jarvis_private && set +a
+# 週の整理（本線・金曜 20:00）。引数なしは下見（Todoist・Supabase・Slack に書かない）
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_weekly.py
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_weekly.py --apply        # 本番（runner が金曜に呼ぶ）
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_weekly.py --undo list    # 7日以内に閉じた件
+~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_weekly.py --undo 2       # #2 を戻す（1,3／task_id／all）
+# 手動で金曜以外に回す: T313_WEEKLY_FORCE=1 launchd/jarvis_todoist_313_digest_runner.sh
+# 以下は旧運用（手動のみ）
 # L1ダイジェスト（#consult）
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py --dry-run
 ~/selenium_env/venv/bin/python scripts/jarvis_todoist_313_digest.py
@@ -234,3 +252,4 @@ python3 scripts/jarvis_todoist_313_slack_ingest.py --dry-run
 | 2026-11-23 | 318 との二重質問の防止: 318 Todoist消化係が /313/bulk に載せた件（`.jarvis_state/todoist_318/bulk_queue.json` の published=true）は 20:00 の片付けに出さない（`cleanup.collect_items` の `exclude_ids`）。318 側も 313 の片付けが36時間以内に出した件は載せない。318 が載せていない間はこれまでどおり。/313/bulk の材料（`jarvis_todoist_cleanup_bulk.py`）は 318 の ② を `sync_meta.todoist_318_bulk_queue` から混ぜる（318 が `--publish` した時だけ） |
 | 2026-11-22 | 状態ファイルの時刻ずれ修正＋同じ候補の繰り返し停止。runner は片付け（`cleanup.py`）・外で済んだ候補（`done_elsewhere.py`）を呼ぶが、最終まとめ時刻は旧 `digest.py` だけが `todoist_313_digest.json` に書いていたので 11/07 のまま止まって見えた（実行・Slack 送信は毎日通っていた）。送信が通った回に `last_run_at`／`last_digest_at` を書く。あわせて **「残す」判断の記録**（`.jarvis_state/todoist_313_judgments.json`・未追跡）＝残すと答えた候補は題・期日・説明・ラベル・優先度・更新時刻が変わるまで再提示しない。close 了承は従来どおり `--apply --select`。digest に「同じ候補を N 日連続」の1行（`jarvis_todoist_313_judgment.py`） |
 | 2026-11-24 | Todoist API の一時エラー（429/500/502/503/504・接続断・タイムアウト）は読み取り（GET）だけ自動で再試行（5s/15s/45s・最大4回・429は Retry-After 尊重）。close・期日変更・コメントの書き込みは二重実行防止のため再試行しない。11/23 20:00 の 502 落ちの対策（`jarvis_todoist_313_http.py`） |
+| 2026-11-24 | **週の整理に一本化**（松野さん了承・Orca 項目50）。毎晩 20:00 の片付け3択（期日ずらし）を停止し、金曜 20:00 に A「済みました」（PR・Issue がすべて済み等の強い根拠だけ先に閉じる・7日戻せる `--undo`）と B「やめてもいいのでは」（21日動きなし → /313/bulk で 済み／やめる／残す。やめるも完了扱い・残すは4週）を1通 #consult。基準は `config/todoist_313_weekly.yaml`。実データ下見（11/24）は A 0件／B 15件：リンク付き8件はすべて保留（元タスクのリンク・【松野さん】の確認・マージ後の設定など）で B の「済み？」へ。runner は金曜以外は何もしない。launchd の入れ替え（Weekday=5）は Mac main 追従後にラスカル。315-B の 313 監視は週1（200h・空回り判定なし）に変更 |

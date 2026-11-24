@@ -188,20 +188,17 @@ stall_watch_315b:
       label: 313 完了候補確認
       owner: 313 完了候補確認係
       action: "launchctl list | grep 313 → ~/Library/Logs/jarvis_todoist_313_digest/todoist_313_digest.err.log の末尾"
-      # 20:00 の runner は 片付け（Slack 送信）が通ったときだけ「外で済んだ候補」を書く。超過 0 件の日もここは書かれる
-      # 旧 todoist_313_digest.json は段階1（片付け 1 通）への切替で更新されなくなったので見ない
+      # 2026-11-24〜 週1回（金曜 20:00）の「週の整理」だけ。--apply が終わった回に state の at が書かれる
+      # 金曜→次の金曜 168h ＋遅れの余裕で 200h。旧 done_elsewhere.json／cleanup.json は毎晩の片付けをやめたので見ない
       stop:
         kind: json_time
-        file: .jarvis_state/todoist_313_done_elsewhere.json
+        file: .jarvis_state/todoist_313_weekly.json
         path: at
-        max_age_h: 26
-      # 候補（外で済んだ候補＋同じ回の片付け）の集合が 3 回連続で同じ、かつ超過合計が減っていなければ空回り
+        max_age_h: 200
+      # 週1回なので同じ候補の繰り返しは「残す」で外れる。空回り判定はしない
       idle:
-        kind: candidate_repeat
-        file: .jarvis_state/todoist_313_done_elsewhere.json
-        extra_file: .jarvis_state/todoist_313_cleanup.json
-        same_run_within_min: 120
-        runs: 3
+        kind: skip
+        note: 週1回（金曜）の週の整理。「残す」は4週出さないので繰り返し判定なし
     - id: "314"
       label: 314 業務品質監査
       owner: 314 業務品質監査

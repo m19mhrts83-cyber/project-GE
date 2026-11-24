@@ -161,7 +161,8 @@ class CriteriaTests(Base):
         self.assertEqual(ids, ["311", "312", "313", "314", "317"])
         by = {t["id"]: t for t in crit["targets"]}
         self.assertEqual(by["311"]["stop"]["max_age_h"], 1)
-        self.assertEqual(by["313"]["stop"]["max_age_h"], 26)
+        self.assertEqual(by["313"]["stop"]["max_age_h"], 200)  # 週1回（金曜）の週の整理
+        self.assertEqual(by["313"]["idle"]["kind"], "skip")
         self.assertEqual(by["317"]["stop"]["max_age_h"], 2)
         self.assertEqual(by["314"]["stop"]["ref"], "weekly_review_facts")
         existing = next(p for p in fw.yaml.safe_load(sw.CONFIG.read_text())["products"] if p["id"] == "weekly_review_facts")

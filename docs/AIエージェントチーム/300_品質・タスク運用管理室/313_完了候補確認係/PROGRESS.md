@@ -1,6 +1,21 @@
 # 313 PROGRESS
 
-更新: 2026-11-22
+更新: 2026-11-24
+
+## 2026-11-24 週の整理に一本化（松野さん了承・Orca 項目50）
+
+- [x] `scripts/jarvis_todoist_313_weekly.py`＋`config/todoist_313_weekly.yaml`（A 済みました・B やめる提案・`--undo`）
+- [x] /313/bulk に「313 週の整理」の見出し・済み／やめる／残す（やめる＝完了扱い）。cleanup_bulk が `sync_meta.todoist_313_weekly_queue` を混ぜ、reflect は 313 カードを削除せず完了にする
+- [x] runner: 金曜以外は何もしない。318 は 313 が載せた件（8日）を載せない。315-B は週1の監視に
+- [x] 実データ下見 11/24: タスク229件 → A 0件／B 15件（うち「済み？」5件）
+- [ ] 初回本番 2026-11-27（金）20:00 → 結果（A n／B n・閉じた件の誤り）を確かめる
+- [ ] launchd 入れ替え（ラスカル・Mac の `~/git-repos` を main に追従した後）:
+  ```bash
+  cd ~/git-repos && git pull --ff-only
+  zsh launchd/install_jarvis_todoist_313_digest_launchd.sh   # 金曜 20:00（Weekday=5）で入れ直す
+  plutil -p ~/Library/LaunchAgents/com.matsunoma.jarvis.todoist-313-digest.plist | grep -A3 StartCalendarInterval
+  ```
+  戻すとき: このPRを revert → 同じ install を流す（毎日 20:00 に戻る）。止めるだけなら `zsh launchd/uninstall_jarvis_todoist_313_digest_launchd.sh`
 
 ## 2026-11-22 空回り停止・状態時刻
 

@@ -2,8 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  ACT_LABEL,
+  ACTS_313,
+  GROUP_TITLE,
+  actLabel,
   addDaysIso,
+  groupOf,
   buildCleanupDecisions,
   type Choice,
   type Choices,
@@ -18,10 +21,11 @@ function todayIso(): string {
   return new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
 }
 
-/** おすすめを初期の選択にする（外せる）。keep は「残す」を選んだ扱いにはせず未選択のまま */
+/** おすすめを初期の選択にする（外せる）。keep は「残す」を選んだ扱いにはせず未選択のまま。
+ *  313 週の整理のカードは本人が選ぶもの（閉じるのは選んだ件だけ）なので初期選択にしない */
 function fromSuggest(cards: CleanupCard[]): Choices {
   const out: Choices = {};
-  for (const c of cards) if (c.suggest === "close" || c.suggest === "drop") out[c.id] = { act: c.suggest };
+  for (const c of cards) if (c.origin !== "313" && (c.suggest === "close" || c.suggest === "drop")) out[c.id] = { act: c.suggest };
   return out;
 }
 
@@ -108,7 +112,11 @@ export default function CleanupBulkClient() {
       <div className="glass wk-head">
         <div>
           <div className="meta">
-            {snap.from_318 ? `318の判断依頼 ${snap.from_318} 件＋スター付きメール由来 ${snap.total - snap.from_318} 件` : `スター付きメール由来 ${snap.total} 件`}
+            {[
+              snap.from_318 ? `318の判断依頼 ${snap.from_318} 件` : "",
+              snap.from_313 ? `313 週の整理 ${snap.from_313} 件` : "",
+              `スター付きメール由来 ${snap.total - (snap.from_318 || 0) - (snap.from_313 || 0)} 件`,
+            ].filter(Boolean).join("＋")}
           </div>
           <div className="wk-progress">
             <b>{decided}</b>
@@ -135,10 +143,15 @@ export default function CleanupBulkClient() {
         <button className="wk-link" onClick={() => setPicked({})}>チェックを外す</button>
       </div>
 
-      {cards.map((c) => {
+      {cards.map((c, i) => {
         const v = ch[c.id];
+        const g = groupOf(c);
+        const head = i === 0 || groupOf(cards[i - 1]) !== g;
+        const acts = c.origin === "313" ? ACTS_313 : ACTS;
         return (
-          <div key={c.id} className="glass wk-card">
+          <div key={c.id}>
+          {head && <div className="eyebrow acc" style={{ margin: "12px 4px 4px" }}>{GROUP_TITLE[g]}</div>}
+          <div className="glass wk-card">
             <label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
               <input type="checkbox" checked={!!picked[c.id]} onChange={(e) => setPicked((p) => ({ ...p, [c.id]: e.target.checked }))} />
               <span style={{ flex: 1 }}>
@@ -146,6 +159,7 @@ export default function CleanupBulkClient() {
                 <span className="meta" style={{ display: "block" }}>
                   {[
                     c.origin === "318" && "318 判断依頼",
+                    c.origin === "313" && "313 週の整理",
                     c.sender,
                     c.mail_date && `${c.mail_date}のメール`,
                     c.age_days != null && `${c.age_days}日前`,
@@ -156,17 +170,22 @@ export default function CleanupBulkClient() {
               </span>
             </label>
             {c.summary && <div className="meta">{c.summary}</div>}
-            <div className="meta">おすすめ: {c.suggest === "keep" ? "残す" : ACT_LABEL[c.suggest]}（{c.why}）</div>
+            <div className="meta">
+              {c.origin === "313" ? `${c.why}（おすすめ: ${actLabel(c, c.suggest)}・やめるも完了扱い）` : `おすすめ: ${actLabel(c, c.suggest)}（${c.why}）`}
+            </div>
             <div className="btn-row">
-              {ACTS.map((a) => (
+              {acts.map((a) => (
                 <button
                   key={a}
                   className={v?.act === a ? "primary" : ""}
                   onClick={() => setOne(c.id, v?.act === a ? null : { act: a, due: a === "reschedule" ? addDaysIso(todayIso(), 7) : undefined })}
                 >
-                  {ACT_LABEL[a]}
+                  {actLabel(c, a)}
                 </button>
               ))}
+              {c.evidence_url && (
+                <a className="wk-link" href={c.evidence_url} target="_blank" rel="noreferrer">根拠を開く</a>
+              )}
               {c.gmail_url && (
                 <a className="wk-link" href={c.gmail_url} target="_blank" rel="noreferrer">メールを開く</a>
               )}
@@ -174,6 +193,7 @@ export default function CleanupBulkClient() {
             {v?.act === "reschedule" && (
               <input type="date" value={v.due || ""} onChange={(e) => setOne(c.id, { act: "reschedule", due: e.target.value })} aria-label="新しい日" />
             )}
+          </div>
           </div>
         );
       })}

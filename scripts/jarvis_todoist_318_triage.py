@@ -214,6 +214,10 @@ class Paths:
         return self.state_dir / "todoist_313_cleanup.json"
 
     @property
+    def weekly_313(self) -> Path:
+        return self.state_dir / "todoist_313_weekly.json"
+
+    @property
     def judgments_313(self) -> Path:
         return self.state_dir / "todoist_313_judgments.json"
 
@@ -1290,6 +1294,8 @@ def _route_and_notify(
     """② → /313/bulk の待ち、③ → 週次の受け渡し、通知・報告の案。外へ出すのはフラグの時だけ。"""
     live = not opts.dry_run
     asked = ho.asked_by_313(paths.cleanup_313, started)
+    weekly = ho.asked_by_313_weekly(paths.weekly_313, started)  # 313 週の整理（金曜）が載せた件
+    asked = None if (asked is None or weekly is None) else (asked | weekly)
     if asked is None:
         # 313 の質問状況が分からない時は二重質問を避けて ② を載せない
         run["errors"].append({"where": "cleanup_313", "error": "313 片付けの状態が読めないので②を /313/bulk に載せない"})
