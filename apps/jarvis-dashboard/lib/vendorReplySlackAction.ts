@@ -2,6 +2,7 @@
  * 地場業者返信 — Slack から送信／編集／返信なし
  * 署名は PROPERTY_GATE_ACTION_TOKEN（物件ゲートと同系）
  */
+import { isBlockedRecipient } from "@/lib/gmail/blockedRecipient";
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { sendGmailViaEnv } from "@/lib/gmail/sendFromEnv";
@@ -108,10 +109,7 @@ function asPayload(raw: unknown): Record<string, unknown> {
 }
 
 export function isBlockedVendorReplyRecipient(address: string): boolean {
-  const normalized = String(address || "").trim().toLowerCase();
-  return /(^|[._+-])(no-?reply|noreplyto|do-?not-?reply)([._+@-]|$)|mailer-daemon|@google\.com$/i.test(
-    normalized,
-  );
+  return isBlockedRecipient(address);
 }
 
 export async function fetchVendorReplyTriage(

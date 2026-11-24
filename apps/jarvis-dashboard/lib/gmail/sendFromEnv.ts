@@ -8,6 +8,7 @@ import {
   gmailClientFromEnv,
   tokenEnvForAccount,
 } from "@/lib/gmail/clientFromEnv";
+import { assertSendableRecipients } from "@/lib/gmail/blockedRecipient";
 import { buildMimeMessage, type MailAttachment } from "@/lib/materialFileSearch";
 
 /** いずれかの送信用トークンがあれば true（UI の送信ボタン表示用） */
@@ -60,6 +61,8 @@ export async function sendGmailViaEnv(opts: {
   /** triage_items.account。未指定時は estate → m19m → admin の順 */
   account?: string | null;
 }): Promise<{ id: string; threadId?: string; from: string; account: string }> {
+  // 最終関門: noreply 等には Gmail API を呼ぶ前に必ず弾く（全送信経路共通）
+  assertSendableRecipients(opts.to);
   const preferred = (opts.account || "").trim().toLowerCase();
   const candidates = preferred
     ? [preferred]

@@ -1,5 +1,6 @@
 "use server";
 
+import { BlockedRecipientError } from "@/lib/gmail/blockedRecipient";
 import { deskWorthy } from "@/lib/deskWorthy";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -821,6 +822,7 @@ export async function sendTriageAfterConfirm(
       const payload = asPayload(it.payload);
       payload.last_send_error = errMsg;
       payload.last_send_error_at = new Date().toISOString();
+      if (e instanceof BlockedRecipientError) payload.needs_review = true;
       await supabase
         .from("triage_items")
         .update({
