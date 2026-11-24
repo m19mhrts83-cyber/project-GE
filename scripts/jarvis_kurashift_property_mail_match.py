@@ -1111,10 +1111,58 @@ def existing_gmail_ids(sb: Any) -> set[str]:
             gid = sj.get("gmail_id")
             if gid:
                 ids.add(str(gid))
+            for dup in sj.get("duplicate_gmail_ids") or []:
+                if dup:
+                    ids.add(str(dup))
         if len(rows) < page_size:
             break
         start += page_size
     return ids
+
+
+def build_fingerprint_index(sb: Any) -> dict[str, str]:
+    """既存 deals の property_fingerprint（未設定は算出）→ deal id。重複マージ済み敗者は除く。"""
+    from jarvis_kurashift_re_deal_dedupe_merge import deal_fingerprint, fetch_all_deals
+
+    index: dict[str, str] = {}
+    for d in fetch_all_deals(sb):
+        sj = d.get("summary_json") if isinstance(d.get("summary_json"), dict) else {}
+        if sj.get("duplicate_of"):
+            continue
+        fp = deal_fingerprint(d)
+        if fp.startswith("id:"):
+            continue
+        index.setdefault(fp, str(d.get("id")))
+    return index
+
+
+def row_fingerprint(row: dict[str, Any]) -> str:
+    """新規行の fingerprint（算出不能なら空文字）。dedupe_merge の deal_fingerprint を再利用。"""
+    from jarvis_kurashift_re_deal_dedupe_merge import deal_fingerprint
+
+    fp = deal_fingerprint({**row, "property_fingerprint": ""})
+    return "" if fp.startswith("id:") else fp
+
+
+def record_duplicate_gmail(sb: Any, existing_id: str, gmail_id: str) -> None:
+    """重複取込メールの gmail_id を既存 deal の summary_json.duplicate_gmail_ids へ追記（再取込防止）。"""
+    cur = (
+        sb.table("kurashift_re_deals")
+        .select("summary_json")
+        .eq("id", existing_id)
+        .limit(1)
+        .execute()
+    )
+    rows = cur.data or []
+    sj = dict((rows[0].get("summary_json") or {}) if rows else {})
+    dups = [str(x) for x in (sj.get("duplicate_gmail_ids") or [])]
+    if gmail_id in dups:
+        return
+    dups.append(gmail_id)
+    sj["duplicate_gmail_ids"] = dups
+    sb.table("kurashift_re_deals").update({"summary_json": sj}).eq(
+        "id", existing_id
+    ).execute()
 
 
 def mark_gmail_message_read(
@@ -1728,12 +1776,30 @@ def main() -> int:
         return 0
 
     seen = existing_gmail_ids(sb)
+    fp_index = build_fingerprint_index(sb)
+    fp_skipped = 0
     inserted = 0
     import_read = 0
     for c in uniq:
         gid = (c.get("summary_json") or {}).get("gmail_id")
         if gid in seen:
             continue
+        fp = row_fingerprint(c)
+        if fp and fp in fp_index:
+            # 同一物件（fingerprint 一致）は新規 insert しない。メールは既読にして再取込を防ぐ
+            c = stamp_row_gmail_read_on_import(c)
+            if (c.get("summary_json") or {}).get("gmail_read_at"):
+                import_read += 1
+            if gid:
+                try:
+                    record_duplicate_gmail(sb, fp_index[fp], str(gid))
+                except Exception as e:
+                    print(f"# duplicate_gmail record FAIL {type(e).__name__}: {e}")
+                seen.add(gid)
+            fp_skipped += 1
+            continue
+        if fp:
+            c = {**c, "property_fingerprint": fp}
         c = stamp_row_gmail_read_on_import(c)
         if (c.get("summary_json") or {}).get("gmail_read_at"):
             import_read += 1
@@ -1741,6 +1807,8 @@ def main() -> int:
         inserted += 1
         if gid:
             seen.add(gid)
+        if fp:
+            fp_index[fp] = str((ins.data or [{}])[0].get("id") or "")
         try:
             from jarvis_kurashift_deal_events import insert_deal_event
 
@@ -1789,9 +1857,23 @@ def main() -> int:
                 sj2 = dict(row.get("summary_json") or {})
                 sj2["auto_pass_allowlisted_read"] = True
                 row["summary_json"] = sj2
-        sb.table("kurashift_re_deals").insert(row).execute()
+        fp = row_fingerprint(row)
+        if fp and fp in fp_index:
+            fp_skipped += 1
+            if fp_index[fp]:
+                try:
+                    record_duplicate_gmail(sb, fp_index[fp], str(gid))
+                except Exception as e:
+                    print(f"# duplicate_gmail record FAIL {type(e).__name__}: {e}")
+            seen.add(gid)
+            continue
+        if fp:
+            row["property_fingerprint"] = fp
+        ins_pass = sb.table("kurashift_re_deals").insert(row).execute()
         auto_inserted += 1
         seen.add(gid)
+        if fp:
+            fp_index[fp] = str((ins_pass.data or [{}])[0].get("id") or "")
 
     uketsuke_pass = pass_deals_with_uketsuke_shuryo(sb)
 
@@ -1816,6 +1898,7 @@ def main() -> int:
         f"uketsuke_passed={uketsuke_pass.get('passed_direct', 0)}+"
         f"{uketsuke_pass.get('passed_siblings', 0)} "
         f"skipped_existing={len(uniq) + len(uniq_pass) - inserted - auto_inserted} "
+        f"fingerprint_dup_skipped={fp_skipped} "
         f"promoted_to_viewing={promoted}"
     )
     print(
@@ -1826,6 +1909,7 @@ def main() -> int:
                 "import_marked_read": import_read,
                 "auto_pass_inserted": auto_inserted,
                 "auto_pass_marked_read": auto_read,
+                "fingerprint_dup_skipped": fp_skipped,
                 "promoted": promoted,
             },
             ensure_ascii=False,
