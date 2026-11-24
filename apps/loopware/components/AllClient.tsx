@@ -3,16 +3,23 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  GENRES,
   GENRE_LABEL,
   LATER,
   LEVEL_LABEL,
+  SORT_LABEL,
+  WEIGHT_MARK,
   adoptSuggestions,
   applyFilter,
+  cleanupChoice,
   countBy,
+  isCleanup,
+  sortItems,
   type AllItem,
   type Filter,
   type Genre,
   type Level,
+  type SortMode,
 } from "@/lib/allCore";
 import { buildCleanupDecisions, type Choices } from "@/lib/cleanupBulk";
 
@@ -28,12 +35,25 @@ async function pool<T>(list: T[], n: number, fn: (x: T) => Promise<void>) {
   );
 }
 
+const LINK_LABEL: Record<Genre, string> = {
+  mail: "開いて返信する／全文を見る",
+  g318: "根拠・元のメールを開く",
+  g313: "根拠（PR・Issue 等）を開く",
+  star: "元のメールを開く",
+  topic: "案の中身を見る",
+  week: "今週の9件を開く",
+  zaim: "Zaim の見直しを開く",
+  rule: "今週の学びを開く",
+};
+
 export default function AllClient() {
   const [items, setItems] = useState<AllItem[] | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [err, setErr] = useState("");
-  const [filter, setFilter] = useState<Filter>({ genre: "all", level: 0 });
+  const [filter, setFilter] = useState<Filter>({ genre: "all", level: 0, weight: "all", suggestOnly: false });
+  const [sort, setSort] = useState<SortMode>("level");
   const [chosen, setChosen] = useState<Chosen>({});
+  const [checked, setChecked] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [report, setReport] = useState<string[]>([]);
@@ -52,9 +72,28 @@ export default function AllClient() {
 
   const all = items || [];
   const counts = useMemo(() => countBy(all), [all]);
-  const shown = useMemo(() => applyFilter(all, filter), [all, filter]);
+  const shown = useMemo(() => sortItems(applyFilter(all, filter), sort), [all, filter, sort]);
   const nChosen = Object.keys(chosen).length;
   const nSuggest = shown.filter((i) => i.suggest && !chosen[i.key]).length;
+  const nChecked = shown.filter((i) => checked.has(i.key) && i.suggest).length;
+
+  function toggleCheck(key: string) {
+    setChecked((p) => {
+      const n = new Set(p);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  }
+  function adoptChecked() {
+    setChosen((p) => {
+      // チェックした分は、選び直していても提案どおりに戻す（本人がチェックで指したので）
+      const out = { ...p };
+      for (const i of shown) if (checked.has(i.key) && i.suggest) out[i.key] = i.suggest;
+      return out;
+    });
+    setChecked(new Set());
+  }
 
   function choose(it: AllItem, act: string) {
     setChosen((p) => {
@@ -74,13 +113,10 @@ export default function AllClient() {
     const picked = items.filter((i) => chosen[i.key]);
     try {
       // 片付け: まとめて1回
-      const cl = picked.filter((i) => i.genre === "cleanup" && i.cleanup);
+      const cl = picked.filter((i) => isCleanup(i) && i.cleanup && cleanupChoice(i, chosen[i.key]));
       if (cl.length) {
         const ch: Choices = {};
-        for (const i of cl) {
-          const a = chosen[i.key];
-          ch[i.id] = a === LATER ? { act: "keep" } : { act: a as "close" | "drop" };
-        }
+        for (const i of cl) ch[i.id] = cleanupChoice(i, chosen[i.key])!;
         const rows = buildCleanupDecisions(cl.map((i) => i.cleanup!), ch, Date.now().toString(36), new Date().toISOString());
         try {
           const r = await fetch("/api/cleanup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ decisions: rows }) });
@@ -146,10 +182,57 @@ export default function AllClient() {
         });
         lines.push(`お題 ${ok}/${tl.length}件`);
       }
+      // Zaim: 1件ずつ順に（同じ見張りの行を読み書きするので並べない）
+      const zl = picked.filter((i) => i.genre === "zaim");
+      if (zl.length) {
+        let ok = 0;
+        const run = Date.now().toString(36);
+        await pool(zl, 1, async (i) => {
+          try {
+            const r = await fetch("/api/zaim", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ id: i.id, verdict: chosen[i.key], note: "", idemKey: `lw-zaim-all-${i.id}-${run}` }),
+            });
+            const j = await r.json();
+            if (j.ok) {
+              ok += 1;
+              done.add(i.key);
+            }
+          } catch {
+            /* 失敗は残す */
+          }
+        });
+        lines.push(`Zaim ${ok}/${zl.length}件`);
+      }
+      // ルール候補: 1件ずつ（採用＝承認。本人が押したものだけ）
+      const rl = picked.filter((i) => i.genre === "rule" && i.rule);
+      if (rl.length) {
+        let ok = 0;
+        const run = Date.now().toString(36);
+        await pool(rl, 1, async (i) => {
+          try {
+            const r = await fetch("/api/rules/decide", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ verdict: chosen[i.key], candidate: i.rule, idemKey: `lw-rule-all-${i.id}-${run}` }),
+            });
+            const j = await r.json();
+            if (j.ok) {
+              ok += 1;
+              done.add(i.key);
+            }
+          } catch {
+            /* 失敗は残す */
+          }
+        });
+        lines.push(`ルール ${ok}/${rl.length}件`);
+      }
     } finally {
       // 記録できたものは一覧から外し、できなかったものは選んだまま残す
       setItems((cur) => (cur || []).filter((i) => !done.has(i.key)));
       setChosen((p) => Object.fromEntries(Object.entries(p).filter(([k]) => !done.has(k))));
+      setChecked((p) => new Set([...p].filter((k) => !done.has(k))));
       setReport(lines);
       setSaving(false);
     }
@@ -158,8 +241,9 @@ export default function AllClient() {
   if (err) return <p className="meta">{err}</p>;
   if (!items) return <p className="meta">読み込み中…</p>;
 
-  const genres: (Genre | "all")[] = ["all", "mail", "cleanup", "topic"];
+  const genres: (Genre | "all")[] = ["all", ...GENRES.filter((g) => counts.genre[g] > 0)];
   const levels: (Level | 0)[] = [0, 3, 2, 1];
+  const sorts: SortMode[] = ["level", "overdue", "quick"];
 
   return (
     <div className="all-wrap">
@@ -169,7 +253,8 @@ export default function AllClient() {
           <span>件が判断待ち</span>
         </div>
         <div className="meta">
-          高 {counts.level[3]}／中 {counts.level[2]}／低 {counts.level[1]}　（メール {counts.genre.mail}・片付け {counts.genre.cleanup}・お題 {counts.genre.topic}）
+          高 {counts.level[3]}／中 {counts.level[2]}／低 {counts.level[1]}　提案あり {counts.suggest}
+          {counts.overdue ? `　期日超過 ${counts.overdue}` : ""}
         </div>
         <div className="all-chips" role="group" aria-label="重要度">
           {levels.map((l) => (
@@ -183,16 +268,37 @@ export default function AllClient() {
           {genres.map((g) => (
             <button key={g} className={`chip ${filter.genre === g ? "on" : ""}`} onClick={() => setFilter({ ...filter, genre: g })}>
               {g === "all" ? "ぜんぶ" : GENRE_LABEL[g]}
-              {g === "all" ? "" : ` ${counts.genre[g]}`}
+              <span className="all-badge">{g === "all" ? counts.total : counts.genre[g]}</span>
+            </button>
+          ))}
+        </div>
+        <div className="all-chips" role="group" aria-label="判断の重さ・提案">
+          <button className={`chip ${filter.weight === "quick" ? "on" : ""}`} onClick={() => setFilter({ ...filter, weight: filter.weight === "quick" ? "all" : "quick" })}>
+            すぐ決まる {counts.weight.quick}
+          </button>
+          <button className={`chip ${filter.weight === "deep" ? "on" : ""}`} onClick={() => setFilter({ ...filter, weight: filter.weight === "deep" ? "all" : "deep" })}>
+            じっくり {counts.weight.deep}
+          </button>
+          <button className={`chip ${filter.suggestOnly ? "on" : ""}`} onClick={() => setFilter({ ...filter, suggestOnly: !filter.suggestOnly })}>
+            提案ありだけ {counts.suggest}
+          </button>
+        </div>
+        <div className="all-chips" role="group" aria-label="並べ替え">
+          {sorts.map((m) => (
+            <button key={m} className={`chip ${sort === m ? "on" : ""}`} onClick={() => setSort(m)}>
+              {SORT_LABEL[m]}
             </button>
           ))}
         </div>
         <div className="all-quick">
-          <button className="secondary" onClick={() => setFilter({ genre: "all", level: 3 })}>
+          <button className="secondary" onClick={() => setFilter({ genre: "all", level: 3, weight: "all", suggestOnly: false })}>
             時間がない：重要度「高」だけ
           </button>
           <button className="secondary" disabled={!nSuggest} onClick={() => setChosen((p) => adoptSuggestions(shown, p))}>
             表示中の提案どおり {nSuggest}件を選ぶ
+          </button>
+          <button className="secondary" disabled={!nChecked} onClick={adoptChecked}>
+            チェックした {nChecked}件を提案どおりに
           </button>
         </div>
       </div>
@@ -220,22 +326,40 @@ export default function AllClient() {
         const expanded = open === it.key;
         return (
           <div key={it.key} className={`glass all-row lv${it.level} ${v ? "picked" : ""}`}>
-            <button className="all-main-btn" onClick={() => setOpen(expanded ? null : it.key)} aria-expanded={expanded}>
-              <span className={`all-lv lv${it.level}`}>{LEVEL_LABEL[it.level]}</span>
-              <span className="all-tt">
-                <b>{it.title}</b>
-                <span className="meta">
-                  {GENRE_LABEL[it.genre]}｜{it.sub}
+            <div className="all-row-top">
+              {it.suggest ? (
+                <input
+                  type="checkbox"
+                  className="all-check"
+                  aria-label="提案どおりの対象にする"
+                  checked={checked.has(it.key)}
+                  onChange={() => toggleCheck(it.key)}
+                />
+              ) : (
+                <span className="all-check-sp" />
+              )}
+              <button className="all-main-btn" onClick={() => setOpen(expanded ? null : it.key)} aria-expanded={expanded}>
+                <span className={`all-lv lv${it.level}`}>{LEVEL_LABEL[it.level]}</span>
+                <span className="all-tt">
+                  <b>{it.title}</b>
+                  <span className="meta">
+                    <span className={`all-gtag g-${it.genre}`}>{GENRE_LABEL[it.genre]}</span>
+                    {it.weight && WEIGHT_MARK[it.weight] && <span className={`all-wtag w-${it.weight}`}>{WEIGHT_MARK[it.weight]}</span>}
+                    {(it.overdue ?? 0) > 0 && <span className="all-otag">{it.overdue}日超過</span>}
+                    {it.sub}
+                  </span>
+                  {it.suggest && <span className="meta all-sugline">提案: {it.options.find((o) => o.act === it.suggest)?.label}（{it.why}）</span>}
                 </span>
-              </span>
-            </button>
+              </button>
+            </div>
             {expanded && (
               <div className="all-detail">
                 {it.summary && <div className="meta">{it.summary}</div>}
-                <div className="meta">重要度の理由: {it.why}</div>
+                <div className="meta">理由: {it.why}</div>
+                {it.weightWhy && <div className="meta">重さ: {it.weightWhy}</div>}
                 {it.link && (
                   <Link className="wk-link" href={it.link} target={it.link.startsWith("http") ? "_blank" : undefined}>
-                    {it.genre === "mail" ? "開いて返信する／全文を見る" : it.genre === "topic" ? "案の中身を見る" : "元のメールを開く"}
+                    {LINK_LABEL[it.genre]}
                   </Link>
                 )}
               </div>
@@ -247,6 +371,11 @@ export default function AllClient() {
                   {it.suggest === o.act ? " ★" : ""}
                 </button>
               ))}
+              {!it.options.length && it.link && (
+                <Link className="all-open" href={it.link}>
+                  開いて決める
+                </Link>
+              )}
             </div>
           </div>
         );

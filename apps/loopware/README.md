@@ -27,6 +27,26 @@ npm run dev   # http://127.0.0.1:3004
 - `/drafts` 下書きを直す（箇所を選んで声でダメ出し → ダメ出しは箇所ごとに即記録 → 「まとめて直す」で Mac の Cursor（定額）が新しい版 → 差分。判断ログ surface=draft_review。従量課金の API キーは不要）
 - `/312?tab=misses` 提案を仕分ける（いろんなソースの候補を 採る／見送る／保留 → コメント → 最後に選ばなかった理由）
 
+## まとめて判断（`/all`）
+
+ジャンルをまたいで1画面で判断する（2026-11-25 松野さん要望・Todoist 6j4hH9FW4rFF7J97）。部品は `lib/allCore.ts`、一覧は `/api/all`。
+
+| ジャンル | 材料 | その場の選択 | 記録・反映（既存の道のまま） |
+|---|---|---|---|
+| メール | 判断デスク（`loadDeskCards`） | ToDo／済み／見送る／あとで | `/api/desk/decide` |
+| 318 要判断 | `sync_meta.todoist_cleanup_snapshot`（origin=318） | 完了／残す | `/api/cleanup` → owner_decisions(todoist_313) → cleanup reflect |
+| 313 週の整理 | 同上（origin=313） | 済み／やめる／残す（やめるも完了扱い） | 同上 |
+| スター片付け | 同上（origin なし） | 完了／残す | 同上 |
+| お題 | `task_loop_topics`（312） | 案n／保留 | `/api/decide` |
+| 今週の9件 | `sync_meta.weekly_pick_snapshot`（未確定の週だけ1行） | なし（「開いて決める」→ `/week`） | `/api/week` |
+| Zaim | `watch_status(zaim_quality)` | 正しい／違う | `/api/zaim` |
+| ルール候補 | `sync_meta.loopware_rule_candidates`（未判断だけ） | 採用／今回だけ／違う | `/api/rules/decide` |
+
+- 並べ替え: 重要度順／期日超過順／すぐ決まる順。絞り込み: ジャンル（件数バッジ）・重要度・すぐ決まる／じっくり・提案ありだけ
+- 判断の重さ（すぐ／じっくり）は今週の9件の材料（`config/todoist_weekly_weight.yaml` で判定済み）から同じタスク id に付ける。分からない件は印なし（推測で付けない）
+- 提案どおり: 行の ★、チェックした分、表示中ぜんぶ。どれも「選ぶ」だけで、「まとめて確定」を押すまで何も記録しない
+- Todoist の削除はここでは選べない（318・スターの「削除」は `/313/bulk` だけ）。Zaim・ルール候補には提案を置かない（基準は本人が選ぶ）
+
 ## 312 の本物のお題（collect／reflect）
 
 - `scripts/jarvis_todoist_312_collect.py`（`.github/workflows/todoist-312-collect.yml`）
