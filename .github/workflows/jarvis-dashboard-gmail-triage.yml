@@ -54,8 +54,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 05:00 本便だけ Mac 定刻キック（jarvis_gha_precise_kick.py）との二重実行を防ぐ。
+  # 日中便の schedule は guard を通さない（朝のキックで日中便が skip されないように）。
+  guard:
+    if: ${{ github.event_name != 'schedule' || github.event.schedule == '0 20 * * *' }}
+    uses: ./.github/workflows/_kick-guard.yml
+    permissions:
+      actions: read
+
   triage:
-    if: ${{ !((github.event.schedule == '0 0-12/2 * * *') && vars.JARVIS_GMAIL_DAYTIME_DISABLE == '1') }}
+    needs: guard
+    if: ${{ !cancelled() && needs.guard.outputs.skip != 'true' && !((github.event.schedule == '0 0-12/2 * * *') && vars.JARVIS_GMAIL_DAYTIME_DISABLE == '1') }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
