@@ -30,3 +30,14 @@ export function isUnread(status: string | null | undefined): boolean {
 export function isClosed(status: string | null | undefined): boolean {
   return CLOSED_STATUSES.includes((status || "") as TriageStatus);
 }
+
+export const NEEDS_REVIEW_LABEL = "要確認: 送信先が返信不可アドレス";
+
+/** 送信の最終関門が返信不可宛で止めたカード（payload.needs_review=true） */
+export function needsReview(payload: unknown): boolean {
+  return (
+    !!payload &&
+    typeof payload === "object" &&
+    (payload as { needs_review?: unknown }).needs_review === true
+  );
+}

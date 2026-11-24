@@ -14,7 +14,12 @@ import {
   type LaneView,
 } from "@/lib/laneView";
 import { resolvePartnerToEmail } from "@/lib/partnerContacts";
-import { STATUS_LABEL, type TriageStatus } from "@/lib/triageStatus";
+import {
+  NEEDS_REVIEW_LABEL,
+  STATUS_LABEL,
+  needsReview,
+  type TriageStatus,
+} from "@/lib/triageStatus";
 import {
   filterOutMutedSenders,
   muteRegistryFromMetaMap,
@@ -370,6 +375,11 @@ export default async function TriageLanePage({
                 <article className="card focus-card">
                   <header>
                     <strong>{focus.partner || focus.from_email || "—"}</strong>
+                    {needsReview(focus.payload) ? (
+                      <span className="status-badge status-needs-review">
+                        {NEEDS_REVIEW_LABEL}
+                      </span>
+                    ) : null}
                     <span className="meta">
                       {focus.folder} · {focus.received_at}
                     </span>
@@ -505,6 +515,11 @@ export default async function TriageLanePage({
                       <strong>
                         {it.partner || it.from_email || it.subject}
                       </strong>
+                      {needsReview(it.payload) ? (
+                      <span className="status-badge status-needs-review">
+                        {NEEDS_REVIEW_LABEL}
+                      </span>
+                    ) : null}
                       <span className="meta">{it.received_at}</span>
                       <TriageStatusActions
                         id={it.id}

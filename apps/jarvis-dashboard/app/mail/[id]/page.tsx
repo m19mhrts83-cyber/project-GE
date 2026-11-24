@@ -22,7 +22,12 @@ import {
   laneLabel,
   mailPriorityToLevel,
 } from "@/lib/homeLevels";
-import { STATUS_LABEL, type TriageStatus } from "@/lib/triageStatus";
+import {
+  NEEDS_REVIEW_LABEL,
+  STATUS_LABEL,
+  needsReview,
+  type TriageStatus,
+} from "@/lib/triageStatus";
 import { createClient } from "@/lib/supabase/server";
 
 /** Cursor Cloud Agent 見直しの待ち時間用 */
@@ -100,6 +105,14 @@ export default async function MailDetailPage({
           {st === "sent" ? (
             <span className="status-badge status-sent" style={{ marginLeft: 4 }}>
               送りました
+            </span>
+          ) : null}
+          {needsReview(payload) ? (
+            <span
+              className="status-badge status-needs-review"
+              style={{ marginLeft: 4 }}
+            >
+              {NEEDS_REVIEW_LABEL}
             </span>
           ) : null}
           <strong>{it.partner || it.from_email || "—"}</strong>

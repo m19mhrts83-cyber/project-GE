@@ -2877,6 +2877,12 @@ p.back {
   border-color: #fed7aa;
 }
 
+.status-badge.status-needs-review {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
 .focus-nav {
   display: flex;
   gap: 8px;
