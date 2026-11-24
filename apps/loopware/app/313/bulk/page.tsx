@@ -16,6 +16,9 @@ export default function CleanupBulkPage() {
           <h1>まとめて片付ける</h1>
         </div>
       </div>
+      <Link className="wk-link" href="/all" style={{ display: "inline-block", margin: "0 0 10px" }}>
+        ジャンルをまたいで決める（まとめて判断）→
+      </Link>
       <CleanupBulkClient />
     </main>
   );

@@ -23,7 +23,7 @@ export default function HubPage() {
         </span>
         <span className="txt">
           <strong>まとめて判断</strong>
-          <span className="meta">メール・片付け・お題を1画面で。重要度の順に、提案どおりをまとめて確定</span>
+          <span className="meta">メール・318・313 週の整理・お題・今週の9件・Zaim・ルール候補を1画面で。重要度・期日超過・すぐ決まるで並べて、提案どおりをまとめて確定</span>
         </span>
         <Icon name="next" size={18} />
       </Link>

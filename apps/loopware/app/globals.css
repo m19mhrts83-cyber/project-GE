@@ -2262,3 +2262,20 @@ main.wk-main { max-width: 600px; }
 .all-bar-in { max-width: 560px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25); }
 .all-bar-in .primary { min-height: 44px; padding: 0 16px; background: var(--accent); color: var(--on-accent); border: 1px solid var(--accent); border-radius: 10px; font-weight: 700; }
 .all-bar-in .primary:disabled { opacity: 0.45; }
+
+/* まとめて判断: ジャンルのバッジ・チェック・重さ／超過の印（2026-11-25） */
+.all-badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 6px; padding: 0 6px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); font-size: 11px; font-weight: 700; }
+.all-chips .chip.on .all-badge { border-color: var(--accent); }
+.all-row-top { display: flex; gap: 8px; align-items: flex-start; }
+.all-check { flex: none; width: 24px; height: 24px; margin: 10px 0 0; accent-color: var(--accent); }
+.all-check-sp { flex: none; width: 24px; }
+.all-gtag, .all-wtag, .all-otag { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px; font-size: 11px; line-height: 18px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); }
+.all-wtag.w-quick { border-color: #3fb97f; }
+.all-wtag.w-deep { border-color: #8a7bff; }
+.all-otag { border-color: #ff6b6b; color: #ff6b6b; font-weight: 700; }
+.all-sugline { overflow-wrap: anywhere; }
+.all-open { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--accent); color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 700; }
+@media (max-width: 420px) {
+  .all-acts button { flex: 1 1 calc(33% - 6px); padding: 0 8px; }
+  .all-quick button { font-size: 13px; }
+}
