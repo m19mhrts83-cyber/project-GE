@@ -71,6 +71,8 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 書き出し: `【報告】317 コメント起動｜…`  
 **同一未処理メモ集合は再掲しない**（fingerprint／`sync_meta.comment_dispatch_slack_fp`）。連投掃除は `jarvis_comment_dispatch_slack_cleanup.py`。
 
+- 判定色は呼び出し側で明示する（`report_signal`）: 未処理メモ・要判断・failover（Mac停止→GHA）= yellow／Phase B 失敗・Cloud枠なし・下流 rc≠0 = red／完了だけ = green。report は推定だと常に🟢になるため（2026-11-24）
+
 ## 5. 成果物の置き場
 
 - 依頼: [`TASK.md`](./TASK.md)
