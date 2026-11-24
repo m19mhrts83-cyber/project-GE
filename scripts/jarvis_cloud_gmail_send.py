@@ -26,6 +26,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import sys
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -34,6 +35,23 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[1]
 MANUAL = REPO / "215_kamiooya" / "C1_cursor" / "1b_Cursorマニュアル"
 CRED_DIR = REPO / ".credentials"
+
+
+_BLOCKED_RECIPIENT_RE = re.compile(
+    r"(^|[._+-])(no-?reply|noreplyto|do-?not-?reply)([._+@-]|$)|mailer-daemon|postmaster@|@(?:[a-z0-9-]+\.)*google\.com$",
+    re.IGNORECASE,
+)
+
+
+def blocked_recipients(to: str) -> list[str]:
+    """noreply／自動通知など送ってはいけない宛先（To 内の全アドレスを検査）。"""
+    out: list[str] = []
+    for part in re.split(r"[,;]", to or ""):
+        m = re.search(r"<([^>]+)>", part)
+        addr = (m.group(1) if m else part).strip().lower()
+        if addr and _BLOCKED_RECIPIENT_RE.search(addr):
+            out.append(addr)
+    return out
 
 
 def _b64_write(env_name: str, dest: Path) -> bool:
@@ -138,6 +156,9 @@ def send_mail(
     thread_id: str | None,
     dry_run: bool,
 ) -> dict[str, Any]:
+    blocked = blocked_recipients(to)
+    if blocked:
+        raise SystemExit(f"送信禁止宛先です（noreply／自動通知）。needs_review として人が確認してください: {blocked[0]}")
     msg = MIMEText(body, _charset="utf-8")
     msg["to"] = to
     msg["subject"] = subject
