@@ -5,9 +5,33 @@
 
 - FlowForge（閲覧／編集）: [flow_HyQRXkqw8SMz_Jg1ipPsQVcp](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_HyQRXkqw8SMz_Jg1ipPsQVcp)
 - Flowforge 入口: https://flowforge-259747770348.asia-northeast1.run.app/
-- 更新: 2026-10-21（**毎日20:00のL1ダイジェストを本線化**／完了動線・塩梅・運用格上げ／FlowForgeキャンバスを実装同型に同期）
+- 更新: 2026-11-24（**金曜 20:00 の週の整理に一本化**・下の「週の整理」）／2026-10-21（毎日20:00のL1ダイジェストを本線化／完了動線・塩梅・運用格上げ／FlowForgeキャンバスを実装同型に同期）
 
-## いまの結論（文字1行）
+## 週の整理（本線・2026-11-24〜・松野さん了承・Orca 項目50）
+
+> **毎晩 20:00 の片付け（3択・期日ずらし）は止めた**。期日は土曜 07:00 の「今週の9件」（loopware `/week`）で決める。
+> 313 の仕事は **A 済みました／B やめてもいいのでは** の2つだけ。下の「いまの結論」以降は旧運用の記録（手動で使う時だけ）。
+
+| # | 種別 | 実行者・道具 | 作業 |
+|---|---|---|---|
+| W1 | プログラム | launchd `com.matsunoma.jarvis.todoist-313-digest`（**金曜 20:00**）→ runner | 起動。金曜以外は何もしない（plist 入れ替え前でも runner が止める）。停止スイッチ `JARVIS_TODOIST_313_WEEKLY_DISABLE=1` |
+| W2 | プログラム | `jarvis_todoist_313_weekly.py` | 基準 `config/todoist_313_weekly.yaml` を読む。**読めなければ止める**（基準なしで動かない） |
+| W3 | 外部サービス | Todoist（本人トークン）・Supabase | 未完了タスク・コメント、318 の /313/bulk 待ち、今週の9件の確定、313 カードの「残す」（4週）を読む。Supabase が読めなければ **B は載せない**（A は進める＝部分成功） |
+| W4 | 外部サービス | GitHub API（`gh auth token`） | 説明・コメントに貼られた PR・Issue・別タスクの済み状況を読む。読めないリンクは「済み」と数えない |
+| W5 | プログラム | 同上（判定） | **A**: PR・Issue が**すべて**済み、済んだのがタスク作成後、その後に「済み」報告以外のコメントなし、保留語（確認・待ち・本番・【松野さん】・お金・対外 等）なし、子タスクなし、繰り返しでない、318 が聞いていない。**B**: 21日以上 題・説明・コメントが動いていない（先の期日・今週の9件・318 の待ち・残す4週内・繰り返しは除く）＋A に届かなかった「済み？」 |
+| W6 | プログラム | 同上（A を閉じる） | 1件ずつ Todoist コメント（根拠1行＋リンク・戻し方）→ close。`.jarvis_state/todoist_313_weekly.json` に task_id・根拠・戻せる期限（7日）を記録、owner_decisions に action=close。上限 15件（超えた分は翌週） |
+| W7 | プログラム | 同上（B を載せる） | `sync_meta.todoist_313_weekly_queue` に置く（上限20件）。GHA `todoist-cleanup-bulk`（30分ごと）が /313/bulk の材料に混ぜる（318 → 313 → スター起票の順・見出しで分ける） |
+| W8 | 外部サービス | Slack `#consult`（Webhook） | **1通**「【相談】313 週の整理」: 済みました n件（根拠リンク）／やめる提案 n件／/313/bulk へのリンク |
+| W9 | 人間 | 松野さん・loopware `/313/bulk` | B を **済み／やめる／残す** で選んで確定（初期選択なし＝選んだ件だけ） |
+| W10 | プログラム | GHA `jarvis_todoist_cleanup_bulk.py --mode reflect` | 済み・やめる → コメント＋**完了**（削除しない）。残す → defer（313 は4週、画面は14日出さない） |
+
+- 成功: W6 の close と W7 の掲載と W8 の送信がすべて通った。**部分成功**: close の一部失敗／B を載せられない／Slack 失敗（state の `last_run.result=partial` と Slack の ⚠ 行）。**失敗**: 基準・Todoist が読めない（何も書かない）
+- 保存（W6・W7）と画面反映（W9 で見える）は別。画面は W7 の 30 分以内の snapshot で反映
+- 戻り矢印（今回の取り直し）: W6 で閉じた件が違った → **7日以内**に `jarvis_todoist_313_weekly.py --undo list` → `--undo N`（または Todoist の完了済みから戻す）→ 次の W5 で再判定。条件なしの再実行はしない
+- 戻り矢印（次回基準の改善）: 誤って閉じた・閉じ損ねた型が2件以上 → `config/todoist_313_weekly.yaml`（保留語・日数）を PR で直す（本人了承）→ W2
+- 318 との分担: 318＝やり切る・判断を聞く（毎朝 10:30・②→/313/bulk）、313＝済み・やめるの整理だけ。318 が載せた件は 313 が出さず、313 が載せた件（state の `b_ids`・8日）は 318 が載せない
+
+## いまの結論（文字1行・旧運用）
 
 完了相当をスキャン → 塩梅（L0確認のみ静かに／L1ダイジェスト見るだけ／L2個別了承）→ Slack → **了承または確認のみ例外で Todoist close**。新規起票は312。  
 **2026-11-07〜**: 滞留は「313 片付け」**3択**（済んだ／いつ・優先／やめる）。外作業済みは根拠コメント付き消し込み。迷い・直すは `apps/loopware` `/313`。
@@ -16,7 +40,7 @@
 
 | きっかけ | 時刻 | 何が起きる | 実装 |
 |---|---|---|---|
-| **定時片付け（本線・2026-11-07〜）** | **毎日 20:00** | **1通「313 片付け」**・上位5件・3択（済んだ／いつ・優先／やめる）＋loopware リンク。自動変更なし | `jarvis_todoist_313_cleanup.py`／launchd `com.matsunoma.jarvis.todoist-313-digest` |
+| 定時片付け（2026-11-07〜11-24・**停止**） | 旧 毎日 20:00 | **1通「313 片付け」**・上位5件・3択（済んだ／いつ・優先／やめる）＋loopware リンク。自動変更なし | `jarvis_todoist_313_cleanup.py`／launchd `com.matsunoma.jarvis.todoist-313-digest` |
 | 人の依頼 | 随時 | `/todoist-batch`・「掃除して」→ L1/L0 | skill `todoist-batch-sweep` |
 | 完了相当 | 随時 | 会話で完了相当 → 即スキャン | 313_digest |
 | 312／hawk | 随時 | 完了疑い・`owner_confirm` を合流 | 同上 |

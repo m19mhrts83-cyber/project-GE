@@ -1,5 +1,6 @@
 #!/bin/zsh
 set -euo pipefail
+# 313 週の整理（金曜 20:00）。2026-11-24 に毎日 20:00 → 金曜だけに変更
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -31,6 +32,8 @@ cat > "$PLIST" <<EOF
   <false/>
   <key>StartCalendarInterval</key>
   <dict>
+    <key>Weekday</key>
+    <integer>5</integer>
     <key>Hour</key>
     <integer>20</integer>
     <key>Minute</key>
@@ -50,6 +53,6 @@ launchctl enable "gui/${UID_VALUE}/${LABEL}" || true
 launchctl bootstrap "gui/${UID_VALUE}" "$PLIST"
 
 echo "Installed: ${LABEL}"
-echo "Schedule: every day 20:00 (local)"
+echo "Schedule: every Friday 20:00 (local) — 313 週の整理"
 echo "Logs: ${LOG_DIR}/"
 launchctl print "gui/${UID_VALUE}/${LABEL}" | /usr/bin/awk '/state =|last exit code|runs =/'

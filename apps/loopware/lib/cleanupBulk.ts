@@ -21,8 +21,15 @@ export type CleanupCard = {
   suggest: Suggest;
   why: string;
   priority?: string | number | null;
-  /** 318 Todoist消化係から来た判断依頼（②）。scripts/jarvis_todoist_318_handoff.py が作る */
-  origin?: "318";
+  /**
+   * どこから来たカードか。
+   * 318 … Todoist消化係の判断依頼（②）。scripts/jarvis_todoist_318_handoff.py が作る
+   * 313 … 週の整理（金曜）の「済み？／やめてもいいのでは」。scripts/jarvis_todoist_313_weekly.py が作る。
+   *       選べるのは 済み／やめる／残す だけ。やめるも完了扱い（削除しない）
+   */
+  origin?: "318" | "313";
+  /** 313: 済みの根拠（PR・Issue 等）へのリンク */
+  evidence_url?: string | null;
   deadline?: string | null;
   /** 前回の本人判断（例: 前回: 残す（2026-11-20）） */
   prev?: string;
@@ -36,6 +43,8 @@ export type CleanupSnapshot = {
   cards: CleanupCard[];
   /** 318 から足した件数 */
   from_318?: number;
+  /** 313 週の整理から足した件数 */
+  from_313?: number;
 };
 
 /** 松野さんの選択。未選択のカードは何も記録しない（おすすめは初期表示だけ） */
@@ -47,6 +56,30 @@ export const ACT_LABEL: Record<Choice["act"], string> = {
   drop: "削除",
   reschedule: "日を変える",
   keep: "残す",
+};
+
+/** 313 週の整理のカードで出す選択肢と呼び方（やめる＝完了扱い。削除・日を変えるは出さない） */
+export const ACTS_313: Choice["act"][] = ["close", "drop", "keep"];
+export const ACT_LABEL_313: Record<Choice["act"], string> = {
+  close: "済み",
+  drop: "やめる",
+  reschedule: "日を変える",
+  keep: "残す",
+};
+
+export function actLabel(c: Pick<CleanupCard, "origin">, act: Choice["act"]): string {
+  return c.origin === "313" ? ACT_LABEL_313[act] : ACT_LABEL[act];
+}
+
+/** 一覧の並び（318 → 313 → スター起票）ごとの見出し */
+export function groupOf(c: Pick<CleanupCard, "origin">): "318" | "313" | "star" {
+  return c.origin === "318" || c.origin === "313" ? c.origin : "star";
+}
+
+export const GROUP_TITLE: Record<"318" | "313" | "star", string> = {
+  "318": "318 判断依頼（やり切る前に聞きたいこと）",
+  "313": "313 週の整理（済み？／やめてもいいのでは）",
+  star: "スター付きメール由来",
 };
 
 /** 契約の action: keep は defer（今回は見送り・候補に残す）で記録する */
@@ -72,6 +105,7 @@ export function buildCleanupDecisions(
     const ch = choices[c.id];
     if (!ch) continue;
     if (ch.act === "reschedule" && !isDate(ch.due)) continue;
+    if (c.origin === "313" && !ACTS_313.includes(ch.act)) continue; // 313 のカードは 済み・やめる・残す だけ
     out.push({
       surface: "todoist_313",
       action: ACTION_OF[ch.act],
@@ -90,7 +124,7 @@ export function buildCleanupDecisions(
         why: c.why,
         sender: c.sender,
         age_days: c.age_days,
-        label: c.origin === "318" ? "318判断依頼" : "スター起票",
+        label: c.origin === "318" ? "318判断依頼" : c.origin === "313" ? "313週の整理" : "スター起票",
         origin: c.origin,
         followed_suggest: ch.act === c.suggest,
       },

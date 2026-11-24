@@ -96,6 +96,25 @@ def asked_by_313(path: Path, now: datetime) -> set[str] | None:
     return {str(x.get("task_id")) for x in (d.get("items") or []) if isinstance(x, dict) and x.get("task_id")}
 
 
+WEEKLY_313_DAYS = 8  # 313 週の整理（金曜）が /313/bulk に載せた件は、次の金曜まで 318 から聞かない
+
+
+def asked_by_313_weekly(path: Path, now: datetime) -> set[str] | None:
+    """313 週の整理が /313/bulk に載せた task_id（8日以内）。ファイルが無い＝出していない。壊れている＝分からない（None）。"""
+    if not path.is_file():
+        return set()
+    try:
+        d = json.loads(path.read_text(encoding="utf-8"))
+        at = datetime.fromisoformat(str(d.get("at") or ""))
+    except Exception:  # noqa: BLE001
+        return None
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=now.tzinfo)
+    if now - at > timedelta(days=WEEKLY_313_DAYS):
+        return set()
+    return {str(x) for x in (d.get("b_ids") or []) if x}
+
+
 def published_queue_ids(path: Path) -> set[str]:
     """313 片付け側で使う: 318 が /313/bulk に実際に載せた件。無い・壊れている・未公開なら空。"""
     try:

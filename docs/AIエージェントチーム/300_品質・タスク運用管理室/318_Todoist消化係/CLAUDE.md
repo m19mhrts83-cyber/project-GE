@@ -13,7 +13,7 @@ Phase 3 準備として【318】コメント（`--write-comments`）と 10:30 �
 - 仕様を変えたい時は独断で変えない。300 BL（ラスカル）に相談する
 - 実装: `scripts/jarvis_todoist_318_triage.py`（本体）・`scripts/jarvis_todoist_318_handoff.py`（Phase 2 の部品）・`scripts/jarvis_todoist_318_comment.py`（【318】コメント）・`scripts/jarvis_todoist_morning_slot.py`（朝枠の排他）／基準: `config/todoist_318_criteria.yaml`／テスト: `scripts/tests/test_todoist_318_triage.py`・`test_todoist_318_phase2.py`・`test_todoist_318_phase3.py`
 - 10:30 の移管: [`移管手順_10時30分.md`](./移管手順_10時30分.md)（止める順番・戻し方。launchd は 2026-11-23 登録済み）
-- 関係: 起票は [312](../312_Todoist起票整理係/CLAUDE.md)、完了・片付け・毎朝の 0.5 は [313](../313_完了候補確認係/CLAUDE.md)、コメント起動は [317](../317_コメント起動係/CLAUDE.md)
+- 関係: 起票は [312](../312_Todoist起票整理係/CLAUDE.md)、済み・やめるの週の整理（金曜）は [313](../313_完了候補確認係/CLAUDE.md)、コメント起動は [317](../317_コメント起動係/CLAUDE.md)
 
 ## 1. 役割
 
@@ -25,13 +25,14 @@ Phase 3 準備として【318】コメント（`--write-comments`）と 10:30 �
   - 1-4 3分類と根拠。迷ったら②。大規模は印だけ付けて既存タスクのまま
   - 内部ログ（`.jarvis_state/todoist_318/`・git 管理外）に分類根拠・採用基準・判断案・停止理由・次回再評価条件・処理日時と「報告案」を保存
 - **やること（Phase 2・既定は案の保存まで）**
-  - 本人回答の読み戻し: owner_decisions（surface=`todoist_313`・target_type=`todoist_task`。/313/bulk と 20:00 のボタン）の最新を毎回読む。読めなければ安全停止（`--owner-answers skip` を明示した時だけ読まない）
+  - 本人回答の読み戻し: owner_decisions（surface=`todoist_313`・target_type=`todoist_task`。/313/bulk と旧 20:00 のボタン）の最新を毎回読む。読めなければ安全停止（`--owner-answers skip` を明示した時だけ読まない）
     - 回答だけが変わった件は「回答取込」として聞き直さない。再評価は「日を変える」→その日、「残す」→14日後、ほかの項目が後から変わった時
   - ② → `/313/bulk`: 回答待ちの ② を CleanupCard と同じ形で `sync_meta.todoist_318_bulk_queue` に置く（`--publish` の時だけ）。既存の `jarvis_todoist_cleanup_bulk.py`（GHA 30分ごと）が画面の材料に混ぜる。選んだ結果は既存どおり owner_decisions に残り、完了・削除・日を変えるは既存の reflect が反映する
   - ③ → 312「今週の9件」: `sync_meta.todoist_318_weekly_handoff`（`--publish` の時だけ）。週次ピックが候補に入れ、理由「318: 本人の操作が要る」を付ける（🤖 の件でも入る）
     - 週次側で判断の重さを付ける（2026-11-23）: ③（本人の操作）は「すぐ決まる」の手がかり、大規模（週次へ）は「じっくり」の手がかり（`config/todoist_weekly_weight.yaml`）。じっくりは週1件・火金の枠、すぐ決まるは月→水→金に前倒し
   - 通知・報告の案: `#consult`（新しく待ちに入った件だけ・1回だけ）と `#ai-hub`（終了報告）。`drafts/` に保存。**送るのは `--send-slack` の時だけ**。`#consult` は `--publish` で画面に載っていない時は送らない
-  - 313 との二重質問の防止（同じタスクは片方だけ）: 313 の 20:00 片付けが36時間以内に出した件は 318 が載せない。318 が載せた件（`bulk_queue.json` の published=true）は 313 の片付けが出さない。313 の状態が読めない時は ② を載せない（部分成功）
+  - 313 との分担（2026-11-24〜）: 318＝やり切る・判断を聞く、313＝金曜の「週の整理」（済みました・やめる提案）だけ。313 の毎晩 20:00 片付けは停止
+  - 313 との二重質問の防止（同じタスクは片方だけ）: 313 の週の整理が /313/bulk に載せた件（`.jarvis_state/todoist_313_weekly.json` の `b_ids`・8日以内）と、旧 20:00 片付けが36時間以内に出した件は 318 が載せない。318 が載せた件（`bulk_queue.json` の published=true）は 313 の片付けが出さない。313 の状態が読めない時は ② を載せない（部分成功）
 - **やること（Phase 3 準備・既定はオフ）**
   - 【318】コメント（`--write-comments` の本実行だけ）: 内部ログと判断履歴を保存できた後、変化があって分類し直した件だけに追記する
     - 中身: 先頭【318】＋処理状態（① 途中／② 要判断／③ 本人作業）・要約・成果物・残作業／必要な判断・末尾 `処理ID: <run_id>`。下書きは毎回 `runs/<run_id>.json` の `comment_draft`
