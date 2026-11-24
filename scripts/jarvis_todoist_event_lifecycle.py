@@ -154,7 +154,7 @@ class Lifecycle:
                 "GET",
                 f"sync_meta?key=eq.{urllib.parse.quote(SINCE_META_KEY)}&select=value",
             )
-        except Exception as exc:  # noqa: BLE001
+        except (Exception, SystemExit) as exc:  # noqa: BLE001  （接続設定なしは SystemExit）
             log(f"lifecycle: 境界の読取失敗 → この回は legacy だけ: {exc}")
             return cls(sb_req, since=None)
         row = (rows[0] if isinstance(rows, list) and rows else None) or {}
