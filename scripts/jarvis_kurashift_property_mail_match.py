@@ -772,12 +772,61 @@ def strip_uketsuke_shuryo_marker(subject: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+# 非物件（案内・告知・ダイジェスト等）の件名/本文の型
+NON_PROPERTY_NOTICE_MARKERS = (
+    "セミナー",
+    "説明会",
+    "勉強会",
+    "講座",
+    "ウェビナー",
+    "webinar",
+    "メルマガ",
+    "メールマガジン",
+    "ニュースレター",
+    "newsletter",
+    "ダイジェスト",
+    "キャンペーン",
+    "イベントのご案内",
+    "開催のお知らせ",
+    "参加者募集",
+)
+
+# 物件要素（1つでもあれば物件扱いのまま）。「戸建」「利回り」単独や「万円」単独は
+# セミナー告知にも出るため要素に数えない。
+_PROPERTY_ELEMENT_PATTERNS = (
+    r"(販売|売出|売買|物件|希望)?価格\s*[：:]?\s*[\d,，]+\s*(万|億)",
+    r"[\d,，]+\s*万円\s*(\(|（)?\s*(税込|税抜)?\s*(\)|）)?\s*(で|の)?\s*(売|販売)",
+    r"所在地",
+    r"(都|道|府|県).{1,8}(市|区|郡|町|村).{0,12}\d+\s*(丁目|番地|-\d)",
+    r"[1-9]\s*[SLDK]{1,4}\b",
+    r"築\s*\d+\s*年",
+    r"(土地|建物|延床|敷地)面積",
+    r"\d+(\.\d+)?\s*(㎡|m2|m²|坪)",
+    r"(表面|想定)?利回り\s*[：:]?\s*\d+(\.\d+)?\s*[%％]",
+    r"(最寄|徒歩)\s*\d*\s*(駅|分)",
+)
+
+
+def has_property_element(text: str) -> bool:
+    return any(re.search(p, text or "", re.IGNORECASE) for p in _PROPERTY_ELEMENT_PATTERNS)
+
+
+def is_non_property_notice(subject: str, text: str) -> bool:
+    """案内メール等の非物件か。件名に告知の型があり、かつ件名・本文に物件要素が無い時だけ True。"""
+    subj = (subject or "").lower()
+    if not any(mk.lower() in subj for mk in NON_PROPERTY_NOTICE_MARKERS):
+        return False
+    return not has_property_element(f"{subject}\n{text}")
+
+
 def clearly_out_of_scope(subject: str, text: str, score: float) -> tuple[bool, str]:
     """取込時点で明らかに対象外か（境界候補は False）。"""
     if title_has_uketsuke_shuryo(subject):
         return True, "uketsuke_shuryo"
     if any(n in subject for n in SUBJECT_NOISE):
         return True, "subject_noise"
+    if is_non_property_notice(subject, text):
+        return True, "non_property_notice"
     has_kodate = bool(re.search(r"戸建|戸建て", text))
     if re.search(r"区分|ワンルーム", text) and not has_kodate:
         return True, "mansion_unit"
