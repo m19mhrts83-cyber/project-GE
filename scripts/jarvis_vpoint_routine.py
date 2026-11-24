@@ -31,6 +31,9 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jarvis_614_verified_state as vs  # noqa: E402
+
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 STATE_DIR = REPO / ".jarvis_state"
@@ -68,6 +71,31 @@ def load_json(path: Path) -> dict[str, Any]:
 def save_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def save_monthly_verified(monthly: dict[str, Any], expect: dict[str, Any]) -> dict[str, Any]:
+    """vpoint_monthly.json を tmp→置換で書き、読み戻して expect の項目が今回の値か照合する（工程28）。
+
+    不一致なら取得済みの値を非公開の pending に残し、保存だけ1回やり直す（子の再実行・再取得はしない）。"""
+
+    expect_json = vs.roundtrip(expect)  # tuple→list など JSON を通した姿で照合する
+
+    def verify(read_back: dict[str, Any], _expected: dict[str, Any]) -> list[str]:
+        return [f"{k} が今回の値と違う" for k, v in expect_json.items() if read_back.get(k) != v]
+
+    return vs.save_json_verified(
+        MONTHLY_PATH, monthly, verify=verify,
+        pending_path=MONTHLY_PATH.with_name(MONTHLY_PATH.stem + ".pending.json"),
+    )
+
+
+def check_stamp_invariant(
+    last_check_c_now: Any, prev: Any, *, stamp_expected: bool, month: str
+) -> list[str]:
+    """月印 last_check_c は『今月ウィンドウCで付与サマリが成功した』時だけ今月になり、それ以外は動かない（D6）。"""
+    if stamp_expected:
+        return [] if last_check_c_now == month else ["last_check_c が付いていない（成功したはず）"]
+    return [] if last_check_c_now == prev else ["last_check_c が成功でないのに変わった"]
 
 
 def now_iso() -> str:
@@ -305,6 +333,7 @@ def main() -> int:
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
+    prev_check_c = monthly.get("last_check_c")
     cadence = load_json(CADENCE_PATH)
     teiki = load_json(TEIKI_PATH)
     target = (args.target_month or "").strip() or prev_month_key(now)
@@ -316,6 +345,7 @@ def main() -> int:
     grant_quality = ""  # success / partial / failed（付与サマリを今回作った時だけ）
     grant_quality_reason = ""
     grant_run_failed = False
+    save_failed = False  # 保存の読み戻しを確認できなかった時（月印・短報・画面反映を成功として渡さない）
 
     # --- Auto A: grant summary ---
     need_grant = do_window and (
@@ -457,7 +487,8 @@ def main() -> int:
         # 直後の load_json で last_routine_at／asks が消える（11/23 に確認）。
         monthly = load_json(MONTHLY_PATH)
         monthly.update(routine_fields)
-        save_json(MONTHLY_PATH, monthly)
+        # 保存は読み戻して照合する（P0b・工程28）。last_routine_at／asks が今回の値か
+        pre_save = save_monthly_verified(monthly, dict(routine_fields))
         # PDCA ボード（良かった点／要改善／次の一手）
         pdca_r = run_py(
             [str(REPO / "scripts" / "jarvis_vpoint_pdca.py"), "--apply"],
@@ -467,7 +498,23 @@ def main() -> int:
         monthly = load_json(MONTHLY_PATH)
         monthly.update(routine_fields)  # 子の書き込みで落ちていても保つ
         report["manual"]["pdca_board"] = monthly.get("pdca_board")
-        save_json(MONTHLY_PATH, monthly)
+        # last_check_c は今回の付与サマリが成功した時だけ今月になる（子が書いた値を検査）
+        stamp_expected = bool(grant_built and in_window_c(now) and grant_quality == "success")
+        stamp_errors = check_stamp_invariant(
+            monthly.get("last_check_c"), prev_check_c, stamp_expected=stamp_expected, month=month_key(now)
+        )
+        expect = dict(routine_fields)
+        expect["last_check_c"] = monthly.get("last_check_c")
+        final_save = save_monthly_verified(monthly, expect)
+        save_errors = [*stamp_errors, *final_save["errors"]]
+        report["save_verify"] = {
+            "ok": bool(final_save["ok"]) and not stamp_errors,
+            "first_save_ok": bool(pre_save["ok"]),
+            "attempts": final_save["attempts"],
+            "errors": save_errors,
+        }
+        if not report["save_verify"]["ok"]:
+            save_failed = True
 
         # human-readable block for chat / logs
         lines = [
@@ -480,6 +527,11 @@ def main() -> int:
         if grant_quality in ("partial", "failed"):
             lines.append(
                 f"- 付与サマリの結果: {'部分成功' if grant_quality == 'partial' else '失敗'}（{grant_quality_reason}）"
+            )
+        if save_failed:
+            lines.append(
+                "- ⚠ 保存の読み戻しで不一致（" + "; ".join(report["save_verify"]["errors"])[:150]
+                + "）。定例の結果を成功として扱いません"
             )
         if asks:
             lines.append("- Jarvis確認が必要なこと:")
@@ -507,10 +559,14 @@ def main() -> int:
         print()
 
     if args.push and args.apply and not args.dry_run:
-        report["push"] = run_py(
-            [str(REPO / "scripts" / "jarvis_dashboard_push.py"), "--watch-only"],
-            timeout=180,
-        )
+        if save_failed:
+            # 保存を確認できない state を画面へ渡さない
+            report["push"] = {"ok": False, "skipped": "save_verify_failed"}
+        else:
+            report["push"] = run_py(
+                [str(REPO / "scripts" / "jarvis_dashboard_push.py"), "--watch-only"],
+                timeout=180,
+            )
         # 614 ポイント・還元ウォッチ係 → Slack #report（失敗しても本線は止めない）
         asks = (report.get("manual") or {}).get("jarvis_asks") or []
         if not isinstance(asks, list):
@@ -521,7 +577,13 @@ def main() -> int:
         # 結果語は成功(checked)／部分成功(partial)／失敗(failed)（D6・n27）。
         # 月印が付かなかった日を『定例ウォッチ更新』と読ませない。
         slack_outcome, slack_extra = "checked", []
-        if grant_run_failed or grant_quality == "failed":
+        if save_failed:
+            slack_outcome = "failed"
+            slack_extra = [
+                "--error",
+                ("Vポイント state の保存を読み戻して確認できず: " + "; ".join(report["save_verify"]["errors"]))[:150],
+            ]
+        elif grant_run_failed or grant_quality == "failed":
             slack_outcome = "failed"
             slack_extra = [
                 "--error",
@@ -545,7 +607,7 @@ def main() -> int:
         report["slack"] = run_py(slack_cmd, timeout=60)
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0
+    return 1 if save_failed else 0
 
 
 if __name__ == "__main__":

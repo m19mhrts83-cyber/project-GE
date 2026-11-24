@@ -173,6 +173,10 @@ def build_etc(
     elif out == "failed":
         lines.append(f"・結果: 失敗 — {error or '不明'}")
         lines.append("・次: smile-etc／ログ or #ops")
+    elif out == "waiting":
+        # 未付与は失敗ではない（取得待ち）。窓内は自動で翌日に再確認する
+        lines.append(f"・結果: 取得待ち（{reason or '付与前'}）")
+        lines.append("・次: 窓内（20〜26日）は翌日に自動で再確認。月印は付けていません")
     else:
         lines.append("・結果: 還元サマリ取得")
 
@@ -326,7 +330,7 @@ def main() -> int:
     ap.add_argument(
         "--outcome",
         default="checked",
-        choices=("checked", "drew", "skipped", "failed", "disabled", "partial", "maintenance"),
+        choices=("checked", "drew", "skipped", "failed", "disabled", "partial", "maintenance", "waiting"),
     )
     ap.add_argument("--from-state", action="store_true")
     ap.add_argument("--tickets", type=int, default=None)
