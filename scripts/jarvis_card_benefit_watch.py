@@ -37,6 +37,12 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jarvis_614_verified_state as vs  # noqa: E402
+
+StateReadError = vs.StateReadError
+LockBusy = vs.LockBusy
+
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO / "config" / "card_benefit_watch.yaml"
@@ -54,6 +60,18 @@ VERDICT_FAR = "届かない見込み"
 VERDICT_DONE = "達成"
 VERDICT_MISSED = "未達（期間終了）"
 VERDICT_NODATA = "データなし"
+
+# 取得元ごとの取得品質（TASK 4.5）。成功だけが月印・寄せ先推奨の材料になる
+SRC_OK = "success"            # 成功（基準日が鮮度の基準内）
+SRC_PARTIAL = "partial"       # 部分成功（取れたが古い・一部欠け）
+SRC_WAITING = "waiting"       # 取得待ち（まだ届いていない）
+SRC_FAILED = "failed"         # 失敗（技術障害）
+SRC_UNCONFIRMED = "unconfirmed"  # 未確認（確かめられていない）
+SRC_LABEL = {
+    SRC_OK: "成功", SRC_PARTIAL: "部分成功", SRC_WAITING: "取得待ち",
+    SRC_FAILED: "失敗", SRC_UNCONFIRMED: "未確認",
+}
+SOURCE_IDS = ("olive", "bonvoy")
 
 
 def state_dir() -> Path:
@@ -82,6 +100,27 @@ def load_state(path: Path | None = None) -> dict[str, Any]:
         return data if isinstance(data, dict) else {}
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def lock_path() -> Path:
+    return state_dir() / "card_benefit_watch.lock"
+
+
+def pending_path() -> Path:
+    return state_dir() / "card_benefit_watch.pending.json"
+
+
+def load_state_strict(path: Path | None = None) -> dict[str, Any]:
+    """無ければ {}。あるのに読めない時は StateReadError（空にして上書きしない）。"""
+    return vs.load_json_strict(path or state_path())
+
+
+def save_state_verified(data: dict[str, Any], path: Path | None = None) -> dict[str, Any]:
+    """tmp→置換→読み戻し照合。失敗時は pending に残し、保存だけ1回やり直す（外部は取り直さない）。"""
+    p = path or state_path()
+    data["updated_at"] = datetime.now(JST).isoformat(timespec="seconds")
+    pend = p.with_name(p.stem + ".pending.json")
+    return vs.save_json_verified(p, data, pending_path=pend)
 
 
 def save_state(data: dict[str, Any], path: Path | None = None) -> Path:
@@ -140,23 +179,60 @@ def _orca_json(args: list[str], timeout: int = 60) -> dict[str, Any] | None:
         return None
 
 
-def fetch_olive(state: dict[str, Any], *, newer_than_days: int = 200) -> tuple[int, str]:
-    """Gmail の月次メールから Olive の確定値を state へ追加。返り値=(追加件数, メモ)。"""
+def _src_record(status: str, *, as_of: str | None, note: str, error_code: str | None = None) -> dict[str, Any]:
+    return {
+        "status": status,
+        "status_label": SRC_LABEL[status],
+        "as_of": as_of,
+        "error_code": error_code,
+        "note": note,
+        "checked_at": datetime.now(JST).isoformat(timespec="seconds"),
+    }
+
+
+def _age_days(as_of: str | None, today: date) -> int | None:
+    try:
+        return (today - _d(as_of)).days if as_of else None
+    except ValueError:
+        return None
+
+
+def fetch_olive_checked(
+    state: dict[str, Any], *, cfg: dict[str, Any] | None = None, today: date | None = None,
+    newer_than_days: int = 200,
+) -> dict[str, Any]:
+    """Gmail の月次メールから Olive の確定値を state へ追加し、取得品質（5状態）を返す。
+
+    返り値: {status, status_label, as_of, error_code, note, added, checked_at}
+    失敗（Gmail 検索失敗など）を『メモ』にして成功扱いに埋もれさせない（F5）。"""
+    today = today or datetime.now(JST).date()
+    cfg = cfg or load_config()
+    stale_days = int(((cfg.get("cards") or {}).get("olive") or {}).get("stale_days", 45))
     acct = (os.environ.get("CARD_BENEFIT_GMAIL_ACCOUNT") or "").strip()
     extra = ["--account", acct] if acct else []
     q = f"subject:各種特典条件達成状況 subject:Olive from:vpass.ne.jp newer_than:{newer_than_days}d"
     res = _orca_json(["search", q, "--limit", "20", *extra])
+    snaps = (state.get("olive") or {}).get("snapshots") or []
+    latest = max((s.get("as_of") for s in snaps if isinstance(s, dict) and s.get("as_of")), default=None)
     if not res or not res.get("ok"):
-        return 0, "Gmail 検索に失敗（orca gmail／アカウント連携を確認）"
+        r = _src_record(
+            SRC_FAILED, as_of=latest, error_code="gmail_search_failed",
+            note="Gmail 検索に失敗（orca gmail／アカウント連携を確認）",
+        )
+        r["added"] = 0
+        return r
     threads = (res.get("result") or {}).get("threads") or []
     snaps = state.setdefault("olive", {}).setdefault("snapshots", [])
     have = {s.get("as_of") for s in snaps}
-    added = 0
+    added = read_failed = 0
     for t in threads:
         ref = t.get("ref")
         if not ref:
             continue
         rd = _orca_json(["read", ref, *extra])
+        if rd is None or not rd.get("ok", True):
+            read_failed += 1
+            continue
         msgs = ((rd or {}).get("result") or {}).get("messages") or []
         for msg in msgs:
             parsed = parse_olive_mail(msg.get("body") or "")
@@ -168,7 +244,40 @@ def fetch_olive(state: dict[str, Any], *, newer_than_days: int = 200) -> tuple[i
             have.add(parsed[0])
             added += 1
     snaps.sort(key=lambda s: s.get("as_of") or "")
-    return added, f"メール {len(threads)} 通を確認・新規 {added} 件"
+    latest = snaps[-1].get("as_of") if snaps else None
+    age = _age_days(latest, today)
+    memo = f"メール {len(threads)} 通を確認・新規 {added} 件"
+    if latest is None:
+        # 1件も確定値が無い
+        if threads and read_failed < len(threads):
+            r = _src_record(SRC_FAILED, as_of=None, error_code="olive_mail_parse_failed",
+                            note=memo + "・本文から基準日と利用額を読めない")
+        elif read_failed:
+            r = _src_record(SRC_FAILED, as_of=None, error_code="gmail_read_failed",
+                            note=memo + f"・本文の取得に失敗 {read_failed} 件")
+        else:
+            r = _src_record(SRC_WAITING, as_of=None, error_code="olive_mail_not_arrived",
+                            note=memo + "・月次メール未着")
+    elif age is not None and age > stale_days:
+        if threads and not read_failed:
+            r = _src_record(SRC_PARTIAL, as_of=latest, error_code="olive_stale",
+                            note=memo + f"・最新の基準日が{age}日前（基準{stale_days}日）")
+        else:
+            r = _src_record(SRC_WAITING, as_of=latest, error_code="olive_mail_not_arrived",
+                            note=memo + f"・新しい月次メール待ち（最新の基準日が{age}日前）")
+    elif read_failed and not added:
+        r = _src_record(SRC_PARTIAL, as_of=latest, error_code="gmail_read_failed",
+                        note=memo + f"・本文の取得に失敗 {read_failed} 件（最新を取り逃した可能性）")
+    else:
+        r = _src_record(SRC_OK, as_of=latest, note=memo)
+    r["added"] = added
+    return r
+
+
+def fetch_olive(state: dict[str, Any], *, newer_than_days: int = 200) -> tuple[int, str]:
+    """後方互換: (追加件数, メモ)。成否の判定は fetch_olive_checked を使う。"""
+    r = fetch_olive_checked(state, newer_than_days=newer_than_days)
+    return int(r.get("added") or 0), str(r.get("note") or "")
 
 
 def aggregate_zaim(
@@ -253,15 +362,27 @@ def aggregate_zaim_transfers(
     return out
 
 
-def refresh_bonvoy(state: dict[str, Any], cfg: dict[str, Any], today: date) -> str:
+def refresh_bonvoy_checked(
+    state: dict[str, Any], cfg: dict[str, Any], today: date
+) -> dict[str, Any]:
+    """Zaim 取込行から Bonvoy の概算を集計して state へ入れ、取得品質（5状態）を返す。
+
+    失敗時は既存の bonvoy.zaim（前回値）を消さないが、status=failed として推奨・月印の材料にしない。"""
+    card_cfg = cfg["cards"]["bonvoy"]
+    stale_days = int(cfg.get("zaim_stale_days", 10))
+    prev = ((state.get("bonvoy") or {}).get("zaim") or {}).get("as_of")
     p = zaim_index_path()
     if not p.is_file():
-        return "Zaim 取込 index が見つからない"
+        return _src_record(SRC_FAILED, as_of=prev, error_code="zaim_index_missing",
+                           note="Zaim 取込 index が見つからない")
     try:
         index = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return "Zaim 取込 index を読めない"
-    card_cfg = cfg["cards"]["bonvoy"]
+        return _src_record(SRC_FAILED, as_of=prev, error_code="zaim_index_unreadable",
+                           note="Zaim 取込 index を読めない")
+    if not isinstance(index, dict):
+        return _src_record(SRC_FAILED, as_of=prev, error_code="zaim_index_unreadable",
+                           note="Zaim 取込 index の形式が想定外")
     period = period_for(card_cfg, today)
     agg = aggregate_zaim(index, card_cfg, period)
     csv_p = str(index.get("csv") or "")
@@ -284,17 +405,50 @@ def refresh_bonvoy(state: dict[str, Any], cfg: dict[str, Any], today: date) -> s
             agg["other_transfer_rows"] = tr.get("other_rows", 0)
             agg["transfers_checked"] = bool(tr.get("checked"))
     if agg is None:
-        return "期間内の該当行なし"
+        return _src_record(SRC_UNCONFIRMED, as_of=prev, error_code="zaim_no_rows",
+                           note="期間内の該当行なし（Zaim の取込を確認）")
     agg["computed_at"] = datetime.now(JST).isoformat(timespec="seconds")
     state.setdefault("bonvoy", {})["zaim"] = agg
     note = ""
+    transfers_unchecked = bool(card_cfg.get("zaim_transfer_to_include")) and not agg.get("transfers_checked")
     if card_cfg.get("zaim_transfer_to_include"):
         note = (
             f"・振替 {agg.get('transfer_rows', 0)} 件を加算（未算入の振替 {agg.get('other_transfer_rows', 0)} 件）"
             if agg.get("transfers_checked")
             else "・振替行は読めず未加算（Zaim CSV を確認）"
         )
-    return f"Zaim 該当 {agg['rows']} 行（基準日 {agg['as_of']}）{note}"
+    memo = f"Zaim 該当 {agg['rows']} 行（基準日 {agg['as_of']}）{note}"
+    age = _age_days(agg["as_of"], today)
+    if transfers_unchecked:
+        return _src_record(SRC_PARTIAL, as_of=agg["as_of"], error_code="zaim_transfers_unchecked", note=memo)
+    if age is not None and age > stale_days:
+        return _src_record(SRC_PARTIAL, as_of=agg["as_of"], error_code="zaim_stale",
+                           note=memo + f"・基準日が{age}日前（基準{stale_days}日）")
+    return _src_record(SRC_OK, as_of=agg["as_of"], note=memo)
+
+
+def refresh_bonvoy(state: dict[str, Any], cfg: dict[str, Any], today: date) -> str:
+    """後方互換: メモ文字列。成否の判定は refresh_bonvoy_checked を使う。"""
+    return str(refresh_bonvoy_checked(state, cfg, today).get("note") or "")
+
+
+def refresh_sources(
+    state: dict[str, Any], cfg: dict[str, Any], today: date, only: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """取得元ごとに取り込み、state['sources'] に成否・基準日・エラーコードを残す（工程25）。"""
+    out: dict[str, dict[str, Any]] = {}
+    sources = state.setdefault("sources", {})
+    for sid in SOURCE_IDS:
+        if only is not None and sid not in only:
+            continue
+        r = (
+            fetch_olive_checked(state, cfg=cfg, today=today)
+            if sid == "olive"
+            else refresh_bonvoy_checked(state, cfg, today)
+        )
+        out[sid] = r
+        sources[sid] = {k: v for k, v in r.items() if k != "added"}
+    return out
 
 
 # ---------------------------------------------------------------- 計算
@@ -343,6 +497,50 @@ def _verdict(need_pm: float, pace_pm: float, pace_cfg: dict[str, Any]) -> str:
     return VERDICT_FAR
 
 
+def _md_label(iso: str | None) -> str:
+    try:
+        d = _d(str(iso))
+        return f"{d.month}/{d.day}"
+    except ValueError:
+        return "不明"
+
+
+def _apply_reliability(out: dict[str, Any], card_id: str, state: dict[str, Any]) -> None:
+    """取得元の成否・鮮度から『この数字を推奨の材料にしてよいか』を決める（工程25・F9）。
+
+    失敗・取得待ち・部分成功・古い・未取得は材料にしない。数字そのもの（前回値）は表示してよいが、
+    最新値として扱わない。"""
+    src = (state.get("sources") or {}).get(card_id)
+    src = src if isinstance(src, dict) else {}
+    status = src.get("status")
+    out["source_status"] = status
+    out["source_status_label"] = SRC_LABEL.get(status) if status else None
+    out["source_error_code"] = src.get("error_code")
+    out["source_note"] = src.get("note")
+    short = out.get("short") or out.get("name")
+    reason = None
+    if out.get("usage_yen") is None:
+        reason = f"{short}の実額が未取得"
+    elif status == SRC_FAILED:
+        reason = f"{short}の取込に失敗"
+    elif status == SRC_UNCONFIRMED:
+        reason = f"{short}は取込を確認できていない"
+    elif status == SRC_WAITING:
+        reason = f"{short}は新しいデータ待ち"
+    elif out.get("usage_stale"):
+        reason = (
+            f"{short}の確定値が古い（{_md_label(out.get('usage_as_of'))}現在）"
+            if out.get("usage_kind") == "confirmed"
+            else f"{short}の Zaim が古い（基準日{_md_label(out.get('usage_as_of'))}）"
+        )
+    elif out.get("usage_kind") == "estimate" and out.get("usage_transfers_expected") and not out.get("usage_transfers_checked"):
+        reason = f"{short}の振替が未加算"
+    elif status == SRC_PARTIAL:
+        reason = f"{short}は一部しか取れていない"
+    out["reliable"] = reason is None
+    out["unreliable_reason"] = reason
+
+
 def compute_card(
     card_id: str, cfg: dict[str, Any], state: dict[str, Any], today: date
 ) -> dict[str, Any]:
@@ -373,6 +571,7 @@ def compute_card(
         out["note"] = "実額がまだ state にありません（--fetch-olive / --refresh-bonvoy）"
         for t in c.get("tiers") or []:
             out["tiers"].append(_tier_base(t) | {"verdict": VERDICT_NODATA})
+        _apply_reliability(out, card_id, state)
         return out
     as_of = _d(usage["as_of"])
     elapsed_months = max((as_of - start).days / DAYS_PER_MONTH, 1.0)
@@ -413,6 +612,7 @@ def compute_card(
                 verdict=_verdict(need_pm, pace, cfg.get("pace") or {}),
             )
         out["tiers"].append(row)
+    _apply_reliability(out, card_id, state)
     return out
 
 
@@ -442,7 +642,20 @@ def recommend(cards: list[dict[str, Any]]) -> dict[str, Any]:
     各カードの「次に狙う未達の線」のうち、届く＞厳しいを候補にし、
     必要月額が小さい（＝いちばん手が届く）方を挙げる。どちらも届かない見込みなら
     寄せ先は満足度で決める材料として、そう書く。
-    """
+
+    信頼できる両カードの情報（取得成功・鮮度内）が揃わない時は、カード間の推奨を保留する（工程25・F9）。
+    取れたカードの達成率などは別に表示される。"""
+    if cards and all(c.get("usage_yen") is None for c in cards):
+        return {"card": None, "line": "実額が未取得のため今月の寄せ先は出せません"}
+    unreliable = [c for c in cards if not c.get("reliable", True)]
+    if unreliable:
+        reasons = [str(c.get("unreliable_reason") or f"{c.get('short')}は信頼できる最新値なし") for c in unreliable]
+        return {
+            "card": None,
+            "withheld": True,
+            "reasons": reasons,
+            "line": "寄せ先の推奨は保留（" + "／".join(reasons) + "）。取れた方の達成率は目安として表示",
+        }
     rank = {VERDICT_REACH: 0, VERDICT_TIGHT: 1}
     cands: list[tuple[int, int, dict[str, Any], dict[str, Any]]] = []
     for c in cards:
@@ -450,8 +663,6 @@ def recommend(cards: list[dict[str, Any]]) -> dict[str, Any]:
         if t and t.get("verdict") in rank:
             cands.append((rank[t["verdict"]], int(t.get("need_per_month_yen") or 0), c, t))
     if not cands:
-        if all(c.get("usage_yen") is None for c in cards):
-            return {"card": None, "line": "実額が未取得のため今月の寄せ先は出せません"}
         return {
             "card": None,
             "line": "どちらも届かない見込み。寄せ先は特典への満足度で決める材料にしてください",
@@ -623,8 +834,18 @@ def build_slack_text(result: dict[str, Any], *, header: str, dash_url: str, mask
     if weak:
         lines.append(f"{len(result['cards']) + 1}. 条件の金額: " + " / ".join(weak))
         lines.append("   公式で確認できるまで目安扱い")
+    # 取込に失敗・取得待ち・未確認の取得元は、前回値があっても最新として扱っていないことを明示（実額は書かない）
+    for c in result["cards"]:
+        st = c.get("source_status")
+        if st in (SRC_FAILED, SRC_WAITING, SRC_UNCONFIRMED):
+            lines.append(f"・{c['short']}は取込{SRC_LABEL[st]}")
+            lines.append("  数字は前回値の目安")
     lines.append(f"見る: {dash_url}")
-    lines.append(f"今月はこちらを使うのがおすすめ: {result['recommendation']['line']}（判断はあなた）")
+    rec = result["recommendation"]
+    if rec.get("withheld"):
+        lines.append(f"寄せ先のおすすめは保留: {'／'.join(rec.get('reasons') or [])}（判断はあなた）")
+    else:
+        lines.append(f"今月はこちらを使うのがおすすめ: {rec['line']}（判断はあなた）")
     return "\n".join(lines)
 
 
@@ -642,15 +863,34 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = load_config()
     today = datetime.now(JST).date()
+    rc = 0
     if args.fetch_olive or args.refresh or args.refresh_bonvoy:
-        st = load_state()
+        only = []
         if args.fetch_olive or args.refresh:
-            _, note = fetch_olive(st)
-            print(f"Olive: {note}")
+            only.append("olive")
         if args.refresh_bonvoy or args.refresh:
-            print(f"Bonvoy: {refresh_bonvoy(st, cfg, today)}")
-        p = save_state(st)
-        print(f"state 更新: {p.name}")
+            only.append("bonvoy")
+        try:
+            with vs.file_lock(lock_path()):
+                try:
+                    st = load_state_strict()
+                except StateReadError as e:
+                    print(f"❌ state を読めないため取込を止めました（上書きしません）: {e}", file=sys.stderr)
+                    return 3
+                results = refresh_sources(st, cfg, today, only=only)
+                for sid, r in results.items():
+                    label = "Olive" if sid == "olive" else "Bonvoy"
+                    print(f"{label}: [{r['status_label']}] {r['note']}")
+                    if r["status"] == SRC_FAILED:
+                        rc = 2
+                sv = save_state_verified(st)
+                if not sv["ok"]:
+                    print(f"❌ state の保存を読み戻して確認できませんでした: {'; '.join(sv['errors'])}", file=sys.stderr)
+                    return 4
+                print(f"state 更新（読み戻し確認済み）: {state_path().name}")
+        except LockBusy:
+            print("⏭ 別の年間特典の取込が実行中のため何もしません", file=sys.stderr)
+            return 3
     result = compute(cfg, load_state(), today)
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -658,7 +898,7 @@ def main(argv: list[str] | None = None) -> int:
         print(render_text(result, mask=args.mask))
     else:
         ap.print_help()
-    return 0
+    return rc
 
 
 if __name__ == "__main__":
