@@ -429,3 +429,14 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def is_automation_off(acc: dict[str, Any] | None) -> bool:
+    """automation: off の判定。YAML では off が False として読まれるので、それも「オフ」とみなす。
+    キー自体が無い（None）ときはオフではない。"""
+    if not acc:
+        return False
+    v = acc.get("automation")
+    if v is None:
+        return False
+    return v is False or str(v).strip().lower() in ("off", "false", "0", "no")

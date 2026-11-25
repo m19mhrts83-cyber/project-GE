@@ -39,6 +39,7 @@ PLAYWRIGHT_LOCK = LOG_DIR / "zaim_playwright.lock"
 sys.path.insert(0, str(ZAIM_DIR))
 sys.path.insert(0, str(REPO / "scripts"))
 import zaim_budget_apply as zaim  # noqa: E402
+from jarvis_zaim_online_accounts import is_automation_off  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
 ONLINE = "https://zaim.net/online_accounts"
@@ -144,7 +145,7 @@ def names_from_stale(*, respect_automation: bool = True) -> list[str]:
         if respect_automation and acc:
             if acc.get("unlinkable"):
                 continue
-            if str(acc.get("automation") or "").lower() in ("off", "false", "0", "no"):
+            if is_automation_off(acc):
                 continue
         if respect_automation and in_cooldown(auto, name, cooldown_h):
             continue
