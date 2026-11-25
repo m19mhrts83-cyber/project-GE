@@ -5,6 +5,9 @@
 # Phase1: CSV の最終日付ラグで「更新が止まっていそう」を特定 → 手動更新を Jarvis と一緒に
 # Phase1.5: stale のみ Playwright 更新（automation: off / cooldown で抑制）
 # Phase2: OTP 半自動（検知→Todoist／任意で SMS/Gmail OTP 試行。画像認証は対象外）
+# Phase3（2026-11-25）: Zaim 連携設定ページの「最終更新」とエラー表示も見る。
+#   取引がなくても更新されていれば「連携は生きている（取引なし）」で遅れ扱いにしない。
+#   更新日時が取れないときは従来の CSV 判定に戻し、その旨を表示する（安全側）。
 
 version: 1
 
@@ -12,6 +15,14 @@ csv_base_dir: "~/Library/CloudStorage/OneDrive-個人用/215_神・大家さん�
 
 # CSV 上の最新日付から何日以上止まっていたら要確認か（口座ごと上書き可）
 default_stale_days: 12
+
+# Zaim 画面の「最終更新」を判定に使う（取得は jarvis_zaim_online_accounts.py --fetch。
+# 火・金 09:00 の runner が読み取り専用で1回だけ開く。押す操作はしない）
+# 更新日時の閾値は口座ごとの stale_days と同じ（日数以上前なら止まっている扱い）
+online_status:
+  enabled: true
+  # 取得がこれより古いと使わない（週2回取得なので、1回抜けても使える程度）
+  snapshot_max_age_days: 5
 
 # 金曜ウィンドウ（JST）で Jarvis がセッション中に促す / launchd も金曜
 friday_weekday: 5  # mon=0 … fri=5
@@ -33,6 +44,8 @@ zaim_accounts_url: "https://zaim.net/online_accounts"
 zaim_home_url: "https://zaim.net/"
 
 # match: CSV の 支払元 / 入金先 に部分一致（先に長い match を置く）
+# online_match: Zaim 画面の口座名・サービス名に合わせる名前（省略時は match。★と空白は無視）
+#   見つからない口座は「更新日時は確かめられなかった」と表示して従来の CSV 判定に戻る
 # env_hint: .env.jarvis_private の変数名（値は出さない）。手動 OTP 時に Jarvis が読む
 # unlinkable: true → 事情で連携できない想定。注意事項に「連携不可（既知）」として出すが stale 警告にはしない
 # automation: off → stale 自動更新の対象外（検知・通知はする）
@@ -107,6 +120,7 @@ accounts:
   - id: amex_marriott
     label: "AMEX Marriott"
     match: "MARRIOTT BONVOY"
+    online_match: ["アメリカン・エキスプレス"]
     stale_days: 10
     env_hint: ["AMEX_LOGIN_ID", "AMEX_PASSWORD"]
     automation: off

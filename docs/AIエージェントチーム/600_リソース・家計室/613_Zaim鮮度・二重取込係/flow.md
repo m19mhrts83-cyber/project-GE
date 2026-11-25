@@ -61,7 +61,7 @@ Zaim（家計簿）の**収入・支出の財務記録を正しく保つ**。①
 | 618 の判断ログ実行基盤 | `jarvis_asset_618_runtime.py`＝本人の明示採用・targets・effective_from／expires_at・`reverts_id`・run 限定・読取失敗は `Blocked` | 実装済 | 規則5・6 の先行例。流用できる |
 | Jarvis ダッシュボード `/zaim` | 鮮度・ピン・学習一覧。`watch_status`（id=zaim_quality）を読む | 実装済 | 本番画面は今回開いていない |
 | GHA `zaim-finance-sync` | check と Watch（更新ボタンは押さない）。CSV は Mac の OneDrive 配下のため GHA だけでは読めない | 実装済 | cron は workflow を確認 |
-| 口座の鮮度（銀行連携・OTP） | `jarvis_zaim_bank_sync_*`・`reconnect`（`CLAUDE.md` §6-A） | 実装済 | **本稿の対象外**（既存のまま） |
+| 口座の鮮度（銀行連携・OTP） | `jarvis_zaim_bank_sync_*`・`reconnect`（`CLAUDE.md` §6-A） | 実装済 | **本稿の対象外**（既存のまま）。2026-11-25 から CSV 最終取引日に加え Zaim の更新日時・エラー表示も判定（`jarvis_zaim_online_accounts.py`、`CLAUDE.md` §6-A） |
 
 **確定/提案の区別**: ノード4・5・7・8・9・10・11・13・15・18・21・26・29・30・31 は**提案（未実装）**。一部実装は 2・6・12・14・16・17・19・20・22・24・27。他は既存。
 **既存社員との境界**: 612・611・316・618 は作り直さない。618 の判断ログの型は読み方だけ参考にする。
