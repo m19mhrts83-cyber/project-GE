@@ -148,5 +148,47 @@ class TestSlackReportLayout(unittest.TestCase):
         self.assertLessEqual(len(out), 10)
 
 
+class TestReportShape(unittest.TestCase):
+    def _note(self, i, title, comment, kind="要判断"):
+        return {"row_id": i, "task_title": title, "comment": comment, "kind": kind}
+
+    def test_agent_header_comments_are_excluded(self):
+        from jarvis_todoist_webhook_handle import is_agent_comment
+
+        for t in (
+            "【300 ラス隊長 11/25 期日なしの棚卸し】 判定: やめる候補？",
+            "【Jarvis】サマリ: 完了",
+            "【318】記録",
+            "【317 コメント拾い】報告",
+        ):
+            self.assertTrue(is_agent_comment(t), t)
+        self.assertFalse(is_agent_comment("これはどうする？"))
+        self.assertFalse(is_agent_comment("【急ぎ】この件どうする？"))
+
+    def test_decision_line_strips_header_and_label(self):
+        out = cd._decision_line("【ダミー 11/25 棚卸し】 判定: 古いので閉じる。やめてよいですか？")
+        self.assertEqual(out, "やめてよいですか？")
+        self.assertNotIn("【", out)
+        self.assertNotIn("判定", cd._decision_line("判定: 期日を決める"))
+
+    def test_same_decision_is_folded(self):
+        notes = [
+            self._note(i, f"ダミータスク{i}", "【ダミー】 判定: 棚卸し。やめてよいですか？")
+            for i in range(1, 4)
+        ] + [self._note(9, "別件", "来週にずらす？")]
+        out = cd.build_report(path="mac", fb_rc=0, wh_rc=0, notes=notes, phase_b=[])
+        self.assertIn("未処理 4件", out)
+        self.assertIn("ほか2件", out)
+        self.assertIn("同じ内容の判断 3件 → 項目でまとめて", out)
+        self.assertEqual(out.count("やめてよいですか"), 0)
+        self.assertIn("来週にずらす？", out)
+        self.assertIn("次: 判断待ちはJarvisに一声", out)
+
+    def test_no_next_line_when_no_decision_pending(self):
+        notes = [self._note(1, "ダミー", "確認済み、了承です", kind="要判断")]
+        out = cd.build_report(path="mac", fb_rc=0, wh_rc=0, notes=notes, phase_b=[])
+        self.assertNotIn("次: 判断待ち", out)
+
+
 if __name__ == "__main__":
     unittest.main()

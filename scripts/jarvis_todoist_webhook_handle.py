@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.error
@@ -46,11 +47,16 @@ LOG = "📎 Todoist Webhookコメント"
 # 受領を返すと、その返しでまた相手が反応する循環になるので、本文の先頭で見分けて処理済みにする。
 # 318 Todoist消化係の【318】（FlowForge 318 node_format_log「317 が【318】コメントを処理しない」）
 AGENT_COMMENT_PREFIXES = ("【318】",)
+# 【300 ラス隊長 11/25 …】【3xx 名前】【Jarvis】など、AI 署名ヘッダで始まるコメント
+_AGENT_HEADER_RE = re.compile(
+    r"^【(?:\d{3}(?:[\s\u3000][^】]*)?|Jarvis|ジャービス|ラス隊長|FRIDAY|フライデー|Miss Lemon|ミスレモン)】"
+)
 
 
 def is_agent_comment(text: str) -> bool:
     """AI 社員の記録コメントか（先頭の空白は無視）。"""
-    return str(text or "").lstrip().startswith(AGENT_COMMENT_PREFIXES)
+    t = str(text or "").lstrip()
+    return t.startswith(AGENT_COMMENT_PREFIXES) or bool(_AGENT_HEADER_RE.match(t))
 
 
 def _now_iso() -> str:

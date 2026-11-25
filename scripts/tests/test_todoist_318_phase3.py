@@ -2,6 +2,7 @@
 """318 Todoist消化係 Phase 3 準備のテスト（【318】コメント・朝枠の排他・① のやる予定・launchd 雛形）。ネットワーク不要。"""
 from __future__ import annotations
 
+import re
 import json
 import os
 import plistlib
@@ -301,7 +302,10 @@ class Guard317Test(P3Base):
 
     def test_unverified_317_exclusion_stops_comments(self):
         td = FakeTodoist([task("a")])
-        with mock.patch.object(wh, "AGENT_COMMENT_PREFIXES", ("【別】",)):
+        # 317 が 318 を除外しない状態（接頭辞もヘッダ判定も外れた）を作る
+        with mock.patch.object(wh, "AGENT_COMMENT_PREFIXES", ("【別】",)), mock.patch.object(
+            wh, "_AGENT_HEADER_RE", re.compile(r"^【別】")
+        ):
             run = self.run_once(td, write_comments=True)
         self.assertEqual(td.posts, [])
         self.assertFalse(run["comments"]["enabled"])
