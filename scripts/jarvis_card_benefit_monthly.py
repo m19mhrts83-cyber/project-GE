@@ -252,12 +252,17 @@ def run(args: argparse.Namespace, rec: runlog614.RunRecord) -> int:
             rec.stage(SYS, "slack", "skipped", "短報は停止中")
         elif rc == 0:
             rec.stage(SYS, "slack", "success", "投稿済み（控え保存・結果追記済み）")
+        elif rc == 5:
+            rec.stage(SYS, "slack", "skipped", "614 全体停止中のため送らず（投稿済みとして数えない）")
         elif rc == 4:
             rec.stage(SYS, "slack", "unverified", "投稿結果不明（再投稿していない）", "post_unknown")
         elif rc == 3:
             rec.stage(SYS, "slack", "failed", "控えを保存できず投稿を保留", "archive_failed")
         else:
             rec.stage(SYS, "slack", "failed", f"exit {rc}", "post_failed")
+        if rc == 5:
+            print("# end ok（短報は全体停止中のため未投稿）")
+            return 1 if failed else 0  # 投稿していないので短報済みの印は付けない
         if rc not in (0, 3, 4):
             _notify(rec, "slack", f"短報の投稿に失敗（exit {rc}）。取得・保存・月印は済み",
                     "投稿だけ翌朝に自動で再試行", dry)
@@ -297,9 +302,13 @@ def main(argv: list[str] | None = None) -> int:
     os.environ["JARVIS_614_RUN_ID"] = rec.run_id  # 子（Slack 短報）が同じ run_id を使う
     if disabled():
         print("⏭ JARVIS_CARD_BENEFIT_DISABLE=1／614 全体停止 — 実行スキップ")
+        rec.stage(SYS, "fetch", "skipped", "停止中（系統別または全体停止）")
+        rec.finish()
         return 0
     if not args.force and not args.all and _today().day < RUN_DAY:
         print("⏭ 28日前のためスキップ（--force で実行）")
+        rec.stage(SYS, "fetch", "skipped", "28日前")
+        rec.finish()
         return 0
     rc = 1
     try:
@@ -307,9 +316,12 @@ def main(argv: list[str] | None = None) -> int:
             rc = run(args, rec)
     except vs.LockBusy:
         print("⏭ 別の年間特典の実行中のためスキップ（排他）")
+        rec.stage(SYS, "fetch", "skipped", "別の実行中（排他）")
+        rec.finish()
         return 0
     except Exception as e:  # noqa: BLE001 — 想定外でも無言で落とさない
-        rec.stage(SYS, "fetch", "failed", f"想定外のエラー（{type(e).__name__}）", "unexpected_error")
+        # どの工程で落ちたか分からないので、実績のある工程（取得・保存など）を書き換えず『run』に残す
+        rec.stage(SYS, "run", "failed", f"想定外のエラー（{type(e).__name__}）", "unexpected_error")
         try:
             _notify(rec, "fetch", f"年間特典の月次が想定外のエラーで止まった（{type(e).__name__}）",
                     "ログ（~/Library/Logs/jarvis_card_benefit/）を確認", bool(args.dry_run))

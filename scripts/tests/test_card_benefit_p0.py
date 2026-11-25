@@ -584,6 +584,23 @@ class MonthlyFlowTests(Base):
         self.assertEqual(self.slack_calls, [])
         self.assertFalse(m.needs_catchup(datetime(2026, 11, 29, 9, tzinfo=c.JST)))
 
+    def test_global_stop_mid_run_is_not_counted_as_posted(self):
+        self.slack_rc = 5  # 実行中に全体停止が掛かり、短報は送られなかった
+        self.assertEqual(self.run_m(), 0)
+        st = self.stages()
+        self.assertEqual(st["slack"]["status"], "skipped")
+        self.assertFalse(self.state()["monthly"].get("slack_fp"))  # 送っていないので投稿済みの印を付けない
+        self.assertEqual(self.state()["last_monthly_run"], "2026-11")  # 取得・保存・月印は済み
+
+    def test_skipped_runs_are_recorded(self):
+        os.environ["JARVIS_CARD_BENEFIT_DISABLE"] = "1"
+        self.run_m()
+        self.assertEqual(self.stages()["fetch"]["status"], "skipped")
+        os.environ.pop("JARVIS_CARD_BENEFIT_DISABLE")
+        with vs.file_lock(c.lock_path()):
+            self.run_m()
+        self.assertEqual(self.stages()["fetch"]["detail"], "別の実行中（排他）")
+
     def test_all_failed_skips_push_and_slack_stage(self):
         self.orca.search_ok = False
         (self.dir / "zaim_learn_csv_index.json").unlink()
@@ -596,7 +613,7 @@ class MonthlyFlowTests(Base):
         with mock.patch.object(m, "run", side_effect=RuntimeError("x")):
             with self.assertRaises(RuntimeError):
                 self.run_m()
-        self.assertEqual(self.stages()["fetch"]["error_code"], "unexpected_error")
+        self.assertEqual(self.last_run()["systems"]["card_benefit"]["stages"]["run"]["error_code"], "unexpected_error")
         self.assertTrue(self.ops())
 
     def test_disabled_does_nothing(self):

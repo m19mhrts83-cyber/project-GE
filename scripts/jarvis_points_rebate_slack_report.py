@@ -32,6 +32,7 @@ import jarvis_614_runlog as runlog614  # noqa: E402
 import jarvis_614_slack_ledger as ledger614  # noqa: E402
 
 EXIT_HELD = 3  # 控えを保存できず投稿を保留
+EXIT_SKIPPED = 5  # 614 全体停止中のため送らなかった（送っていない。『投稿済み』として数えない）
 EXIT_UNKNOWN = 4  # 結果不明（jarvis_slack_webhook_post.EXIT_UNKNOWN と同じ）。再投稿しない
 
 REPO = Path(__file__).resolve().parents[1]
@@ -405,7 +406,7 @@ def _post(
         if is_ops:
             ops614.enqueue_pending(text, nid=ledger614.fingerprint(text), system=kind, stage="slack", run_id=run_id)
         print("⏭ 614 全体停止中 — Slack 投稿せず保留" if is_ops else "⏭ 614 全体停止中 — Slack 投稿スキップ")
-        return 0
+        return EXIT_SKIPPED
     k = ledger614.key(kind, channel, text)
     blocked = ledger614.should_skip(k)
     if blocked and not (force and blocked == "sent"):

@@ -230,14 +230,13 @@ EXIT_UNKNOWN = 4
 
 def classify_exception(e: BaseException) -> int:
     """送信中の例外が『届いていないと確定』か『結果不明』か。不明なものは再投稿してはいけない（614 P1）。"""
-    reason = e.reason if isinstance(e, urllib.error.URLError) else e
-    if isinstance(reason, (socket.gaierror, ConnectionRefusedError)):
-        return 1  # 接続前に失敗＝届いていない
-    if isinstance(reason, (socket.timeout, TimeoutError, ConnectionResetError, http.client.HTTPException)):
-        return EXIT_UNKNOWN
     if isinstance(e, urllib.error.URLError):
-        return 1
-    return EXIT_UNKNOWN
+        return 1  # urlopen は接続段階の失敗（名前解決・接続拒否・接続タイムアウト）を URLError で包む＝届いていない
+    if isinstance(e, ValueError):
+        return 1  # URL の形式不正など、送る前に失敗
+    if isinstance(e, (socket.timeout, TimeoutError, ConnectionResetError, http.client.HTTPException)):
+        return EXIT_UNKNOWN  # 送ったあと応答待ちで切れた＝届いた可能性
+    return EXIT_UNKNOWN  # 分からないものは不明側（再投稿しない）
 
 
 def main() -> int:

@@ -118,8 +118,11 @@ def slack_token() -> str:
     )
 
 
+HISTORY_LIMIT = 30
+
+
 def fetch_history(cid: str, *, oldest: float, token: str) -> list[dict[str, Any]]:
-    params = {"channel": cid, "limit": "30", "oldest": f"{oldest:.6f}"}
+    params = {"channel": cid, "limit": str(HISTORY_LIMIT), "oldest": f"{oldest:.6f}"}
     req = urllib.request.Request(
         "https://slack.com/api/conversations.history?" + urllib.parse.urlencode(params),
         headers={"Authorization": f"Bearer {token}"}, method="GET",
@@ -143,4 +146,7 @@ def confirm_sent(
         msgs = (history or fetch_history)(cid, oldest=time.time() - CONFIRM_LOOKBACK_SEC, token=token)
     except Exception:  # noqa: BLE001 — not_in_channel / missing_scope / ネットワーク等
         return None
-    return any(text_matches(str(m.get("text") or ""), text) for m in msgs)
+    if any(text_matches(str(m.get("text") or ""), text) for m in msgs):
+        return True
+    # 窓内のメッセージが上限に達していたら、全部は見えていない。『無かった』とは言えない
+    return None if len(msgs) >= HISTORY_LIMIT else False

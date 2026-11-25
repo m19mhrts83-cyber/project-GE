@@ -105,19 +105,30 @@ def private_env() -> dict[str, str]:
     return out
 
 
+_last_push_tail = ""
+
+
 def default_pusher() -> int:
+    global _last_push_tail
     py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
     exe = str(py) if py.is_file() else sys.executable
     env = os.environ.copy()
     for k, v in private_env().items():
         env.setdefault(k, v)
+    _last_push_tail = ""
     try:
-        return subprocess.run(
+        proc = subprocess.run(
             [exe, str(PUSH), "--watch-only"], cwd=str(REPO), env=env, check=False, timeout=240,
             capture_output=True, text=True,
-        ).returncode
-    except (OSError, subprocess.SubprocessError):
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        _last_push_tail = type(e).__name__
         return 1
+    if proc.returncode != 0:
+        # 失敗の理由が分かるよう最後の1行だけ（値は出さない。長さも抑える）
+        lines = [ln for ln in (proc.stderr or proc.stdout or "").strip().splitlines() if ln.strip()]
+        _last_push_tail = lines[-1][:120] if lines else ""
+    return proc.returncode
 
 
 def default_row_fetcher(ids: list[str]) -> dict[str, dict[str, Any] | None]:
@@ -145,17 +156,24 @@ def sync_and_verify(
 
     返り値: {push: success|failed, display: success|failed|unverified, attempts, mismatches, error}
     display=unverified は『読み戻せなかった（資格情報・ネットワーク等）』。成功に数えない。"""
-    push = pusher or default_pusher
-    fetch = fetcher or default_row_fetcher
-    expected = {i: expected_for(i) for i in ids}
     res: dict[str, Any] = {"push": "failed", "display": "unverified", "attempts": 0, "mismatches": [], "error": ""}
+    try:
+        return _sync_and_verify(ids, pusher or default_pusher, fetcher or default_row_fetcher, retries, res)
+    except Exception as e:  # noqa: BLE001 — 画面反映の失敗で呼び出し元（月印・短報）を落とさない
+        res["display"] = "unverified"
+        res["error"] = f"画面反映の確認中に想定外のエラー（{type(e).__name__}）"
+        return res
+
+
+def _sync_and_verify(ids, push, fetch, retries, res) -> dict[str, Any]:
+    expected = {i: expected_for(i) for i in ids}
     for attempt in range(retries + 1):
         res["attempts"] = attempt + 1
         rc = push()
         res["push"] = "success" if rc == 0 else "failed"
         if rc != 0:
             res["display"] = "unverified"
-            res["error"] = f"push exit {rc}"
+            res["error"] = f"push exit {rc}" + (f"（{_last_push_tail}）" if _last_push_tail else "")
             continue
         try:
             rows = fetch(ids)

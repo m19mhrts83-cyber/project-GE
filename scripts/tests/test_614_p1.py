@@ -181,6 +181,40 @@ class OpsTests(Base):
         self.assertIn("送れず保留のまま", self.emergency())
         self.assertEqual(ops.flush_pending(poster=lambda t: 0)["sent"], 0)  # 諦めたものは再送しない
 
+    def test_unknown_result_is_never_queued_or_resent(self):
+        self.assertEqual(self.call(lambda t: 4)["status"], "unknown")
+        sent = []
+        out = ops.flush_pending(poster=lambda t: sent.append(t) or 0)
+        self.assertEqual((out["sent"], sent), (0, []))  # 届いた可能性があるので再送しない
+        self.assertIn("結果不明", self.emergency())
+        self.assertEqual(self.call(lambda t: 0)["status"], "duplicate")
+
+    def test_unknown_on_resend_stops_and_is_not_retried(self):
+        self.call(lambda t: 1)
+        ops.flush_pending(poster=lambda t: 4)
+        self.assertEqual(list(ops._pending_state().values())[0]["status"], "unknown")
+        self.assertEqual(ops.flush_pending(poster=lambda t: 0)["sent"], 0)
+
+    def test_flush_stops_after_first_failure_to_keep_startup_short(self):
+        for i in range(3):
+            self.call(lambda t: 1, cause=f"原因{i}")
+        calls = []
+        out = ops.flush_pending(poster=lambda t: calls.append(1) or 1)
+        self.assertEqual((len(calls), out["failed"]), (1, 1))
+
+    def test_flush_is_exclusive_across_processes(self):
+        self.call(lambda t: 1)
+        import fcntl
+        lock = ops.pending_path().with_suffix(".lock")
+        fd = os.open(lock, os.O_RDWR | os.O_CREAT)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            sent = []
+            out = ops.flush_pending(poster=lambda t: sent.append(t) or 0)
+            self.assertEqual((out["skipped"], sent), ("busy", []))  # 同時起動でも二重に送らない
+        finally:
+            os.close(fd)
+
     def test_global_stop_blocks_new_and_resend_but_queues(self):
         self.call(lambda t: 1)  # 保留1件
         os.environ["JARVIS_614_GLOBAL_STOP"] = "1"
@@ -279,6 +313,13 @@ class LedgerTests(Base):
                 raise RuntimeError("not_in_channel")
 
             self.assertIsNone(led.confirm_sent("report", "A\nB", history=boom))  # 確認できない≠未送信
+
+    def test_full_history_window_cannot_prove_absence(self):
+        os.environ["SLACK_BOT_TOKEN"] = "x"
+        busy = [{"text": f"他の投稿{i}"} for i in range(led.HISTORY_LIMIT)]
+        with mock.patch.object(led, "channel_id", lambda ch: "C123"):
+            self.assertIsNone(led.confirm_sent("report", "A\nB", history=lambda *a, **k: busy))  # 見えていない分があり得る
+            self.assertTrue(led.confirm_sent("report", "A\nB", history=lambda *a, **k: busy + [{"text": "A\nB"}]))
 
     def test_channel_ids_come_from_hub_config(self):
         self.assertTrue(led.channel_id("report").startswith("C"))
@@ -441,8 +482,8 @@ class PostFlowTests(Base):
 
     def test_global_stop_skips_report_and_queues_ops(self):
         os.environ["JARVIS_614_GLOBAL_STOP"] = "1"
-        self.assertEqual(self.post(), 0)
-        self.assertEqual(self.post("ops", "【614】失敗 — s"), 0)
+        self.assertEqual(self.post(), sr.EXIT_SKIPPED)  # 送っていない＝『投稿済み』として数えない
+        self.assertEqual(self.post("ops", "【614】失敗 — s"), sr.EXIT_SKIPPED)
         self.assertEqual(self.posts, [])
         self.assertEqual(len(ops._pending_state()), 1)
 
@@ -479,9 +520,10 @@ class WebhookExitCodeTests(unittest.TestCase):
         self.assertEqual(c(urllib.error.URLError(socket.gaierror(8, "x"))), 1)  # 接続前＝届いていない
         self.assertEqual(c(urllib.error.URLError(ConnectionRefusedError())), 1)
         self.assertEqual(c(socket.timeout()), wh.EXIT_UNKNOWN)  # 応答待ちで切れた＝届いた可能性
-        self.assertEqual(c(urllib.error.URLError(socket.timeout())), wh.EXIT_UNKNOWN)
+        self.assertEqual(c(urllib.error.URLError(socket.timeout())), 1)  # 接続段階のタイムアウト＝届いていない
         self.assertEqual(c(ConnectionResetError()), wh.EXIT_UNKNOWN)
-        self.assertEqual(c(ValueError("x")), wh.EXIT_UNKNOWN)  # 分からないものは不明側（再投稿しない）
+        self.assertEqual(c(ValueError("bad url")), 1)  # 送る前に失敗
+        self.assertEqual(c(RuntimeError("x")), wh.EXIT_UNKNOWN)  # 分からないものは不明側（再投稿しない）
         self.assertEqual(wh.EXIT_UNKNOWN, sr.EXIT_UNKNOWN)
 
 
@@ -565,6 +607,21 @@ class DisplayTests(Base):
             else:
                 self.fail("資格情報なしで読み戻せてしまった")
 
+    def test_unexpected_exception_is_unverified_not_crash(self):
+        with mock.patch.object(dsp, "expected_for", side_effect=ValueError("shape")):
+            res = dsp.sync_and_verify(["vpoint"], pusher=lambda: 0, fetcher=lambda ids: {})
+        self.assertEqual((res["push"], res["display"]), ("failed", "unverified"))
+        self.assertIn("想定外のエラー", res["error"])
+
+    def test_push_failure_reason_is_kept_without_secrets(self):
+        self.seed_state()
+        fake = mock.Mock(returncode=1, stderr="line1\nJARVIS_SUPABASE_URL が未設定です", stdout="")
+        with mock.patch.object(dsp.subprocess, "run", return_value=fake), \
+                mock.patch.object(dsp, "private_env", lambda: {}):
+            res = dsp.sync_and_verify(["vpoint"], fetcher=lambda ids: {})
+        self.assertIn("未設定です", res["error"])
+        self.assertLessEqual(len(res["error"]), 160)
+
     def test_card_benefit_view_ignores_changing_fields_and_flags_withheld(self):
         self.seed_state()
         a = dsp.card_benefit_view(cbw.compute_from_files())
@@ -619,7 +676,13 @@ class TeikiWrapperTests(Base):
 
         with self.assertRaises(RuntimeError):
             self.run_wrapper(["--run"], impl=boom, states=[{}])
-        self.assertEqual(self.last()["error_code"], "unexpected_error")
+        run_stage = rl.read_runs()[-1]["systems"]["teiki"]["stages"]["run"]
+        self.assertEqual(run_stage["error_code"], "unexpected_error")
+
+    def test_child_of_another_run_does_not_write_its_own_line(self):
+        os.environ["JARVIS_614_RUN_ID"] = "parent-run"
+        self.run_wrapper(["--run"], impl=lambda: 0, states=[{"last_check_at": "a"}, {"last_check_at": "b"}])
+        self.assertEqual(rl.read_runs(), [])  # 親（Vポイント定例）が系統 teiki の工程として記録する＝二重計上しない
 
     def test_global_stop_is_honored_by_body(self):
         os.environ["JARVIS_614_GLOBAL_STOP"] = "1"

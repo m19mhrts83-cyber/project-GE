@@ -851,13 +851,17 @@ def main() -> int:
         run_id=runlog614.new_run_id("teiki"), dry_run=dry,
         trigger="manual" if "--force" in argv else "auto", script="jarvis_teiki_barai_chance.py",
     )
+    # 親（Vポイント定例など）から呼ばれた子は自分の run 行を書かない（親が系統 teiki の工程として記録する。二重計上しない）
+    is_child = bool((os.environ.get("JARVIS_614_RUN_ID") or "").strip())
+    if is_child:
+        rec.finish = lambda: {}  # type: ignore[method-assign]
     os.environ["JARVIS_614_RUN_ID"] = rec.run_id  # 子（Slack 短報）が同じ run_id を使う
     before = (load_state() or {}).get("last_check_at")
     try:
         rc = _main_impl()
     except BaseException as e:  # noqa: BLE001 — SystemExit も含めて記録だけして再送出
         if not isinstance(e, SystemExit) or e.code not in (0, None):
-            rec.stage("teiki", "fetch", "failed", f"想定外の終了（{type(e).__name__}）", "unexpected_error")
+            rec.stage("teiki", "run", "failed", f"想定外の終了（{type(e).__name__}）", "unexpected_error")
         rec.finish()
         raise
     after_state = load_state() or {}

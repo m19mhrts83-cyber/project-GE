@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import hashlib
 import json
@@ -33,7 +34,8 @@ JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 POST = REPO / "scripts" / "jarvis_slack_webhook_post.py"
 MAX_ATTEMPTS = 5
-MAX_FLUSH_PER_RUN = 5
+MAX_FLUSH_PER_RUN = 3
+EXIT_UNKNOWN = 4  # jarvis_slack_webhook_post.EXIT_UNKNOWN（届いたか不明。再送してはいけない）
 _TRUE = ("1", "true", "yes", "on")
 
 
@@ -125,7 +127,7 @@ def _default_poster(text: str) -> int:
     try:
         return subprocess.run(
             [sys.executable, str(POST), "--channel", "ops", "--text", text],
-            cwd=str(REPO), env=env, check=False, timeout=60,
+            cwd=str(REPO), env=env, check=False, timeout=25,
         ).returncode
     except (OSError, subprocess.SubprocessError):
         return 1
@@ -177,6 +179,12 @@ def notify_ops(
         _append_jsonl(pending_path(), {"id": nid, "status": "sent", "system": system, "stage": stage,
                                        "run_id": run_id, "sent_at": runlog.now_iso()})
         return {"status": "sent", "id": nid}
+    if rc == EXIT_UNKNOWN:
+        # 届いたか分からない通知は再送しない（二重通知を避ける）。pending には『unknown』として残すだけ
+        _append_jsonl(pending_path(), {"id": nid, "status": "unknown", "system": system, "stage": stage,
+                                       "run_id": run_id, "at": runlog.now_iso()})
+        emergency_log(f"ops 通知の結果不明（再送しない） {system}/{stage} run={run_id}")
+        return {"status": "unknown", "id": nid}
     queued = enqueue_pending(text, nid=nid, system=system, stage=stage, run_id=run_id)
     if not queued:
         emergency_log(f"ops 通知を送れず保存も失敗 {system}/{stage}: {cause[:120]} run={run_id}")
@@ -192,20 +200,44 @@ def flush_pending(*, poster: Callable[[str], int] | None = None, limit: int = MA
     if _guard_active():
         out["skipped"] = "guard"
         return out
-    todo = [r for r in _pending_state().values() if r.get("status") == "pending"]
-    todo.sort(key=lambda r: str(r.get("queued_at")))
-    for r in todo[:limit]:
-        attempts = int(r.get("attempts") or 0) + 1
-        rc = (poster or _default_poster)(str(r.get("text") or ""))
-        base = {k: r.get(k) for k in ("id", "system", "stage", "run_id", "text", "queued_at")}
-        if rc == 0:
-            _append_jsonl(pending_path(), {**base, "status": "sent", "attempts": attempts, "sent_at": runlog.now_iso()})
-            out["sent"] += 1
-        elif attempts >= MAX_ATTEMPTS:
-            _append_jsonl(pending_path(), {**base, "status": "gave_up", "attempts": attempts})
-            emergency_log(f"ops 通知を {MAX_ATTEMPTS} 回送れず保留のまま id={r.get('id')} {r.get('system')}/{r.get('stage')}")
-            out["gave_up"] += 1
-        else:
-            _append_jsonl(pending_path(), {**base, "status": "pending", "attempts": attempts})
-            out["failed"] += 1
-    return out
+    # 複数のスクリプトが同時に起動しても同じ通知を二重に送らない（排他。取れなければ今回は何もしない）
+    lock = pending_path().with_suffix(".lock")
+    try:
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(lock, os.O_RDWR | os.O_CREAT, 0o600)
+    except OSError:
+        out["skipped"] = "lock_unavailable"
+        return out
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            out["skipped"] = "busy"
+            return out
+        todo = [r for r in _pending_state().values() if r.get("status") == "pending"]
+        todo.sort(key=lambda r: str(r.get("queued_at")))
+        for r in todo[:limit]:
+            attempts = int(r.get("attempts") or 0) + 1
+            rc = (poster or _default_poster)(str(r.get("text") or ""))
+            base = {k: r.get(k) for k in ("id", "system", "stage", "run_id", "text", "queued_at")}
+            if rc == 0:
+                _append_jsonl(pending_path(), {**base, "status": "sent", "attempts": attempts, "sent_at": runlog.now_iso()})
+                out["sent"] += 1
+                continue
+            if rc == EXIT_UNKNOWN:
+                _append_jsonl(pending_path(), {**base, "status": "unknown", "attempts": attempts})
+                emergency_log(f"ops 再送の結果不明（再送しない） id={r.get('id')}")
+                break
+            if attempts >= MAX_ATTEMPTS:
+                _append_jsonl(pending_path(), {**base, "status": "gave_up", "attempts": attempts})
+                emergency_log(f"ops 通知を {MAX_ATTEMPTS} 回送れず保留のまま id={r.get('id')} {r.get('system')}/{r.get('stage')}")
+                out["gave_up"] += 1
+            else:
+                _append_jsonl(pending_path(), {**base, "status": "pending", "attempts": attempts})
+                out["failed"] += 1
+            break  # 送れなかった（回線不調など）なら今回はここまで。起動を長引かせない
+        return out
+    finally:
+        with contextlib.suppress(OSError):
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)

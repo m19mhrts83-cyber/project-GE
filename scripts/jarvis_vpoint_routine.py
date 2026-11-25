@@ -336,7 +336,7 @@ def main() -> int:
         _stage("fetch", "skipped", "別の実行中（排他）")
         return _finish(0)
     except Exception as e:  # noqa: BLE001
-        _stage("fetch", "failed", f"想定外のエラー（{type(e).__name__}）", "unexpected_error")
+        _stage("run", "failed", f"想定外のエラー（{type(e).__name__}）", "unexpected_error")
         ops614.notify_ops(
             system=SYS, stage="Vポイント定例", run_id=REC.run_id,
             cause=f"想定外のエラーで止まった（{type(e).__name__}）",
@@ -704,6 +704,8 @@ def _main() -> int:
         src = report["slack"].get("returncode")
         if report["slack"].get("ok"):
             _stage("slack", "success", f"短報（結果語={slack_outcome}）")
+        elif src == 5:
+            _stage("slack", "skipped", "614 全体停止中のため送らず")
         elif src == 4:
             _stage("slack", "unverified", "投稿結果不明（再投稿していない）", "post_unknown")
         elif src == 3:

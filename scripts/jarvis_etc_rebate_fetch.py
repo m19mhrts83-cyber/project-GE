@@ -476,6 +476,8 @@ def _slack_stage(res: dict[str, Any] | None) -> None:
     rc = res.get("returncode")
     if res.get("ok"):
         _stage("slack", "success", "短報を投稿済み（または重複・停止で送らず）")
+    elif rc == 5:
+        _stage("slack", "skipped", "614 全体停止中のため送らず")
     elif rc == 4:
         _stage("slack", "unverified", "投稿結果不明（再投稿していない）", "post_unknown")
     elif rc == 3:
@@ -498,7 +500,7 @@ def main() -> int:
     try:
         rc = _main()
     except Exception as e:  # noqa: BLE001
-        _stage("fetch", "failed", f"想定外のエラー（{type(e).__name__}）", "unexpected_error")
+        _stage("run", "failed", f"想定外のエラー（{type(e).__name__}）", "unexpected_error")
         REC.finish()
         raise
     REC.finish()
