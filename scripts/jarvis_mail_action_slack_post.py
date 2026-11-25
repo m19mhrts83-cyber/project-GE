@@ -1605,7 +1605,8 @@ def load_pending_from_supabase(
         print(f"# loopware miss load soft-fail: {e}", file=sys.stderr)
     from jarvis_kurashift_re_inquiry_channel import is_mail_action_excluded
     from jarvis_learned_rules import apply_to_row, load_rulebook
-    from jarvis_mail_human import looks_human_mail
+    from jarvis_mail_human import has_strong_action_signal, looks_human_mail
+    from jarvis_night_triage_general import NOISE_FROM_RE
 
     book = load_rulebook("116")
     for w in book.warnings:
@@ -1666,13 +1667,22 @@ def load_pending_from_supabase(
             skipped_skim += 1
             fresh_excluded += _is_fresh(row)
             continue
-        if kind == "skim" and pri != "high" and not (row.get("draft_text") or "").strip():
+        strong = bool(
+            not NOISE_FROM_RE.search(str(row.get("from_email") or ""))
+            and has_strong_action_signal(
+                str(row.get("from_email") or ""),
+                subj,
+                str(row.get("original_body") or ""),
+            )
+        )
+        if kind == "skim" and pri != "high" and not strong and not (row.get("draft_text") or "").strip():
             skipped_skim += 1
             fresh_excluded += _is_fresh(row)
             continue
         # 一般メールは人が書いたものだけ（カード・銀行・販促の自動送信は要約側）
         if (
             lane == "general"
+            and not strong
             and not (row.get("draft_text") or "").strip()
             and not looks_human_mail(
                 str(row.get("from_email") or ""),

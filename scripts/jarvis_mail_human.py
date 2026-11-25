@@ -85,3 +85,24 @@ def looks_human_mail(from_email: str, subject: str, body: str) -> bool:
     if addressed and looks_personal_local(addr):
         return True
     return False
+
+
+# 強い判断語（2026-11-25 松野さん決定: skim 落ちでも、対応を求める語があれば要対応に残す）
+# ご返信・ご返答・ご回答は「ご返信は不要」「ご返信いただいても」など定型句にも入るため、
+# 依頼の形（ください・お願い・いただけ…）が続くものだけを強語とする（実測で定型句が過半だった）。
+STRONG_ACTION_RE = re.compile(
+    r"(承認|時間割|ご(返信|返答|回答)[^。\n]{0,12}?(ください|下さい|お願い|いただけ|頂け|賜り))"
+)
+NOREPLY_ADDR_RE = re.compile(
+    r"(noreply|no-reply|no_reply|donotreply|do-not-reply|mailer-daemon)", re.I
+)
+
+
+def has_strong_action_signal(from_email: str, subject: str, body: str) -> bool:
+    """件名または本文冒頭600字に強い判断語があり、一括配信・noreply 系でない。"""
+    body = str(body or "")
+    if is_bulk_mail(body):
+        return False
+    if NOREPLY_ADDR_RE.search(_addr(from_email)):
+        return False
+    return bool(STRONG_ACTION_RE.search(f"{subject or ''}\n{body[:600]}"))

@@ -9,7 +9,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts"))
 
-from jarvis_mail_human import looks_human_mail  # noqa: E402
+from jarvis_mail_human import has_strong_action_signal, looks_human_mail  # noqa: E402
 from jarvis_night_triage_general import classify_general_kind  # noqa: E402
 
 
@@ -41,6 +41,32 @@ class LooksHumanMailTest(unittest.TestCase):
     def test_classify_uses_human_rule(self) -> None:
         self.assertEqual(classify_general_kind("【PayPayカード公式】キャンペーン", "ご確認ください。送信専用", "paypaycard-info@mail.paypay-card.co.jp"), "skim")
         self.assertEqual(classify_general_kind("富士見台物件について", "松野様\n物件の件でご連絡です。", "to-sirai@nakado.com"), "mail")
+
+
+class StrongActionTest(unittest.TestCase):
+    def test_revived(self) -> None:
+        self.assertEqual(classify_general_kind("手続きの件", "ご承認をお願いします。", "service@ex.example.com"), "mail")
+        self.assertTrue(has_strong_action_signal("service@ex.example.com", "ご返信のお願い", ""))
+        self.assertFalse(has_strong_action_signal("service@ex.example.com", "案内", "ご返信は不要です。"))
+        self.assertFalse(has_strong_action_signal("service@ex.example.com", "案内", "ご返信をいただいても回答できません"))
+
+    def test_bulk_not_revived(self) -> None:
+        body = "ご承認ください。\n配信停止はこちら"
+        self.assertFalse(has_strong_action_signal("service@ex.example.com", "案内", body))
+        self.assertEqual(classify_general_kind("案内", body, "service@ex.example.com"), "skim")
+
+    def test_noreply_not_revived(self) -> None:
+        self.assertFalse(has_strong_action_signal("noreply@ex.example.com", "ご承認ください", ""))
+        self.assertEqual(classify_general_kind("ご承認ください", "", "noreply@ex.example.com"), "skim")
+
+    def test_noise_from_not_revived(self) -> None:
+        self.assertEqual(classify_general_kind("ご承認ください", "", "alerts@github.com"), "skim")
+
+    def test_no_strong_word_unchanged(self) -> None:
+        self.assertEqual(classify_general_kind("ご案内", "ご確認ください。", "service@ex.example.com"), "skim")
+
+    def test_beyond_600_chars_ignored(self) -> None:
+        self.assertFalse(has_strong_action_signal("service@ex.example.com", "案内", "あ" * 601 + "承認"))
 
 
 if __name__ == "__main__":
