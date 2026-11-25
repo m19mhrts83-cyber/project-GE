@@ -62,5 +62,35 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(out, [])
 
 
+class MdTests(unittest.TestCase):
+    def test_render_states_and_registered(self):
+        items = [
+            item(key="a", kind="add"),
+            item(key="b", kind="consult", why="要確認"),
+            item(key="c", kind="dup", why="同じ会社", existing={"name": "既存社", "status": "pending"}),
+            item(key="d", kind="drop", why="電話のみ"),
+            item(key="e", kind="add"),
+        ]
+        md = snap.render_md(items, {"a": "contacted", "既存社": "contacted", "e": "skip"}, now=NOW)
+        self.assertIn("送信済み", md)
+        self.assertIn("新規（判断待ち）", md)
+        self.assertIn("相手は台帳で送信済み", md)  # 台帳の最新を優先
+        self.assertIn("送らない", md)
+        self.assertIn("見送り", md)
+        self.assertIn("未登録", md)
+        self.assertNotIn("000-0000-0000", md)  # 電話・メールは出さない
+
+    def test_write_md_overwrites_and_softfails(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as t:
+            r1 = snap.write_md([item()], {}, t, now=NOW)
+            r2 = snap.write_md([item(), item(key="z")], {}, t, now=NOW)
+            self.assertTrue(r1["ok"] and r2["ok"])
+            self.assertEqual(r2["items"], 2)
+            self.assertEqual(len(list(Path(t).iterdir())), 1)
+        bad = snap.write_md([item()], {}, "/dev/null/x", now=NOW)
+        self.assertFalse(bad["ok"])
+
+
 if __name__ == "__main__":
     unittest.main()

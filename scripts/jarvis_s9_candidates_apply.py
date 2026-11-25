@@ -333,6 +333,14 @@ def main() -> int:
         res["merge"] = ml.merge_append(clean, dry_run=False)
         if os.environ.get("JARVIS_GROK_SNAPSHOT", "1") != "0":
             res["snapshot"] = snap.push(snap_items, now=now_utc)  # 画面用。失敗しても取り込みは続行
+            merged = res["snapshot"].pop("_merged", None)
+            if merged is not None:
+                try:  # 案A: Grok が読める写し（30_shared_working）。失敗しても続行
+                    led = {_norm_name(v.get("name") or ""): str(v.get("status") or "pending")
+                           for v in (ml.load_list().get("vendors") or []) if isinstance(v, dict)}
+                    res["snapshot_md"] = snap.write_md(merged, led, folder("shared_working"), now=now_utc, norm=_norm_name)
+                except Exception as e:  # noqa: BLE001
+                    res["snapshot_md"] = {"ok": False, "error": str(e)[:200]}
         if args.post:
             if clean or dups or dropped:
                 _post("report", build_report(clean, dups, len(consult), dropped))
