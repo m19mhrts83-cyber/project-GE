@@ -66,6 +66,25 @@ export default function VoiceDock({
   ) => void;
 }) {
   const viewed = useViewed();
+  // ふだんは小さなマイクだけ（画面を広く使う）。「ひらく」で字幕つきの大きな表示。端末ごとに覚える
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("lw_vdock_open") === "1") setOpen(true);
+    } catch {
+      /* 保存できなくても動く */
+    }
+  }, []);
+  function toggleOpen() {
+    setOpen((o) => {
+      try {
+        localStorage.setItem("lw_vdock_open", o ? "0" : "1");
+      } catch {
+        /* 保存できなくても動く */
+      }
+      return !o;
+    });
+  }
   const [mode, setMode] = useState<"follow" | "pin">("follow");
   const [pinned, setPinned] = useState<T | null>(null);
   const cur: T | null = mode === "pin" ? pinned : (viewed ?? pinned);
@@ -123,6 +142,33 @@ export default function VoiceDock({
   const shown = listening && startRef.current ? startRef.current.t : cur;
   const noTarget = !cur;
 
+  if (!open) {
+    const note = speech.error ? speech.error : listening ? speech.interim || "聞いています…" : flash ? `✓ ${flash.text}` : "";
+    return (
+      <div className={`vdock mini ${listening ? "live" : ""}`}>
+        {speech.supported ? (
+          <button
+            type="button"
+            className="vmic mini"
+            aria-pressed={listening}
+            aria-label={listening ? "音声入力を止める" : "声でフィードバックする"}
+            disabled={noTarget}
+            onClick={() => (listening ? speech.stop() : speech.start())}
+          >
+            <Icon name={listening ? "stop" : "mic"} size={18} stroke={2.4} />
+          </button>
+        ) : null}
+        <span className="vmini-note" aria-live="polite" title={note}>
+          {note}
+        </span>
+        <button type="button" className="vexpand" aria-label="音声入力の表示をひらく" onClick={toggleOpen}>
+          <Icon name="up" size={16} stroke={2.4} />
+          <span>ひらく</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={`vdock ${listening ? "live" : ""}`}>
       <div className="vdock-row">
@@ -172,6 +218,10 @@ export default function VoiceDock({
           </div>
         </div>
       </div>
+      <button type="button" className="vexpand close" aria-label="音声入力の表示を小さくする" onClick={toggleOpen}>
+        <Icon name="down" size={16} stroke={2.4} />
+        <span>小さくする</span>
+      </button>
       <div className="vmode" role="group" aria-label="対象の決め方">
         <button
           type="button"

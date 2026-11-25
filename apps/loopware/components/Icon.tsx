@@ -6,6 +6,8 @@ const PATHS: Record<string, string> = {
   check: "m5 12 5 5 9-10",
   back: "m15 6-6 6 6 6",
   next: "m9 6 6 6-6 6",
+  up: "m6 15 6-6 6 6",
+  down: "m6 9 6 6 6-6",
   arrow: "M5 12h14M13 6l6 6-6 6",
   calendar: "M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM3 10h18M8 3v4M16 3v4",
   trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
