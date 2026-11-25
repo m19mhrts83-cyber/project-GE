@@ -1908,6 +1908,10 @@ def main() -> int:
                         f"# mail_action_slack: exit={m.returncode} "
                         f"{(m.stderr or m.stdout or '')[-200:]}"
                     )
+                    # stderr の警告で統計が切れるため、除外の内訳は専用の1行で残す
+                    for ln in (m.stdout or "").splitlines():
+                        if ln.startswith("# skip_summary:"):
+                            print(ln)
         except Exception as e:
             print(f"# mail_action_slack soft-fail: {e}")
         # ops: pending が多い／queue が止まったときだけ #ops に1日1回（Todoist には起票しない）
