@@ -39,6 +39,8 @@ MAX_CARDS = 120
 # 313 週の整理（scripts/jarvis_todoist_313_weekly.py）が金曜に置く B の待ち
 QUEUE_313_KEY = "todoist_313_weekly_queue"
 QUEUE_313_STALE_DAYS = 8
+# ふるい分け（300 ラス隊長）のやめる候補。jarvis_todoist_triage_log.py queue が置く。形は QUEUE_313_KEY と同じ
+QUEUE_TRIAGE_KEY = "todoist_triage_drop_queue"
 
 PROMO_RE = re.compile(r"(セミナー|キャンペーン|イベント案内|おすすめイベント|新製品|特典|優待|ポイント|紹介|ご案内|応募|アンケート|動画)")
 MONEY_RE = re.compile(r"(入金|着金|送金|振込|支払|納付|引落|請求)")
@@ -225,6 +227,16 @@ def snapshot(*, dry: bool, now: datetime) -> int:
         snap["total"] += n313
         snap["from_313"] = n313
         print(f"313 週の整理 {n313} 件を足した")
+    # ふるい分けのやめる候補（選んだものだけ反映。origin=313 なので 完了＋コメント）
+    n_before = len(snap["cards"])
+    merged = merge_313_cards(snap["cards"], ho.read_meta(c.sb, QUEUE_TRIAGE_KEY),
+                             active_by_id={str(t["id"]): t for t in tasks}, held=held, now=now)
+    ntri = len(merged) - n_before
+    if ntri:
+        snap["cards"] = merged[:MAX_CARDS]
+        snap["total"] += ntri
+        snap["from_triage"] = ntri
+        print(f"ふるい分けのやめる候補 {ntri} 件を足した")
     by: dict[str, int] = {}
     for x in snap["cards"]:
         by[x["suggest"]] = by.get(x["suggest"], 0) + 1

@@ -175,6 +175,35 @@ def hypotheses(rows: list[dict[str, Any]], *, rejected: set[str] | None = None) 
                 "needs_ai": False,
             })
 
+    # 5) Todoist ふるい分け（surface=todoist_triage）で「同じ種類の判断」が2回以上 → 313 のルール帳へ（rewrite=ふるい分けの指針）
+    #    本人（owner_close）の判断を重く数える。ラス隊長だけの判断は「本人未確認」と明記。採用は松野さんが loopware で押す
+    from jarvis_todoist_triage_log import TRIAGE_GUIDES  # noqa: PLC0415
+
+    by_tag: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for r in rows:
+        tag = _pl(r).get("rule_tag")
+        if r.get("surface") == "todoist_triage" and tag in TRIAGE_GUIDES:
+            by_tag[(str(r.get("action")), str(tag))].append(r)
+    merged_tags: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for (_a, tag), rs in by_tag.items():
+        merged_tags[tag].extend(rs)  # 同じ種類なら close と owner_close は合算（指針は同じ）
+    for tag, rs in merged_tags.items():
+        if len(rs) < 2:
+            continue
+        owner_n = sum(1 for r in rs if r.get("action") == "owner_close")
+        out.append({
+            "id": cand_id("triage", tag),
+            "kind": "triage_guide",
+            "employee": "313",
+            "key": tag,
+            "rule_line": "rewrite | * | scope=always",
+            "text": TRIAGE_GUIDES[tag],
+            "why": f"同じ種類の判断 {len(rs)} 回（本人の判断 {owner_n} 回）" + ("" if owner_n else "・ラス隊長の判断のみ（本人未確認）"),
+            "evidence": [r.get("id") for r in rs][:10],
+            "score": len(rs) * 3 + owner_n * 15,
+            "needs_ai": False,
+        })
+
     out = [c for c in out if c["id"] not in rejected]
     out.sort(key=lambda c: -c["score"])
     for c in out:
