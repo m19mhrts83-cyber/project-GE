@@ -103,9 +103,12 @@ def classify_general_kind(subject: str, body: str = "", from_email: str = "") ->
     """
     if NOISE_FROM_RE.search(from_email or ""):
         return "skim"
-    from jarvis_mail_human import looks_human_mail
+    from jarvis_mail_human import has_strong_action_signal, looks_human_mail
 
-    return "mail" if looks_human_mail(from_email, subject, body) else "skim"
+    if looks_human_mail(from_email, subject, body):
+        return "mail"
+    # 強い判断語（承認・ご返信など）があれば人判定が偽でも残す（NOISE_FROM は上で除外済み）
+    return "mail" if has_strong_action_signal(from_email, subject, body) else "skim"
 
 
 def resolve_contact_yaml(explicit: Path | None = None) -> Path:
