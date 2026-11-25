@@ -1,0 +1,7 @@
+{
+  "state": "up",
+  "since": "2026-11-25T16:00+09:00",
+  "detail": "初期値",
+  "app_url": "https://ma-54t2keqdelz3.raimo-app.buzz/",
+  "note": "kamiooya_navi_watch.py が状態の変わった時だけ書きます。手で直す時も state は up / down のどちらか。"
+}

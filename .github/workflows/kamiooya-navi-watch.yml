@@ -1,0 +1,49 @@
+# 神大家AIナビ（ライモ）の停止を見回る（2026-11-25、第4回協議ToDo）。
+# 15分ごとにAIナビを開き、2回続けて開けなければ docs/kamiooya-navi-status.json を「停止中」にして #ops へ知らせる。
+# 入口ページ docs/kamiooya-navi.html がこのファイルを読み、停止中なら「一時停止中」を出す。
+# 書き込み・通知は状態が変わった時だけ。AIもSupabaseも使わない（公開リポジトリなので実行は無料）。
+name: kamiooya navi watch
+
+on:
+  schedule:
+    - cron: "3,18,33,48 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kamiooya-navi-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check AI Navi
+        env:
+          SLACK_WEBHOOK_AI_TEAM_OPS: ${{ secrets.SLACK_WEBHOOK_AI_TEAM_OPS }}
+        run: python3 scripts/kamiooya_navi_watch.py
+
+      - name: Commit status change
+        run: |
+          set -euo pipefail
+          git add docs/kamiooya-navi-status.json
+          if git diff --staged --quiet; then
+            echo "状態は変わっていません"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: 神大家AIナビの状態 $(python3 -c "import json;print(json.load(open('docs/kamiooya-navi-status.json'))['state'])")"
+          for i in 1 2 3 4; do
+            if git push; then exit 0; fi
+            sleep $((i * 5))
+            git fetch origin main
+            git rebase origin/main
+          done
+          echo "::error::状態の反映に失敗しました"
+          exit 1
