@@ -718,6 +718,8 @@ const App = {
         });
       });
     }
+    // オプチャ一覧の列幅（見出しの境目をドラッグ、2026-11-25）
+    App.initOpenchatColResize();
     // スレッド番号を押したら、そのスレッドだけを古い順に読む（2026-11-17）
     if (App.elements.openchatTableBody) {
       App.elements.openchatTableBody.addEventListener('click', function (ev) {
@@ -2047,6 +2049,129 @@ const App = {
     if (current) select.value = current;
   },
 
+  /* オプチャ一覧の列幅（2026-11-25 松野さん「本文抜粋が狭い・投稿者が広い。見出しで幅を寄せられると良い」）
+     初めは本文抜粋に残りの幅を全部まわす。見出しの境目（縦の線）をマウス・指でドラッグすると幅が変わり、この端末に覚える。
+     幅は rem で持つので、文字サイズ（標準・大・特大）を変えても比率が崩れない。スマホ縦（640px以下）はカード表示なので使わない。 */
+  openchatColKey: 'qa_openchat_col_widths',
+  openchatColDefaults: { chat: 10, kind: 8, when: 8.5, sender: 7 },
+  openchatColLimits: { chat: [5, 30], kind: [5, 20], when: [6, 16], sender: [4.5, 20] },
+  openchatBodyMin: 18,
+  openchatColWidths: () => {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(App.openchatColKey) || 'null'); } catch (e) { saved = null; }
+    const out = {};
+    Object.keys(App.openchatColDefaults).forEach(function (k) {
+      const lim = App.openchatColLimits[k];
+      const v = saved && Number(saved[k]);
+      out[k] = v && isFinite(v) ? Math.min(lim[1], Math.max(lim[0], v)) : App.openchatColDefaults[k];
+    });
+    return { widths: out, custom: !!saved };
+  },
+  applyOpenchatColWidths: (widths, custom) => {
+    const table = document.getElementById('openchatTable');
+    if (!table) return;
+    if (widths) { App.state.openchatColWidths = widths; App.state.openchatColCustom = !!custom; }
+    widths = App.state.openchatColWidths;
+    if (!widths) return;
+    custom = App.state.openchatColCustom;
+    // 初めの幅のときは、窓が狭ければ左4列を縮めて本文抜粋に約半分を残す（自分で変えた幅はそのまま）
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const wrap = table.parentElement;
+    const avail = wrap && wrap.clientWidth ? wrap.clientWidth / rem : 0;
+    const keys = Object.keys(widths);
+    let sum = 0;
+    keys.forEach(function (k) { sum += widths[k]; });
+    let f = 1;
+    if (!custom && avail && sum + App.openchatBodyMin > avail) f = Math.max(0.55, (avail * 0.5) / sum);
+    let used = 0;
+    keys.forEach(function (k) {
+      const w = Math.max(App.openchatColLimits[k][0], Math.round(widths[k] * f * 10) / 10);
+      const col = table.querySelector('col[data-col="' + k + '"]');
+      if (col) col.style.width = w + 'rem';
+      used += w;
+    });
+    const body = table.querySelector('col[data-col="body"]');
+    if (body) body.style.width = 'auto';
+    // 本文抜粋が細くなりすぎないよう、表全体の最小幅＝左4列＋本文の最小幅。足りない窓では横に動かして見る
+    const bodyMin = avail ? Math.min(App.openchatBodyMin, Math.max(12, avail - used)) : App.openchatBodyMin;
+    table.style.width = 'max(100%, ' + (used + bodyMin) + 'rem)';
+    const reset = document.getElementById('openchatColResetBtn');
+    if (reset) reset.classList.toggle('hidden', !custom);
+  },
+  initOpenchatColResize: () => {
+    const table = document.getElementById('openchatTable');
+    if (!table || table.getAttribute('data-col-resize') === '1') return;
+    table.setAttribute('data-col-resize', '1');
+    const state = App.openchatColWidths();
+    let widths = state.widths;
+    App.applyOpenchatColWidths(widths, state.custom);
+    const remPx = function () { return parseFloat(getComputedStyle(document.documentElement).fontSize) || 16; };
+    table.querySelectorAll('thead th[data-col]').forEach(function (th) {
+      const key = th.getAttribute('data-col');
+      if (!App.openchatColLimits[key]) return; // 本文抜粋は残りの幅なので取っ手なし
+      const grip = document.createElement('span');
+      grip.className = 'openchat-col-grip';
+      grip.setAttribute('role', 'separator');
+      grip.setAttribute('aria-orientation', 'vertical');
+      grip.setAttribute('aria-label', th.textContent.trim() + 'の幅を変える（左右の矢印キーでも変えられます）');
+      grip.setAttribute('tabindex', '0');
+      grip.title = 'ドラッグで幅を変えられます（ダブルクリックで元の幅）';
+      th.appendChild(grip);
+      const setWidth = function (v, save) {
+        const lim = App.openchatColLimits[key];
+        widths[key] = Math.round(Math.min(lim[1], Math.max(lim[0], v)) * 10) / 10;
+        App.applyOpenchatColWidths(widths, true);
+        if (save) { try { localStorage.setItem(App.openchatColKey, JSON.stringify(widths)); } catch (e) { /* ignore */ } }
+      };
+      grip.addEventListener('pointerdown', function (ev) {
+        if (ev.button !== undefined && ev.button !== 0) return;
+        ev.preventDefault();
+        if (!App.state.openchatColCustom) {
+          // 窓に合わせて縮めて見せている幅から動かし始める（いきなり跳ねないように）
+          Object.keys(widths).forEach(function (k) {
+            const c = table.querySelector('col[data-col="' + k + '"]');
+            const v = c && parseFloat(c.style.width);
+            if (v) widths[k] = v;
+          });
+        }
+        const startX = ev.clientX;
+        const startW = widths[key];
+        const px = remPx();
+        grip.classList.add('is-dragging');
+        document.documentElement.classList.add('openchat-col-dragging');
+        try { grip.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+        const move = function (e) { setWidth(startW + (e.clientX - startX) / px, false); };
+        const up = function () {
+          grip.classList.remove('is-dragging');
+          document.documentElement.classList.remove('openchat-col-dragging');
+          grip.removeEventListener('pointermove', move);
+          grip.removeEventListener('pointerup', up);
+          grip.removeEventListener('pointercancel', up);
+          setWidth(widths[key], true);
+        };
+        grip.addEventListener('pointermove', move);
+        grip.addEventListener('pointerup', up);
+        grip.addEventListener('pointercancel', up);
+      });
+      grip.addEventListener('dblclick', function () { setWidth(App.openchatColDefaults[key], true); });
+      grip.addEventListener('keydown', function (ev) {
+        if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
+          ev.preventDefault();
+          setWidth(widths[key] + (ev.key === 'ArrowRight' ? 1 : -1), true);
+        }
+      });
+    });
+    window.addEventListener('resize', function () { App.applyOpenchatColWidths(); });
+    const reset = document.getElementById('openchatColResetBtn');
+    if (reset) {
+      reset.addEventListener('click', function () {
+        try { localStorage.removeItem(App.openchatColKey); } catch (e) { /* ignore */ }
+        widths = Object.assign({}, App.openchatColDefaults);
+        App.applyOpenchatColWidths(widths, false);
+      });
+    }
+  },
+
   renderOpenchatTable: (opts) => {
     const options = opts && typeof opts === 'object' ? opts : {};
     const tbody = App.elements.openchatTableBody;
@@ -2152,6 +2277,7 @@ const App = {
         );
       })
       .join('');
+    App.applyOpenchatColWidths();
     tbody.querySelectorAll('.openchat-attachment-slot').forEach(function(container){
       App.appendAttachmentLinks(container,container.getAttribute('data-openchat-source-id'),'添付：','openchat',App.attachmentMetaFromElement(container));
     });
