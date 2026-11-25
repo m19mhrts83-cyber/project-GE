@@ -205,6 +205,8 @@ stall_watch_315b:
         file: .jarvis_state/todoist_313_weekly.json
         path: at
         max_age_h: 200
+        # 初回本番（11/27 金 20:00）まではファイルが無いのが正常。余裕を見て 11/28 08:00 JST を過ぎたら通常の判定
+        first_run_by: "2026-11-28T08:00:00+09:00"
       # 週1回なので同じ候補の繰り返しは「残す」で外れる。空回り判定はしない
       idle:
         kind: skip
