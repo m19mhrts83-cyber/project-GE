@@ -93,6 +93,9 @@ def looks_human_mail(from_email: str, subject: str, body: str) -> bool:
 STRONG_ACTION_RE = re.compile(
     r"(承認|時間割|ご(返信|返答|回答)[^。\n]{0,12}?(ください|下さい|お願い|いただけ|頂け|賜り))"
 )
+STRONG_ACTION_RE_NO_APPROVAL = re.compile(
+    r"(時間割|ご(返信|返答|回答)[^。\n]{0,12}?(ください|下さい|お願い|いただけ|頂け|賜り))"
+)
 NOREPLY_ADDR_RE = re.compile(
     r"(noreply|no-reply|no_reply|donotreply|do-not-reply|mailer-daemon)", re.I
 )
@@ -105,4 +108,8 @@ def has_strong_action_signal(from_email: str, subject: str, body: str) -> bool:
         return False
     if NOREPLY_ADDR_RE.search(_addr(from_email)):
         return False
-    return bool(STRONG_ACTION_RE.search(f"{subject or ''}\n{body[:600]}"))
+    text = f"{subject or ''}\n{body[:600]}"
+    if "新規登録" in text:
+        # 新規登録の承認通知は拾わない（松野さん 2026-11-25）。承認以外の強語は従来どおり
+        return bool(STRONG_ACTION_RE_NO_APPROVAL.search(text))
+    return bool(STRONG_ACTION_RE.search(text))
