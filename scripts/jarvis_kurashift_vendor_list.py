@@ -1011,16 +1011,108 @@ def parse_mark_commands(text: str) -> list[dict[str, str]]:
     return list(by_id.values())
 
 
-def apply_marks_from_text(text: str, *, dry_run: bool) -> dict[str, Any]:
+_ISO_DATE_RE = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)")
+
+
+def _date_from_note(note: str) -> str:
+    """note 内の最初の有効な YYYY-MM-DD（なければ空）。"""
+    for m in _ISO_DATE_RE.finditer(note or ""):
+        try:
+            datetime.strptime(m.group(1), "%Y-%m-%d")
+        except ValueError:
+            continue
+        return m.group(1)
+    return ""
+
+
+def _append_note_once(v: dict[str, Any], note: str) -> bool:
+    """notes に未掲載のときだけ " | " で追記。変更したら True。"""
+    if not note:
+        return False
+    cur = str(v.get("notes") or "")
+    if note in [seg.strip() for seg in cur.split(" | ")]:
+        return False
+    v["notes"] = note if not cur else f"{cur} | {note}"
+    return True
+
+
+def _route_mark_id(vid: str) -> str:
+    """mark id の接頭辞から台帳を決める（mgmt- → 管理会社、repair- → 修繕、他は RE）。"""
+    if vid.startswith("mgmt-"):
+        return "mgmt"
+    if vid.startswith("repair-"):
+        return "repair"
+    return "re"
+
+
+def _apply_one_mark(
+    v: dict[str, Any], *, status: str, note: str, send_date: str, kind: str
+) -> bool:
+    """1 社へ mark を冪等に反映。変更があれば True。
+
+    すでに contacted/replied の社へ contacted を再掲しても status・日付は触らない。
+    """
+    changed = False
+    already_contacted = str(v.get("status") or "") in ("contacted", "replied") or bool(
+        str(v.get("contacted_at") or "").strip()
+    )
+    if status == "contacted" and already_contacted:
+        pass  # 再掲: status / contacted_at / precheck_sent_at は据え置き
+    else:
+        if v.get("status") != status:
+            v["status"] = status
+            changed = True
+        if status == "contacted":
+            v["contacted_at"] = send_date
+            if kind == "mgmt":
+                v["precheck_sent_at"] = send_date
+            changed = True
+        if status == "replied":
+            if not str(v.get("replied_at") or "").strip():
+                v["replied_at"] = send_date
+                changed = True
+            if kind == "mgmt" and not str(v.get("contacted_at") or "").strip():
+                v["contacted_at"] = send_date
+                changed = True
+    if _append_note_once(v, note):
+        changed = True
+    if changed:
+        v["updated_at"] = now_iso()
+    return changed
+
+
+def apply_marks_from_text(
+    text: str, *, dry_run: bool, default_date: str | None = None
+) -> dict[str, Any]:
+    """日報等の --mark 行を台帳へ反映（冪等）。
+
+    mgmt- は管理会社台帳、repair- は修繕台帳、他は RE 台帳。
+    送信日は note の YYYY-MM-DD → default_date（メール日付 JST）→ 今日 JST。
+    """
     cmds = parse_mark_commands(text)
     if not cmds:
         return {"ok": False, "error": "no --mark commands found", "parsed": 0}
-    data = load_list()
-    by_id = vendor_index(data)
+    import importlib
+
+    kinds: dict[str, Any] = {}
+
+    def _ledger(kind: str) -> dict[str, Any]:
+        if kind not in kinds:
+            if kind == "re":
+                mod: Any = sys.modules[__name__]
+            elif kind == "mgmt":
+                mod = importlib.import_module("jarvis_kurashift_mgmt_vendor_list")
+            else:
+                mod = importlib.import_module("jarvis_kurashift_repair_vendor_list")
+            data = mod.load_list()
+            kinds[kind] = {"mod": mod, "data": data, "index": mod.vendor_index(data), "dirty": False}
+        return kinds[kind]
+
     applied: list[dict[str, Any]] = []
+    unchanged: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
     url_updates: list[dict[str, str]] = []
-    today = today_jst()
+    fallback_date = default_date or today_jst()
     for cmd in cmds:
         vid = cmd["id"]
         status = cmd["status"]
@@ -1028,33 +1120,44 @@ def apply_marks_from_text(text: str, *, dry_run: bool) -> dict[str, Any]:
         if status not in STATUSES:
             errors.append({"id": vid, "error": f"invalid status: {status}"})
             continue
-        v = by_id.get(vid)
-        if not v:
-            errors.append({"id": vid, "error": "vendor not found"})
+        kind = _route_mark_id(vid)
+        try:
+            led = _ledger(kind)
+        except Exception as e:  # noqa: BLE001
+            errors.append({"id": vid, "error": f"ledger load failed ({kind}): {type(e).__name__}"})
             continue
-        v["status"] = status
-        if note:
-            v["notes"] = note if not v.get("notes") else f"{v['notes']} | {note}"
-        if status == "contacted":
-            v["contacted_at"] = today
-        if status == "replied":
-            v["replied_at"] = today
+        v = led["index"].get(vid)
+        if not v:
+            errors.append({"id": vid, "error": f"vendor not found ({kind})"})
+            continue
+        send_date = _date_from_note(note) or fallback_date
+        changed = _apply_one_mark(v, status=status, note=note, send_date=send_date, kind=kind)
         discovered = extract_discovered_url(note)
         if discovered:
             if not str(v.get("contact_url") or "").strip():
                 v["contact_url"] = discovered
                 url_updates.append({"id": vid, "contact_url": discovered})
+                changed = True
             if not str(v.get("url") or "").strip():
                 v["url"] = discovered
-        v["updated_at"] = now_iso()
-        applied.append({"id": vid, "status": status, "note": note})
-    if not dry_run and applied:
-        save_list(data)
+                changed = True
+        item = {"id": vid, "status": status, "note": note, "ledger": kind}
+        if changed:
+            led["dirty"] = True
+            applied.append(item)
+        else:
+            unchanged.append(item)
+    if not dry_run:
+        for led in kinds.values():
+            if led["dirty"]:
+                led["mod"].save_list(led["data"])
     return {
         "ok": len(errors) == 0,
         "parsed": len(cmds),
         "applied": len(applied),
         "applied_items": applied,
+        "unchanged": len(unchanged),
+        "failed": len(errors),
         "url_updates": url_updates,
         "errors": errors,
         "dry_run": dry_run,
