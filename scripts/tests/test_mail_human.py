@@ -65,6 +65,15 @@ class StrongActionTest(unittest.TestCase):
     def test_no_strong_word_unchanged(self) -> None:
         self.assertEqual(classify_general_kind("ご案内", "ご確認ください。", "service@ex.example.com"), "skim")
 
+    def test_signup_approval_not_revived(self) -> None:
+        f = "service@ex.example.com"
+        self.assertFalse(has_strong_action_signal(f, "新規登録のご承認のお知らせ", ""))
+        self.assertFalse(has_strong_action_signal(f, "通知", "新規登録が承認されました。"))
+        # 新規登録を含んでも承認以外の強語は従来どおり
+        self.assertTrue(has_strong_action_signal(f, "新規登録の件、ご返信ください", ""))
+        self.assertTrue(has_strong_action_signal(f, "新規登録の時間割", ""))
+        self.assertTrue(has_strong_action_signal(f, "ご承認ください", ""))
+
     def test_beyond_600_chars_ignored(self) -> None:
         self.assertFalse(has_strong_action_signal("service@ex.example.com", "案内", "あ" * 601 + "承認"))
 
