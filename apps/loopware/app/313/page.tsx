@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import Icon from "@/components/Icon";
 import CleanupClient from "@/components/CleanupClient";
+import CleanupBulkClient from "@/components/CleanupBulkClient";
+import SegTabs from "@/components/SegTabs";
 
 export default async function Page313({
   searchParams,
@@ -10,7 +12,8 @@ export default async function Page313({
 }) {
   const sp = (await searchParams) || {};
   const taskId = sp.task || "";
-  const tab = sp.tab === "misses" ? "misses" : "cleanup";
+  // 基本は「まとめて片付ける」。Slack の「アプリで開く」（task つき）は1件ずつへ
+  const tab = sp.tab === "misses" ? "misses" : sp.tab === "cleanup" || taskId ? "cleanup" : "bulk";
 
   return (
     <main>
@@ -23,18 +26,28 @@ export default async function Page313({
           <h1>片付ける</h1>
         </div>
       </div>
-      <Link className="glass nav-card" href="/313/bulk" style={{ marginBottom: 12 }}>
-        <span className="txt">
-          <strong>まとめて片付ける</strong>
-          <span className="meta">スター付きメール由来のタスクを、完了・削除・日を変える・残すでまとめて判断</span>
-        </span>
-        <Icon name="next" size={18} />
-      </Link>
+      <SegTabs
+        tabs={[
+          { href: "/313", label: "まとめて", key: "cleanup", active: tab === "bulk" },
+          { href: "/313?tab=misses", label: "閉じ漏れ", key: "closeLeak", active: tab === "misses" },
+          { href: "/313?tab=cleanup", label: "1件ずつ", key: null, active: tab === "cleanup" },
+        ]}
+      />
       <Suspense fallback={<p className="meta">読み込み中…</p>}>
-        <CleanupClient
-          initialTaskId={taskId}
-          initialTab={tab === "misses" ? "misses" : "cleanup"}
-        />
+        {tab === "bulk" ? (
+          <CleanupBulkClient />
+        ) : tab === "misses" ? (
+          <div className="glass wk-empty">
+            <b>閉じ漏れの検知結果は、まだこの画面に届いていません</b>
+            <span className="meta">
+              台帳で送信済み・PRマージ済み・「これ済んだ」と判断できたものを、Todoist に残っているタスクと照らして出す機能です。
+              検知スクリプト（scripts/jarvis_todoist_313_done_elsewhere.py）はあり、結果をこの画面へ流す接続が未完了です。
+              件数バッジが「—」でなく出るようになったら、ここに並びます。
+            </span>
+          </div>
+        ) : (
+          <CleanupClient initialTaskId={taskId} initialTab="cleanup" />
+        )}
       </Suspense>
     </main>
   );

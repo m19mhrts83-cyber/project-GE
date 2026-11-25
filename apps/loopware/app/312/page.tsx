@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import Icon from "@/components/Icon";
 import TaskDedupeClient from "@/components/TaskDedupeClient";
+import SegTabs from "@/components/SegTabs";
 import ProposeClient from "@/components/ProposeClient";
 
 export default async function Page312({
@@ -24,17 +25,12 @@ export default async function Page312({
           <h1>何を拾うか</h1>
         </div>
       </div>
-      <div className="seg" style={{ marginBottom: 14 }}>
-        <Link className={tab === "handle" ? "active" : ""} href="/312">
-          扱いを決める
-        </Link>
-        <Link
-          className={tab === "misses" ? "active" : ""}
-          href="/312?tab=misses"
-        >
-          提案を仕分ける
-        </Link>
-      </div>
+      <SegTabs
+        tabs={[
+          { href: "/312", label: "扱いを決める", key: "topics", active: tab === "handle" },
+          { href: "/312?tab=misses", label: "提案を仕分ける", key: "misses", active: tab === "misses" },
+        ]}
+      />
       <Suspense fallback={<p className="meta">読み込み中…</p>}>
         {tab === "misses" ? (
           <ProposeClient />

@@ -18,16 +18,14 @@ type Tab = "cleanup" | "misses";
 
 export default function CleanupClient({
   initialTaskId = "",
-  initialTab = "cleanup",
 }: {
   initialTaskId?: string;
   initialTab?: Tab;
 }) {
   const sp = useSearchParams();
   const taskId = sp.get("task") || initialTaskId;
-  const [tab, setTab] = useState<Tab>(
-    sp.get("tab") === "misses" ? "misses" : initialTab,
-  );
+  // 画面上部のタブ（313 のページ側）で切り替える。ここは「1件ずつ」だけ
+  const tab: Tab = "cleanup";
   const [title, setTitle] = useState(taskId ? `Task ${taskId}` : "");
   const [due, setDue] = useState("");
   const [note, setNote] = useState("");
@@ -114,29 +112,6 @@ export default function CleanupClient({
           onClose={() => setSaved(null)}
         />
       ) : null}
-      <div className="seg" style={{ marginBottom: 14 }}>
-        <a
-          href="?tab=cleanup"
-          className={tab === "cleanup" ? "active" : ""}
-          onClick={(e) => {
-            e.preventDefault();
-            setTab("cleanup");
-          }}
-        >
-          片付ける
-        </a>
-        <a
-          href="?tab=misses"
-          className={tab === "misses" ? "active" : ""}
-          onClick={(e) => {
-            e.preventDefault();
-            setTab("misses");
-          }}
-        >
-          閉じ漏れ
-        </a>
-      </div>
-
       {tab === "cleanup" ? (
         <>
           <div className="card" data-tid={`task-${taskId || "manual"}`} data-tlabel={title || "このタスク"} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -233,16 +208,7 @@ export default function CleanupClient({
             placeholder="一言・根拠"
           />
         </>
-      ) : (
-        <div className="card">
-          <div className="eyebrow" style={{ margin: 0 }}>閉じ漏れ（段階2）</div>
-          <p className="meta">
-            台帳送信済・PRマージ・watch解消・番頭さんの指摘・「これ済んだ」をここに並べる。
-            検知スクリプト: <code>scripts/jarvis_todoist_313_done_elsewhere.py</code>
-          </p>
-          <p className="meta">現状は枠のみ。検知結果は API／state から流し込む。</p>
-        </div>
-      )}
+      ) : null}
 
       <div className="eyebrow">記録</div>
       <ul className="list glass">

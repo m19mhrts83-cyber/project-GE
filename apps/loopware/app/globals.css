@@ -2327,3 +2327,10 @@ button.primary:disabled,
 .vdock.live .vmini-note { color: var(--ink); }
 .vexpand { flex: none; min-height: 44px; padding: 0 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-muted); }
 .vexpand.close { align-self: flex-end; min-height: 36px; }
+
+/* タブの残り件数バッジ（2026-11-25） */
+.segn a { gap: 6px; font-size: 13px; padding: 0 4px; text-align: center; }
+.seg-badge { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; display: inline-grid; place-items: center; font-size: 12px; font-weight: 700; background: #ff6b6b; color: #fff; }
+.seg-badge.zero { background: var(--positive); color: var(--on-accent); }
+
+.wk-section > .wk-head { position: sticky; top: 0; z-index: 6; }
