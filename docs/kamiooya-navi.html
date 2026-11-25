@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>神大家AIナビ</title>
+<!-- 神大家AIナビの入口（2026-11-25）。ライモが止まっている時だけ「一時停止中」を出し、
+     それ以外はAIナビへそのまま移る。状態は kamiooya-navi-status.json（GitHub Actions の見回りが書く）。
+     状態が読めない時は、いつもどおりAIナビへ移る（入口が原因で使えなくならないように）。 -->
+<style>
+  :root { --navy:#11366A; --orange:#FE910B; --ink:#2b2b2b; --bg:#F4F6FA; --soft:#FFF4E5; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink);
+         font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; }
+  header { height:60px; background:var(--navy); color:#fff; font-weight:800; font-size:20px;
+           display:flex; align-items:center; justify-content:center; gap:8px; }
+  header i { width:12px; height:12px; border-radius:50%; background:var(--orange); display:inline-block; }
+  main { max-width:520px; margin:32px auto; padding:0 16px; }
+  .card { background:#fff; border:2px solid var(--ink); border-radius:20px; padding:24px 20px; text-align:center; }
+  .ico { font-size:52px; line-height:1; }
+  h1 { margin:12px 0 12px; font-size:22px; color:var(--navy); }
+  p { margin:0 0 12px; font-size:17px; line-height:1.7; text-align:left; }
+  .info { background:var(--soft); border-radius:12px; padding:12px 14px; font-size:15.5px; line-height:1.6; text-align:left; }
+  .btn { display:inline-block; margin-top:16px; padding:12px 22px; border-radius:999px; background:var(--orange);
+         color:#fff; font-weight:700; font-size:17px; text-decoration:none; }
+  .wait { text-align:center; font-size:17px; color:#555; margin-top:48px; }
+  .since { font-size:14px; color:#666; margin-top:10px; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<header><i></i>神大家AIナビ</header>
+<main>
+  <p class="wait" id="wait">神大家AIナビを開いています…</p>
+  <section class="card" id="paused" hidden>
+    <div class="ico" aria-hidden="true">🛠️</div>
+    <h1>ただいま一時停止中です</h1>
+    <p>神大家AIナビを動かしているサービスが止まっているため、いまはご利用いただけません。データは消えていませんので、ご安心ください。</p>
+    <div class="info">復旧したら、このページからいつもの画面に戻れます。しばらくしてから、もう一度開いてください。</div>
+    <p class="since" id="since"></p>
+    <a class="btn" id="retry" href="#">もう一度ためす</a>
+  </section>
+</main>
+<script>
+(function () {
+  var APP = 'https://ma-54t2keqdelz3.raimo-app.buzz/';
+  var go = function () { location.replace(APP); };
+  var show = function (s) {
+    document.getElementById('wait').hidden = true;
+    document.getElementById('paused').hidden = false;
+    if (s && s.since) document.getElementById('since').textContent = s.since.slice(0, 16).replace('T', ' ') + ' ごろから止まっています';
+  };
+  document.getElementById('retry').addEventListener('click', function (e) { e.preventDefault(); go(); });
+  var timer = setTimeout(go, 4000); // 状態が読めない・遅い時は、いつもどおり開く
+  fetch('kamiooya-navi-status.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (s) {
+      clearTimeout(timer);
+      if (s && s.state === 'down') show(s); else go();
+    })
+    .catch(function () { clearTimeout(timer); go(); });
+})();
+</script>
+</body>
+</html>
