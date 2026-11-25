@@ -804,6 +804,29 @@ def _area_m2(raw: Any) -> float | None:
     return _first_number(s)
 
 
+_ROUTE_TSUBO_UNIT = re.compile(
+    r"(?<![\d.,〜~－-])(\d+(?:\.\d+)?)\s*万円?\s*/\s*坪"
+)
+_ROUTE_TSUBO_LEAD = re.compile(
+    r"^約?\s*(\d+(?:\.\d+)?)\s*[（(](?=[^）)]*(?:\d+\s*E|円\s*/\s*㎡))"
+)
+
+
+def _route_price_tsubo_man(raw: Any) -> float | None:
+    """route_price_tsubo から万円/坪を取る。形が明確な時だけ（説明文・図番号・年号・㎡単価は None）。
+
+    使う形: 「約4.8（91E=…）」「4.8（…円/㎡）」「…約4.8万/坪相当」「4.8万円/坪」、数字のみ。
+    使わない: 先頭が「未確定」「（」の説明文、「1,234円/㎡」等の㎡単価。
+    """
+    s = str(raw or "").strip()
+    if not s or s.startswith(("未確定", "（", "(")):
+        return None
+    if re.fullmatch(r"\d+(?:\.\d+)?", s):
+        return float(s)
+    m = _ROUTE_TSUBO_LEAD.match(s) or _ROUTE_TSUBO_UNIT.search(s)
+    return float(m.group(1)) if m else None
+
+
 def _scenarios(raw: Any) -> list[tuple[float, str]]:
     """「参考1,494（91E）／1,805（110E）」→ [(1494.0,'91E'), (1805.0,'110E')]。"""
     s = str(raw or "")
@@ -818,6 +841,17 @@ def _scenarios(raw: Any) -> list[tuple[float, str]]:
         if n is not None:
             out.append((n, ""))
     return out
+
+
+def _ratio_scenarios(raw: Any) -> list[tuple[float, str]]:
+    """率の欄。先頭（「参考」「約」を除く）が数字の時だけ率として読む。
+
+    「算定不可」「未取得（…404…）」等の文章中の数字は率にしない。
+    """
+    s = str(raw or "").strip()
+    if not re.match(r"^(?:参考|約|概ね)?\s*\d", s):
+        return []
+    return _scenarios(s)
 
 
 def _land_display(deal: dict[str, Any]) -> tuple[str, str]:
@@ -841,11 +875,11 @@ def _land_display(deal: dict[str, Any]) -> tuple[str, str]:
     )
     vals = _scenarios(pick("land_appraisal_man"))
     if not vals:  # 相続税路線価(万円/坪) × 面積(㎡) から算出
-        rp = _first_number(pick("route_price_tsubo"))
+        rp = _route_price_tsubo_man(pick("route_price_tsubo"))
         area = _area_m2(pick("land_area"))
         if rp and area:
             vals = [(rp * area / 3.30578, "")]
-    ratios = _scenarios(pick("land100_ratio", "land_ratio", "land100"))
+    ratios = _ratio_scenarios(pick("land100_ratio", "land_ratio", "land100"))
     if not vals and ratios and price:  # 率しか無い時は価格×率で金額を逆算
         vals = [
             (price * (n / 100) if n >= 10 else price * n, t) for n, t in ratios
