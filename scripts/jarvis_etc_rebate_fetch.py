@@ -29,6 +29,9 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jarvis_614_verified_state as vs  # noqa: E402
+
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 STATE_PATH = REPO / ".jarvis_state" / "etc_monthly.json"
@@ -74,6 +77,13 @@ def save_state(state: dict[str, Any]) -> None:
     )
 
 
+def save_state_verified(state: dict[str, Any]) -> dict[str, Any]:
+    """tmp→置換→読み戻し照合。失敗時は取得済みの結果を非公開の pending に残し、保存だけ1回やり直す。"""
+    return vs.save_json_verified(
+        STATE_PATH, state, pending_path=STATE_PATH.with_name(STATE_PATH.stem + ".pending.json")
+    )
+
+
 def month_key(dt: datetime) -> str:
     return dt.strftime("%Y-%m")
 
@@ -94,6 +104,33 @@ def ym_label(ym: str) -> str:
     """smile-etc 画面は『2026年08月分』のように月がゼロ埋め。"""
     y, m = ym.split("-")
     return f"{y}年{int(m):02d}月"
+
+
+def parse_label(label: str) -> tuple[int, int] | None:
+    """『2026年08月』→ (2026, 8)。読めなければ None。"""
+    m = re.match(r"^\s*(\d{4})年(\d{1,2})月", label or "")
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def classify_unavailable(first_label: str, grant_label: str) -> str:
+    """付与月の明細を開けなかった時の分類。
+
+    画面の最新の月が付与月より前＝まだ付与・掲載されていない → 'waiting'（取得待ち）。
+    月が読めない・ログインできていない・付与月より後ろしか無い等は 'failed'（技術障害）。"""
+    f, g = parse_label(first_label), parse_label(grant_label)
+    return "waiting" if f and g and f < g else "failed"
+
+
+def validate_scraped(scraped: dict[str, Any], target: str) -> str | None:
+    """取得結果が対象月のものか確かめる。問題があれば理由、なければ None（古い月・別の月は完了扱いにしない）。"""
+    if scraped.get("target_month") != target:
+        return f"対象月が一致しません（要求 {target}／取得 {scraped.get('target_month')}）"
+    if scraped.get("grant_month") != add_months(target, 1):
+        return "付与月が対象月の翌月と一致しません"
+    y = scraped.get("rebate_yen")
+    if not isinstance(y, int) or isinstance(y, bool) or y < 0:
+        return "還元額が数値として確認できません"
+    return None
 
 
 def default_target_month(now: datetime) -> str | None:
@@ -216,10 +253,13 @@ def scrape_rebate(
         page.wait_for_timeout(1200)
 
         found = False
+        first_label = None
         for _ in range(10):
             body = page.inner_text("body")
             m = re.search(r"(20\d{2}年\d{1,2}月)分", body)
             cur = m.group(1) if m else ""
+            if first_label is None:
+                first_label = cur
             if cur == grant_label:
                 found = True
                 break
@@ -230,9 +270,15 @@ def scrape_rebate(
             page.wait_for_timeout(1500)
         if not found:
             browser.close()
+            kind = classify_unavailable(first_label or "", grant_label)
             return {
                 "ok": False,
-                "error": f"還元額明細で {grant_label}分 を開けませんでした",
+                "kind": kind,
+                "error": (
+                    f"還元額明細の最新は {first_label} で、{grant_label}分はまだ掲載されていません（付与前）"
+                    if kind == "waiting"
+                    else f"還元額明細で {grant_label}分 を開けませんでした"
+                ),
                 "target_month": target_month,
                 "grant_month": grant_month,
             }
@@ -247,6 +293,7 @@ def scrape_rebate(
             browser.close()
             return {
                 "ok": False,
+                "kind": "waiting",  # 月の明細は開けたが特典行も開始残高も無い＝付与前
                 "error": (
                     f"{grant_label}分に特典行も開始残高も取れません。"
                     "付与前（翌月20日前）の可能性あり"
@@ -307,9 +354,15 @@ def apply_result(state: dict[str, Any], scraped: dict[str, Any], now: datetime) 
         "method": scraped.get("method"),
         "nexco_points": scraped.get("nexco_points"),
     }
-    state["last_check_b"] = month_key(now)
-    state["last_result_b"] = result
+    # 月印 last_check_b は『今月の定例の対象（前月利用分）』を取れた時だけ。古い月の手動取得で今月を完了扱いにしない
+    if scraped["target_month"] == add_months(month_key(now), -1):
+        state["last_check_b"] = month_key(now)
+    # 最新結果 last_result_b は、より新しい月の結果を古い月で上書きしない
+    cur = state.get("last_result_b") if isinstance(state.get("last_result_b"), dict) else {}
+    if str(cur.get("target_month") or "") <= str(result["target_month"]):
+        state["last_result_b"] = result
     upsert_rebate_history(state, result)
+    state.pop("etc_wait", None)
     state["last_auto_fetch_at"] = now.isoformat()
     state["last_auto_fetch_target"] = scraped["target_month"]
     return result
@@ -458,6 +511,19 @@ def main() -> int:
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
+    wait = state.get("etc_wait") if isinstance(state.get("etc_wait"), dict) else {}
+    if (
+        not args.force
+        and not (args.target_month or "").strip()
+        and wait.get("target_month") == target
+        and wait.get("last_attempt_day") == now.strftime("%Y-%m-%d")
+    ):
+        # 取得待ちは窓内の翌日に再確認する。同じ日に何度もサイトへ取りに行かない（手動・--force は別）
+        report["skipped"] = "取得待ち: 今日は確認済み（翌日に再確認）"
+        report["status"] = "waiting"
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
+
     mid = env.get("ETC_MILEAGE_ID") or ""
     pw = env.get("ETC_MILEAGE_WEB_PASSWORD") or ""
     if not mid or not pw:
@@ -492,6 +558,40 @@ def main() -> int:
         return 1
 
     report["scrape"] = scraped
+    if not scraped.get("ok") and scraped.get("kind") == "waiting":
+        # 未付与＝取得待ち。技術障害（失敗）とは区別する。窓内は翌日に再確認、窓の最終日を過ぎても未取得なら #ops
+        report["ok"] = None
+        report["status"] = "waiting"
+        report["waiting_reason"] = str(scraped.get("error") or "付与前")
+        last_day = max(AUTO_WINDOW_DAYS)
+        window_over = now.day >= last_day and not (args.target_month or "").strip()
+        attempts = 1
+        if not (args.dry_run or not args.apply):
+            wait = state.get("etc_wait") if isinstance(state.get("etc_wait"), dict) else {}
+            attempts = int(wait.get("attempts") or 0) + 1 if wait.get("target_month") == target else 1
+            state["etc_wait"] = {
+                "target_month": target,
+                "last_attempt_day": now.strftime("%Y-%m-%d"),
+                "attempts": attempts,
+                "reason": report["waiting_reason"][:120],
+            }
+            sv = save_state_verified(state)
+            report["save_verify"] = {"ok": sv["ok"], "errors": sv["errors"]}
+        if want_slack:
+            if window_over:
+                report["slack"] = push_slack_report(
+                    outcome="failed",
+                    target_month=target,
+                    error=f"取得窓（20〜{last_day}日）の最終日まで未付与のまま。smile-etc の還元額明細を確認",
+                )
+            elif attempts == 1:  # 毎日同じ『取得待ち』を出さない（最初の1回だけ）
+                report["slack"] = push_slack_report(
+                    outcome="waiting",
+                    target_month=target,
+                    reason="付与前。窓内は翌日に再確認",
+                )
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
     if not scraped.get("ok"):
         report["ok"] = False
         if want_slack:
@@ -500,6 +600,15 @@ def main() -> int:
                 target_month=target,
                 error=str(scraped.get("error") or scraped.get("note") or "scrape not ok"),
             )
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 1
+    invalid = validate_scraped(scraped, target)
+    if invalid:
+        # 対象月が違う・還元額が確認できない結果は完了扱いにしない
+        report["ok"] = False
+        report["error"] = invalid
+        if want_slack:
+            report["slack"] = push_slack_report(outcome="failed", target_month=target, error=invalid)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 1
 
@@ -511,7 +620,18 @@ def main() -> int:
         return 0
 
     result = apply_result(state, scraped, now)
-    save_state(state)
+    sv = save_state_verified(state)
+    report["save_verify"] = {"ok": sv["ok"], "attempts": sv["attempts"], "errors": sv["errors"]}
+    if not sv["ok"]:
+        # 保存を確認できない結果は成功として画面・短報へ渡さない（外部は取り直さず、取得済みは pending に保持）
+        report["ok"] = False
+        report["error"] = "state の保存を読み戻して確認できませんでした（取得済みデータは非公開側に一時保持）"
+        if want_slack:
+            report["slack"] = push_slack_report(
+                outcome="failed", target_month=target, error=str(report["error"])
+            )
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 1
     report["applied"] = result
 
     if args.push:
