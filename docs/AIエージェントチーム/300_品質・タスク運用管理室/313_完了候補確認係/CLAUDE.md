@@ -41,6 +41,12 @@
   - **A 済みました**: 説明・コメントに貼られた PR・Issue が**すべて**済み（タスク作成後に・その後に「済み」報告以外のコメントなし・保留語なし・子タスクなし）の件だけ、313 が**先に閉じて**知らせる。Todoist コメントに根拠1行＋リンク。**7日間は戻せる**（`--undo list` → `--undo N`、または Todoist の完了済みから戻す）。根拠が弱い件は閉じずに B で「済み？」
   - **B やめてもいいのでは**: 21日以上 題・説明・コメントが動いていない件（先の期日・今週の9件・318 の待ち・「残す」4週内・繰り返しは除く）。理由1行を付けて **/313/bulk**（「313 週の整理」の見出し）に載せる。松野さんが **済み／やめる／残す** を選ぶ → GHA reflect が閉じる（**やめるも完了扱い・削除しない**）。残すは4週出さない
 - Slack は **#consult に1通**「【相談】313 週の整理」（済みました n件／やめる提案 n件／画面リンク）
+
+## 0b. 閉じ漏れ（毎日 19:30・2026-11-25〜・松野さん依頼）
+
+- Mac launchd `com.matsunoma.jarvis.todoist-313-close-leak`（`launchd/install_jarvis_todoist_313_close_leak_launchd.sh`）が `scripts/jarvis_todoist_313_done_elsewhere.py --publish` を実行。パートナー `5.やり取り.md` の送信記録と照らして「外で済んだのに残っている」候補を **`sync_meta.todoist_313_close_leak`** に置く（ローカルのパスは載せない。Todoist は触らない）
+- 画面: Nody **/313?tab=misses**（閉じ漏れタブ・件数バッジ）。`/api/closeleak` が材料を読み、作成後に判断済みの件を外す。バッジは `/api/counts` の `closeLeak`（未到着・読めない時は —）
+- 本人が **済み（完了）／残す** を選ぶ → `/api/cleanup`（owner_decisions todoist_313, payload.bulk, origin=close_leak）→ GHA の cleanup reflect が根拠コメント付きで完了（削除しない）。残すは4週出さない
 - 閾値・日数・保留語は `config/todoist_313_weekly.yaml`（読めなければ止まる）。CLI: `scripts/jarvis_todoist_313_weekly.py`
 - 318 との分担: 318＝やり切る・判断を聞く（毎朝 10:30・②→/313/bulk）、313＝済み・やめるの整理だけ。カードは見出しで分け、同じ件は片方だけ（318 が載せた件は 313 が出さない／313 が載せた件は8日 318 が載せない）
 - 閉じない: 繰り返しタスク・318 が聞いている件・根拠が読めない件。削除はしない

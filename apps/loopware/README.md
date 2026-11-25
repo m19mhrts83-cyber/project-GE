@@ -36,6 +36,7 @@ npm run dev   # http://127.0.0.1:3004
 | メール | 判断デスク（`loadDeskCards`） | ToDo／済み／見送る／あとで | `/api/desk/decide` |
 | 318 要判断 | `sync_meta.todoist_cleanup_snapshot`（origin=318） | 完了／残す | `/api/cleanup` → owner_decisions(todoist_313) → cleanup reflect |
 | 313 週の整理 | 同上（origin=313） | 済み／やめる／残す（やめるも完了扱い） | 同上 |
+| 313 閉じ漏れ（`/313?tab=misses`） | `sync_meta.todoist_313_close_leak`（Mac 毎日 19:30 `done_elsewhere.py --publish`）→ `/api/closeleak` | 済み／残す | `/api/cleanup`（origin=close_leak）→ cleanup reflect が根拠コメント付きで完了 |
 | スター片付け | 同上（origin なし） | 完了／残す | 同上 |
 | お題 | `task_loop_topics`（312） | 案n／保留 | `/api/decide` |
 | 今週の9件 | `sync_meta.weekly_pick_snapshot`（未確定の週だけ1行） | なし（「開いて決める」→ `/week`） | `/api/week` |
