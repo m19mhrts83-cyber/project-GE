@@ -3,11 +3,13 @@
 # 時刻が要るジョブだけここに載せる。遅れて来た schedule は _kick-guard.yml が skip する。
 # 対象 workflow には guard ジョブ（_kick-guard.yml）を必ず入れること（二重実行防止）。
 #
+# main_marker_step（任意）: 指定すると「実行済み」を本便だけで数える。日中便で skipped になる本便専用ステップ名を書く
 # time: JST "HH:MM" / weekdays: 1=月 … 7=日（省略で毎日）/ grace_min: これを過ぎたら今日は諦めて schedule に任せる
 repo: m19mhrts83-cyber/project-GE
 jobs:
   - workflow: jarvis-dashboard-gmail-triage.yml
-    time: "05:00"  # 本便（dispatch 既定 daytime=false）。日中便の schedule は対象外
+    time: "05:00"  # 本便（dispatch 既定 daytime=false）。遅れて来た日中便は数えない
+    main_marker_step: "Partner Gmail → OneDrive MD (Graph)"
   - workflow: kurashift-grok-mail-noon.yml
     time: "11:00"
   - workflow: jarvis-partner-day-report.yml
