@@ -32,6 +32,10 @@ if [[ "${JARVIS_ZAIM_BANK_SYNC_DISABLE:-}" == "1" ]]; then
 fi
 
 cd "$REPO_DIR"
+# Zaim 連携設定ページの「最終更新」・エラー表示を読む（読み取り専用・押す操作なし）。
+# 取れなければ前回分を残し、check は従来の CSV 判定に戻る。週2回（火・金）だけ。
+"$PY" scripts/jarvis_zaim_online_accounts.py --fetch --headless --lock-wait 180 \
+  >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
 "$PY" scripts/jarvis_zaim_bank_sync_check.py --force-prompt --mark-prompted \
   >>"${LOG_DIR}/bank_sync.out.log" 2>>"${LOG_DIR}/bank_sync.err.log" || true
 

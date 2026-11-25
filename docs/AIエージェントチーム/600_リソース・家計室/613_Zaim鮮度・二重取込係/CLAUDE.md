@@ -97,7 +97,10 @@
 
 ### A. 火・金 09:00（鮮度）
 
-1. `jarvis_zaim_bank_sync_check.py`（遅れ・欠落の数値化）
+0. `jarvis_zaim_online_accounts.py --fetch`（**読み取り専用**。Zaim 連携設定ページの各口座「最終更新」とエラー表示を1回だけ読む。押す操作なし。取れなければ前回分を残す。結果は `.jarvis_state/zaim_online_accounts.json`）
+1. `jarvis_zaim_bank_sync_check.py`（遅れ・欠落の数値化）。判定の軸は2つ:
+   - CSV の最終取引日のラグ（従来）
+   - Zaim の更新日時・エラー表示（2026-11-25〜）。**更新日時が閾値内でエラーなし → 取引が古くても stale にせず「取引なし・連携OK」（`sync_state: alive_no_txn`）**。更新日時が古い（`sync_stopped`）／エラー表示（`needs_reauth`・`sync_error`）→ stale。更新日時が取れない・口座が画面で見つからない（`unverified`）→ 従来の CSV 判定に戻し「更新日時は確かめられなかった」と表示（安全側）
 2. 許可時: `jarvis_zaim_bank_sync_manual.py --from-stale`（または `jarvis_zaim_reconnect.py --from-stale`）。OTP は YAML `otp_channel` がある口座のみ
 3. `jarvis_zaim_watch_runner.py --skip-finance`（二重取込・費目の安全適用）
 4. 残留 stale／失敗があれば Todoist または `#ops`（dedupe あり）
@@ -128,6 +131,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | ノード案 | 既存スクリプト／手段 |
 |---|---|
 | 起動（火金09 / 火金12 / キュー／人） | launchd / GHA / refresh_queue / 会話 |
+| Zaim 更新日時の取得 | `jarvis_zaim_online_accounts.py --fetch`（読み取り専用・火金09:00 の runner が先に1回） |
 | check | `jarvis_zaim_bank_sync_check.py` |
 | stale 更新 | `jarvis_zaim_bank_sync_manual.py` / `reconnect`（Mac） |
 | CSV | `zaim_csv_export`（Mac） |
@@ -155,4 +159,5 @@ cd ~/git-repos && ~/selenium_env/venv/bin/python scripts/jarvis_agent_team_statu
 | 2026-10-14 | 指示書を本線配線で充填。役割に費目学習を明記。FlowForge 作り込み用に手順・4点・スクリプト対応を固定（status は候補のまま） |
 | 2026-10-22 | 費目学習を店＋金額キー＋CSV前後差分に変更。食費等の自信あり誤分類も high 不一致なら自動直し。成功時 `#report` 短報 |
 | 2026-10-22 | その他系は店名キー、それ以外は店+金額の二段に。Amazon／アオキ等は店名キー除外 |
+| 2026-11-25 | 銀行連携ウォッチの誤検知を直した（ラコ #57）。CSV の最終取引日だけでは「取引がないだけ」を遅れと誤る（滋賀銀行が14日遅れ扱い）ため、Zaim 連携設定ページの「最終更新」・エラー表示も判定に加えた。取得は読み取り専用で火・金の既存 runner 内に1回（新しい常駐なし）。取れないときは従来判定に戻し明示。口座名が画面と合わないものは YAML `online_match` で結ぶ |
 | 2026-11-24 | 作業フロー第1稿を作成（flow.md 全面改訂・flow.json・flow.html・chatgpt_review_pack.md）。重複（型A・型B・拡張＝判断キュー）と費目・内訳の学習を Loopware の判断ログへ。決定済み: 重複の既定対象・置き場=Loopware・既存773件の一括採用→新規は提案→承認・内訳の学習。docs のみ（コード・Zaim・実データは未変更）。status は変えていない |
