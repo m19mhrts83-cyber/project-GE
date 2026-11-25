@@ -38,6 +38,8 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from car_loan.chrome_cdp import CHROME, cdp_ready, start_cdp_chrome, stop_cdp_chrome  # noqa: E402
 from car_loan.env_state import ENV_FILE, load_env  # noqa: E402
+import jarvis_614_ops as ops614  # noqa: E402
+import jarvis_614_runlog as runlog614  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
@@ -841,6 +843,39 @@ def print_status(state: dict[str, Any], env: dict[str, str]) -> None:
 
 
 def main() -> int:
+    """run を集約記録（P1・工程31）して本体を実行する。本体の動作・終了コードは変えない。
+    記録の失敗で本線は落とさない。取得の結果は『実行した（last_check_at が進んだ）か』『メンテ停止中か』で粗く残す。"""
+    argv = sys.argv[1:]
+    dry = "--dry-run" in argv or "--run" not in argv
+    rec = runlog614.RunRecord(
+        run_id=runlog614.new_run_id("teiki"), dry_run=dry,
+        trigger="manual" if "--force" in argv else "auto", script="jarvis_teiki_barai_chance.py",
+    )
+    os.environ["JARVIS_614_RUN_ID"] = rec.run_id  # 子（Slack 短報）が同じ run_id を使う
+    before = (load_state() or {}).get("last_check_at")
+    try:
+        rc = _main_impl()
+    except BaseException as e:  # noqa: BLE001 — SystemExit も含めて記録だけして再送出
+        if not isinstance(e, SystemExit) or e.code not in (0, None):
+            rec.stage("teiki", "fetch", "failed", f"想定外の終了（{type(e).__name__}）", "unexpected_error")
+        rec.finish()
+        raise
+    after_state = load_state() or {}
+    if dry:
+        rec.stage("teiki", "fetch", "not_applicable", "確認のみ／dry-run")
+    elif rc != 0:
+        rec.stage("teiki", "fetch", "failed", f"exit {rc}", "teiki_failed")
+    elif after_state.get("last_check_at") == before:
+        rec.stage("teiki", "fetch", "skipped", "間隔内・停止中などで確認せず")
+    elif after_state.get("site_status") == "maintenance":
+        rec.stage("teiki", "fetch", "partial", "サイトがメンテナンス停止中（券数は前回値・最新として扱わない）", "site_maintenance")
+    else:
+        rec.stage("teiki", "fetch", "success", "画面を確認")
+    rec.finish()
+    return rc
+
+
+def _main_impl() -> int:
     ap = argparse.ArgumentParser(description="定期払いチャンス（テイチャン）")
     ap.add_argument("--status", action="store_true", help="state / due / 候補のみ")
     ap.add_argument("--run", action="store_true", help="画面確認＋券があれば抽選")
@@ -867,10 +902,10 @@ def main() -> int:
     want_slack = (args.slack or args.push) and not args.no_slack
 
     env = load_env(ENV_FILE)
-    if env.get("JARVIS_TEIKI_BARAI_DISABLE") == "1" or os.environ.get(
+    if ops614.global_stop() or env.get("JARVIS_TEIKI_BARAI_DISABLE") == "1" or os.environ.get(
         "JARVIS_TEIKI_BARAI_DISABLE"
     ) == "1":
-        print("📎 テイチャン: 無効化（JARVIS_TEIKI_BARAI_DISABLE=1）")
+        print("📎 テイチャン: 無効化（JARVIS_TEIKI_BARAI_DISABLE=1／614 全体停止）")
         if want_slack:
             print(f"📎 slack: {push_slack_report(outcome='disabled', state={})}")
         return 0

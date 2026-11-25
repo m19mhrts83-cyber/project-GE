@@ -2,6 +2,7 @@
 import contextlib
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -140,7 +141,9 @@ class RoutineSaveTest(unittest.TestCase):
                     monthly_path.write_text(json.dumps(cur), encoding="utf-8")
                 return {"ok": True, "returncode": 0, "stdout_tail": "", "stderr_tail": ""}
 
-            with mock.patch.object(rt, "MONTHLY_PATH", monthly_path), \
+            with mock.patch.dict(os.environ, {"JARVIS_614_LOG_DIR": str(sd / "614_watch"),
+                                              "JARVIS_614_EMERGENCY_DIR": str(sd / "emergency")}), \
+                 mock.patch.object(rt, "MONTHLY_PATH", monthly_path), \
                  mock.patch.object(rt, "CADENCE_PATH", sd / "c.json"), \
                  mock.patch.object(rt, "TEIKI_PATH", sd / "t.json"), \
                  mock.patch.object(rt, "PRIVATE_ENV", sd / "none.env"), \

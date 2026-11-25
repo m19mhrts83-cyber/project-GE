@@ -22,6 +22,8 @@ import fcntl
 import hashlib
 import json
 import os
+import socket
+import http.client
 import sys
 import time
 import urllib.error
@@ -221,6 +223,23 @@ def _webhook_for(channel: str) -> tuple[str, str, bool]:
     return "", ch, False
 
 
+# 終了コード: 0=送信成功 / 1=送信失敗（届いていないと確定できる＝HTTP エラー・接続できず）
+#             / 2=Webhook 未設定（未送信）/ 4=結果不明（送った後に応答待ちで切れた等。届いた可能性がある）
+EXIT_UNKNOWN = 4
+
+
+def classify_exception(e: BaseException) -> int:
+    """送信中の例外が『届いていないと確定』か『結果不明』か。不明なものは再投稿してはいけない（614 P1）。"""
+    reason = e.reason if isinstance(e, urllib.error.URLError) else e
+    if isinstance(reason, (socket.gaierror, ConnectionRefusedError)):
+        return 1  # 接続前に失敗＝届いていない
+    if isinstance(reason, (socket.timeout, TimeoutError, ConnectionResetError, http.client.HTTPException)):
+        return EXIT_UNKNOWN
+    if isinstance(e, urllib.error.URLError):
+        return 1
+    return EXIT_UNKNOWN
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -321,8 +340,13 @@ def main() -> int:
         print(f"❌ Slack webhook HTTP {e.code}: {err}", file=sys.stderr)
         return 1
     except Exception as e:
-        print(f"❌ Slack webhook failed: {e}", file=sys.stderr)
-        return 1
+        rc = classify_exception(e)
+        print(
+            f"❌ Slack webhook failed: {e}"
+            + ("（結果不明: 届いた可能性あり）" if rc == EXIT_UNKNOWN else ""),
+            file=sys.stderr,
+        )
+        return rc
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import jarvis_614_runlog as runlog  # noqa: E402
 import jarvis_614_verified_state as vs  # noqa: E402
 import jarvis_card_benefit_monthly as m  # noqa: E402
 import jarvis_card_benefit_watch as c  # noqa: E402
@@ -67,12 +68,17 @@ class Base(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.dir = Path(self.tmp.name)
-        patcher = mock.patch.dict(os.environ, {"JARVIS_STATE_DIR": str(self.dir)})
+        patcher = mock.patch.dict(os.environ, {
+            "JARVIS_STATE_DIR": str(self.dir),
+            "JARVIS_614_LOG_DIR": str(self.dir / "614_watch"),
+            "JARVIS_614_EMERGENCY_DIR": str(self.dir / "emergency"),
+        })
         patcher.start()
         self.addCleanup(patcher.stop)
         os.environ.pop("JARVIS_CARD_BENEFIT_DISABLE", None)
         os.environ.pop("JARVIS_CARD_BENEFIT_SLACK_REPORT_DISABLE", None)
         os.environ.pop("JARVIS_POINTS_REBATE_SLACK_REPORT_DISABLE", None)
+        os.environ.pop("JARVIS_614_GLOBAL_STOP", None)
 
     def write_index(self, as_of="2026-11-25", pay="FOO CARD", amount=1000, updated_at="x"):
         rows = {"k1": {"pay": pay, "date": as_of, "amount": amount, "shop": "s", "item": "i"}}
@@ -359,12 +365,17 @@ class MonthlyFlowTests(Base):
         super().setUp()
         self.slack_calls = []
         self.slack_rc = 0
+        self.ops_calls = []
+        self.sync = {"push": "success", "display": "success", "attempts": 1, "mismatches": [], "error": ""}
         self.orca = FakeOrca(mails=[mail_body(2026, 11, 15, 1_000_000)])
         for patcher in (
             mock.patch.object(c, "load_config", lambda *a, **k: CFG),
             mock.patch.object(c, "_orca_json", self.orca),
             mock.patch.object(m, "_today", lambda: TODAY),
             mock.patch.object(m, "_slack", self._slack),
+            mock.patch.object(m.ops614, "notify_ops", lambda **kw: self.ops_calls.append(kw) or {"status": "sent"}),
+            mock.patch.object(m.ops614, "flush_pending", lambda **kw: {"sent": 0}),
+            mock.patch.object(m.display614, "sync_and_verify", lambda ids, **kw: self.sync),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -372,8 +383,6 @@ class MonthlyFlowTests(Base):
 
     def _slack(self, *extra):
         self.slack_calls.append(extra)
-        if "--outcome" in extra:
-            return 0  # #ops 通知自体は成功
         return self.slack_rc
 
     def run_m(self, *flags):
@@ -383,7 +392,7 @@ class MonthlyFlowTests(Base):
         return [x for x in self.slack_calls if "--from-state" in x]
 
     def ops(self):
-        return [x for x in self.slack_calls if "--outcome" in x]
+        return self.ops_calls
 
     def test_all_success_stamps_after_save_verification(self):
         self.assertEqual(self.run_m(), 0)
@@ -398,7 +407,7 @@ class MonthlyFlowTests(Base):
         st = self.state()
         self.assertNotIn("last_monthly_run", st)
         self.assertEqual(st["sources"]["olive"]["status"], c.SRC_FAILED)
-        self.assertTrue(any("Olive取込に失敗" in x[x.index("--error") + 1] for x in self.ops()))
+        self.assertTrue(any("Oliveの取込に失敗" in x["cause"] for x in self.ops()))
 
     def test_unexpected_exception_becomes_failed_not_crash(self):
         with mock.patch.object(c, "refresh_bonvoy_checked", side_effect=KeyError("x")):
@@ -449,7 +458,7 @@ class MonthlyFlowTests(Base):
         st = self.state()
         self.assertEqual(st["last_monthly_run"], "2026-11")  # 取得済みの月印は消えない
         self.assertFalse(st["monthly"].get("slack_fp"))
-        self.assertTrue(any("取得・保存・月印は済み" in x[x.index("--error") + 1] for x in self.ops()))
+        self.assertTrue(any("取得・保存・月印は済み" in x["cause"] for x in self.ops()))
         calls = self.orca.calls
         self.slack_rc = 0
         self.assertEqual(self.run_m(), 0)
@@ -473,7 +482,7 @@ class MonthlyFlowTests(Base):
         self.assertEqual(self.posted(), [])  # 保存を確認できないものを下流へ渡さない
         self.assertTrue((self.dir / "card_benefit_watch.pending.json").is_file())
         self.assertNotIn("last_monthly_run", json.loads(c.state_path().read_text()))
-        self.assertTrue(any("保存に失敗" in x[x.index("--error") + 1] for x in self.ops()))
+        self.assertTrue(any("保存を読み戻して確認できず" in x["cause"] for x in self.ops()))
 
     def test_corrupt_state_aborts_without_overwrite(self):
         c.state_path().write_text("{broken")
@@ -498,6 +507,97 @@ class MonthlyFlowTests(Base):
         calls = self.orca.calls
         self.run_m("--all")
         self.assertGreater(self.orca.calls, calls)
+
+    # ---- P1: run 集約・画面反映・Slack の独立 ----
+    def last_run(self):
+        runs = runlog.read_runs()
+        return runs[-1]
+
+    def stages(self):
+        return self.last_run()["systems"]["card_benefit"]["stages"]
+
+    def test_run_is_recorded_with_independent_stages(self):
+        self.run_m()
+        r = self.last_run()
+        st = r["systems"]["card_benefit"]["stages"]
+        for name in ("fetch", "save", "save_verify", "stamp", "push", "display", "slack"):
+            self.assertEqual(st[name]["status"], "success", name)
+        self.assertFalse(r["dry_run"])
+        self.assertEqual(r["run_id"], os.environ["JARVIS_614_RUN_ID"])
+        self.assertEqual(runlog.success_count(runlog.read_runs(), system="card_benefit"), 1)
+
+    def test_dry_run_is_recorded_but_never_counts_as_success(self):
+        self.run_m("--dry-run")
+        r = self.last_run()
+        self.assertTrue(r["dry_run"])
+        st = self.stages()
+        self.assertEqual((st["stamp"]["status"], st["push"]["status"], st["slack"]["status"]),
+                         ("not_applicable",) * 3)
+        self.assertEqual(runlog.success_count(runlog.read_runs()), 0)
+
+    def test_push_failure_is_separate_from_fetch_save_stamp(self):
+        self.sync = {"push": "failed", "display": "unverified", "attempts": 2, "mismatches": [], "error": "push exit 1"}
+        self.assertEqual(self.run_m(), 0)  # 取得・保存・月印は成功のまま
+        st = self.stages()
+        self.assertEqual((st["fetch"]["status"], st["save_verify"]["status"], st["stamp"]["status"]),
+                         ("success", "success", "success"))
+        self.assertEqual((st["push"]["status"], st["display"]["status"]), ("failed", "unverified"))
+        self.assertEqual(self.state()["last_monthly_run"], "2026-11")  # 月印は消えない
+        self.assertTrue(any(o["stage"].startswith("n17") for o in self.ops()))
+
+    def test_display_mismatch_fails_display_only_and_notifies(self):
+        self.sync = {"push": "success", "display": "failed", "attempts": 2,
+                     "mismatches": ["vpoint:teiki_last_check_at"], "error": "画面の値が保存済み state と違う"}
+        self.assertEqual(self.run_m(), 0)
+        st = self.stages()
+        self.assertEqual((st["push"]["status"], st["display"]["status"]), ("success", "failed"))
+        self.assertEqual(self.state()["last_monthly_run"], "2026-11")
+        self.assertTrue(any(o["stage"].startswith("n18") for o in self.ops()))
+        self.assertEqual(len(self.posted()), 1)  # 短報は画面反映の失敗に引きずられない
+
+    def test_slack_unknown_result_is_not_reposted_and_not_counted_success(self):
+        self.slack_rc = 4
+        self.assertEqual(self.run_m(), 1)
+        self.assertEqual(self.stages()["slack"]["status"], "unverified")
+        st = self.state()
+        self.assertEqual(st["last_monthly_run"], "2026-11")
+        self.assertEqual(st["monthly"]["slack_result"], "unknown")
+        self.assertTrue(st["monthly"]["slack_fp"])
+        self.slack_rc = 0
+        self.assertEqual(self.run_m(), 0)
+        self.assertEqual(len(self.posted()), 1)  # 自動では再投稿しない
+        self.assertFalse(m.needs_catchup(datetime(2026, 11, 29, 9, tzinfo=c.JST)))
+        # 送信側で既に #ops 通知済みなので、月次側から二重に通知しない
+        self.assertEqual([o for o in self.ops() if o["stage"].startswith("n19")], [])
+
+    def test_slack_held_for_archive_failure_is_not_double_notified(self):
+        self.slack_rc = 3
+        self.assertEqual(self.run_m(), 3)
+        self.assertEqual(self.stages()["slack"]["status"], "failed")
+        self.assertEqual([o for o in self.ops() if o["stage"].startswith("n19")], [])
+        self.assertEqual(self.state()["last_monthly_run"], "2026-11")
+
+    def test_global_stop_overrides_force_and_skips_everything(self):
+        os.environ["JARVIS_614_GLOBAL_STOP"] = "1"
+        self.assertEqual(self.run_m("--all"), 0)
+        self.assertEqual(self.orca.calls, 0)
+        self.assertEqual(self.slack_calls, [])
+        self.assertFalse(m.needs_catchup(datetime(2026, 11, 29, 9, tzinfo=c.JST)))
+
+    def test_all_failed_skips_push_and_slack_stage(self):
+        self.orca.search_ok = False
+        (self.dir / "zaim_learn_csv_index.json").unlink()
+        self.run_m()
+        st = self.stages()
+        self.assertEqual((st["fetch"]["status"], st["push"]["status"], st["slack"]["status"]),
+                         ("failed", "skipped", "skipped"))
+
+    def test_unexpected_error_is_recorded_and_notified(self):
+        with mock.patch.object(m, "run", side_effect=RuntimeError("x")):
+            with self.assertRaises(RuntimeError):
+                self.run_m()
+        self.assertEqual(self.stages()["fetch"]["error_code"], "unexpected_error")
+        self.assertTrue(self.ops())
 
     def test_disabled_does_nothing(self):
         os.environ["JARVIS_CARD_BENEFIT_DISABLE"] = "1"

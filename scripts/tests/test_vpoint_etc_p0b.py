@@ -5,6 +5,7 @@
 import contextlib
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -14,12 +15,27 @@ from unittest import mock
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import jarvis_614_display as display614  # noqa: E402
+import jarvis_614_ops as ops614  # noqa: E402
+import jarvis_614_runlog as runlog614  # noqa: E402
 import jarvis_614_verified_state as vs  # noqa: E402
 import jarvis_etc_rebate_fetch as etc  # noqa: E402
 import jarvis_points_rebate_slack_report as sr  # noqa: E402
 import jarvis_vpoint_routine as rt  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
+
+
+def hermetic(case: unittest.TestCase, base: Path) -> None:
+    """614 の run 記録・#ops 保留・緊急ログを一時フォルダへ（実 state・実ログを汚さない）。"""
+    p = mock.patch.dict(os.environ, {
+        "JARVIS_STATE_DIR": str(base),
+        "JARVIS_614_LOG_DIR": str(base / "614_watch"),
+        "JARVIS_614_EMERGENCY_DIR": str(base / "emergency"),
+    })
+    p.start()
+    case.addCleanup(p.stop)
+    os.environ.pop("JARVIS_614_GLOBAL_STOP", None)
 
 
 class StampInvariantTests(unittest.TestCase):
@@ -39,10 +55,21 @@ class RoutineVerifiedSaveTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.sd = Path(self.tmp.name)
+        hermetic(self, self.sd)
         self.monthly = self.sd / "vpoint_monthly.json"
         self.monthly.write_text(json.dumps({"disabled": False, "last_routine_at": "old"}))
         self.calls = []
         self.child = {"quality": "success", "stamp": True}
+        self.sync = {"push": "success", "display": "success", "attempts": 1, "mismatches": [], "error": ""}
+        self.sync_calls = []
+        self.notified = []
+        for patcher in (
+            mock.patch.object(rt.display614, "sync_and_verify", lambda ids, **kw: self.sync_calls.append(ids) or self.sync),
+            mock.patch.object(rt.ops614, "flush_pending", lambda **kw: {}),
+            mock.patch.object(rt.ops614, "notify_ops", lambda **kw: self.notified.append(kw) or {"status": "sent"}),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def fake_run_py(self, args, *, timeout=300):
         self.calls.append(args)
@@ -125,7 +152,7 @@ class RoutineVerifiedSaveTests(unittest.TestCase):
         self.assertFalse(self.report["save_verify"]["ok"])
         self.assertTrue(any("last_check_c" in e for e in self.report["save_verify"]["errors"]))
         # 保存を確認できない結果は画面へ渡さず、#ops へ失敗を出す
-        self.assertFalse(any("jarvis_dashboard_push" in " ".join(a) for a in self.calls))
+        self.assertEqual(self.sync_calls, [])
         a = self.slack_args()
         self.assertEqual(a[a.index("--outcome") + 1], "failed")
 
@@ -143,7 +170,7 @@ class RoutineVerifiedSaveTests(unittest.TestCase):
         self.assertEqual(self.report["save_verify"]["attempts"], 2)  # 保存だけ1回やり直す
         self.assertTrue((self.sd / "vpoint_monthly.pending.json").is_file())
         self.assertIn("jarvis_asks", json.loads((self.sd / "vpoint_monthly.pending.json").read_text()))
-        self.assertFalse(any("jarvis_dashboard_push" in " ".join(a) for a in self.calls))
+        self.assertEqual(self.sync_calls, [])
         a = self.slack_args()
         self.assertEqual(a[a.index("--outcome") + 1], "failed")
         self.assertIn("読み戻して確認できず", a[a.index("--error") + 1])
@@ -152,6 +179,64 @@ class RoutineVerifiedSaveTests(unittest.TestCase):
         with mock.patch.object(rt, "build_jarvis_asks", lambda **kw: [{"id": "a", "level": "x", "text": "t", "k": ("a", "b")}]):
             self.assertEqual(self.run_routine(), 0)
         self.assertTrue(self.report["save_verify"]["ok"])
+
+    # ---- P1: run 集約・排他・画面反映・全体停止 ----
+    def last_stages(self):
+        return runlog614.read_runs()[-1]["systems"]["vpoint"]["stages"]
+
+    def test_run_recorded_with_independent_stages_on_success(self):
+        self.assertEqual(self.run_routine("--push"), 0)
+        st = self.last_stages()
+        for name in ("fetch", "save", "save_verify", "stamp", "push", "display", "slack"):
+            self.assertEqual(st[name]["status"], "success", name)
+        self.assertEqual(self.sync_calls, [["vpoint"]])
+        self.assertEqual(runlog614.success_count(runlog614.read_runs(), system="vpoint"), 1)
+
+    def test_partial_grant_is_partial_fetch_and_no_stamp_stage(self):
+        self.child = {"quality": "partial", "stamp": False}
+        self.run_routine("--push")
+        st = self.last_stages()
+        self.assertEqual(st["fetch"]["status"], "partial")
+        self.assertEqual(st["stamp"]["status"], "skipped")
+        self.assertEqual(st["save"]["status"], "success")  # 保存は別に成功
+        self.assertEqual(runlog614.success_count(runlog614.read_runs(), system="vpoint"), 0)
+
+    def test_display_failure_is_separate_and_keeps_stamp_and_rc0(self):
+        self.sync = {"push": "success", "display": "failed", "attempts": 2, "mismatches": ["vpoint:x"],
+                     "error": "画面の値が保存済み state と違う"}
+        self.assertEqual(self.run_routine("--push"), 0)
+        st = self.last_stages()
+        self.assertEqual((st["save_verify"]["status"], st["stamp"]["status"], st["display"]["status"]),
+                         ("success", "success", "failed"))
+        self.assertEqual(self.state()["last_check_c"], "2026-11")
+        self.assertTrue(any(n["stage"] == "n17/18 画面反映" for n in self.notified))
+        self.assertEqual(self.slack_args()[self.slack_args().index("--outcome") + 1], "checked")
+
+    def test_readback_unavailable_is_unverified_not_success(self):
+        self.sync = {"push": "success", "display": "unverified", "attempts": 1, "mismatches": [],
+                     "error": "読み戻せず（RuntimeError）"}
+        self.run_routine("--push")
+        self.assertEqual(self.last_stages()["display"]["status"], "unverified")
+
+    def test_dry_run_is_recorded_as_dry_run(self):
+        self.run_routine("--dry-run")
+        self.assertTrue(runlog614.read_runs()[-1]["dry_run"])
+        self.assertEqual(runlog614.success_count(runlog614.read_runs()), 0)
+
+    def test_concurrent_run_is_excluded_and_state_untouched(self):
+        before = self.monthly.read_text()
+        with vs.file_lock(rt.lock_path()) if False else vs.file_lock(self.sd / "vpoint_routine.lock"):
+            self.assertEqual(self.run_routine("--push"), 0)
+        self.assertEqual(self.monthly.read_text(), before)
+        self.assertEqual(self.calls, [])  # 子プロセス（付与サマリ・PDCA）を起動しない
+        self.assertEqual(runlog614.read_runs()[-1]["systems"]["vpoint"]["stages"]["fetch"]["error_code"], None)
+        self.assertEqual(self.last_stages()["fetch"]["status"], "skipped")
+
+    def test_global_stop_skips_even_with_force_window(self):
+        os.environ["JARVIS_614_GLOBAL_STOP"] = "1"
+        self.assertEqual(self.run_routine("--push", "--force-window-c"), 0)
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.last_stages()["fetch"]["status"], "skipped")
 
     def test_outside_window_never_stamps(self):
         self.run_routine(now=datetime(2026, 11, 10, 9, 40, tzinfo=JST))
@@ -213,8 +298,12 @@ class EtcMainTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
+        hermetic(self, Path(self.tmp.name))
         self.state_path = Path(self.tmp.name) / "etc_monthly.json"
         self.slack = []
+        self.slack_res = {"ok": True}
+        self.sync_calls = []
+        self.sync = {"push": "success", "display": "success", "attempts": 1, "mismatches": [], "error": ""}
 
     def run_main(self, scrape, *argv, day=21, state=None):
         if state is not None:
@@ -231,8 +320,9 @@ class EtcMainTests(unittest.TestCase):
                 mock.patch.object(etc, "datetime", FakeDT), \
                 mock.patch.object(etc, "load_dotenv", lambda p: {"ETC_MILEAGE_ID": "x", "ETC_MILEAGE_WEB_PASSWORD": "y"}), \
                 mock.patch.object(etc, "scrape_rebate", scrape), \
-                mock.patch.object(etc, "push_dashboard", lambda: {"returncode": 0}), \
-                mock.patch.object(etc, "push_slack_report", lambda **kw: self.slack.append(kw) or {"ok": True}), \
+                mock.patch.object(etc.display614, "sync_and_verify", lambda ids, **kw: self.sync_calls.append(ids) or self.sync), \
+                mock.patch.object(etc.ops614, "flush_pending", lambda **kw: {}), \
+                mock.patch.object(etc, "push_slack_report", lambda **kw: self.slack.append(kw) or self.slack_res), \
                 mock.patch.object(sys, "argv", ["x", "--apply", "--push", *argv]), \
                 contextlib.redirect_stdout(out):
             rc = etc.main()
@@ -314,12 +404,10 @@ class EtcMainTests(unittest.TestCase):
         def bad(path, data):
             real(path, {"truncated": True} if path == self.state_path else data)
 
-        pushed = []
-        with mock.patch.object(vs, "_write_atomic", bad), \
-                mock.patch.object(etc, "push_dashboard", lambda: pushed.append(1) or {"returncode": 0}):
+        with mock.patch.object(vs, "_write_atomic", bad):
             self.assertEqual(self.run_main(self.ok_scrape()), 1)
         self.assertFalse(self.out["save_verify"]["ok"])
-        self.assertEqual(pushed, [])
+        self.assertEqual(self.sync_calls, [])  # 保存を確認できない結果は画面へ渡さない
         self.assertEqual(self.slack[-1]["outcome"], "failed")
         self.assertTrue(self.state_path.with_name("etc_monthly.pending.json").is_file())
 
@@ -328,6 +416,71 @@ class EtcMainTests(unittest.TestCase):
         st = self.st()
         self.assertEqual(st["rebate_history"][0]["target_month"], "2026-06")
         self.assertNotIn("last_check_b", st)
+
+
+class EtcRunLogTests(EtcMainTests):
+    """ETC の run 記録・画面反映・全体停止（P1）。EtcMainTests の部品を流用。"""
+
+    def stages(self):
+        return runlog614.read_runs()[-1]["systems"]["etc"]["stages"]
+
+    def test_success_run_records_every_stage_independently(self):
+        self.assertEqual(self.run_main(self.ok_scrape()), 0)
+        st = self.stages()
+        for name in ("fetch", "save", "save_verify", "stamp", "push", "display", "slack"):
+            self.assertEqual(st[name]["status"], "success", name)
+        self.assertEqual(self.sync_calls, [["etc_mileage"]])
+        self.assertEqual(runlog614.success_count(runlog614.read_runs(), system="etc"), 1)
+
+    def test_display_mismatch_fails_display_only(self):
+        self.sync = {"push": "success", "display": "failed", "attempts": 2, "mismatches": ["etc_mileage:x"],
+                     "error": "画面の値が保存済み state と違う"}
+        notified = []
+        with mock.patch.object(etc.ops614, "notify_ops", lambda **kw: notified.append(kw) or {}):
+            self.assertEqual(self.run_main(self.ok_scrape()), 0)
+        st = self.stages()
+        self.assertEqual((st["fetch"]["status"], st["save_verify"]["status"], st["stamp"]["status"],
+                          st["display"]["status"]), ("success", "success", "success", "failed"))
+        self.assertEqual(self.st()["last_check_b"], "2026-11")  # 月印は取り消さない
+        self.assertEqual(notified[0]["stage"], "n17/18 画面反映")
+
+    def test_waiting_run_is_waiting_not_success(self):
+        sc = lambda **a: {"ok": False, "kind": "waiting", "error": "付与前"}  # noqa: E731
+        self.run_main(sc)
+        st = self.stages()
+        self.assertEqual((st["fetch"]["status"], st["stamp"]["status"]), ("waiting", "skipped"))
+        self.assertEqual(runlog614.success_count(runlog614.read_runs(), system="etc"), 0)
+        self.assertEqual(self.sync_calls, [])
+
+    def test_failure_run_is_failed_and_not_success(self):
+        sc = lambda **a: {"ok": False, "kind": "failed", "error": "x"}  # noqa: E731
+        self.run_main(sc)
+        self.assertEqual(self.stages()["fetch"]["status"], "failed")
+        self.assertEqual(self.slack[-1]["stage"], "n09 ETC 取得")  # 工程と次の対応つきで #ops へ
+        self.assertTrue(self.slack[-1]["next_action"])
+
+    def test_slack_unknown_result_is_unverified(self):
+        self.slack_res = {"ok": False, "returncode": 4}
+        self.run_main(self.ok_scrape())
+        self.assertEqual(self.stages()["slack"]["status"], "unverified")
+
+    def test_skip_is_recorded_but_not_success(self):
+        self.run_main(self.ok_scrape(), state={"rebate_history": [{"target_month": "2026-10", "rebate_yen": 5}]})
+        self.assertEqual(self.stages()["fetch"]["status"], "skipped")
+        self.assertEqual(runlog614.success_count(runlog614.read_runs(), system="etc"), 0)
+
+    def test_global_stop_beats_force_and_manual(self):
+        os.environ["JARVIS_614_GLOBAL_STOP"] = "1"
+        calls = []
+        sc = lambda **a: calls.append(1) or {"ok": True}  # noqa: E731
+        self.assertEqual(self.run_main(sc, "--force", "--target-month", "2026-10"), 0)
+        self.assertEqual(calls, [])
+        self.assertIn("全体停止", self.out["skipped"])
+
+    def test_dry_run_is_not_counted(self):
+        self.run_main(self.ok_scrape(), "--dry-run")
+        self.assertTrue(runlog614.read_runs()[-1]["dry_run"])
+        self.assertEqual(runlog614.success_count(runlog614.read_runs()), 0)
 
 
 class SlackWaitingWordingTests(unittest.TestCase):
