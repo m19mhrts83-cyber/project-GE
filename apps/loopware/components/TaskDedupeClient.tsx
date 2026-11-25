@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
 import VoiceDock, { CommentList } from "./VoiceDock";
 import { useVoiceLog } from "./useVoiceLog";
+import AllClear from "./AllClear";
 import SaveSheet, { type SaveLine, type SaveStatus } from "./SaveSheet";
 import {
   REASON_TAGS_312,
@@ -223,7 +224,7 @@ export default function TaskDedupeClient({
     return (
       <div>
         {tabsEl}
-        {loaded ? <AllClear /> : <p className="meta">読み込み中…</p>}
+        {loaded ? <AllClear title="今、新規で考えるお題はありません" sub="ぜんぶ終わったよ、おめでとう！🎉" /> : <p className="meta">読み込み中…</p>}
       </div>
     );
   }
@@ -232,7 +233,7 @@ export default function TaskDedupeClient({
     return (
       <div>
         {tabsEl}
-        <AllClear />
+        <AllClear title="今、新規で考えるお題はありません" sub="ぜんぶ終わったよ、おめでとう！🎉" />
       </div>
     );
   }
@@ -584,29 +585,6 @@ export default function TaskDedupeClient({
         </div>
       </div>
       )}
-    </div>
-  );
-}
-
-/** 判断するお題が残っていないときの表示（輪とチェックが描かれ、粒がはじける） */
-function AllClear() {
-  return (
-    <div className="glass card allclear" role="status">
-      <div className="ac-art" aria-hidden="true">
-        <svg className="ac-ring" width="84" height="84" viewBox="0 0 84 84">
-          <circle className="ac-ring-bg" cx="42" cy="42" r="36" />
-          <circle className="ac-ring-fg" cx="42" cy="42" r="36" />
-          <path className="ac-check" d="M27 43 L38 54 L58 31" />
-        </svg>
-        {Array.from({ length: 16 }, (_, i) => (
-          <i key={i} className={`ac-spark c${i % 4}`} style={{ ["--a" as string]: `${i * 22.5}deg` }} />
-        ))}
-      </div>
-      <span aria-hidden="true">{Array.from({ length: 12 }, (_, i) => (
-          <i key={`f${i}`} className={`ac-fall c${i % 4}`} style={{ left: `${4 + i * 8}%`, animationDelay: `${(i % 6) * 0.25}s` }} />
-        ))}</span>
-      <strong className="ac-title">今、新規で考えるお題はありません</strong>
-      <span className="ac-sub">ぜんぶ終わったよ、おめでとう！🎉</span>
     </div>
   );
 }

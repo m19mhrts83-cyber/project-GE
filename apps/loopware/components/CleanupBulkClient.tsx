@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AllClear from "./AllClear";
+import { cleanupItem, LEVEL_LABEL, type Level } from "@/lib/allCore";
 import {
   ACTS_313,
   GROUP_TITLE,
@@ -49,7 +51,21 @@ export default function CleanupBulkClient() {
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
   }, []);
 
-  const cards = snap?.cards || [];
+  // 重要度（期限が近い・優先度が高い→高）の高い順に並べる
+  const levels = useMemo(() => {
+    const today = todayIso();
+    const m: Record<string, Level> = {};
+    for (const c of snap?.cards || []) m[c.id] = cleanupItem(c, today).level;
+    return m;
+  }, [snap]);
+  const cards = useMemo(
+    () => {
+      // グループ（318→313→スター）の順は保ち、その中で重要度の高い順
+      const rank = (c: CleanupCard) => ["318", "313", "star"].indexOf(groupOf(c));
+      return [...(snap?.cards || [])].sort((a, b) => rank(a) - rank(b) || (levels[b.id] ?? 1) - (levels[a.id] ?? 1));
+    },
+    [snap, levels],
+  );
   const nPicked = useMemo(() => Object.values(picked).filter(Boolean).length, [picked]);
   const counts = useMemo(() => {
     const n: Record<string, number> = { close: 0, drop: 0, reschedule: 0, keep: 0 };
@@ -101,9 +117,10 @@ export default function CleanupBulkClient() {
   if (!snap) return <p className="meta">読み込み中…</p>;
   if (!cards.length)
     return (
-      <div className="glass wk-empty">
-        <b>いま片付ける候補はありません</b>
-        <span className="meta">{msg || "材料は 30 分ごとに更新されます（スター付きメール由来のタスク）。"}</span>
+      <div>
+        {msg && <div className="wk-banner ok"><span>{msg}</span></div>}
+        <AllClear title="今、片付けるものはありません" sub="ぜんぶ終わったよ、おめでとう！🎉" />
+        <p className="meta">材料は 30 分ごとに更新されます（スター付きメール由来・318の判断依頼）。</p>
       </div>
     );
 
@@ -155,7 +172,10 @@ export default function CleanupBulkClient() {
             <label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
               <input type="checkbox" checked={!!picked[c.id]} onChange={(e) => setPicked((p) => ({ ...p, [c.id]: e.target.checked }))} />
               <span style={{ flex: 1 }}>
-                <b>{c.title}</b>
+                <b>
+                  {levels[c.id] === 3 && <span className="seg-badge" style={{ marginRight: 6 }}>{LEVEL_LABEL[3]}</span>}
+                  {c.title}
+                </b>
                 <span className="meta" style={{ display: "block" }}>
                   {[
                     c.origin === "318" && "318 判断依頼",

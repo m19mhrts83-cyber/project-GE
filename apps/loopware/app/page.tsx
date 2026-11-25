@@ -120,7 +120,7 @@ export default function HubPage() {
         </span>
         <span className="txt">
           <strong>313 出口</strong>
-          <span className="meta">片付ける。済んだ／いつ・優先／やめる</span>
+          <span className="meta">まとめて片付ける（基本）／閉じ漏れ／1件ずつ。残り件数はタブのバッジで</span>
         </span>
         <Icon name="next" size={18} />
       </Link>
