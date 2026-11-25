@@ -12,7 +12,7 @@ export type Counts = {
   misses: number | null;
   /** 313 まとめて片付ける */
   cleanup: number | null;
-  /** 313 閉じ漏れ（検知結果がまだ届いていない間は null） */
+  /** 313 閉じ漏れ（Mac の検知がまだ一度も届いていない・読めない間は null） */
   closeLeak: number | null;
 };
 

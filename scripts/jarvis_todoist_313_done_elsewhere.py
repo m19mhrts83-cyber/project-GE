@@ -171,6 +171,60 @@ def apply_close(row: dict, author: str) -> None:
     print(f"  closed {tid} {row['title'][:40]}")
 
 
+SNAPSHOT_KEY = "todoist_313_close_leak"
+HOLD_DAYS = 28  # Nody で「残す」を選んだ件はこの日数は出さない（cleanup_bulk と同じ）
+
+
+def _sb():
+    import jarvis_todoist_312_collect as c  # noqa: PLC0415
+
+    return c.sb
+
+
+def nody_held_ids(sb, now: datetime) -> set[str]:
+    """Nody（/313?tab=misses など）で最近「残す」を選んだタスク。"""
+    since = (now - timedelta(days=HOLD_DAYS)).isoformat()
+    rows = sb("owner_decisions", params={
+        "select": "target_id", "surface": "eq.todoist_313", "action": "eq.defer",
+        "target_type": "eq.todoist_task", "decided_at": f"gte.{since}", "limit": "2000",
+    }) or []
+    return {str(r["target_id"]) for r in rows}
+
+
+def snapshot_doc(rows: list[dict], *, now: datetime, held: set[str]) -> dict:
+    """画面（Nody 313 閉じ漏れ）に出す形。ローカルのパスは載せない（フォルダ名・件名・日時だけ）。"""
+    cards = []
+    for r in rows:
+        if r["task_id"] in held:
+            continue
+        ev = [
+            {"folder": str(e.get("folder") or ""), "subject": str(e.get("subject") or "")[:80], "at": str(e.get("mtime") or "")}
+            for e in (r.get("evidence") or [])[:3]
+        ]
+        cards.append({
+            "id": r["task_id"],
+            "title": r["title"],
+            "labels": r.get("labels") or [],
+            "confidence": r.get("confidence") or "low",
+            "streak_days": r.get("streak_days") or 1,
+            "why": "パートナーとのやり取りに、こちらから送った記録がある",
+            "evidence": ev,
+        })
+    return {"v": 1, "generated_at": now.isoformat(timespec="seconds"), "source": "done_elsewhere", "total": len(cards), "cards": cards}
+
+
+def publish(rows: list[dict], *, now: datetime) -> int:
+    """検知結果を sync_meta に置く（Nody の 313「閉じ漏れ」タブとバッジが読む）。Todoist には触らない。"""
+    sb = _sb()
+    held = nody_held_ids(sb, now)
+    doc = snapshot_doc(rows, now=now, held=held)
+    sb("sync_meta", params={"on_conflict": "key"}, method="POST", prefer="resolution=merge-duplicates,return=minimal", body={
+        "key": SNAPSHOT_KEY, "value": json.dumps(doc, ensure_ascii=False), "updated_at": now.isoformat(),
+    })
+    print(f"📎 313 閉じ漏れ: {doc['total']} 件を Nody へ（残す {len(held & {r['task_id'] for r in rows})} 件は除外）")
+    return doc["total"]
+
+
 def keep_selected(select: str) -> int:
     try:
         saved = json.loads(STATE.read_text(encoding="utf-8"))
@@ -200,6 +254,11 @@ def main(argv: list[str] | None = None) -> int:
         "--keep",
         default="",
         help="本人が「残す」と答えた番号。内容が変わるまで再提示しない（Todoist には触らない）",
+    )
+    ap.add_argument(
+        "--publish",
+        action="store_true",
+        help="検知結果を sync_meta.todoist_313_close_leak に置く（Nody の閉じ漏れタブ）。Todoist には触らない",
     )
     args = ap.parse_args(argv)
 
@@ -232,6 +291,13 @@ def main(argv: list[str] | None = None) -> int:
         + "\n",
         encoding="utf-8",
     )
+
+    if args.publish:
+        try:
+            publish(rows, now=datetime.now(JST))
+        except Exception as e:  # noqa: BLE001
+            print(f"❌ 313 閉じ漏れ: Nody へ置けませんでした: {e}", file=sys.stderr)
+            return 1
 
     if args.json:
         print(json.dumps(rows, ensure_ascii=False, indent=2))

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { serviceClient } from "@/lib/supabase";
 import type { CleanupSnapshot } from "@/lib/cleanupBulk";
+import { loadCloseLeak } from "@/lib/closeLeakLoad";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,7 +9,8 @@ export const dynamic = "force-dynamic";
 /**
  * タブのバッジ用の「残り件数」。
  * topics=312の決めていないお題／missIds=提案を仕分ける候補／cleanup=まとめて片付ける候補。
- * 読めなかったものは null（0件と区別する）。閉じ漏れは検知結果がまだここに届いていないので常に null。
+ * closeLeak=313 閉じ漏れ（Mac の検知が sync_meta.todoist_313_close_leak に置いた件のうち未判断）。
+ * 読めなかったもの・まだ一度も置かれていないものは null（0件と区別する）。
  */
 export async function GET() {
   const sb = serviceClient();
@@ -47,6 +49,14 @@ export async function GET() {
       try {
         const snap = data?.value ? (JSON.parse(String(data.value)) as CleanupSnapshot) : null;
         out.cleanup = snap?.cards?.length ?? 0;
+      } catch {
+        /* null のまま */
+      }
+    })(),
+    (async () => {
+      try {
+        const { snapshot, cards } = await loadCloseLeak(sb);
+        out.closeLeak = snapshot ? cards.length : null;
       } catch {
         /* null のまま */
       }

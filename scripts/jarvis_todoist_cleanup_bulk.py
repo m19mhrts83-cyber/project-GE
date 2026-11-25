@@ -268,6 +268,14 @@ def apply_one(row: dict[str, Any], *, dry: bool) -> str:
                 "content": f"【313】タスク完了したよ（週の整理・本人が「{word}」を選択）\nサマリ: /313/bulk で選んだ結果を反映",
             })
             c.todoist(f"tasks/{tid}/close", method="POST")
+        elif origin == "close_leak" and action == "close":
+            # 313 閉じ漏れ（外で済んだ検知）: 本人が「済み」を選んだ件だけ、根拠を添えて完了にする
+            ev = (row.get("payload") or {}).get("evidence") or []
+            lines = ["【313】タスク完了したよ（閉じ漏れ・本人が「済み」を選択）", "サマリ: /313?tab=misses で選んだ結果を反映"]
+            for e in ev[:3]:
+                lines.append(f"- 根拠: {e.get('folder', '')} / {str(e.get('subject', ''))[:60]}")
+            c.todoist("comments", method="POST", body={"task_id": tid, "content": "\n".join(lines)[:1900]})
+            c.todoist(f"tasks/{tid}/close", method="POST")
         elif action == "close":
             c.todoist(f"tasks/{tid}/close", method="POST")
         elif action == "drop":

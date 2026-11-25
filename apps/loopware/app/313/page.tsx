@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import Icon from "@/components/Icon";
 import CleanupClient from "@/components/CleanupClient";
 import CleanupBulkClient from "@/components/CleanupBulkClient";
+import CloseLeakClient from "@/components/CloseLeakClient";
 import SegTabs from "@/components/SegTabs";
 
 export default async function Page313({
@@ -37,14 +38,7 @@ export default async function Page313({
         {tab === "bulk" ? (
           <CleanupBulkClient />
         ) : tab === "misses" ? (
-          <div className="glass wk-empty">
-            <b>閉じ漏れの検知結果は、まだこの画面に届いていません</b>
-            <span className="meta">
-              台帳で送信済み・PRマージ済み・「これ済んだ」と判断できたものを、Todoist に残っているタスクと照らして出す機能です。
-              検知スクリプト（scripts/jarvis_todoist_313_done_elsewhere.py）はあり、結果をこの画面へ流す接続が未完了です。
-              件数バッジが「—」でなく出るようになったら、ここに並びます。
-            </span>
-          </div>
+          <CloseLeakClient />
         ) : (
           <CleanupClient initialTaskId={taskId} initialTab="cleanup" />
         )}
