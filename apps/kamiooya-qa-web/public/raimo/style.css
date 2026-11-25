@@ -19,18 +19,33 @@ table > thead {
   background: #f1f5f9;
 }
 
-#openchatScreen th.openchat-sender,
-#openchatScreen td:has(> .openchat-sender) {
-  width: 15rem;
-  max-width: 15rem;
-  white-space: normal;
-  overflow-wrap: anywhere;
+/* オプチャ一覧の列幅（2026-11-25）: 左4列は決まった幅、本文抜粋に残りを全部まわす。幅は app.js が <col> に入れる。
+   見出しの境目の取っ手（.openchat-col-grip）をドラッグで変えられる。スマホ縦（640px以下）はカード表示なので下の @media で外す */
+#openchatTable { table-layout: fixed; width: 100%; }
+#openchatTable col[data-col="chat"] { width: 10rem; }
+#openchatTable col[data-col="kind"] { width: 8rem; }
+#openchatTable col[data-col="when"] { width: 8.5rem; }
+#openchatTable col[data-col="sender"] { width: 7rem; }
+#openchatTable th { position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 1rem; }
+#openchatTable td { overflow-wrap: anywhere; }
+#openchatTable td { white-space: normal !important; }
+#openchatTable td:nth-child(3) { overflow-wrap: normal; word-break: keep-all; }
+#openchatScreen .openchat-sender { white-space: normal; }
+.openchat-col-grip { position: absolute; top: 0; right: 0; bottom: 0; width: 14px; cursor: col-resize; touch-action: none; z-index: 2; }
+.openchat-col-grip::after { content: ""; position: absolute; top: 20%; bottom: 20%; left: 6px; width: 3px; border-radius: 2px; background: #94a3b8; }
+.openchat-col-grip:hover::after, .openchat-col-grip:focus-visible::after, .openchat-col-grip.is-dragging::after { top: 0; bottom: 0; background: #FE910B; }
+.openchat-col-grip:focus-visible { outline: none; }
+html.openchat-col-dragging, html.openchat-col-dragging * { cursor: col-resize !important; user-select: none !important; }
+.openchat-list-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .25rem 1rem; margin-bottom: .5rem; }
+.openchat-col-hint { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .75rem; color: #64748b; }
+.openchat-col-reset { padding: .15rem .6rem; border: 1px solid #94a3b8; border-radius: 999px; background: #fff; color: #334155; font-size: .75rem; cursor: pointer; }
+.openchat-col-reset:hover, .openchat-col-reset:focus-visible { border-color: #FE910B; color: #b45309; outline: none; }
+@media (min-width: 641px) {
+  #openchatTable td:nth-child(5) { font-size: .85rem; line-height: 1.6; }
 }
-
-#openchatScreen .openchat-sender {
-  display: inline-block;
-  max-width: 15rem;
-  white-space: normal;
+@media (max-width: 640px) {
+  #openchatTable { table-layout: auto; width: 100% !important; }
+  #openchatTable colgroup, .openchat-col-hint { display: none; }
 }
 
 * {

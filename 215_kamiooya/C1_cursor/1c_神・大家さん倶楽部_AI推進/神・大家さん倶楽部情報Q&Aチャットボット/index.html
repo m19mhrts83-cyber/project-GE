@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20261123c" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
+    <link rel="stylesheet" href="style.css?v=20261125a" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
   <!-- (5) ロゴに合わせた配色: この端末で見えていた人は、ログイン画面から同じ色で出す（applyTheme が覚える） -->
   <!-- 2026-11-20 新しい配色は全員に公開済み（design_theme=all）。初めて開く人も新しい配色で出す。スイッチで外れた人だけ '0' を覚えて旧配色 -->
   <script>try{var dt=null;try{dt=localStorage.getItem('qa_design_theme');}catch(e){}if(dt!=='0'){document.documentElement.classList.add('theme-a');document.title='神大家AIナビ';}}catch(e){}</script>
@@ -499,16 +499,27 @@
                   <button type="button" id="openchatThreadBackBtn" class="openchat-thread-back"><i class="fa-solid fa-arrow-left mr-1"></i>一覧に戻る</button>
                 </div>
               </div>
-              <p id="openchatListMeta" class="text-xs text-slate-500 mb-2"></p>
+              <!-- 列の幅は見出しの境目（縦の線）をドラッグして変えられる。変えた幅はこの端末に覚えておく（2026-11-25 松野さん） -->
+              <div class="openchat-list-head">
+                <p id="openchatListMeta" class="text-xs text-slate-500"></p>
+                <p class="openchat-col-hint"><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i>見出しの境目の線を左右に動かすと、列の幅を変えられます<button type="button" id="openchatColResetBtn" class="openchat-col-reset hidden">幅を元に戻す</button></p>
+              </div>
               <div class="overflow-auto bg-white rounded border" style="max-height: calc(100dvh - 260px); min-height: 180px;">
-                <table class="min-w-full text-sm openchat-table">
+                <table class="min-w-full text-sm openchat-table" id="openchatTable">
+                  <colgroup>
+                    <col data-col="chat" />
+                    <col data-col="kind" />
+                    <col data-col="when" />
+                    <col data-col="sender" />
+                    <col data-col="body" />
+                  </colgroup>
                   <thead class="bg-slate-100" style="position: sticky; top: 0; z-index: 10; background: #f1f5f9;">
                     <tr>
-                      <th class="p-2 text-left">取得元（オプチャ）</th>
-                      <th class="p-2 text-left">種別</th>
-                      <th class="p-2 text-left">日時</th>
-                      <th class="p-2 text-left openchat-sender">投稿者</th>
-                      <th class="p-2 text-left">本文抜粋</th>
+                      <th class="p-2 text-left" data-col="chat">取得元（オプチャ）</th>
+                      <th class="p-2 text-left" data-col="kind">種別</th>
+                      <th class="p-2 text-left" data-col="when">日時</th>
+                      <th class="p-2 text-left" data-col="sender">投稿者</th>
+                      <th class="p-2 text-left" data-col="body">本文抜粋</th>
                     </tr>
                   </thead>
                   <tbody id="openchatTableBody"></tbody>
