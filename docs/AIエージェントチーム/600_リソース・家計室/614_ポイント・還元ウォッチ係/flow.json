@@ -1,7 +1,7 @@
 {
   "flow_id": "614-point-rebate-watch",
   "title": "ポイント・還元ウォッチ係（614）作業フロー",
-  "version": "2026-11-23 第2稿（Codex レビュー反映）＋2026-11-24 第3稿 PR-P0a（年間特典の P0 反映）",
+  "version": "2026-11-23 第2稿（Codex レビュー反映）＋2026-11-24 第3稿 PR-P0a（年間特典の P0 反映）＋2026-11-25 第3稿 Tサイト定期取得（n33）・Vpass残高（n34）を追記",
   "reference_date": "2026-11-23",
   "purpose": "得る側（テイチャン・ETC還元・Vポイント定例・年間特典）が動いたかを1係で見せ、松野さんが寄せ先などを判断する材料を出す",
   "runtime_ai_nodes": 0,
@@ -13,6 +13,13 @@
     "note": "誤り指摘6件・優先修正5件を第2稿に反映。JSON と HTML の埋め込みは一致（Codex 確認）"
   },
   "decided": [
+    {
+      "id": "D10",
+      "date": "2026-11-25",
+      "item": "Vポイント Tサイト履歴の取り直し・定期取得・Vpass残高",
+      "decision": "(1)今日（11/25）Tサイト履歴を1回取り直してよい（確認コードは本人のメールを Gmail API で読む）。(2)Tサイトの定期取得を窓C前日（毎月24日 08:30）に launchd で入れてよい。(3)Vpass の残高（基準日つき）を定例に足してよい（Tサイトの基準日の確認用）。VポイントPay は対象外。『付与予定日以降を成功条件に足す』は未決のため実装しない",
+      "note": "D6 の6a（取得時期）はこの決定で『窓C前日』に決まった。6b（品質基準＝基準日が対象月末以降）は変えない。定期取得は PR で実装（launchd の導入はマージ後）。Vpass 残高は取得部品まで実装し、定例への組み込みは P1（PR #647）のマージ後の別 PR"
+    },
     {
       "id": "D9",
       "date": "2026-11-23",
@@ -383,8 +390,8 @@
       "decision": "D6: Tサイトの取得をいつ行うか（現行の最新履歴は 9/10。窓C前に取らないと 10月分も古いデータで作られる）",
       "implementation": "手動",
       "confirmed": "確定",
-      "run_state": "保留",
-      "evidence": "最新のTサイト履歴は 2026-09-10（40日超＝asks に『古い』が出る条件）。11/25 の窓C開始までに新規取得が無ければ、10月分の付与サマリは古い履歴かフォールバックになる見込み",
+      "run_state": "確認済",
+      "evidence": "最新のTサイト履歴は 2026-09-10（40日超＝asks に『古い』が出る条件）。11/25 の窓C開始までに新規取得が無ければ、10月分の付与サマリは古い履歴かフォールバックになる見込み。【11/25 実績】松野さんの了承のうえ手動で1回取り直した（メールOTPは Gmail から自動で読んだ。想定外の画面・追加認証なし）。基準日 11/25・付与行 25件（10月分 15件・11月分 10件）・10月分の付与を含む。dry-run で付与サマリは『成功』（基準日 11/25 ≧ 対象月末 10/31・月印は付けていない＝次の定例に任せる）",
       "source_id": "614-N12"
     },
     {
@@ -854,6 +861,54 @@
       "evidence": "etc 11/21・11/22 09:30 のログ『history already has 2026-10』。Vポイントは月印後もスキップせず定例全体が動く（ノード5）",
       "source_id": "614-N32",
       "added_in": "第2稿"
+    },
+    {
+      "id": "n33",
+      "number": 33,
+      "lane": "vpoint",
+      "title": "Tサイト履歴の定期取得（毎月24日 08:30・窓C前日）",
+      "actor": "プログラム",
+      "executor": "launchd com.matsunoma.jarvis.vpoint-tsite-fetch → vpoint_tsite_fetch_runner.sh → jarvis_vpoint_tsite_scheduled.py → jarvis_vpoint_tsite_fetch.py（V会員番号＋メールOTP。OTP は本人メールを Gmail API で読むだけ）",
+      "trigger": "毎月24日 08:30（Mac がスリープで逃した時は launchd が復帰時に1回。新しい常駐は作らない）",
+      "input": "停止スイッチ JARVIS_VPOINT_TSITE_FETCH_DISABLE・今日の試行状態・V会員番号（値は出さない）・本人メールの確認コード",
+      "process": "1日1回ガード → 取得 → 当日分の履歴を読み戻して確認。失敗は再試行1回まで（認証待ちは再試行しない＝確認コードのメールを増やさない）。定例（窓C）とは別ジョブで、失敗しても定例は壊さない",
+      "output": "vpoint_tsite_history_<日付>.json と試行状態 vpoint_tsite_fetch_run.json（どちらも .jarvis_state・非公開側）。ログは ~/Library/Logs/jarvis_vpoint_tsite_fetch/",
+      "screen": "なし（窓C 25日以降の付与サマリが新しい履歴を読む）",
+      "report": "止まった時だけ Slack #ops に1日1回（認証待ち＝🟡／失敗＝🔴）",
+      "success": "終了コード0 かつ 当日分の履歴を読み戻せた",
+      "partial": "認証待ちで止まった（OTP が届かない・認証が通らない。再試行しない）→ 松野さんが『Tサイト取って』で取り直す",
+      "failure": "2回試して取れず／タイムアウト → #ops に1回",
+      "decision": "D10（2026-11-25 決定）。未決：『付与予定日以降を成功条件に足すか』（実装しない）",
+      "implementation": "実装済（PR。launchd は未導入＝マージ後にラコが install を実行）",
+      "confirmed": "確認済み（単体テスト・--dry-run。本番の初回は 12/24 08:30）",
+      "run_state": "未実行",
+      "evidence": "取得本体（jarvis_vpoint_tsite_fetch.py）は 11/25 の手動1回で成功を確認済み（n12 の evidence）。包み役（ガード・再試行・認証待ち・#ops 1回・読み戻し）は単体テスト（架空の値）で確認。本番の定期実行は未実行",
+      "source_id": "614-N33",
+      "added_in": "第3稿"
+    },
+    {
+      "id": "n34",
+      "number": 34,
+      "lane": "vpoint",
+      "title": "Vpass 残高の取得（基準日つき・Tサイト残高との照合）",
+      "actor": "プログラム",
+      "executor": "jarvis_vpass_balance_fetch.py（既存の Vpass ログイン・chrome_vpass_audit プロファイル。読み取り専用）",
+      "trigger": "手動（取得部品のみ）。定例への組み込みは P1（PR #647）のマージ後の別 PR",
+      "input": "VPASS_ID／VPASS_PASSWORD（値は出さない）・最新のTサイト履歴",
+      "process": "Vpass Myページを開き『ご利用状況 ◯年◯月◯日現在』（基準日）・Vポイント残高・最短有効期限を読む。Tサイトの基準日と同日なら残高の一致を見る（別の日は『照合できない』で、不一致とは書かない）。ポイント交換・支払・チャージ・設定変更はしない",
+      "output": "vpoint_vpass_balance.json（取得日時・基準日・取得元・Tサイトとの照合結果。.jarvis_state・非公開側）",
+      "screen": "なし",
+      "report": "なし（組み込み後に定例の短報へ）",
+      "success": "基準日と残高を読め、保存を読み戻せた",
+      "partial": "Tサイトと基準日が違う（照合できない）",
+      "failure": "ログイン不可・画面の形が変わって読めない・保存の読み戻し失敗",
+      "decision": "D10（残高の基準日の確認用。付与履歴の代わりにはならない）",
+      "implementation": "一部実装（取得部品とテストのみ。定例へは未組み込み）",
+      "confirmed": "確認済み（単体テスト・11/25 調査で保存した Myページの画面テキストで読み取りを確認）。実機のログインから保存までの通しは未実行",
+      "run_state": "未実行",
+      "evidence": "11/25 調査（読み取り専用・Vpass ログイン4回成功・OTP なし）。Vpass は付与履歴を出さない（ID連携後の履歴は Vサイトへ誘導）ので、照合できるのは残高だけ",
+      "source_id": "614-N34",
+      "added_in": "第3稿"
     }
   ],
   "edges": [
@@ -1332,6 +1387,48 @@
       "condition": "【次回基準】D4 で決めたテイチャン停止中の扱いを判定ノードへ反映",
       "kind": "next_run",
       "status": "提案"
+    },
+    {
+      "from": "n01",
+      "to": "n33",
+      "condition": "毎月24日 08:30（窓C前日。launchd は未導入）",
+      "kind": "normal",
+      "status": "現行"
+    },
+    {
+      "from": "n33",
+      "to": "n10",
+      "condition": "履歴ができた → 25日以降の窓Cで付与サマリが読む",
+      "kind": "normal",
+      "status": "現行"
+    },
+    {
+      "from": "n33",
+      "to": "n20",
+      "condition": "認証待ち・失敗の時だけ #ops に1日1回",
+      "kind": "branch",
+      "status": "現行"
+    },
+    {
+      "from": "n33",
+      "to": "n12",
+      "condition": "認証待ち：人が『Tサイト取って』で取り直す",
+      "kind": "branch",
+      "status": "現行"
+    },
+    {
+      "from": "n33",
+      "to": "n33",
+      "condition": "【取り直し】取得失敗（認証待ち以外）だけ、同じ日に1回まで再試行",
+      "kind": "retry",
+      "status": "現行"
+    },
+    {
+      "from": "n34",
+      "to": "n27",
+      "condition": "【提案】Tサイトと同じ基準日なら残高の一致を見る（定例への組み込みは P1 後）",
+      "kind": "normal",
+      "status": "提案"
     }
   ],
   "decisions": [
@@ -1528,6 +1625,27 @@
       "related": "n04",
       "item": "停止スイッチの env の中身",
       "note": "秘密を見ないため state の disabled だけ確認"
+    },
+    {
+      "id": "U17",
+      "priority": true,
+      "related": "n33",
+      "item": "Tサイト定期取得の本番初回（12/24 08:30）",
+      "note": "launchd はマージ後にラコが導入。当日のログ（~/Library/Logs/jarvis_vpoint_tsite_fetch/）・vpoint_tsite_fetch_run.json・履歴ファイルの日付・#ops で確認。スリープで逃した時の復帰時実行も実機では未確認"
+    },
+    {
+      "id": "U18",
+      "priority": false,
+      "related": "n34",
+      "item": "Vpass 残高の実機取得（ログイン〜保存の通し）",
+      "note": "取得部品は単体テストと保存済みの画面テキストでの読み取りまで。実機の通しは未実行。定例への組み込みは P1（PR #647）のマージ後"
+    },
+    {
+      "id": "U19",
+      "priority": false,
+      "related": "n27・n33",
+      "item": "『付与予定日以降を成功条件に足すか』",
+      "note": "未決のため実装しない。Olive クレジットは利用月の翌月10日頃付与なので、10月分は 11/10 以降の取得で完全（今回の取り直しは 11/25＝条件を満たす）。窓C前日（24日）の取得は毎月この条件を満たす"
     }
   ],
   "findings_not_fixed": [
