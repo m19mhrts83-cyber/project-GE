@@ -63,6 +63,38 @@ def save_state(state: dict[str, Any]) -> None:
     STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+FAIL_NOTIFY_THRESHOLD = 3  # 同じメールで連続この回数失敗したら #ops に1回だけ知らせる
+SLACK_POST = REPO / "scripts" / "jarvis_slack_webhook_post.py"
+
+
+def mail_date_jst(date_header: str) -> str | None:
+    """メールの Date ヘッダ → JST の YYYY-MM-DD（読めなければ None＝今日 JST にフォールバック）。"""
+    from email.utils import parsedate_to_datetime
+    from zoneinfo import ZoneInfo
+
+    try:
+        return parsedate_to_datetime(date_header or "").astimezone(ZoneInfo("Asia/Tokyo")).date().isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
+def notify_ops(text: str) -> bool:
+    """#ops へ1回投稿（既存の webhook 投稿スクリプト経由）。成功なら True。"""
+    if not SLACK_POST.is_file():
+        return False
+    py = Path.home() / "selenium_env" / "venv" / "bin" / "python"
+    try:
+        r = subprocess.run(
+            [str(py if py.is_file() else sys.executable), str(SLACK_POST),
+             "--channel", "ops", "--text", text, "--username", "Grok部長メール取込"],
+            cwd=str(REPO), env=os.environ.copy(), capture_output=True, text=True, timeout=60,
+        )
+        return r.returncode == 0
+    except Exception as e:  # noqa: BLE001
+        print(f"# grok_bucho ops notify soft-fail: {e}", file=sys.stderr)
+        return False
+
+
 def gmail_service():
     path = MANUAL / "token_estate.json"
     if not path.is_file():
@@ -252,7 +284,7 @@ def is_scope_error(exc: Exception) -> bool:
     return "insufficient authentication scopes" in text or "insufficientPermissions" in text
 
 
-def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, Any]:
+def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool, notify_fn=None) -> dict[str, Any]:
     sys.path.insert(0, str(REPO / "scripts"))
     from jarvis_kurashift_vendor_list import (
         apply_marks_from_text,
@@ -261,6 +293,7 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
         parse_mark_commands,
     )
 
+    notify_fn = notify_fn or notify_ops
     print("使用アカウント: estate / Gmail API（[Grok部長] 受信取込）")
 
     svc = gmail_service()
@@ -304,6 +337,9 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
             print(f"# grok_bucho archive soft-fail id={msg.get('id')}: {e}", file=sys.stderr)
 
     relay_items: list[dict[str, Any]] = []
+    fail_counts: dict[str, int] = dict(state.get("fail_counts") or {})
+    notified: set[str] = set(state.get("fail_notified_ids") or [])
+    total_failed = 0
     for msg in messages:
         mid = msg["id"]
         if mid in processed and not reprocess:
@@ -320,10 +356,13 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
             "parsed_discovery": len(discovery_preview),
         }
         if cmds:
-            out = apply_marks_from_text(body, dry_run=dry_run)
+            out = apply_marks_from_text(
+                body, dry_run=dry_run, default_date=mail_date_jst(msg.get("date") or "")
+            )
             entry["apply"] = out
             total_marks += out.get("parsed", 0)
             total_applied += out.get("applied", 0)
+            total_failed += out.get("failed", 0)
             entry["ok"] = out.get("ok", False)
         else:
             entry["apply"] = {"ok": True, "skipped": "no --mark in body"}
@@ -341,14 +380,34 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
             entry["ok"] = True
 
         results.append(entry)
-        relay_items.append(intake_item_from_mail(msg))
         if not dry_run:
-            processed.add(mid)
-            if entry.get("ok"):
+            if entry["ok"]:
+                # 全行成功したメールだけ処理済みにする（失敗行があれば次回も再取込）
+                processed.add(mid)
+                fail_counts.pop(mid, None)
                 _archive(msg)
+            else:
+                fail_counts[mid] = int(fail_counts.get(mid, 0)) + 1
+                entry["fail_count"] = fail_counts[mid]
+                if fail_counts[mid] >= FAIL_NOTIFY_THRESHOLD and mid not in notified:
+                    errs = (entry.get("apply") or {}).get("errors") or []
+                    ids = ", ".join(str(e.get("id")) for e in errs[:5]) or "（探索追記）"
+                    if notify_fn(
+                        f"🔴 Grok部長メールの取込が{fail_counts[mid]}回続けて失敗\n"
+                        f"メール {mid} · 失敗行: {ids}（台帳に無い id など）"
+                    ):
+                        notified.add(mid)
+                        entry["ops_notified"] = True
+        # 受付窓口へは成功時と初回失敗時だけ送る（失敗の再試行のたびに重ねない）
+        if entry["ok"] or fail_counts.get(mid, 1) <= 1:
+            relay_items.append(intake_item_from_mail(msg))
 
     if not dry_run and results:
         state["processed_ids"] = sorted(processed)[-500:]
+        # 一覧から消えた古い失敗記録は捨てる
+        seen = {m["id"] for m in messages}
+        state["fail_counts"] = {k: v for k, v in fail_counts.items() if k in seen}
+        state["fail_notified_ids"] = sorted(notified & seen)[-200:]
         save_state(state)
 
     relay: dict[str, Any] = {"enabled": intake_relay_enabled()}
@@ -365,6 +424,7 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
         "messages_processed": len(results),
         "marks_parsed": total_marks,
         "marks_applied": total_applied,
+        "marks_failed": total_failed,
         "discovery_parsed": total_discovery_parsed,
         "discovery_added": total_discovery_added,
         "dry_run": dry_run,
@@ -376,7 +436,7 @@ def apply_from_gmail(*, dry_run: bool, days: int, reprocess: bool) -> dict[str, 
     print("📎 Grok部長メール取込")
     print(f"- 対象: 直近{days}日 · subject {BUCHO_PREFIX}")
     print(f"- 処理: {len(results)}通（一覧{len(messages)}通）")
-    print(f"- --mark: 解析 {total_marks} 件 · 反映 {total_applied} 件")
+    print(f"- --mark: 解析 {total_marks} 件 · 反映 {total_applied} 件 · 失敗 {total_failed} 件")
     print(
         f"- 探索追記: 解析 {total_discovery_parsed} 件 · 新規追加 {total_discovery_added} 件"
     )
