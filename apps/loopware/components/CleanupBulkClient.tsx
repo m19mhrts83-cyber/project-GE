@@ -108,7 +108,7 @@ export default function CleanupBulkClient() {
     );
 
   return (
-    <div className="wk-section">
+    <div className="wk-section bulk">
       <div className="glass wk-head">
         <div>
           <div className="meta">
@@ -123,7 +123,7 @@ export default function CleanupBulkClient() {
             <span>件を選んだ（完了 {counts.close}／削除 {counts.drop}／日を変更 {counts.reschedule}／残す {counts.keep}）</span>
           </div>
         </div>
-        <button className="primary" disabled={saving || !decided} onClick={submit}>
+        <button className="primary bulk-submit" disabled={saving || !decided} onClick={submit}>
           {saving ? "保存中…" : "確定する"}
         </button>
       </div>
@@ -197,6 +197,13 @@ export default function CleanupBulkClient() {
           </div>
         );
       })}
+
+      <div className="glass bulk-foot">
+        <div className="meta">{decided} 件を選んだ（完了 {counts.close}／削除 {counts.drop}／日を変更 {counts.reschedule}／残す {counts.keep}）</div>
+        <button className="primary bulk-submit" disabled={saving || !decided} onClick={submit}>
+          {saving ? "保存中…" : `確定する（${decided} 件）`}
+        </button>
+      </div>
     </div>
   );
 }
