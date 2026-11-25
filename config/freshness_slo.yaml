@@ -57,6 +57,16 @@ products:
     max_age_h: 36
     owner: 815 KURASHIFT更新
     action: "zsh launchd/openchat_thread_backfill.sh（新スレッドの追い上げ）→ ログの thread sync 行を確認"
+  # グルコン材料: 毎朝の Mac refresh（triage-morning-open 経由）の --apply が成功した時刻。inbox が空でも成功は更新される。
+  # morning refresh は soft-fail で気づけないので、ここで拾う。週末の Mac 不在を見て 72h
+  - id: glucon_materials_import
+    label: グルコン材料 Drive取込
+    kind: json_time
+    file: .jarvis_state/glucon_materials_import.json
+    path: last_ok_at
+    max_age_h: 72
+    owner: 神大家（グルコン）報告
+    action: "cat .jarvis_state/glucon_materials_import.json の error → ~/selenium_env/venv/bin/python scripts/jarvis_glucon_materials_from_drive.py --dry-run（Drive 同期・Supabase 鍵）"
   - id: openchat_main
     label: オプチャ【メイン】受信
     kind: json_time

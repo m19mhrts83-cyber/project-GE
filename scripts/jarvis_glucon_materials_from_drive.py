@@ -28,7 +28,7 @@ import os
 import re
 import shutil
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +40,22 @@ from jarvis_cloud_file import read_text_cloud
 REPO = Path(__file__).resolve().parents[1]
 BRIDGE = REPO / "config" / "kurashift_grok_bridge_folders.yaml"
 CFG = REPO / "config" / "glucon_grok_materials.yaml"
+# 315 鮮度監視（config/freshness_slo.yaml の glucon_materials_import）が読む。件数のみで材料の中身は書かない。
+STATE = REPO / ".jarvis_state" / "glucon_materials_import.json"
+_JST = timezone(timedelta(hours=9))
+
+
+def _write_state(*, ok: bool, files: int, rows: int, error: str = "") -> None:
+    now = datetime.now(_JST).isoformat(timespec="seconds")
+    try:
+        cur = json.loads(STATE.read_text(encoding="utf-8")) if STATE.is_file() else {}
+    except (OSError, ValueError):
+        cur = {}
+    cur.update({"last_run_at": now, "ok": ok, "files": files, "rows": rows, "error": error[:200]})
+    if ok:
+        cur["last_ok_at"] = now
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    STATE.write_text(json.dumps(cur, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _bridge_root() -> Path:
@@ -143,13 +159,18 @@ def main() -> int:
     if args.dry_run:
         print(json.dumps(rows[:3], ensure_ascii=False, indent=2))
         return 0
-    if rows:
-        _post(rows)
-    for f in files:
-        dest = processed / f.name
-        if dest.exists():
-            dest = processed / f"{f.stem}_{date.today().isoformat()}{f.suffix}"
-        shutil.move(str(f), str(dest))
+    try:
+        if rows:
+            _post(rows)
+        for f in files:
+            dest = processed / f.name
+            if dest.exists():
+                dest = processed / f"{f.stem}_{date.today().isoformat()}{f.suffix}"
+            shutil.move(str(f), str(dest))
+    except (SystemExit, OSError) as e:
+        _write_state(ok=False, files=len(files), rows=len(rows), error=str(e))
+        raise
+    _write_state(ok=True, files=len(files), rows=len(rows))
     print(f"# applied {len(rows)} → processed")
     return 0
 
