@@ -383,11 +383,6 @@ def cmd_queue(args: argparse.Namespace) -> int:
 
     now = datetime.now(JST)
     cards, closed, gone = [], 0, 0
-    why_by_id: dict[str, str] = {}
-    for t, cs in fetch_triaged("2026-11-23", tok):
-        d = decide_task(t, cs, run_id="queue")
-        if d and d["action"] == "drop_candidate":
-            why_by_id[str(t["id"])] = d["payload"].get("reason_ai", "")
     for tid in ids:
         try:
             t = request("GET", f"/tasks/{tid}", tok)
@@ -397,7 +392,10 @@ def cmd_queue(args: argparse.Namespace) -> int:
         if t.get("checked") or t.get("is_deleted"):
             closed += 1
             continue
-        cards.append(drop_card(t, why_by_id.get(tid, ""), now))
+        # 対象の件だけコメントを読む（全件を読むと Todoist の回数制限に当たる）
+        cs = request("GET", f"/comments?task_id={tid}&limit=100", tok).get("results", [])
+        d = decide_task(t, cs, run_id="queue")
+        cards.append(drop_card(t, (d or {}).get("payload", {}).get("reason_ai", ""), now))
     print(f"やめる候補 {len(ids)} 件: カードにする {len(cards)}・既に完了 {closed}・見つからない {gone}")
     if not args.apply:
         print("# dry-run（置いていません）")
