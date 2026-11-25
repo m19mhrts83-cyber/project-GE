@@ -25,36 +25,64 @@ numbering: '3桁固定ID。百の位＝部門、十の位＝まとまり、一�
   統合・移動しても id は採番し直さない（path のみ更新）。
 
   '
+# チーム Orca の全体リーダー（隊長たちの上）。ダッシュ /agent-team の上部に出す（2026-11-26 松野さん）
+team_lead:
+  id: '001'
+  name: シャア大佐
+  role: 特命・隊長たちの上
+  does: 室をまたぐ件・原因が深い件・指示の割り振り・どの室にも属さない定時の仕事。エージェントの道具の使いこなしとプログラムの組み方を深く検討する
+# 室の隊長（lead）。kind: orca_bot＝Orca ボットの隊長 / pending＝隊長これから（2026-11-26 松野さん）
 departments:
   '100':
     name: 連絡・物件動向把握室
     path: 100_連絡・物件動向把握室
+    lead:
+      name: こんぶ隊長
+      kind: orca_bot
   '200':
     name: 返信・案内文面制作室
     path: 200_返信・案内文面制作室
+    lead:
+      name: 隊長これから
+      kind: pending
   '300':
     name: 品質・タスク運用管理室
     path: 300_品質・タスク運用管理室
     # BL（ブランチリーダー）＝室のリーダー役の Orca ボット。任意。詳細は室の 01_部門.md
     lead:
-      name: 300品質・タスクBL_ラスカル
+      name: ラス隊長（ラスカル）
       kind: orca_bot
       status: 試行
   '400':
     name: ミックス・取捨判断室
     path: 400_ミックス・取捨判断室
+    lead:
+      name: 隊長これから
+      kind: pending
   '500':
     name: 不動産パイプライン実行室
     path: 500_不動産パイプライン実行室
+    lead:
+      name: ペド隊長
+      kind: orca_bot
   '600':
     name: リソース・家計室
     path: 600_リソース・家計室
+    lead:
+      name: ラコ隊長
+      kind: orca_bot
   '700':
     name: コーチング支援室
     path: 700_コーチング支援室
+    lead:
+      name: 隊長これから
+      kind: pending
   '800':
     name: 俯瞰UI・投影更新室
     path: 800_俯瞰UI・投影更新室
+    lead:
+      name: 隊長これから
+      kind: pending
 agents:
   '111':
     name: パートナー連絡整理係
