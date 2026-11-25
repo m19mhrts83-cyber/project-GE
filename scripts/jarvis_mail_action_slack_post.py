@@ -1479,6 +1479,90 @@ def post_run_report(rc: int) -> None:
         print(f"# run report skip: {e}", file=sys.stderr)
 
 
+FRESH_HOURS = 48
+ALL_EXCLUDED_META_KEY = "mail_action_all_excluded_ops_at"
+
+
+def _is_fresh(row: dict[str, Any]) -> int:
+    """直近 FRESH_HOURS 以内に届いた行なら 1（除外の「黙って落ちた」判定用）。"""
+    try:
+        return 1 if _age_hours(str(row.get("received_at") or "")) <= FRESH_HOURS else 0
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def skip_summary_line(stats: dict[str, Any], *, posted: int) -> str:
+    """除外の内訳を1行で（night_triage のログ末尾切れ対策で短い key=value 形式）。"""
+    keys = (
+        "pending_loaded", "pool", "ranked", "skim_skip", "self_skip", "muted",
+        "policy_hidden", "rule_hidden", "vendor_skip", "already_posted",
+        "star_excluded", "fresh_excluded", "mute_entries",
+    )
+    body = " ".join(f"{k}={int(stats.get(k) or 0)}" for k in keys)
+    return f"# skip_summary: posted={posted} {body}"
+
+
+def all_excluded_ops_needed(stats: dict[str, Any], *, final_rows: int) -> bool:
+    """新着の候補があったのに、除外で投稿 0 件になったか。"""
+    return final_rows == 0 and int(stats.get("fresh_excluded") or 0) > 0
+
+
+def all_excluded_ops_text(stats: dict[str, Any]) -> str:
+    return "\n".join(
+        [
+            "🟡【ops】116 メール要対応 — 新着の候補があったのに全て除外され 0 件でした",
+            f"・直近{FRESH_HOURS}時間の新着 {int(stats.get('fresh_excluded') or 0)}件が除外"
+            f"（流し読み {int(stats.get('skim_skip') or 0)}・ミュート {int(stats.get('muted') or 0)}"
+            f"・送信元設定 {int(stats.get('policy_hidden') or 0)}・ルール {int(stats.get('rule_hidden') or 0)}）",
+            "・本当に不要な通知なら対応不要。大事なメールが流し読み扱いになっていないかだけ確認してください",
+            "・判定は 100室側で見直し（このメッセージは1日1回まで）",
+        ]
+    )
+
+
+def notify_all_excluded_ops(sb: Any | None, stats: dict[str, Any], *, dry_run: bool) -> bool:
+    text = all_excluded_ops_text(stats)
+    if dry_run:
+        print("# dry-run ops: " + text.replace("\n", " / "))
+        return True
+    if sb is not None:
+        try:
+            r = sb.table("sync_meta").select("value").eq("key", ALL_EXCLUDED_META_KEY).limit(1).execute()
+            raw = ((r.data or [{}])[0] or {}).get("value")
+            obj = json.loads(raw) if isinstance(raw, str) and raw.strip() else (raw or {})
+            at = str((obj or {}).get("at") or "")
+            if at:
+                ts = datetime.fromisoformat(at.replace("Z", "+00:00"))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                if (datetime.now(timezone.utc) - ts).total_seconds() < 20 * 3600:
+                    print("# all_excluded ops skip（20時間以内に通知済み）", file=sys.stderr)
+                    return False
+        except Exception as e:  # noqa: BLE001
+            print(f"# all_excluded meta load skip: {e}", file=sys.stderr)
+    post = REPO / "scripts" / "jarvis_slack_webhook_post.py"
+    if not post.is_file():
+        return False
+    import subprocess
+
+    subprocess.run(
+        [sys.executable, str(post), "--channel", "ops", "--text", text, "--username", "116 メール要対応"],
+        cwd=str(REPO),
+        check=False,
+        timeout=60,
+    )
+    if sb is not None:
+        try:
+            sb.table("sync_meta").upsert(
+                {"key": ALL_EXCLUDED_META_KEY, "value": json.dumps({"at": now_iso()}, ensure_ascii=False),
+                 "updated_at": now_iso()},
+                on_conflict="key",
+            ).execute()
+        except Exception as e:  # noqa: BLE001
+            print(f"# all_excluded meta save skip: {e}", file=sys.stderr)
+    return True
+
+
 def load_pending_from_supabase(
     *, limit: int, dry_run: bool = False
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -1536,6 +1620,7 @@ def load_pending_from_supabase(
     skipped_posted = 0
     skipped_self = 0
     loopware_miss_n = 0
+    fresh_excluded = 0  # 直近 FRESH_HOURS の新着で、判定により除外された件数（黙って落ちた疑い）
     for row in rows_all:
         tid = str(row.get("id") or "")
         if tid.startswith("re-vendor-"):
@@ -1563,10 +1648,12 @@ def load_pending_from_supabase(
         subj = str(row.get("subject") or "")
         if NOISE_SUBJECT_RE.search(subj) and not (row.get("draft_text") or "").strip():
             skipped_skim += 1
+            fresh_excluded += _is_fresh(row)
             continue
         # OTP・請求通知・申込完了など返信不要定型は再掲しない
         if NO_REPLY_SUBJECT_RE.search(subj) and not (row.get("draft_text") or "").strip():
             skipped_skim += 1
+            fresh_excluded += _is_fresh(row)
             continue
         partner_name = str(row.get("partner") or "")
         if (
@@ -1577,9 +1664,11 @@ def load_pending_from_supabase(
             and not (row.get("draft_text") or "").strip()
         ):
             skipped_skim += 1
+            fresh_excluded += _is_fresh(row)
             continue
         if kind == "skim" and pri != "high" and not (row.get("draft_text") or "").strip():
             skipped_skim += 1
+            fresh_excluded += _is_fresh(row)
             continue
         # 一般メールは人が書いたものだけ（カード・銀行・販促の自動送信は要約側）
         if (
@@ -1592,21 +1681,25 @@ def load_pending_from_supabase(
             )
         ):
             skipped_skim += 1
+            fresh_excluded += _is_fresh(row)
             continue
         if lane == "openchat":
             continue
         pol = sender_policy(policies, str(row.get("from_email") or ""))
         if pol in ("hide", "auto_done"):
             policy_hidden += 1
+            fresh_excluded += _is_fresh(row)
             if pol == "auto_done" and not dry_run and auto_close_by_policy(sb, row):
                 policy_closed += 1
             continue
         if pol != "always" and is_muted(mute, str(row.get("from_email") or "")):
             muted_n += 1
+            fresh_excluded += _is_fresh(row)
             continue
         ap = apply_to_row(book, row)
         if ap.hidden:
             rule_hidden += 1
+            fresh_excluded += _is_fresh(row)
             continue
         if ap.rule_ids:
             row = {**row, "_rule_delta": ap.delta, "_applied_rules": ap.rule_ids}
@@ -1629,6 +1722,8 @@ def load_pending_from_supabase(
     ranked = ranked_all[:limit]
     near = ranked_all[limit:]
     stats = {
+        "pending_loaded": len(rows_all),
+        "fresh_excluded": fresh_excluded,
         "pool": len(pool_rows),
         "ranked": len(ranked),
         "muted": muted_n,
@@ -2054,6 +2149,13 @@ def main() -> int:
     if not rows:
         print("投稿対象なし（pending 要対応が無い／ミュート除外）")
         RUN_SUMMARY["skipped_reason"] = "要対応の新着なし"
+        if args.from_triage:
+            print(skip_summary_line(stats, posted=0))
+            if all_excluded_ops_needed(stats, final_rows=0):
+                try:
+                    notify_all_excluded_ops(None if args.dry_run else _sb(), stats, dry_run=args.dry_run)
+                except Exception as e:  # noqa: BLE001 — 注意の失敗で本線を止めない
+                    print(f"# all_excluded ops skip: {e}", file=sys.stderr)
         return 0
 
     for i, row in enumerate(rows, 1):
@@ -2153,6 +2255,8 @@ def main() -> int:
         f"thread_cards={'yes' if card_thread_ts else 'no'} "
         f"gmail_read={json.dumps(read_stats, ensure_ascii=False)}"
     )
+    if args.from_triage:
+        print(skip_summary_line(stats, posted=posted))
     return 0
 
 
