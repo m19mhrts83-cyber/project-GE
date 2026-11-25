@@ -126,6 +126,17 @@ def in_cooldown(auto: dict[str, Any], name: str, hours: int) -> bool:
     return datetime.now(JST) - dt < timedelta(hours=max(1, hours))
 
 
+def is_automation_off(acc: dict[str, Any] | None) -> bool:
+    """automation: off の判定。YAML では off が False として読まれるので、それも「オフ」とみなす。
+    キー自体が無い（None）ときはオフではない。"""
+    if not acc:
+        return False
+    v = acc.get("automation")
+    if v is None:
+        return False
+    return v is False or str(v).strip().lower() in ("off", "false", "0", "no")
+
+
 def names_from_stale(*, respect_automation: bool = True) -> list[str]:
     """state の stale から更新対象名を取る。automation:off / cooldown は除外。"""
     cfg = load_cfg()
@@ -144,7 +155,7 @@ def names_from_stale(*, respect_automation: bool = True) -> list[str]:
         if respect_automation and acc:
             if acc.get("unlinkable"):
                 continue
-            if str(acc.get("automation") or "").lower() in ("off", "false", "0", "no"):
+            if is_automation_off(acc):
                 continue
         if respect_automation and in_cooldown(auto, name, cooldown_h):
             continue

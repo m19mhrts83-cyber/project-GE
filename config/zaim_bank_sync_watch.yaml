@@ -71,7 +71,8 @@ accounts:
   - id: shiga
     label: "滋賀銀行"
     match: "★滋賀銀行"
-    stale_days: 14
+    stale_days: 10
+    note: "2026-11-09 から取込が止まった実績あり（閾値 14→10 日）"
     env_hint: []
   - id: nagoya
     label: "名古屋銀行（生活）"
