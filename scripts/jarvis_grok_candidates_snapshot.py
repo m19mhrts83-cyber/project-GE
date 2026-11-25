@@ -144,6 +144,83 @@ def push(new: list[dict[str, Any]], *, now: datetime | None = None) -> dict[str,
                 "updated_at": _iso(now),
             },
         )
-        return {"ok": True, "items": len(merged), "new": len(new)}
+        return {"ok": True, "items": len(merged), "new": len(new), "_merged": merged}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e)[:200]}
+
+
+# ---- 案A（2026-11-25）：同じ写しを Grok が読める MD にも出す -------------------------
+MD_NAME = "grok_candidates_status.md"
+STATE_LABEL = {
+    "decide": "新規（判断待ち）", "pending": "送信待ち", "sent": "送信済み",
+    "skipped": "見送り", "dup": "重複（登録済み）", "drop": "送らない",
+}
+
+
+def ledger_state(status: str | None) -> str:
+    """台帳 status → 状態（画面 stateFromLedgerStatus と同じ）。"""
+    s = str(status or "pending")
+    if s in ("pending", "discovered"):
+        return "pending"
+    if s in ("skip", "invalid"):
+        return "skipped"
+    return "sent"
+
+
+def item_state(it: dict[str, Any], ledger: dict[str, str], norm: Any = str) -> tuple[str, str, bool]:
+    """(状態, 理由, 台帳登録済みか)。ledger は正規化した社名→status。"""
+    key = str(it.get("key") or "")
+    why = str(it.get("why") or "")
+    in_ledger = key in ledger
+    kind = it.get("kind")
+    if kind == "drop":
+        return "drop", why, in_ledger
+    if kind == "dup":
+        ex = it.get("existing") or {}
+        exn = norm(str(ex.get("name") or ""))
+        st = ledger.get(exn) if exn in ledger else ex.get("status")
+        tail = {"pending": "送信待ち", "sent": "送信済み", "skipped": "見送り"}[ledger_state(st)]
+        return "dup", f"{why or '台帳に既存'}／相手は台帳で{tail}", True
+    if in_ledger:
+        return ledger_state(ledger[key]), "", True
+    return ("pending", "", False) if kind == "add" else ("decide", why, False)
+
+
+def render_md(items: list[dict[str, Any]], ledger: dict[str, str], *, now: datetime, norm: Any = str) -> str:
+    """Grok 向け一覧。ledger は {正規化社名: status}。"""
+    rows = []
+    for it in items:
+        st, why, reg = item_state(it, ledger, norm)
+        c = it.get("cand") or {}
+        rows.append((st, str(it.get("seen_at") or "")[:10], str(c.get("name") or ""), str(c.get("area") or ""), why, reg))
+    order = list(STATE_LABEL)
+    rows.sort(key=lambda r: (order.index(r[0]), r[1]), reverse=False)
+    lines = [
+        "# Grok候補の取り込み状況（自動生成・手で編集しない）",
+        "",
+        f"更新: {_iso(now)}（Jarvis が取り込みのたびに上書き）。直近{KEEP_DAYS}日・{len(rows)}件。",
+        "候補を出す前に、ここに同じ会社がないか確認してください（登録済み＝重複になります）。",
+        "",
+        "| 状態 | 取込日 | 会社名 | エリア | 理由 | 台帳登録 |",
+        "|---|---|---|---|---|---|",
+    ]
+    for st, d, name, area, why, reg in rows:
+        cell = lambda x: x.replace("|", "／").replace("\n", " ")  # noqa: E731
+        lines.append(f"| {STATE_LABEL[st]} | {d} | {cell(name)} | {cell(area)} | {cell(why)} | {'登録済み' if reg else '未登録'} |")
+    return "\n".join(lines) + "\n"
+
+
+def write_md(items: list[dict[str, Any]], ledger: dict[str, str], dest_dir: Any, *, now: datetime | None = None, norm: Any = str) -> dict[str, Any]:
+    """soft-fail。dest_dir は Grok が読む側（30_shared_working）。"""
+    from pathlib import Path
+    now = now or datetime.now(timezone.utc)
+    try:
+        d = Path(dest_dir)
+        d.mkdir(parents=True, exist_ok=True)
+        path = d / MD_NAME
+        tmp = d / (MD_NAME + ".tmp")
+        tmp.write_text(render_md(items, ledger, now=now, norm=norm), encoding="utf-8")
+        tmp.replace(path)
+        return {"ok": True, "items": len(items), "path": str(path)}
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "error": str(e)[:200]}
