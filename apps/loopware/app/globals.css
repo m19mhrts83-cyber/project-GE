@@ -2279,3 +2279,12 @@ main.wk-main { max-width: 600px; }
   .all-acts button { flex: 1 1 calc(33% - 6px); padding: 0 8px; }
   .all-quick button { font-size: 13px; }
 }
+
+/* ---- まとめて片付ける（/313/bulk）: ボタンの文字色・背景を読める組み合わせに ---- */
+.bulk .btn-row button { min-height: 44px; height: auto; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); }
+.bulk .btn-row button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700; }
+.bulk .btn-row button:disabled { opacity: 0.45; }
+.bulk .bulk-submit { min-height: 48px; padding: 0 20px; border-radius: 12px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); font-size: 15px; font-weight: 700; }
+.bulk .bulk-submit:disabled { opacity: 0.45; }
+.bulk-foot { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.bulk-foot .bulk-submit { width: 100%; min-height: 52px; }
