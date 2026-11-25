@@ -230,7 +230,7 @@
       "summary": "品質・ミックス取捨・参謀。Jarvis（Mac）× ホークが横のつながり",
       "leaders": {
         "grok": "ホークアイ（参謀）",
-        "ai": "品質・タスク運用／ミックス・取捨判断（＋ Jarvis 右腕）"
+        "ai": "001 シャア大佐（全体リーダー）／品質・タスク運用／ミックス・取捨判断（＋ Jarvis 右腕）"
       },
       "ai_department_ids": [
         "300",
@@ -274,20 +274,36 @@
     }
   ],
   "genre_note": "Jarvis は横断の束ね。各ジャンルは Grok 部（リーダー付き）と AI 室が並行し、 ダッシュ /agent-team のジャンルビューで横並びにする。\n",
+  "team_lead": {
+    "id": "001",
+    "name": "シャア大佐",
+    "role": "特命・隊長たちの上",
+    "does": "室をまたぐ件・原因が深い件・指示の割り振り・どの室にも属さない定時の仕事。エージェントの道具の使いこなしとプログラムの組み方を深く検討する"
+  },
   "departments": [
     {
       "id": "100",
       "name": "連絡・物件動向把握室",
       "path": "100_連絡・物件動向把握室",
       "genre_id": "property",
-      "genre_name": "物件"
+      "genre_name": "物件",
+      "lead": {
+        "name": "こんぶ隊長",
+        "kind": "orca_bot",
+        "status": ""
+      }
     },
     {
       "id": "200",
       "name": "返信・案内文面制作室",
       "path": "200_返信・案内文面制作室",
       "genre_id": "property",
-      "genre_name": "物件"
+      "genre_name": "物件",
+      "lead": {
+        "name": "隊長これから",
+        "kind": "pending",
+        "status": ""
+      }
     },
     {
       "id": "300",
@@ -296,7 +312,7 @@
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
       "lead": {
-        "name": "300品質・タスクBL_ラスカル",
+        "name": "ラス隊長（ラスカル）",
         "kind": "orca_bot",
         "status": "試行"
       }
@@ -306,35 +322,60 @@
       "name": "ミックス・取捨判断室",
       "path": "400_ミックス・取捨判断室",
       "genre_id": "jarvis_cross",
-      "genre_name": "Jarvis横断"
+      "genre_name": "Jarvis横断",
+      "lead": {
+        "name": "隊長これから",
+        "kind": "pending",
+        "status": ""
+      }
     },
     {
       "id": "500",
       "name": "不動産パイプライン実行室",
       "path": "500_不動産パイプライン実行室",
       "genre_id": "property",
-      "genre_name": "物件"
+      "genre_name": "物件",
+      "lead": {
+        "name": "ペド隊長",
+        "kind": "orca_bot",
+        "status": ""
+      }
     },
     {
       "id": "600",
       "name": "リソース・家計室",
       "path": "600_リソース・家計室",
       "genre_id": "resource",
-      "genre_name": "リソース・家計"
+      "genre_name": "リソース・家計",
+      "lead": {
+        "name": "ラコ隊長",
+        "kind": "orca_bot",
+        "status": ""
+      }
     },
     {
       "id": "700",
       "name": "コーチング支援室",
       "path": "700_コーチング支援室",
       "genre_id": "coaching",
-      "genre_name": "コーチング"
+      "genre_name": "コーチング",
+      "lead": {
+        "name": "隊長これから",
+        "kind": "pending",
+        "status": ""
+      }
     },
     {
       "id": "800",
       "name": "俯瞰UI・投影更新室",
       "path": "800_俯瞰UI・投影更新室",
       "genre_id": "apps",
-      "genre_name": "アプリ・俯瞰"
+      "genre_name": "アプリ・俯瞰",
+      "lead": {
+        "name": "隊長これから",
+        "kind": "pending",
+        "status": ""
+      }
     }
   ],
   "agents": [

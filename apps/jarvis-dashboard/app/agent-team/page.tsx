@@ -28,6 +28,7 @@ export default function AgentTeamPage() {
         agents={team.agents}
         genres={genres}
         genreNote={team.genre_note}
+        teamLead={team.team_lead}
         counts={team.counts}
         updated={team.updated}
         flowforgeNote={team.flowforge_open_note}

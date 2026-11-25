@@ -1296,6 +1296,14 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
             }
         dept_list.append(entry)
 
+    # チーム Orca の全体リーダー（registry の team_lead）。無ければ載せない
+    tl = data.get("team_lead")
+    team_lead = (
+        {k: str(tl.get(k) or "") for k in ("id", "name", "role", "does")}
+        if isinstance(tl, dict) and tl.get("name")
+        else None
+    )
+
     counts: dict[str, int] = {
         "候補": 0,
         "設計中": 0,
@@ -1411,6 +1419,7 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
         "counts": counts,
         "genres": genres,
         "genre_note": genre_reg.get("note") or "",
+        "team_lead": team_lead,
         "departments": dept_list,
         "agents": agent_list,
         "grok": grok_payload,

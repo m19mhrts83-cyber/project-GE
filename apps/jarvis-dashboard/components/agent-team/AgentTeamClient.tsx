@@ -49,6 +49,7 @@ type Props = {
   agents: AgentTeamAgent[];
   genres: AgentTeamGenre[];
   genreNote?: string;
+  teamLead?: { id: string; name: string; role?: string; does?: string };
   counts: Record<string, number>;
   updated: string;
   flowforgeNote: string;
@@ -70,6 +71,7 @@ export default function AgentTeamClient({
   agents,
   genres,
   genreNote,
+  teamLead,
   counts,
   updated,
   flowforgeNote,
@@ -311,6 +313,33 @@ export default function AgentTeamClient({
       {tab === "genre" ? (
         <>
           {genreNote ? <p className="at-hint">{genreNote}</p> : null}
+          {teamLead || botsById.get("hawk") ? (
+            <div className="at-genre-leaders at-team-leaders" aria-label="全体リーダー">
+              <div>
+                <span className="at-genre-leader-label">
+                  AIエージェントチーム（Orca）全体リーダー
+                </span>
+                <strong>
+                  {teamLead ? `${teamLead.id} 特命 ${teamLead.name}` : "—"}
+                </strong>
+                {teamLead?.role ? (
+                  <span className="meta">{teamLead.role}</span>
+                ) : null}
+                {teamLead?.does ? (
+                  <span className="meta">{teamLead.does}</span>
+                ) : null}
+              </div>
+              <div>
+                <span className="at-genre-leader-label">
+                  Grok Bot 組織のリーダー
+                </span>
+                <strong>{botsById.get("hawk")?.name ?? "—"}</strong>
+                {botsById.get("hawk")?.work ? (
+                  <span className="meta">{botsById.get("hawk")?.work}</span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           <div className="at-filters" style={{ marginBottom: 14 }}>
             <label>
               ジャンル{" "}
@@ -398,14 +427,19 @@ export default function AgentTeamClient({
                             .join(" · ")}
                         </p>
                       ) : null}
-                      {aiRooms
-                        .filter((d) => d.lead?.name)
-                        .map((d) => (
-                          <p key={d.id} className="meta at-genre-sub">
-                            BL: {d.lead?.name}
-                            {d.lead?.status ? `（${d.lead.status}）` : ""}
-                          </p>
-                        ))}
+                      {aiRooms.map((d) => (
+                        <p key={d.id} className="meta at-genre-sub">
+                          {d.id} 隊長:{" "}
+                          {d.lead?.name && d.lead.kind !== "pending" ? (
+                            <>
+                              {d.lead.name}
+                              {d.lead.status ? `（${d.lead.status}）` : ""}
+                            </>
+                          ) : (
+                            <span className="at-map-missing">隊長これから</span>
+                          )}
+                        </p>
+                      ))}
                       <ul>
                         {aiList.map((a) => (
                           <li key={a.id}>

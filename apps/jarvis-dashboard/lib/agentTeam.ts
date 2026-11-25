@@ -260,6 +260,8 @@ export type AgentTeamPayload = {
   counts: Record<string, number>;
   genres?: AgentTeamGenre[];
   genre_note?: string;
+  /** チーム Orca の全体リーダー（隊長たちの上） */
+  team_lead?: { id: string; name: string; role?: string; does?: string };
   departments: AgentTeamDept[];
   agents: AgentTeamAgent[];
   grok?: GrokPayload;
