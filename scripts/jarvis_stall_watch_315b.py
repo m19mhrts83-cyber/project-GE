@@ -17,6 +17,8 @@ FlowForge 315-B（flow_ZQIfYZY4GJF2XspXY8i0sGWD）の工程をそのまま関数
 入口: 既存の鮮度監視の launchd（毎日 08:20・18:20、launchd/freshness_watch_runner.sh）に相乗り
 結果: 成功 0 ／ 部分成功 2（一部読めない・画面反映や通知の失敗）／ 失敗 1（基準の読取・結果の保存の失敗）
 停止: JARVIS_STALL_WATCH_315B_DISABLE=1
+初回待ち: stop に任意の first_run_by（ISO 日時）を書くと、状態ファイルがまだ無く now がその時刻より前の間は
+  「正常（初回待ち）」にする（週1回の 313 の初回本番前の誤報を防ぐ）。時刻を過ぎてもファイルが無ければ従来どおり読取不可。
 やらない: 自動復旧・Backlog 起票・AI 分析・途中の人の承認
 """
 from __future__ import annotations
@@ -63,6 +65,26 @@ def _abs(repo: Path, p: str) -> Path:
     return path if path.is_absolute() else repo / path
 
 
+def _parse_first_run_by(v: Any) -> datetime:
+    dt = v if isinstance(v, datetime) else datetime.fromisoformat(str(v))
+    return dt if dt.tzinfo else dt.replace(tzinfo=JST)
+
+
+def awaiting_first_run(spec: dict[str, Any], now: datetime | None, repo: Path = REPO) -> datetime | None:
+    """first_run_by が設定済み・now がそれより前・停止の元ファイルがまだ無いとき、その時刻を返す。"""
+    fr = spec.get("first_run_by")
+    if not fr or now is None:
+        return None
+    if isinstance(fr, str):
+        fr = _parse_first_run_by(fr)
+    if now >= fr:
+        return None
+    for fmt, p in _paths_of(spec, repo):
+        if (fmt == "glob" and glob.glob(str(p))) or (fmt != "glob" and Path(p).exists()):
+            return None
+    return fr
+
+
 def fetch_criteria(config_path: Path = CONFIG) -> dict[str, Any]:
     try:
         cfg = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
@@ -102,6 +124,13 @@ def fetch_criteria(config_path: Path = CONFIG) -> dict[str, Any]:
             stop["max_age_h"] = float(stop["max_age_h"])
         except (TypeError, ValueError) as exc:
             raise CriteriaError(f"{tid}: max_age_h が数でない") from exc
+        if stop.get("first_run_by") not in (None, ""):
+            try:
+                stop["first_run_by"] = _parse_first_run_by(stop["first_run_by"])
+            except (TypeError, ValueError) as exc:
+                raise CriteriaError(f"{tid}: first_run_by が日時でない") from exc
+        else:
+            stop.pop("first_run_by", None)
         idle = t.get("idle")
         if idle is not None and (not isinstance(idle, dict) or not idle.get("kind")):
             raise CriteriaError(f"{tid}: idle の形が違う")
@@ -127,12 +156,14 @@ def _paths_of(spec: dict[str, Any], repo: Path) -> list[tuple[str, Path | str]]:
     return []
 
 
-def validate_data(targets: list[dict[str, Any]], repo: Path = REPO) -> dict[str, list[str]]:
+def validate_data(targets: list[dict[str, Any]], repo: Path = REPO, now: datetime | None = None) -> dict[str, list[str]]:
     """対象ごとの欠損・形式不整合（空リストなら問題なし）。"""
     flags: dict[str, list[str]] = {}
     for t in targets:
         bad: list[str] = []
         for part, spec in (("停止", t["stop"]), ("空回り", t.get("idle") or {})):
+            if part == "停止" and awaiting_first_run(spec, now, repo):
+                continue  # 初回待ち: まだ無いのは正常
             for fmt, p in _paths_of(spec, repo):
                 if fmt == "glob":
                     if not glob.glob(str(p)):
@@ -209,8 +240,12 @@ def last_success(spec: dict[str, Any], *, repo: Path = REPO) -> tuple[datetime |
     return fw.last_time(spec, repo=repo)
 
 
-def judge_stop(t: dict[str, Any], now: datetime, getter: Callable = last_success) -> dict[str, Any]:
+def judge_stop(t: dict[str, Any], now: datetime, getter: Callable = last_success, repo: Path = REPO) -> dict[str, Any]:
     spec = t["stop"]
+    first = awaiting_first_run(spec, now, repo)
+    if first:
+        return {"status": "ok", "last": None, "age_h": None, "max_age_h": spec["max_age_h"],
+                "why": f"初回待ち（〜{first.astimezone(JST):%-m/%-d}）"}
     try:
         last, why = getter(spec)
     except (OSError, subprocess.SubprocessError, ValueError, KeyError) as exc:
@@ -500,9 +535,9 @@ def run(
 
     rows: list[dict[str, Any]] = []
     if targets:
-        flags = validate_data(targets, repo)  # ②
+        flags = validate_data(targets, repo, now)  # ②
         for t in targets:
-            stop = judge_stop(t, now, getter)  # ③
+            stop = judge_stop(t, now, getter, repo)  # ③
             idle, history = judge_idle(t, now, history, repo)  # ④
             status, why = classify(stop, idle, flags[t["id"]])  # ⑤（分類）
             rows.append({

@@ -484,3 +484,51 @@ class ResultTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FirstRunWaitTests(unittest.TestCase):
+    """stop.first_run_by: 週1回の初回本番前は、状態ファイルが無くても読取不可にしない。"""
+
+    FIRST = "2026-11-28T08:00:00+09:00"
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def target(self, first=True):
+        stop = {"kind": "json_time", "file": "st/weekly.json", "path": "at", "max_age_h": 200.0}
+        if first:
+            stop["first_run_by"] = self.FIRST
+        return {"id": "313", "stop": stop, "idle": {"kind": "skip"}}
+
+    def judge(self, now, first=True):
+        t = self.target(first)
+        res = sw.judge_stop(t, now, repo=self.repo, getter=lambda spec: fw.last_time(spec, repo=self.repo))
+        return res, sw.validate_data([t], self.repo, now)["313"]
+
+    def test_before_first_run_is_ok_waiting(self):
+        res, missing = self.judge(NOW)
+        self.assertEqual(res["status"], "ok")
+        self.assertIn("初回待ち（〜11/28）", res["why"])
+        self.assertEqual(missing, [])
+
+    def test_after_first_run_by_without_file_is_unknown(self):
+        res, missing = self.judge(datetime(2026, 11, 28, 8, 20, tzinfo=JST))
+        self.assertEqual(res["status"], "unknown")
+        self.assertTrue(missing)
+
+    def test_without_setting_behaves_as_before(self):
+        res, missing = self.judge(NOW, first=False)
+        self.assertEqual(res["status"], "unknown")
+        self.assertTrue(missing)
+
+    def test_existing_file_is_judged_normally(self):
+        (self.repo / "st").mkdir()
+        (self.repo / "st/weekly.json").write_text(json.dumps({"at": (NOW - timedelta(hours=300)).isoformat()}), encoding="utf-8")
+        res, _ = self.judge(NOW)
+        self.assertEqual(res["status"], "stale")
+
+    def test_real_config_313_has_first_run_by(self):
+        by = {t["id"]: t for t in sw.fetch_criteria(sw.CONFIG)["targets"]}
+        self.assertEqual(by["313"]["stop"]["first_run_by"], datetime(2026, 11, 28, 8, 0, tzinfo=JST))
