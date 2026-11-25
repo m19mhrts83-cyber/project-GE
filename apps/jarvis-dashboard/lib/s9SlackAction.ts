@@ -307,7 +307,7 @@ export type S9ApplyResult = { ok: boolean; message: string; jobId?: string };
 export async function applyS9Action(opts: {
   decision: S9Decision;
   candidate: S9Candidate;
-  source: "slack_button" | "slack_link";
+  source: "slack_button" | "slack_link" | "dashboard";
   channelId?: string;
   messageTs?: string;
   userId?: string;

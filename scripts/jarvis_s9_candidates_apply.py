@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jarvis_bucho_bridge_lib import STATE_DIR, folder, list_queue_files  # noqa: E402
 import jarvis_s9_slack_blocks as s9blocks  # noqa: E402
 import jarvis_slack_signal as sig  # noqa: E402
+import jarvis_grok_candidates_snapshot as snap  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 JST = ZoneInfo("Asia/Tokyo")
@@ -288,6 +289,8 @@ def main() -> int:
     dups = 0
     upgraded: list[str] = []
     files_done: list[Path] = []
+    snap_items: list[dict[str, Any]] = []
+    now_utc = datetime.now(ZoneInfo("UTC"))
     for p in list_queue_files(inbox):
         meta, body = parse_frontmatter(p.read_text(encoding="utf-8", errors="replace"))
         if (meta.get("action") or "").strip() != ACTION:
@@ -296,18 +299,27 @@ def main() -> int:
         for c in parse_candidates(body):
             row = to_row(c, md_date=md_date)
             kind, why = classify(row, vendors + to_add)
+            ex = find_existing(row, vendors) if kind == "dup" else None
+            was_upgraded = False
             if kind == "add":
                 to_add.append(row)
             elif kind == "dup":
-                ex = find_existing(row, vendors)
                 if ex is not None and upgrade_route(row, ex):
                     upgraded.append(str(ex.get("name") or ""))
+                    was_upgraded = True
                 else:
                     dups += 1
             elif kind == "drop":
                 dropped.append((row, why))
             else:
                 consult.append((row, why, p.name))
+            snap_items.append(
+                snap.make_item(
+                    row, kind, "経路を電話→メール／フォームに更新" if was_upgraded else why,
+                    key=_norm_name(row["name"]), n=len(snap_items) + 1, source_md=p.name,
+                    now=now_utc, existing=ex, upgraded=was_upgraded,
+                )
+            )
         files_done.append(p)
 
     clean = [{k: v for k, v in r.items() if not k.startswith("_")} for r in to_add]
@@ -319,6 +331,8 @@ def main() -> int:
         ml.save_list(data)  # merge_append より先に保存（merge_append は読み直す）
     if args.apply and files_done:
         res["merge"] = ml.merge_append(clean, dry_run=False)
+        if os.environ.get("JARVIS_GROK_SNAPSHOT", "1") != "0":
+            res["snapshot"] = snap.push(snap_items, now=now_utc)  # 画面用。失敗しても取り込みは続行
         if args.post:
             if clean or dups or dropped:
                 _post("report", build_report(clean, dups, len(consult), dropped))
