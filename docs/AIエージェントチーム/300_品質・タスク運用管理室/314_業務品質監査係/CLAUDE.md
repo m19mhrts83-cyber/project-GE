@@ -13,7 +13,8 @@
 - 週次稼働 CLI: `scripts/jarvis_agent_weekly_activity.py`（AI なし。9:30 のレビューでは 🔴🟡 の社員を先に見る）
 - 段階の見直し CLI: `scripts/jarvis_agent_stage_review.py`（AI なし）。9:30 の点検で `--apply --commit` を流し、松野さんが /review で「上げる」を採用した社員だけ `agents_registry.yaml` の status を直す（1件1コミット・理由はコミット本文。PR はルール帳と同じ流れ）。採用されていない段階は変えない
 - launchd: `launchd/install_weekly_review_314_launchd.sh`（土曜 9:00）
-- Claude 定期タスク: `weekly-review-314`（土曜 9:30・Claude デスクトップ。`~/.claude/scheduled-tasks/weekly-review-314/SKILL.md`）
+- Orca の定時実行: 「314 週次レビュー（毎週土曜9:40・ラス隊長）」（2026-11-25〜。`orca automations list` で見える。実行者は 300 室のラス隊長）
+- Claude 定期タスク `weekly-review-314`（土曜 9:30・Claude デスクトップ）は 2026-11-25 に一時停止。手順は `~/.claude/scheduled-tasks/weekly-review-314/SKILL.md` に残してあり、戻す時はこれを有効にして Orca 側を止める（両方を有効にしない）
 
 ## 1. 役割（3R の Role＝点検者）
 
@@ -27,10 +28,10 @@
 | 土曜 9:00 | launchd（Mac） | 機械チェック → `.jarvis_state/weekly_review_314/facts_YYYYMMDD.md`＋`latest.json`、Slack（要確認あり `#ops`／なし `#report`） |
 | 土曜 9:00（同じ runner） | launchd（Mac） | **AI社員・Grok Bot の週次稼働**（`scripts/jarvis_agent_weekly_activity.py --push`。起動・実働・件数・失敗・Slack 報告・Grok の成果物メール）→ metrics／sync_meta `agent_weekly_activity` → ダッシュ `/agent-team#activity`。314 の Slack に「稼働: 機能した社員 n/N」と 🔴🟡 を数行足す（🟡 は週次まとめ）。数え方の正本 `config/agent_weekly_activity.yaml` |
 | 土曜 9:00（同じ runner） | launchd（Mac） | **AI社員の段階の見直し**（`scripts/jarvis_agent_stage_review.py --push`）: 週次稼働の履歴と判断ログから「設計中→運用確認」「運用確認→運用」「運用→運用確認（戻す）」の提案 → sync_meta `agent_stage_review` → `/review#stage` で松野さんが 上げる／見送る／来週また＋理由（owner_decisions surface=`agent_stage`）。物差し `config/agent_stage_review.yaml` |
-| 土曜 9:30 | Claude 定期タスク（Miss Lemon） | 事実ファイル＋今週の差分を読んでレビュー → 修正 PR＋`output/YYYYMMDD_週次レビュー.md` |
+| 土曜 9:40 | Orca の定時実行（ラス隊長） | 事実ファイル＋今週の差分を読んでレビュー → 修正 PR＋`output/YYYYMMDD_週次レビュー.md`。結果はラス隊長のチャット、#ai-hub は下書きまで |
 | 手動 | 人 | 「314 週次レビューやって」でいつでも同じ手順 |
 
-Claude デスクトップが閉じていると 9:30 の回は次の起動時に走る。定期実行の本線は launchd（家ルール）。Claude は判断の補助。
+Orca が閉じている・Mac が止まっていると 9:40 の回は走らない（逃した回は、12時間以内に Orca が起きれば1回だけ走る）。定期実行の本線は launchd（家ルール）。AI は判断の補助。
 
 ## 3. 実行権限
 
@@ -142,4 +143,5 @@ PR: <url>
 | 2026-11-14 | 5回目（`output/20261114_週次レビュー.md`）。**リポが public** と分かったので、判断ログ本体（件名・名前入り）は `.jarvis_state/weekly_review_314/` に出してコミットしない（§6.1）。機械チェックの「0 件は正常」を JSON の `"streams_failed": 0` にも効かせた。新しい常駐（定額AIの係）も「Supabase 失敗中は倍々で最大 300 秒」の型に揃えた |
 | 2026-11-21 | public 判断待ち（11/14 の人の対応待ち 1）を解消扱いに（松野さん了承）。以後は公開ガードの確認（guard 失敗・Pages 選別・元ブランチの残り）を週次で見る（§5 の 0） |
 | 2026-11-21 | 6回目（`output/20261121_週次レビュー.md`）。機械チェックの誤検知を1つ減らした: 行頭に `[ok]`／`[update]`／✅ の印がある行は、処理した項目の名前に fail が入っていてもエラーに数えない（部長ブリッジ ×84）。週次稼働で 314 自身が毎週「動いた跡なし」と出ていたのは、日付だけの名前（`facts_YYYYMMDD.md`）が集計窓の境目で落ちていたため。日付だけの名前はその日のうちなら窓の内に。#ops は今回コネクタで読めた |
+| 2026-11-25 | 9:30 の AI レビューの実行者を、Claude デスクトップの定期タスク（Miss Lemon）から Orca の定時実行（300 室のラス隊長・土曜 9:40）へ移した（松野さん了承）。手順は同じ。定時実行の依頼文の観点に「Orca の定時実行で走らなかったもの・二重登録が無いか」を足した。Claude 側は一時停止で、二重に走らせない。初回は 11/28 |
 | 2026-11-07 | 4回目（`output/20261107_週次レビュー.md`）。機械チェックの launchd ログは**前回の本番実行（`--post`）で読んだ位置から後だけ**数えるように（`.jarvis_state/weekly_review_314/log_offsets.json`。`--dry-run` は位置を動かさない）。各エラーに「最後に出たファイルの時刻」も付く。それでも件数だけで判断せず、**最後の発生を見てから**仕分ける |
