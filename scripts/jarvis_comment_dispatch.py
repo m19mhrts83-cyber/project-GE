@@ -640,6 +640,37 @@ def _report_kind(n: dict[str, Any]) -> str:
     return kind
 
 
+_HEADER_RE = re.compile(r"^(?:【[^】]*】\s*)+")
+_LABEL_RE = re.compile(r"^(?:判定|サマリ|要約|結論|提案|質問|確認)\s*[:：]\s*")
+
+
+def _decision_line(comment: str, n: int = 36) -> str:
+    """コメントから「決めること」1行を取る。見出し【…】・定型語は剥がし、問い・選択肢の文を優先。"""
+    t = " ".join((comment or "").split())
+    t = _HEADER_RE.sub("", t)
+    t = _LABEL_RE.sub("", t)
+    sentences = [x for x in re.split(r"(?<=[。？?！!])", t) if x.strip()]
+    for sent in sentences:
+        if re.search(r"[？?]|どうする|どちら|か\s*$|[ABＡＢ①②]\s*[:：)）]", sent.strip()):
+            return _clip(_LABEL_RE.sub("", sent.strip()), n)
+    return _clip(t, n)
+
+
+def _group_notes(
+    notes: list[dict[str, Any]], kinds: dict[int, str]
+) -> list[tuple[dict[str, Any], int, str]]:
+    """決めること1行が同じ件（同種別）を1項目に畳む。(代表note, 件数, 決めること1行)。"""
+    order: list[tuple[str, str]] = []
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for n in notes:
+        key = (kinds[id(n)], _decision_line(str(n.get("comment") or "")))
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(n)
+    return [(groups[k][0], len(groups[k]), k[1]) for k in order]
+
+
 def build_report(
     *,
     path: str,
@@ -664,17 +695,20 @@ def build_report(
         must = [n for n in notes if kinds[id(n)] in ("要判断", "確認のみ")]
         if must:
             lines += ["", f"📌要ボス {len(must)}件（判断待ち）"]
-        for i, n in enumerate(notes[:5], 1):
+        for i, (n, count, rest) in enumerate(_group_notes(notes, kinds)[:5], 1):
             title = _clip(str(n.get("task_title") or n.get("task_id") or ""), 22)
-            comment = _clip(str(n.get("comment") or ""), 36)
             kind = _KIND_JA_REPORT.get(kinds[id(n)], "メモ")
-            lines += [
-                "",
-                f"{i}. {title}",
-                f"　{kind}｜{comment}",
-            ]
-        if len(notes) > 5:
-            lines += ["", f"他{len(notes) - 5}件はTodoistで確認"]
+            if count > 1:
+                lines += [
+                    "",
+                    f"{i}. {title} ほか{count - 1}件",
+                    f"　{kind}｜同じ内容の判断 {count}件 → 項目でまとめて",
+                ]
+            else:
+                lines += ["", f"{i}. {title}", f"　{kind}｜{rest}"]
+        groups_n = len(_group_notes(notes, kinds))
+        if groups_n > 5:
+            lines += ["", f"他{groups_n - 5}項目はTodoistで確認"]
         if must:
             lines += ["", "次: 判断待ちはJarvisに一声（当面は人が橋）"]
 

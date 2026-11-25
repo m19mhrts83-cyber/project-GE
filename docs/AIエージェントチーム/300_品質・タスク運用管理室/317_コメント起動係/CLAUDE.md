@@ -104,10 +104,14 @@ Slack FB スレ返信と Todoist タスクコメントを **チャット依頼�
 | 2026-11-23 | AI 社員の記録コメントの除外: 本文が `【318】` で始まるコメントは、本人トークンで書かれて投稿者 uid では見分けられないため、受領を返さず処理済みにする（`jarvis_todoist_webhook_handle.is_agent_comment`。dispatch の報告・Phase B 起動にも数えない）。318 の Phase 3（Todoist コメント）の前提。足すときは `AGENT_COMMENT_PREFIXES` に足す |
 | 2026-11-25 | 58_ 段階2: 境界時刻（`sync_meta.todoist_event_lifecycle_since`）より後の Todoist イベントは `status` を回す（claimed→done／同じ event_id は skipped／3回失敗で failed＋`#ops` 1通）。部品 `jarvis_todoist_event_lifecycle.py`。境界より前は processed_at だけ（従来どおり）。止める: `JARVIS_TODOIST_EVENT_LIFECYCLE_DISABLE=1` |
 
-## 4. #report の形（2026-10-25 iPhone 見直し）
+| 2026-11-25 | 報告を判断に集中できる形へ: 先頭が【300 ラス隊長 …】【3xx …】【Jarvis】など AI 署名ヘッダのコメントも `is_agent_comment` で除外（人コメントとして数えない）。報告の各件は「タイトル＋決めること1行」（見出し【…】・「判定:」を剥がし問いの文を優先）、同じ決めること＋同種別は「同じ内容の判断 N件 → 項目でまとめて」に畳む |
+
+## 4. #report の形（2026-10-25 iPhone 見直し・2026-11-25 畳み込み）
 
 - 先頭1行: `【報告】317 コメント起動｜未処理 N件`（rc・path は出さない。path は failover 時のみ「（Mac停止中・GHA）」）
 - 📌要ボス N件 → 項目（番号＋タイトル／種別｜コメント）を空行で区切る（最大5件、超過は「他N件はTodoistで確認」）
+- 各件の2行目は「種別｜決めること1行」。コメント冒頭の【…】見出し・定型語は出さず、問い・選択肢の文を優先。同文が複数件なら1項目に畳む（`N. タイトル ほかM件` ／ `同じ内容の判断 N件 → 項目でまとめて`）
+- 「次: 判断待ちはJarvisに一声」は判断待ち（要判断・確認のみ）が1件以上の時だけ
 - 締めのコメント（了承・クローズ・完了）は種別「メモ」（分類器は「？」で要判断に寄るため報告側で補正）
 - 対応したよ（Local／Cloud）も同じ形の短報
 - 正本の表示ルール: `41_Slackスマホレイアウト_草案_20261022.md`
