@@ -100,6 +100,20 @@ class ApplyMarksTests(Base):
         self.assertEqual(out["unchanged"], 1)
         self.assertEqual(_read(self.mg_p)["mgmt-sample-a"], first)
 
+    def test_mgmt_only(self):
+        out = relist.apply_marks_from_text("--mark mgmt-sample-a --status contacted", dry_run=False,
+                                           default_date="2026-11-24")
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["applied_items"][0]["ledger"], "mgmt")
+        self.assertEqual(_read(self.re_p)["chubu-900"].get("contacted_at") or "", "")
+
+    def test_re_only(self):
+        out = relist.apply_marks_from_text("--mark chubu-900 --status contacted", dry_run=False,
+                                           default_date="2026-11-24")
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["applied_items"][0]["ledger"], "re")
+        self.assertEqual(_read(self.mg_p)["mgmt-sample-a"]["status"], "pending")
+
     def test_unknown_id_is_failed(self):
         out = relist.apply_marks_from_text("--mark mgmt-nope --status contacted", dry_run=False)
         self.assertFalse(out["ok"])

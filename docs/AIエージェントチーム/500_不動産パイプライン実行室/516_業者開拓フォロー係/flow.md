@@ -22,6 +22,7 @@
    - 時間: **GHA 平日16:00**（見守り・sync_meta）／Mac 朝 soft-fail・夕方 `--evening`（補給＋週次ゲート）
    - 届いたら: inbox poll 後フック（S2/S4/S9 再生成依頼）
    - 失敗見回り: `needs_refill` / stale marks / bridge NG
+   - 日報メールの `--mark` 取込: `mgmt-`=管理会社台帳／`repair-`=修繕台帳／他=RE台帳。失敗行があるメールは処理済みにせず再取込（2026-11-25）
 2. **取得・確認**
    - S2/S4/S9 各 YAML の pending/discovered と日次枠
    - GHA は Secrets（gzip|B64）から YAML materialize。inbox 消化は Mac
