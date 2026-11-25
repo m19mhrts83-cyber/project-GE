@@ -46,6 +46,13 @@ class CleanupBulkTests(unittest.TestCase):
         self.assertEqual([c["id"] for c in s["cards"]], ["1"])
         self.assertEqual(s["cards"][0]["age_days"], 130)
 
+    def test_leak_queue_cards_get_leak_origin(self):
+        now = datetime.now(b.JST)
+        q = {"published": True, "generated_at": now.isoformat(), "cards": [{"id": "9", "title": "x", "suggest": "close"}]}
+        out = b.merge_313_cards([], q, active_by_id={"9": {"id": "9", "content": "実タイトル"}}, held=set(), now=now, origin="leak")
+        self.assertEqual([(c["id"], c["origin"], c["title"]) for c in out], [("9", "leak", "実タイトル")])
+        self.assertEqual(b.merge_313_cards([], q, active_by_id={}, held=set(), now=now, origin="leak"), [])
+
 
 if __name__ == "__main__":
     unittest.main()

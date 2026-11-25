@@ -59,3 +59,13 @@ test("313 週の整理: 済み・やめる・残すだけ記録し、印と呼�
 });
 
 test("addDaysIso", () => assert.equal(addDaysIso("2026-11-17", 7), "2026-11-24"));
+
+test("閉じ漏れ(leak): 313と同じ選択肢・専用の印とグループ", () => {
+  const c: CleanupCard = { ...card("lk", "close"), origin: "leak", why: "外で済んだ可能性" };
+  const rows = buildCleanupDecisions([c], { lk: { act: "reschedule", due: "2026-12-01" } }, "n", "2026-11-25T00:00:00Z");
+  assert.equal(rows.length, 0); // 日を変えるは記録しない
+  const ok = buildCleanupDecisions([c], { lk: { act: "close" } }, "n", "2026-11-25T00:00:00Z");
+  assert.equal((ok[0].payload as Record<string, unknown>).label, "閉じ漏れ検知");
+  assert.equal(groupOf(c), "leak");
+  assert.equal(actLabel(c, "close"), "済み");
+});

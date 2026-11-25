@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 /**
  * タブのバッジ用の「残り件数」。
  * topics=312の決めていないお題／missIds=提案を仕分ける候補／cleanup=まとめて片付ける候補。
- * 読めなかったものは null（0件と区別する）。閉じ漏れは検知結果がまだここに届いていないので常に null。
+ * 読めなかったものは null（0件と区別する）。閉じ漏れ=Macの検知結果（origin leak のカード）の件数。cleanup はそれを除く。
  */
 export async function GET() {
   const sb = serviceClient();
@@ -46,7 +46,9 @@ export async function GET() {
       if (error) return;
       try {
         const snap = data?.value ? (JSON.parse(String(data.value)) as CleanupSnapshot) : null;
-        out.cleanup = snap?.cards?.length ?? 0;
+        const cs = snap?.cards ?? [];
+        out.closeLeak = cs.filter((c) => c.origin === "leak").length;
+        out.cleanup = cs.length - out.closeLeak;
       } catch {
         /* null のまま */
       }

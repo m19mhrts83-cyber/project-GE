@@ -41,6 +41,8 @@ QUEUE_313_KEY = "todoist_313_weekly_queue"
 QUEUE_313_STALE_DAYS = 8
 # ふるい分け（300 ラス隊長）のやめる候補。jarvis_todoist_triage_log.py queue が置く。形は QUEUE_313_KEY と同じ
 QUEUE_TRIAGE_KEY = "todoist_triage_drop_queue"
+# 閉じ漏れ（外で済んだ可能性）。jarvis_todoist_313_done_elsewhere.py が Mac で置く。形は QUEUE_313_KEY と同じ（origin=leak）
+QUEUE_LEAK_KEY = "todoist_313_leak_queue"
 
 PROMO_RE = re.compile(r"(セミナー|キャンペーン|イベント案内|おすすめイベント|新製品|特典|優待|ポイント|紹介|ご案内|応募|アンケート|動画)")
 MONEY_RE = re.compile(r"(入金|着金|送金|振込|支払|納付|引落|請求)")
@@ -131,7 +133,8 @@ def build_snapshot(*, tasks: list[dict[str, Any]], held: set[str], today: date, 
 
 
 def merge_313_cards(
-    cards: list[dict[str, Any]], queue: Any, *, active_by_id: dict[str, dict[str, Any]], held: set[str], now: datetime
+    cards: list[dict[str, Any]], queue: Any, *, active_by_id: dict[str, dict[str, Any]], held: set[str], now: datetime,
+    origin: str = "313",
 ) -> list[dict[str, Any]]:
     """313 週の整理の B を 318 の後・スター起票の前に入れる。古い（8日超）・未公開・閉じた件・「残す」中・重複は出さない。"""
     if not isinstance(queue, dict) or not queue.get("published"):
@@ -151,7 +154,7 @@ def merge_313_cards(
         t = active_by_id.get(tid)
         if not tid or tid in have or tid in held or not t:
             continue
-        extra.append({**x, "origin": "313", "title": str(t.get("content") or x.get("title") or "")})
+        extra.append({**x, "origin": origin, "title": str(t.get("content") or x.get("title") or "")})
         have.add(tid)
     head = [x for x in cards if x.get("origin") == "318"]
     rest = [x for x in cards if x.get("origin") != "318"]
@@ -237,6 +240,16 @@ def snapshot(*, dry: bool, now: datetime) -> int:
         snap["total"] += ntri
         snap["from_triage"] = ntri
         print(f"ふるい分けのやめる候補 {ntri} 件を足した")
+    # 閉じ漏れ（外で済んだ可能性）。Nody の「閉じ漏れ」タブに出る。選んだものだけ反映
+    n_before = len(snap["cards"])
+    merged = merge_313_cards(snap["cards"], ho.read_meta(c.sb, QUEUE_LEAK_KEY),
+                             active_by_id={str(t["id"]): t for t in tasks}, held=held, now=now, origin="leak")
+    nleak = len(merged) - n_before
+    if nleak:
+        snap["cards"] = merged[:MAX_CARDS]
+        snap["total"] += nleak
+        snap["from_leak"] = nleak
+        print(f"閉じ漏れ候補 {nleak} 件を足した")
     by: dict[str, int] = {}
     for x in snap["cards"]:
         by[x["suggest"]] = by.get(x["suggest"], 0) + 1
@@ -260,12 +273,13 @@ def apply_one(row: dict[str, Any], *, dry: bool) -> str:
         return "dry"
     origin = str((row.get("payload") or {}).get("origin") or "")
     try:
-        if origin == "313" and action in ("close", "drop"):
-            # 313 週の整理のカード: 済み・やめるとも完了にする（削除しない）。本人が選んだことをコメントに残す
+        if origin in ("313", "leak") and action in ("close", "drop"):
+            # 313 週の整理・閉じ漏れのカード: 済み・やめるとも完了にする（削除しない）。本人が選んだことをコメントに残す
             word = "済み" if action == "close" else "やめる"
+            where = "閉じ漏れ・外で済んだ検知" if origin == "leak" else "週の整理"
             c.todoist("comments", method="POST", body={
                 "task_id": tid,
-                "content": f"【313】タスク完了したよ（週の整理・本人が「{word}」を選択）\nサマリ: /313/bulk で選んだ結果を反映",
+                "content": f"【313】タスク完了したよ（{where}・本人が「{word}」を選択）\nサマリ: Nody で選んだ結果を反映",
             })
             c.todoist(f"tasks/{tid}/close", method="POST")
         elif action == "close":
@@ -319,7 +333,7 @@ def reflect(*, dry: bool, now: datetime) -> int:
         key = "failed" if res.startswith("failed") else ("superseded" if res == "superseded" else ("gone" if res == "gone" else "ok"))
         n[key] += 1
         if key == "ok" and not dry:
-            is313 = str((r.get("payload") or {}).get("origin") or "") == "313"
+            is313 = str((r.get("payload") or {}).get("origin") or "") in ("313", "leak")
             by_action["stop" if (is313 and r["action"] == "drop") else r["action"]] += 1
         if dry or res.startswith("failed"):
             continue  # 失敗は次回また試す

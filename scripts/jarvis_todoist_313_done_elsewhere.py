@@ -134,6 +134,55 @@ def propose(judgments: dict | None = None) -> list[dict]:
     return out
 
 
+QUEUE_LEAK_KEY = "todoist_313_leak_queue"
+
+
+def leak_card(row: dict) -> dict:
+    """Nody「閉じ漏れ」タブ用のカード（/313 の CleanupCard と同じ形・origin=leak）。"""
+    ev = row.get("evidence") or []
+    e0 = ev[0] if ev else {}
+    folder = str(e0.get("folder") or "")
+    why = f"外で済んだ可能性（{folder} にこちらから送信した痕跡）" if folder else "外で済んだ可能性"
+    if len(ev) >= 2:
+        why += f"。ほか {len(ev) - 1} 件の痕跡"
+    return {
+        "id": str(row.get("task_id") or ""),
+        "title": str(row.get("title") or ""),
+        "sender": folder,
+        "subject": str(e0.get("subject") or "")[:80],
+        "mail_date": "",
+        "summary": f"確度: {row.get('confidence', 'low')}（{row.get('streak_days', 1)}日連続で候補）",
+        "gmail_url": "",
+        "due": None,
+        "added_at": "",
+        "age_days": None,
+        "suggest": "close" if row.get("confidence") == "medium" else "keep",
+        "why": why,
+        "priority": None,
+        "origin": "leak",
+    }
+
+
+def publish_leak_queue(rows: list[dict]) -> bool:
+    """検知結果を Supabase（sync_meta）に置く。Nody の閉じ漏れタブとバッジがこれを読む。0件の日も置く（件数が消える）。
+    置けなくても検知・Slack は止めない。"""
+    try:
+        import jarvis_todoist_312_collect as c  # noqa: PLC0415
+
+        doc = {
+            "published": True,
+            "generated_at": datetime.now(JST).isoformat(timespec="seconds"),
+            "cards": [leak_card(r) for r in rows if r.get("task_id")],
+        }
+        c.sb("sync_meta", params={"on_conflict": "key"}, method="POST", prefer="resolution=merge-duplicates,return=minimal", body={
+            "key": QUEUE_LEAK_KEY, "value": json.dumps(doc, ensure_ascii=False), "updated_at": doc["generated_at"],
+        })
+        return True
+    except Exception as e:  # noqa: BLE001
+        print(f"  leak queue publish soft-fail: {e}", file=sys.stderr)
+        return False
+
+
 def apply_close(row: dict, author: str) -> None:
     tid = row["task_id"]
     ev = row.get("evidence") or []
@@ -232,6 +281,8 @@ def main(argv: list[str] | None = None) -> int:
         + "\n",
         encoding="utf-8",
     )
+
+    ok_pub = publish_leak_queue(rows)
 
     if args.json:
         print(json.dumps(rows, ensure_ascii=False, indent=2))

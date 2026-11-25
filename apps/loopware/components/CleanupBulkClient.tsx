@@ -27,11 +27,11 @@ function todayIso(): string {
  *  313 週の整理のカードは本人が選ぶもの（閉じるのは選んだ件だけ）なので初期選択にしない */
 function fromSuggest(cards: CleanupCard[]): Choices {
   const out: Choices = {};
-  for (const c of cards) if (c.origin !== "313" && (c.suggest === "close" || c.suggest === "drop")) out[c.id] = { act: c.suggest };
+  for (const c of cards) if (c.origin !== "313" && c.origin !== "leak" && (c.suggest === "close" || c.suggest === "drop")) out[c.id] = { act: c.suggest };
   return out;
 }
 
-export default function CleanupBulkClient() {
+export default function CleanupBulkClient({ only = "main" }: { only?: "main" | "leak" }) {
   const [snap, setSnap] = useState<CleanupSnapshot | null>(null);
   const [err, setErr] = useState("");
   const [ch, setCh] = useState<Choices>({});
@@ -60,11 +60,12 @@ export default function CleanupBulkClient() {
   }, [snap]);
   const cards = useMemo(
     () => {
+      const list = (snap?.cards || []).filter((c) => (only === "leak") === (c.origin === "leak"));
       // グループ（318→313→スター）の順は保ち、その中で重要度の高い順
-      const rank = (c: CleanupCard) => ["318", "313", "star"].indexOf(groupOf(c));
-      return [...(snap?.cards || [])].sort((a, b) => rank(a) - rank(b) || (levels[b.id] ?? 1) - (levels[a.id] ?? 1));
+      const rank = (c: CleanupCard) => ["318", "313", "leak", "star"].indexOf(groupOf(c));
+      return [...list].sort((a, b) => rank(a) - rank(b) || (levels[b.id] ?? 1) - (levels[a.id] ?? 1));
     },
-    [snap, levels],
+    [snap, levels, only],
   );
   const nPicked = useMemo(() => Object.values(picked).filter(Boolean).length, [picked]);
   const counts = useMemo(() => {
@@ -119,8 +120,17 @@ export default function CleanupBulkClient() {
     return (
       <div>
         {msg && <div className="wk-banner ok"><span>{msg}</span></div>}
-        <AllClear title="今、片付けるものはありません" sub="ぜんぶ終わったよ、おめでとう！🎉" />
-        <p className="meta">材料は 30 分ごとに更新されます（スター付きメール由来・318の判断依頼）。</p>
+        {only === "leak" ? (
+          <>
+            <AllClear title="今、閉じ漏れはありません" sub="外で済んだ疑いのものは残っていません🎉" />
+            <p className="meta">Mac の検知（毎日20時ごろ）の結果が、30 分ごとにここへ反映されます。</p>
+          </>
+        ) : (
+          <>
+            <AllClear title="今、片付けるものはありません" sub="ぜんぶ終わったよ、おめでとう！🎉" />
+            <p className="meta">材料は 30 分ごとに更新されます（スター付きメール由来・318の判断依頼）。</p>
+          </>
+        )}
       </div>
     );
 
@@ -164,7 +174,7 @@ export default function CleanupBulkClient() {
         const v = ch[c.id];
         const g = groupOf(c);
         const head = i === 0 || groupOf(cards[i - 1]) !== g;
-        const acts = c.origin === "313" ? ACTS_313 : ACTS;
+        const acts = c.origin === "313" || c.origin === "leak" ? ACTS_313 : ACTS;
         return (
           <div key={c.id}>
           {head && <div className="eyebrow acc" style={{ margin: "12px 4px 4px" }}>{GROUP_TITLE[g]}</div>}
@@ -180,6 +190,7 @@ export default function CleanupBulkClient() {
                   {[
                     c.origin === "318" && "318 判断依頼",
                     c.origin === "313" && "313 週の整理",
+                    c.origin === "leak" && "閉じ漏れ",
                     c.sender,
                     c.mail_date && `${c.mail_date}のメール`,
                     c.age_days != null && `${c.age_days}日前`,
@@ -191,7 +202,7 @@ export default function CleanupBulkClient() {
             </label>
             {c.summary && <div className="meta">{c.summary}</div>}
             <div className="meta">
-              {c.origin === "313" ? `${c.why}（おすすめ: ${actLabel(c, c.suggest)}・やめるも完了扱い）` : `おすすめ: ${actLabel(c, c.suggest)}（${c.why}）`}
+              {c.origin === "313" || c.origin === "leak" ? `${c.why}（おすすめ: ${actLabel(c, c.suggest)}・やめるも完了扱い）` : `おすすめ: ${actLabel(c, c.suggest)}（${c.why}）`}
             </div>
             <div className="btn-row">
               {acts.map((a) => (
