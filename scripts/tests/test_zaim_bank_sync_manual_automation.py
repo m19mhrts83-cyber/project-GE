@@ -11,7 +11,7 @@ import yaml
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import jarvis_zaim_bank_sync_manual as man  # noqa: E402
+import jarvis_zaim_online_accounts as man  # noqa: E402
 
 
 class AutomationOffTest(unittest.TestCase):

@@ -39,6 +39,7 @@ PLAYWRIGHT_LOCK = LOG_DIR / "zaim_playwright.lock"
 sys.path.insert(0, str(ZAIM_DIR))
 sys.path.insert(0, str(REPO / "scripts"))
 import zaim_budget_apply as zaim  # noqa: E402
+from jarvis_zaim_online_accounts import is_automation_off  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
 ONLINE = "https://zaim.net/online_accounts"
@@ -124,17 +125,6 @@ def in_cooldown(auto: dict[str, Any], name: str, hours: int) -> bool:
     except ValueError:
         return False
     return datetime.now(JST) - dt < timedelta(hours=max(1, hours))
-
-
-def is_automation_off(acc: dict[str, Any] | None) -> bool:
-    """automation: off の判定。YAML では off が False として読まれるので、それも「オフ」とみなす。
-    キー自体が無い（None）ときはオフではない。"""
-    if not acc:
-        return False
-    v = acc.get("automation")
-    if v is None:
-        return False
-    return v is False or str(v).strip().lower() in ("off", "false", "0", "no")
 
 
 def names_from_stale(*, respect_automation: bool = True) -> list[str]:
