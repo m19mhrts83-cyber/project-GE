@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { usableLandRatioText } from "@/lib/landRatio";
 
 export type GateAction = "yes" | "no";
 
@@ -168,7 +169,9 @@ export function judgmentDetailHtml(deal: DealRow, events: DealEvent[] = []): str
   };
   const priceMan = num(price);
   const appraisalRaw = pick("land_appraisal_man");
-  const ratioRaw = pick("land100_ratio", "land_ratio", "land100");
+  const ratioPicked = pick("land100_ratio", "land_ratio", "land100");
+  // 「算定不可」等の文章は率にしない（中の数字を拾わない）
+  const ratioRaw = usableLandRatioText(ratioPicked) ?? "—";
   // 複数シナリオ「1,494（91E）／1,805（110E）」をそのまま見せる
   const landValText =
     appraisalRaw !== "—"
