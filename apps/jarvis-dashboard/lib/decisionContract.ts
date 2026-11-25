@@ -133,6 +133,7 @@ const OUTCOME_OF: Record<string, Outcome> = {
   create: "take",
   done: "take",
   close: "take",
+  owner_close: "take",
   drop: "take",
   merge: "take",
   skipped: "ng",

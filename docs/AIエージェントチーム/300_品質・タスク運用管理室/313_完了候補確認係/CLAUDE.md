@@ -28,6 +28,12 @@
 - Cursor ルール: `jarvis-todoist-batch-sweep.mdc` / `jarvis-todoist-owner-confirm.mdc` / `jarvis-chat-open-complete-313.mdc`
 - 起票側: [`312_Todoist起票整理係`](../312_Todoist起票整理係/CLAUDE.md)
 
+## 0.0 ふるい分けの前に読む／後に記録する（2026-11-25〜・松野さん了承）
+
+- **Todoist をふるい分ける前に**: `python3 scripts/jarvis_todoist_triage_log.py context` を読む（採用済みの指針＝`learned_rules.md`・最近の判断）。同じことを毎回聞かない
+- **ふるい分けた後**: 判断を owner_decisions（surface=`todoist_triage`。action は close／owner_close／drop_candidate／keep）に記録（`backfill`。本人の理由は転記があるときだけ・補作しない）。土曜の週次が「同じ種類の判断2回以上」でルール候補を出し、松野さんが loopware で採用したものだけが `learned_rules.md` に入る
+- やめる候補は `queue` で /313/bulk のカードに出す（選んだものだけ反映・勝手に閉じない）。surface を todoist_313 と分けた理由は `scripts/jarvis_todoist_triage_log.py` の冒頭
+
 ## 0. 週の整理（本線・2026-11-24〜・松野さん了承 Orca 項目50）
 
 - **毎晩の期日ずらし（20:00 片付け3択）はやめた**。期日は土曜 07:00 の「今週の9件」（loopware `/week`）で決める
