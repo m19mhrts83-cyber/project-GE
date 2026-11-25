@@ -13,11 +13,11 @@ def deal(grok, price=1000):
 class RoutePriceTest(unittest.TestCase):
     def test_explanation_text_is_not_a_price(self):
         bad = [
-            "（〇〇町は路線価図77530上「倍率地域」。周辺のみ28E〜60E等）",
+            "（〇〇町は路線価図12345上「倍率地域」。周辺のみ10E〜20E等）",
             "（路線価地域なし・R08町丁索引に〇〇町なし）",
             "未確定（近傍公示系は約4.8〜6万/㎡…）",
-            "（本件は調整区域。図12/3の路線28E〜60Eは別側）",
-            "1,234円/㎡（35E・令和8・国税庁路線価図12）",
+            "（本件は調整区域。図1/2の路線10E〜20Eは別側）",
+            "1,234円/㎡（30E・令和9・国税庁路線価図1）",
         ]
         for text in bad:
             self.assertIsNone(lib._route_price_tsubo_man(text), text)
@@ -30,8 +30,8 @@ class RoutePriceTest(unittest.TestCase):
 
     def test_clear_forms_still_work(self):
         self.assertEqual(lib._route_price_tsubo_man("35万/坪"), 35.0)
-        self.assertEqual(lib._route_price_tsubo_man("参考28E≒約4.8万/坪相当"), 4.8)
-        self.assertEqual(lib._route_price_tsubo_man("約4.8（91E=15,000円/㎡）"), 4.8)
+        self.assertEqual(lib._route_price_tsubo_man("参考20E≒約4.8万/坪相当"), 4.8)
+        self.assertEqual(lib._route_price_tsubo_man("約4.8（50E=15,000円/㎡）"), 4.8)
         self.assertEqual(lib._route_price_tsubo_man("12.5"), 12.5)
         d = deal({"route_price_tsubo": "10万/坪", "land_area": "330.578㎡"})
         value_s, ratio_s = lib._land_display(d)
@@ -53,10 +53,10 @@ class RatioTest(unittest.TestCase):
                          [(1.2, "確定不可")])
 
     def test_scenarios_unchanged(self):
-        d = deal({"land_appraisal_man": "参考1,494（91E）／1,805（110E）"})
+        d = deal({"land_appraisal_man": "参考1,000（50E）／1,200（60E）"})
         value_s, ratio_s = lib._land_display(d)
-        self.assertEqual(value_s, "約1,494万（91E）／約1,805万（110E）")
-        self.assertEqual(ratio_s, "149%／180%")
+        self.assertEqual(value_s, "約1,000万（50E）／約1,200万（60E）")
+        self.assertEqual(ratio_s, "100%／120%")
 
 
 if __name__ == "__main__":
