@@ -40,6 +40,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/partners", label: "パートナーのやり取り", icon: "partner" },
       { href: "/openchat", label: "神大家オプチャ", icon: "chat" },
       { href: "/situation", label: "状況ウォッチ", icon: "watch" },
+      // 2026-11-25: Grok が見つけた管理会社候補の状態（新規／重複／送信待ち／送信済み）。読む画面
+      { href: "/grok-candidates", label: "Grokの候補", icon: "users" },
       { href: "/review", label: "週次レビュー", icon: "loop" },
       { href: "/kotoba", label: "ことばの棚", icon: "book" },
       { href: "/archive", label: "処理済み", icon: "archive" },
