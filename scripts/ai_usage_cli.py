@@ -115,23 +115,47 @@ def pick_codex(lines_by_file, now):
                 rl = _find_rl(ev)
                 if rl and isinstance(rl.get("primary"), dict):
                     best = (rl, _parse_ts(ev.get("timestamp", "")) or mtime)
-            if best and limit_err:
+            if best:
                 break
-        if best and limit_err:
+        if best:
             break
     return best, limit_err
 
 
-def read_codex(now, files=None):
-    files = files if files is not None else sorted(
-        glob.glob(os.path.expanduser("~/.codex/sessions/**/*.jsonl"), recursive=True),
-        key=os.path.getmtime, reverse=True)[:30]
-    data = []
-    for f in files:
+CODEX_MAX_FILES = 300
+CODEX_MAX_AGE_DAYS = 14
+
+
+def _codex_files(now):
+    """新しい順。Codex Desktop が rate_limits:null のセッションを一度に大量に書くことがあるので、
+    本数ではなく 300 本・14 日までさかのぼる。"""
+    fs = []
+    for f in glob.glob(os.path.expanduser("~/.codex/sessions/**/*.jsonl"), recursive=True):
         try:
-            data.append((open(f, encoding="utf-8", errors="ignore").readlines(), os.path.getmtime(f)))
+            fs.append((os.path.getmtime(f), f))
         except OSError:
             pass
+    fs.sort(reverse=True)
+    cutoff = now - CODEX_MAX_AGE_DAYS * 86400
+    return [f for m, f in fs[:CODEX_MAX_FILES] if m >= cutoff]
+
+
+def _codex_data(files):
+    """枠・制限エラーのどちらの手がかりも無いファイルは行に展開せず飛ばす（遅くしない）。"""
+    for f in files:
+        try:
+            text = open(f, encoding="utf-8", errors="ignore").read()
+            mtime = os.path.getmtime(f)
+        except OSError:
+            continue
+        if "hit your usage limit" not in text and not re.search(r'"rate_limits"\s*:\s*\{', text):
+            continue
+        yield (text.splitlines(), mtime)
+
+
+def read_codex(now, files=None):
+    files = files if files is not None else _codex_files(now)
+    data = _codex_data(files)
     best, err = pick_codex(data, now)
     out = {}
     if best:
