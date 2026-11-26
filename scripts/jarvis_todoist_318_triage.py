@@ -1276,12 +1276,17 @@ def _run_comments(
         run["errors"].append({"where": "comment", "error": f"コメント処理で想定外の失敗（{type(e).__name__}）"})
 
 
+# Slack 表示名（項目48の方針）。#consult・#ai-hub 共通。
+SLACK_USERNAME = "300 ラス隊長"
+
+
 def _post_default(channel: str, text: str) -> bool:
     """既存の Webhook 投稿（jarvis_slack_webhook_post.py）。--send-slack の時だけ呼ばれる。"""
     import subprocess  # noqa: PLC0415
 
     r = subprocess.run(
-        [sys.executable, str(REPO / "scripts" / "jarvis_slack_webhook_post.py"), "--channel", channel, "--text", text, "--no-fb-footer"],
+        [sys.executable, str(REPO / "scripts" / "jarvis_slack_webhook_post.py"), "--channel", channel, "--text", text, "--no-fb-footer",
+         "--username", SLACK_USERNAME],
         capture_output=True, text=True, timeout=60,
     )
     return r.returncode == 0
