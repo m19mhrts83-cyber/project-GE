@@ -104,5 +104,37 @@ class ExpireTests(unittest.TestCase):
         self.assertEqual([i["status"] for i in items], ["skipped", "pending", "pending", "skipped"])
 
 
+class AutoReplyTests(unittest.TestCase):
+    """問い合わせフォームの自動返信は要対応の色に入れない（2026-11-26）。架空文のみ。"""
+
+    def _mail(self, subject, **kw):
+        return item(1, kind="mail", days_ago=14, from_email="noreply@example.com",
+                    subject=subject, original_body="ご担当者様 問い合わせを受け付けました", **kw)
+
+    def test_auto_reply_subjects_are_not_stale(self):
+        for subj in ("【自動返信】お問い合わせありがとうございます", "お問い合わせありがとうございます",
+                     "ご予約を受け付けました", "Auto-Reply: sample"):
+            s = ms.classify([self._mail(subj)], TODAY)
+            self.assertEqual(s["level"], "green", subj)
+            self.assertEqual(s["stale"], [], subj)
+            self.assertEqual(s["other"], 1, subj)
+
+    def test_auto_submitted_header_wins(self):
+        s = ms.classify([self._mail("確認のご連絡", payload={"auto_submitted": "auto-replied"})], TODAY)
+        self.assertEqual(s["stale"], [])
+
+    def test_ambiguous_still_counts(self):
+        # 語がなく、ヘッダも no → 従来どおり数える
+        m = self._mail("見積の件", payload={"auto_submitted": "no"})
+        m["from_email"] = "taro@gmail.com"  # public-ok 架空のテスト用
+        s = ms.classify([m], TODAY)
+        self.assertEqual(s["level"], "red")
+
+    def test_partner_with_same_words_still_counts(self):
+        p = item(2, lane="partner", kind="mail", days_ago=14, partner="架空商事",
+                 subject="お問い合わせありがとうございます")
+        self.assertEqual(ms.classify([p], TODAY)["level"], "red")
+
+
 if __name__ == "__main__":
     unittest.main()
