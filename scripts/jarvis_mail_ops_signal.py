@@ -23,6 +23,7 @@ import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+import re
 from typing import Any, Iterable
 
 REPO = Path(__file__).resolve().parents[1]
@@ -158,6 +159,29 @@ def weekdays_between(start: date, end: date) -> int:
     return n
 
 
+# 自動返信（問い合わせフォームの受付メールなど）。返事は要らないので要対応の色に入れない（2026-11-26）
+_AUTO_REPLY_SUBJECT = re.compile(
+    r"自動返信|自動送信メール|お問い合わせ(いただき)?(、)?(誠に)?ありがとうござい|受け付けました|受付けました|受付完了|auto[- ]?reply",
+    re.IGNORECASE,
+)
+_AUTO_SUBMITTED_OK = ("auto-replied", "auto-generated")
+
+
+def looks_auto_reply(it: dict[str, Any]) -> bool:
+    """自動返信と言い切れるときだけ True。迷ったら False（従来どおり数える）。
+
+    - auto-submitted ヘッダが保存されていれば（no 以外）それを使う。現状は保存されないので件名の語だけ。
+    - パートナー（lane=partner）は件名に語があっても自動返信とは見なさない。
+    """
+    if (it.get("lane") or "partner") == "partner":
+        return False
+    payload = it.get("payload") if isinstance(it.get("payload"), dict) else {}
+    hdr = str(payload.get("auto_submitted") or "").strip().lower()
+    if hdr.startswith(_AUTO_SUBMITTED_OK):
+        return True
+    return bool(_AUTO_REPLY_SUBJECT.search(str(it.get("subject") or "")))
+
+
 def is_human_item(it: dict[str, Any]) -> bool:
     """要対応として数えるもの: パートナー、または人が書いた一般メール。"""
     if it.get("kind") == "activity":
@@ -167,6 +191,8 @@ def is_human_item(it: dict[str, Any]) -> bool:
         return False
     if lane == "partner":
         return True
+    if looks_auto_reply(it):
+        return False
     if it.get("kind") != "mail":
         return False
     return looks_human_mail(
