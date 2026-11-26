@@ -1,5 +1,7 @@
 import json
+import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -31,6 +33,25 @@ class CodexTests(unittest.TestCase):
         best, err = c.pick_codex([(lines, NOW)], NOW)
         self.assertIsNone(best)
         self.assertEqual(err["retry"], "2:20 AM")
+
+    def test_read_codex_goes_past_many_null_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            real = os.path.join(d, "real.jsonl")
+            with open(real, "w") as fh:
+                fh.write(ev("2026-11-21T01:00:00Z", "codex", {"used_percent": 42.0, "resets_at": NOW + 3600},
+                            {"used_percent": 10.0, "resets_at": NOW + 99999}) + "\n")
+            os.utime(real, (NOW - 3600, NOW - 3600))
+            files = []
+            for i in range(50):
+                f = os.path.join(d, "null%d.jsonl" % i)
+                with open(f, "w") as fh:
+                    fh.write(json.dumps({"timestamp": "2026-11-21T05:00:00Z",
+                                         "payload": {"rate_limits": None}}) + "\n")
+                os.utime(f, (NOW - 10, NOW - 10))
+                files.append(f)
+            files.append(real)
+            out = c.read_codex(NOW, files=files)
+            self.assertEqual(out["five_hour"]["used_percent"], 42.0)
 
     def test_no_none_percent_text(self):
         out = {"codex": {"five_hour": {"used_percent": None, "resets_at_ts": None},
