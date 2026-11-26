@@ -319,5 +319,14 @@ class Comment317Test(unittest.TestCase):
         self.assertTrue(d.is_agent_comment("【318】x"))
 
 
+class PostDefaultUsernameTest(unittest.TestCase):
+    def test_post_default_passes_username(self):
+        with mock.patch("subprocess.run") as run:
+            run.return_value.returncode = 0
+            self.assertTrue(tr._post_default("consult", "x"))
+        cmd = run.call_args[0][0]
+        self.assertEqual(cmd[cmd.index("--username") + 1], "300 ラス隊長")
+
+
 if __name__ == "__main__":
     unittest.main()
