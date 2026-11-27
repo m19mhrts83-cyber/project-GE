@@ -17,20 +17,42 @@ export const MA_REASON_TAGS = {
 
 export type MaReasonTag = keyof typeof MA_REASON_TAGS;
 
+/**
+ * Todoist に回した（後回しにした）時の理由タグ。本人が押したものだけを残す（押さなくても進める）。
+ * 見送りの理由（MA_REASON_TAGS）と取り違えないよう、キーを分ける。
+ */
+export const MA_LATER_TAGS = {
+  research: "調べてから返信",
+  deadline: "期限がある",
+  confirm: "人に確認してから",
+  busy: "今は手が回らない",
+} as const;
+
+export type MaLaterTag = keyof typeof MA_LATER_TAGS;
+
+export type MaAnyReasonTag = MaReasonTag | MaLaterTag;
+
+/** 理由タグの表示名（見送り・後回しのどちらでも） */
+export function maReasonLabel(tag: string): string {
+  return (MA_REASON_TAGS as Record<string, string>)[tag] || (MA_LATER_TAGS as Record<string, string>)[tag] || tag;
+}
+
 /** once = 今回だけ（数え直す）／ partner = この送り手は次から出さない */
 export type MaMuteChoice = "once" | "partner";
 
 const ID_RE = "([a-zA-Z0-9_.:-]{6,80})";
 
 /** value: mar:{tag}:{triage_id} */
-export function maReasonValue(tag: MaReasonTag, id: string): string {
+export function maReasonValue(tag: MaAnyReasonTag, id: string): string {
   return `mar:${tag}:${id}`;
 }
 
-export function parseMaReasonValue(value: string): { tag: MaReasonTag; id: string } | null {
-  const m = String(value || "").trim().match(new RegExp(`^mar:(promo|handled|notnow|hesitate):${ID_RE}$`));
+export function parseMaReasonValue(value: string): { tag: MaAnyReasonTag; id: string } | null {
+  const m = String(value || "")
+    .trim()
+    .match(new RegExp(`^mar:(promo|handled|notnow|hesitate|research|deadline|confirm|busy):${ID_RE}$`));
   if (!m) return null;
-  return { tag: m[1] as MaReasonTag, id: m[2] };
+  return { tag: m[1] as MaAnyReasonTag, id: m[2] };
 }
 
 /** value: mam:{once|partner}:{triage_id} */
@@ -169,6 +191,48 @@ export function maSkipFollowupBlocks(opts: {
           value: maMuteValue("partner", opts.id),
         },
       ],
+    });
+  }
+  return blocks;
+}
+
+/**
+ * Todoist に登録した直後のカード（結果の1行＋理由タグ）。tagged があれば理由の行だけにする。
+ * 押さなくても進める。理由は本人が押したものだけを判断ログに残す。
+ */
+export function maLaterFollowupBlocks(opts: {
+  id: string;
+  who: string;
+  detail: string;
+  weekCount: number | null;
+  tagged?: MaLaterTag | null;
+}): Block[] {
+  const who = (opts.who || "").slice(0, 60);
+  const reason = opts.tagged ? `理由: ${MA_LATER_TAGS[opts.tagged]} · ` : "";
+  const blocks: Block[] = [
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: `✅ *Todoist 登録*（${who}）\n${opts.detail}` },
+    },
+    {
+      type: "context",
+      elements: [{ type: "mrkdwn", text: `${reason}${loggedLine(opts.weekCount)}` }],
+    },
+  ];
+  if (!opts.tagged) {
+    blocks.push({
+      type: "actions",
+      block_id: "ma_later_reason",
+      elements: (Object.keys(MA_LATER_TAGS) as MaLaterTag[]).map((tag) => ({
+        type: "button",
+        text: { type: "plain_text", text: MA_LATER_TAGS[tag], emoji: true },
+        action_id: `mail_action_reason_${tag}`,
+        value: maReasonValue(tag, opts.id),
+      })),
+    });
+    blocks.push({
+      type: "context",
+      elements: [{ type: "mrkdwn", text: "後回しの理由は？（押さなくても進めます）" }],
     });
   }
   return blocks;

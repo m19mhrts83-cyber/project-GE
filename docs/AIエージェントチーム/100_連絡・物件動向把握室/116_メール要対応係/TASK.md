@@ -100,3 +100,13 @@
 - 15（B）: Dashboard `lib/starTodoistGuard.ts`（判定は `lib/starLabels.ts`）。「後回し」でスター付き・Todoist済なら作らず、スター起票のタスクを探して寄せる（status=todoist・payload `todoist_by_star`）。確かめられない時は従来どおり作る。
 - テスト: `scripts/tests/test_mail_action_star_and_rules.py`（13件）、既存 mail_action／learned_rules 全件 OK。Dashboard `tests/starLabels.test.mjs` 3件 OK、`tsc --noEmit` OK。`npm test` の失敗1件は外部へ繋ぐ既存テスト（flowforgeShareProxy live）で、変更前も同じ。
 - 未検証: 本番の Gmail・Todoist・Slack での実動作（マージ・デプロイ後に昼の回で確認）。
+
+## 追補（2026-11-27・松野さん了承・大佐 件127）判断ログのパートナー別・理由
+
+- 目的: 見送り・Todoist・後回しを、パートナーと理由つきで判断ログに残し、ダッシュボードでパートナー別に引く。返信は従来どおり `5.やり取り.md`（変えない）。
+- 確かめた形: owner_decisions には `partner`（名前）が全行に入っている。見送りの理由タグは `payload.reason_tags`（直近30日の見送り389件中19件）。Todoist・後で には理由の入口が無かった。
+- 16 判断ログ（変更）: トリガーが `payload.partner_key`（送信元アドレス小文字。無ければ partner 名）を足す。理由は本人が押したタグだけ（`reason_tags`）。押さなければ無し。
+- 15 ボタン（変更）: Todoist 登録後のカードに任意の理由タグ4つ（押さなくても進む）。押すと triage_items の `later_reason_tags` と、直近の判断行の `reason_tags` に入る。
+- 画面: Dashboard `/mail/partners`（ログイン必須・公開しない）。送り手ごとの件数、押すと判断を新しい順に（見送り／Todoist／後で で絞り込み）。理由が無い判断は「理由なし」と出す。
+- 過去分: 埋めない。`partner_key` が無い行は partner 名で束ねる。別案（未実施）: triage_items の `from_email` を判断行に結び付けて `partner_key` を後から埋める。
+- 未検証: 本番 DB への migration 適用と、Slack ボタンの実機操作（マージ・適用後に確認）。

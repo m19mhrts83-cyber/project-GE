@@ -65,3 +65,15 @@ test('しきい値に届いたら「次からも？」を出し、答えたら�
   assert.doesNotMatch(done, /mam:/);
   assert.match(done, /理由: 宣伝・通知/);
 });
+
+test('後回しの理由タグも往復でき、見送りの理由とは別の名前で出る', () => {
+  const m = load();
+  assert.deepEqual({ ...m.parseMaReasonValue(m.maReasonValue('research', 'abc-123456')) }, { tag: 'research', id: 'abc-123456' });
+  assert.equal(m.maReasonLabel('busy'), '今は手が回らない');
+  assert.equal(m.maReasonLabel('promo'), '宣伝・通知');
+  const asked = m.maLaterFollowupBlocks({ id: 'abc-123456', who: 'テスト', detail: 'x', weekCount: 1 });
+  assert.ok(asked.some((b) => b.block_id === 'ma_later_reason'));
+  const tagged = m.maLaterFollowupBlocks({ id: 'abc-123456', who: 'テスト', detail: 'x', weekCount: 1, tagged: 'deadline' });
+  assert.ok(!tagged.some((b) => b.block_id === 'ma_later_reason'));
+  assert.match(JSON.stringify(tagged), /期限がある/);
+});

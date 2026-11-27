@@ -53,7 +53,8 @@ export default function MailInsightsView({
         <h1>メールの振り返り</h1>
         <p className="sub">
           処置は判断デスクで。ここでは直近{rangeDays}日の判断と、届いたメールの傾向を見ます。
-          {error ? ` 一部読めませんでした（${error}）。` : ""}
+          {error ? ` 一部読めませんでした（${error}）。` : ""}{" "}
+          <a href="/mail/partners">パートナー別の見送り・Todoistを見る</a>
         </p>
       </header>
 

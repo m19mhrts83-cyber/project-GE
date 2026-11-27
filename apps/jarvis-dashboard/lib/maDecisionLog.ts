@@ -8,7 +8,7 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import { logOwnerDecision } from "@/lib/ownerDecisionLog";
 import { confirmMailSenderMute, skipPendingFromMutedSender } from "@/lib/mailActionSkipMute";
 import { parseEmailAddr } from "@/lib/selfEmails";
-import { weekStartIso, type MaMuteChoice, type MaReasonTag } from "@/lib/maDecisionBlocks";
+import { weekStartIso, MA_LATER_TAGS, type MaMuteChoice, type MaAnyReasonTag } from "@/lib/maDecisionBlocks";
 
 function obj(raw: unknown): Record<string, unknown> {
   return raw && typeof raw === "object" && !Array.isArray(raw) ? { ...(raw as Record<string, unknown>) } : {};
@@ -37,10 +37,10 @@ export async function weekDecisionCount(): Promise<number | null> {
  */
 export async function tagSkipReason(
   id: string,
-  tag: MaReasonTag,
-): Promise<{ ok: boolean; who: string; fromEmail: string }> {
+  tag: MaAnyReasonTag,
+): Promise<{ ok: boolean; who: string; fromEmail: string; todoistUrl: string }> {
   const sb = createServiceClient();
-  if (!sb) return { ok: false, who: "", fromEmail: "" };
+  if (!sb) return { ok: false, who: "", fromEmail: "", todoistUrl: "" };
   const now = new Date().toISOString();
   const { data: row } = await sb
     .from("triage_items")
@@ -51,9 +51,15 @@ export async function tagSkipReason(
   const fromEmail = String(row?.from_email || "");
   if (row) {
     const pl = obj(row.payload);
-    pl.skip_reason_tags = [tag];
-    pl.skip_reason_at = now;
-    if (tag === "hesitate") pl.hesitated = true;
+    if (tag in MA_LATER_TAGS) {
+      // Todoist に回した理由（後回し）。見送りの理由とは別の鍵に置く
+      pl.later_reason_tags = [tag];
+      pl.later_reason_at = now;
+    } else {
+      pl.skip_reason_tags = [tag];
+      pl.skip_reason_at = now;
+      if (tag === "hesitate") pl.hesitated = true;
+    }
     await sb.from("triage_items").update({ payload: pl }).eq("id", id);
   }
   try {
@@ -76,7 +82,8 @@ export async function tagSkipReason(
   } catch (e) {
     console.warn(`owner_decisions tag soft-fail: ${e instanceof Error ? e.message : String(e)}`);
   }
-  return { ok: Boolean(row), who, fromEmail };
+  const todoistUrl = row ? String(obj(row.payload).todoist_url || "") : "";
+  return { ok: Boolean(row), who, fromEmail, todoistUrl };
 }
 
 /** 「見送りが2回目です。次からも？」への答えを反映し、ルールの確認として記録する */
