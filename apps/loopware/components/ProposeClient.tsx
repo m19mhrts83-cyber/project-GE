@@ -42,6 +42,7 @@ export default function ProposeClient() {
   const [scope, setScope] = useState<Record<string, "once" | "rule">>({});
   const [step, setStep] = useState<Step>("sort");
   const [loaded, setLoaded] = useState(false);
+  const [excluded, setExcluded] = useState(0);
   const voice = useVoiceLog("312");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [saved, setSaved] = useState<{
@@ -57,9 +58,10 @@ export default function ProposeClient() {
     fetch("/api/misses")
       .then((r) => r.json())
       .then((j) => {
+        if (typeof j?.excluded === "number") setExcluded(j.excluded);
         if (Array.isArray(j?.candidates) && j.candidates.length) {
           setItems(
-            j.candidates.map((c: { id: string; source: string; folder: string; snippet: string; hypothesis: string }) => ({
+            j.candidates.map((c: { id: string; source: string; folder: string; snippet: string; hypothesis: string; merged?: number; lastChoice?: string }) => ({
               id: c.id,
               group: c.id,
               source: c.source,
@@ -67,6 +69,12 @@ export default function ProposeClient() {
               sourceText: c.snippet,
               taskTitle: c.snippet.slice(0, 40),
               hypothesis: c.hypothesis,
+              dupNote: [
+                c.lastChoice === "hold" ? "前回は保留" : "",
+                (c.merged ?? 1) > 1 ? `同じ内容${c.merged}件を1枚にまとめた` : "",
+              ]
+                .filter(Boolean)
+                .join("・") || undefined,
             })),
           );
         }
@@ -275,7 +283,9 @@ export default function ProposeClient() {
       <div className="glass" style={{ padding: 20 }}>
         <p style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700 }}>いまは仕分ける提案がありません</p>
         <p className="meta" style={{ margin: 0 }}>
-          Mac で拾い漏れスキャン（scripts/jarvis_todoist_312_miss_scan.py）を動かすと、ここに本物の候補が出ます。
+          {excluded
+            ? `前に採る／見送るを決めた ${excluded}件は、もう出していません。新しい候補は拾い漏れスキャンが届くと出ます。`
+            : "Mac で拾い漏れスキャン（scripts/jarvis_todoist_312_miss_scan.py）を動かすと、ここに本物の候補が出ます。"}
         </p>
       </div>
     );
@@ -433,6 +443,7 @@ export default function ProposeClient() {
               <span className="src-badge">{it.source}</span>
               <span className="meta">{it.from}</span>
             </div>
+            {it.dupNote ? <p className="meta" style={{ margin: "0 0 6px" }}>{it.dupNote}</p> : null}
             {it.sourceText ? <p className="p-snip">原文：{it.sourceText}</p> : null}
             <div className="p-task">
               <div className="eyebrow" style={{ margin: 0 }}>提案タスク</div>

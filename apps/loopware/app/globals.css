@@ -2334,3 +2334,15 @@ button.primary:disabled,
 .seg-badge.zero { background: var(--positive); color: var(--on-accent); }
 
 .wk-section > .wk-head { position: sticky; top: 0; z-index: 6; }
+
+/* ハブ：各項目の残り対応バッジと全体の合計 */
+.hub-badge { min-width: 24px; height: 24px; padding: 0 7px; border-radius: 12px; display: inline-grid; place-items: center; font-size: 13px; font-weight: 700; background: #ff6b6b; color: #fff; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.hub-badge.zero { background: transparent; border: 1px solid var(--positive); color: var(--positive); font-size: 12px; }
+.hub-badge.wait { background: var(--surface); border: 1px solid var(--line); opacity: 0.5; }
+.hub-summary { padding: 14px 16px; margin: 12px 0; }
+.hub-summary-head { display: flex; align-items: baseline; gap: 8px; font-weight: 600; }
+.hub-summary-head b { font-size: 26px; color: #ff6b6b; }
+.hub-summary.clear .hub-summary-head { color: var(--positive); }
+.hub-summary-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.hub-chip { font-size: 12px; padding: 3px 9px; border-radius: 10px; border: 1px solid var(--line); color: var(--ink-muted); }
+.hub-chip b { color: var(--ink, inherit); margin-left: 2px; }

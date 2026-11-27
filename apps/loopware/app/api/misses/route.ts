@@ -3,6 +3,8 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { serviceClient } from "@/lib/supabase";
 import { loadMisses } from "@/lib/misses";
+import { loadProposalCandidates } from "@/lib/proposalCandidates";
+import { mergeCandidates, type RawCandidate } from "@/lib/proposalDedupe";
 
 export const runtime = "nodejs";
 
@@ -21,23 +23,17 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
     }
   }
-  // 本番（Vercel）では Mac のファイルが読めないので、スキャンが sync_meta に置いた候補を読む
+  // 本番（Vercel）では Mac のファイルが読めないので、スキャンが sync_meta に置いた候補を読む。
+  // 同じ中身はまとめ、前に採る／見送るを決めたものは出さない（lib/proposalDedupe.ts）
   const sbm = serviceClient();
   if (sbm) {
     try {
-      const { data } = await sbm.from("sync_meta").select("value").eq("key", "loopware_312_candidates").maybeSingle();
-      const raw = data?.value;
-      const j = (typeof raw === "string" ? JSON.parse(raw) : raw) as { at?: string; candidates?: Record<string, string>[] } | null;
-      if (j && Array.isArray(j.candidates)) {
-        const list = j.candidates.map((c, i) => ({
-          id: `miss-${i + 1}`,
-          source: c.source || "",
-          folder: c.folder || "",
-          snippet: c.snippet || "",
-          hypothesis: c.hypothesis || "",
-          ref: c.ref,
-        }));
-        return NextResponse.json({ ok: true, at: j.at, candidates: list }, { headers: { "cache-control": "private, no-store" } });
+      const got = await loadProposalCandidates(sbm);
+      if (got) {
+        return NextResponse.json(
+          { ok: true, at: got.at, candidates: got.candidates, excluded: got.excluded, mergedAway: got.mergedAway },
+          { headers: { "cache-control": "private, no-store" } },
+        );
       }
     } catch {
       /* 次（Mac 上のファイル）へ */
@@ -51,24 +47,12 @@ export async function GET(req: Request) {
   for (const p of candidates) {
     try {
       const raw = await readFile(p, "utf8");
-      const j = JSON.parse(raw) as {
-        candidates?: {
-          source: string;
-          folder?: string;
-          ref?: string;
-          snippet?: string;
-          hypothesis?: string;
-        }[];
-      };
-      const list = (j.candidates || []).map((c, i) => ({
-        id: `miss-${i + 1}`,
-        source: c.source,
-        folder: c.folder || "",
-        snippet: c.snippet || "",
-        hypothesis: c.hypothesis || "",
-        ref: c.ref,
-      }));
-      return NextResponse.json({ ok: true, candidates: list });
+      const j = JSON.parse(raw) as { at?: string; candidates?: RawCandidate[] };
+      if (sbm) {
+        const got = await loadProposalCandidates(sbm, j);
+        if (got) return NextResponse.json({ ok: true, at: got.at, candidates: got.candidates, excluded: got.excluded, mergedAway: got.mergedAway });
+      }
+      return NextResponse.json({ ok: true, candidates: mergeCandidates(j.candidates || []).map(({ variants: _v, ...c }) => c) });
     } catch {
       /* try next */
     }

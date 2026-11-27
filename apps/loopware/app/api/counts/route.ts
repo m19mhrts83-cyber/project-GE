@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { serviceClient } from "@/lib/supabase";
 import type { CleanupSnapshot } from "@/lib/cleanupBulk";
 import { loadCloseLeak } from "@/lib/closeLeakLoad";
+import { loadProposalCandidates } from "@/lib/proposalCandidates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,12 +34,9 @@ export async function GET() {
       if (!error) out.topics = (data || []).length;
     })(),
     (async () => {
-      const { data, error } = await sb.from("sync_meta").select("value").eq("key", "loopware_312_candidates").maybeSingle();
-      if (error) return;
       try {
-        const raw = data?.value;
-        const j = (typeof raw === "string" ? JSON.parse(raw) : raw) as { candidates?: unknown[] } | null;
-        out.missIds = Array.isArray(j?.candidates) ? j!.candidates!.map((_, i) => `miss-${i + 1}`) : [];
+        const got = await loadProposalCandidates(sb);
+        out.missIds = got ? got.candidates.map((c) => c.id) : [];
       } catch {
         /* null のまま */
       }
