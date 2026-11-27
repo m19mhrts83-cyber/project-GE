@@ -151,7 +151,10 @@ class CommentWriteTest(P3Base):
         self.assertEqual(len(td.posts), 2)
         self.assertEqual(run1["writes"]["todoist"], 2)
         for tid, body in td.posts:
-            self.assertTrue(body.startswith("【318】要判断"))
+            # a は②③の印なしで①（62_聞く基準の既定）、b は「送信」で②
+            self.assertTrue(body.startswith("【318】要判断" if tid == "b" else "【318】"), body[:20])
+            if tid == "a":
+                self.assertFalse(body.startswith("【318】要判断"))
             self.assertTrue(cm.has_run_id(body, run1["run_id"]))
         self.assertEqual(self.c318("a")["state"], "posted")
         self.assertNotIn("body", self.c318("a"))

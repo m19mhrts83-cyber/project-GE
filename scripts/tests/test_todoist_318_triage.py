@@ -330,8 +330,19 @@ class ClassifyTest(unittest.TestCase):
     def cat(self, **kw):
         return tr.classify(task("x", **kw), self.rules)
 
-    def test_unsure_is_2(self):
+    def test_no_marks_is_1_by_62_default(self):
         c = self.cat(content="何かやる")
+        self.assertEqual(c["category"], "1")
+        self.assertEqual(c["rule_ids"], ["R1-DEFAULT-62"])
+        self.assertIn("D-20261127-62-ask-criteria", c["applied_decision_ids"])
+
+    def test_impact_money_send_delete_stay_2(self):
+        for w in ("融資の方針", "経営会議の準備", "先方へ返信", "不要ファイルを削除", "振込する", "物件購入"):
+            self.assertEqual(self.cat(content=w)["category"], "2", w)
+
+    def test_without_default_rule_unsure_is_2(self):
+        rules = [r for r in self.rules if not r.is_default]
+        c = tr.classify(task("x", content="何かやる"), rules)
         self.assertEqual(c["category"], "2")
         self.assertEqual(c["rule_ids"], [])
 
@@ -356,7 +367,7 @@ class ClassifyTest(unittest.TestCase):
         self.assertTrue(c["large"])
 
     def test_ai_answer_rules(self):
-        base = self.cat(content="何かやる")
+        base = tr.classify(task("x", content="何かやる"), [r for r in self.rules if not r.is_default])
         up = tr.apply_ai_answer(base, {"category": "1", "reason": "調べるだけ", "snapshot_id": "s"}, "s")
         self.assertEqual(up["category"], "1")
         self.assertEqual(up["classified_by"], "ai(claude_code)")
