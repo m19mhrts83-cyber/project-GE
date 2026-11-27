@@ -3,10 +3,11 @@
   "weeks": [
     {
       "week_start": "2026-11-23",
-      "decisions": 12,
-      "fixes": 4,
+      "steering": 9,
+      "clarity": 4,
       "policy": 3,
-      "memo": "初回は大佐の見積もり",
+      "needless": 3,
+      "memo": "初回は大佐の見積もり・区分を 11/27 に変更",
       "source": "65_ 決定記録の行・Orca の Needs you"
     }
   ]

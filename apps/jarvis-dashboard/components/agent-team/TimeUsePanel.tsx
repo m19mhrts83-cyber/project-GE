@@ -2,7 +2,7 @@ import data from "@/data/timeUse.json";
 import { buildRows, weekStartOf, type TimeUseRow, type TimeUseWeek } from "@/lib/timeUse";
 
 /**
- * 松野さんの時間の使い方（週ごと）。判断の比率が上がり、直しが減れば良い。方針づくりは別枠で数だけ並べる。
+ * 松野さんの時間の使い方（週ごと・4区分）。主役は「聞くまでもない確認の割合」の推移と、価値の3区分の積み上げ棒。
  * 記録は data/timeUse.json（1週1行）。サーバー描画・SVG だけ（スマホ幅で viewBox が縮む）。
  */
 
@@ -17,40 +17,52 @@ function diff(cur: number, prev: number | undefined) {
 
 function Chart({ rows }: { rows: TimeUseRow[] }) {
   const W = 320;
-  const H = 150;
+  const H = 160;
   const L = 8;
   const R = 8;
   const T = 10;
   const B = 24;
   const plotW = W - L - R;
   const plotH = H - T - B;
-  const max = Math.max(5, ...rows.flatMap((r) => [r.decisions, r.fixes]));
+  const max = Math.max(5, ...rows.map((r) => r.total));
   const slot = plotW / rows.length;
-  const bw = Math.min(14, slot / 2.6);
+  const bw = Math.min(22, slot / 1.6);
   const y = (v: number) => T + plotH - (v / max) * plotH;
   const yr = (v: number) => T + plotH - v * plotH;
   const pts = rows.map((r, i) => (r.ratio == null ? null : [L + slot * i + slot / 2, yr(r.ratio)] as const));
   const line = pts.filter((p): p is readonly [number, number] => p != null).map((p) => p.join(",")).join(" ");
   return (
-    <svg className="tu-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="週ごとの判断・直しの件数と判断の比率">
+    <svg className="tu-chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="週ごとの価値の3区分の積み上げ棒と、聞くまでもない確認の割合の線">
       <line x1={L} x2={W - R} y1={T + plotH} y2={T + plotH} stroke="var(--line)" />
       {rows.map((r, i) => {
         const cx = L + slot * i + slot / 2;
+        let acc = 0;
         return (
           <g key={r.week_start}>
-            <rect x={cx - bw - 1} y={y(r.decisions)} width={bw} height={T + plotH - y(r.decisions)} fill="var(--accent)" rx={2} />
-            <rect x={cx + 1} y={y(r.fixes)} width={bw} height={T + plotH - y(r.fixes)} fill="var(--med)" rx={2} />
+            {SEGS.map((sg) => {
+              const v = r[sg.key];
+              const top = y(acc + v);
+              const h = y(acc) - top;
+              acc += v;
+              return v > 0 ? <rect key={sg.key} x={cx - bw / 2} y={top} width={bw} height={h} fill={sg.color} /> : null;
+            })}
             <text x={cx} y={H - 8} fontSize={9} textAnchor="middle" fill="var(--muted)">
               {md(r.week_start)}
             </text>
           </g>
         );
       })}
-      {line && rows.length > 1 ? <polyline points={line} fill="none" stroke="var(--info)" strokeWidth={2} /> : null}
-      {pts.map((p, i) => (p ? <circle key={i} cx={p[0]} cy={p[1]} r={3} fill="var(--info)" /> : null))}
+      {line && rows.length > 1 ? <polyline points={line} fill="none" stroke="var(--high)" strokeWidth={2} /> : null}
+      {pts.map((p, i) => (p ? <circle key={i} cx={p[0]} cy={p[1]} r={3} fill="var(--high)" /> : null))}
     </svg>
   );
 }
+
+const SEGS = [
+  { key: "steering", label: "舵取りの判断", color: "var(--accent)" },
+  { key: "clarity", label: "分かりやすくする直し", color: "var(--info)" },
+  { key: "policy", label: "方針づくり", color: "var(--med)" },
+] as const;
 
 export default function TimeUsePanel() {
   const rows = buildRows((data as { weeks: TimeUseWeek[] }).weeks);
@@ -63,6 +75,7 @@ export default function TimeUsePanel() {
   const isThis = cur.week_start === thisWeek;
   const recent = rows.slice(-12);
   const dRatio = prev && cur.ratio != null && prev.ratio != null ? Math.round((cur.ratio - prev.ratio) * 100) : null;
+  const needlessDiff = diff(cur.needless, prev?.needless);
 
   return (
     <section className="card tu" id="time-use">
@@ -79,7 +92,7 @@ export default function TimeUsePanel() {
       `}</style>
       <header>
         <strong>時間の使い方</strong>
-        <span className="meta">判断の比率が上がり、直しが減れば良い</span>
+        <span className="meta">聞くまでもない確認の割合が下がれば良い（直しは価値）</span>
       </header>
       <p className="meta">
         {isThis ? "今週" : `最新（${md(cur.week_start)} の週。今週分は未記録）`}
@@ -87,31 +100,27 @@ export default function TimeUsePanel() {
       </p>
       <div className="tu-grid">
         <div className="tu-cell">
-          <small>判断の比率</small>
+          <small>聞くまでもない確認の割合</small>
           <b>{pct(cur.ratio)}</b>
-          <span className="d">{dRatio == null ? "先週なし" : `先週比 ${dRatio > 0 ? "+" : ""}${dRatio}pt`}</span>
+          <span className="d">
+            {cur.needless}件／{cur.total}件・{dRatio == null ? "先週なし" : `先週比 ${dRatio > 0 ? "+" : ""}${dRatio}pt`}
+          </span>
         </div>
-        <div className="tu-cell">
-          <small>判断</small>
-          <b>{cur.decisions}</b>
-          <span className="d">先週比 {diff(cur.decisions, prev?.decisions) ?? "—"}</span>
-        </div>
-        <div className="tu-cell">
-          <small>直し</small>
-          <b>{cur.fixes}</b>
-          <span className="d">先週比 {diff(cur.fixes, prev?.fixes) ?? "—"}</span>
-        </div>
-        <div className="tu-cell">
-          <small>方針づくり（別枠）</small>
-          <b>{cur.policy}</b>
-          <span className="d">先週比 {diff(cur.policy, prev?.policy) ?? "—"}</span>
-        </div>
+        {SEGS.map((sg) => (
+          <div className="tu-cell" key={sg.key}>
+            <small>{sg.label}（価値）</small>
+            <b>{cur[sg.key]}</b>
+            <span className="d">先週比 {diff(cur[sg.key], prev?.[sg.key]) ?? "—"}</span>
+          </div>
+        ))}
       </div>
+      <p className="meta">聞くまでもない確認（減らす）：{cur.needless}件・先週比 {needlessDiff ?? "—"}</p>
       <Chart rows={recent} />
       <div className="tu-legend">
-        <span><i style={{ background: "var(--accent)" }} />判断</span>
-        <span><i style={{ background: "var(--med)" }} />直し</span>
-        <span><i style={{ background: "var(--info)" }} />判断の比率（線）</span>
+        {SEGS.map((sg) => (
+          <span key={sg.key}><i style={{ background: sg.color }} />{sg.label}</span>
+        ))}
+        <span><i style={{ background: "var(--high)" }} />聞くまでもない確認の割合（線）</span>
       </div>
     </section>
   );
