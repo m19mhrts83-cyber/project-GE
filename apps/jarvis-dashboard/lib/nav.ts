@@ -84,6 +84,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/billing", label: "サブスク・課金", icon: "card" },
       // 2026-11-22: プランを上げ下げする判断用。Mac が写した4者の枠（611）
       { href: "/ai-usage", label: "AI 使用量", icon: "ai" },
+      // 2026-11-28: 方針 v8（戦略・戦術・戦力）と戦力の月ごとの推移（アイテム140）
+      { href: "/policy", label: "方針", icon: "decide" },
     ],
   },
   {

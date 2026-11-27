@@ -607,6 +607,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         if rc != 0:
             print(f"# prev year finance push rc={rc} (CSV が無ければ無視可)", flush=True)
+        # 2b) 戦力の推移（AI・基盤の月ごとの支出と AI 顧問料）→ /policy。失敗しても本線は止めない
+        run_script("jarvis_force_monthly.py", ["--push"], timeout=120)
 
     # 3) safe aggregate apply
     cl = load_changelog()
