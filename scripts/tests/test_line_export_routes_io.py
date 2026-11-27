@@ -37,7 +37,7 @@ class RoutesIoTests(unittest.TestCase):
         self.src.write_text("changed", encoding="utf-8")
         err = OSError(11, "Resource deadlock avoided")
         buf = io.StringIO()
-        with mock.patch.object(Path, "read_text", side_effect=self._fail_src(err)), redirect_stdout(buf):
+        with mock.patch.object(Path, "read_text", self._fail_src(err)), redirect_stdout(buf):
             self.assertEqual(m.read_routes_text(self.src, last_good=self.lg), YAML)
         self.assertIn(m.LAST_GOOD_MESSAGE, buf.getvalue())
 
