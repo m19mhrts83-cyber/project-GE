@@ -1202,7 +1202,7 @@ def main() -> int:
     if MAIL_ACTION_SLACK.is_file() and not args.skip_fetch:
         rc = run_step(
             "mail_action_slack",
-            [exe, str(MAIL_ACTION_SLACK), "--from-triage", "--limit", "5"],
+            [exe, str(MAIL_ACTION_SLACK), "--from-triage", "--limit", "5", "--morning"],
             timeout=120,
             dry_run=args.dry_run,
         )
