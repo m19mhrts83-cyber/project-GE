@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatJstYmdHm } from "@/lib/formatJst";
 import AdvisoryExtraForm from "@/components/AdvisoryExtraForm";
 import { monthLabel, monthRows, parseAdvisoryFee, parseForceMonthly, type ForceMonthly } from "@/lib/forceMonthly";
+import { parseVision } from "@/lib/vision";
 import { FORCE, POLICY_LEAD, POLICY_TITLE, STRATEGY, TACTICS, UNDECIDED, type PolicyItem } from "@/lib/policyText";
 
 export const dynamic = "force-dynamic";
@@ -97,10 +98,11 @@ export default async function PolicyPage() {
   const { data: metas } = await supabase
     .from("sync_meta")
     .select("key,value,updated_at")
-    .in("key", ["force_monthly", "advisory_fee"]);
+    .in("key", ["force_monthly", "advisory_fee", "vision"]);
   const val = (k: string) => (metas || []).find((m) => m.key === k)?.value as string | undefined;
   const p = parseForceMonthly(val("force_monthly"));
   const fee = parseAdvisoryFee(val("advisory_fee"));
+  const vision = parseVision(val("vision"));
   const rows = p ? monthRows(p, fee) : [];
 
   return (
@@ -112,6 +114,32 @@ export default async function PolicyPage() {
           {l}
         </p>
       ))}
+
+      {vision && (
+        <>
+          <h2>ビジョン（育てていく）</h2>
+          <section className="card" style={{ padding: "4px 14px" }}>
+            {vision.items.map((it) => (
+              <div key={it.id} style={{ display: "flex", gap: 10, padding: "9px 0", borderBottom: "1px solid var(--line)" }}>
+                <strong style={{ minWidth: 34 }}>{it.id}</strong>
+                <div style={{ minWidth: 0, overflowWrap: "anywhere", lineHeight: 1.6 }}>
+                  <div>{it.text}</div>
+                  {it.sub.map((s) => (
+                    <div key={s} className="meta" style={{ marginTop: 4 }}>
+                      ・{s}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {vision.notes.map((n) => (
+              <p key={n} className="meta" style={{ margin: "8px 0" }}>
+                {n}
+              </p>
+            ))}
+          </section>
+        </>
+      )}
 
       <h2>戦略</h2>
       <Items list={STRATEGY} />
