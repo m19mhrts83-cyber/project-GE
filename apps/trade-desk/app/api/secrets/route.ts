@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { botBlock } from "@/lib/botGuard";
 
 const ALLOWED = new Set([
   "SONYLIFE_LOGIN_URL",
@@ -40,6 +41,8 @@ export async function POST(req: Request) {
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  const blocked = botBlock(user.email, "secrets");
+  if (blocked) return NextResponse.json(blocked, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const raw =

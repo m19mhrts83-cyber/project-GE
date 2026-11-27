@@ -154,7 +154,7 @@ export async function POST(req: Request) {
           g: project.computed.g,
           loanExcludedFromG: project.loanExcludedFromG,
         },
-        created_by: user.id,
+        created_by: user.email ?? user.id,
       });
     if (histErr) {
       return NextResponse.json({ error: histErr.message }, { status: 500 });

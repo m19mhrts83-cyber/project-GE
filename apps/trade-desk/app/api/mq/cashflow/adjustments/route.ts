@@ -105,7 +105,7 @@ export async function PUT(req: Request) {
         amount_man,
         source: "manual",
         note,
-        created_by: user.id,
+        created_by: user.email ?? user.id,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "business_line,entity,period_month,field_key" }

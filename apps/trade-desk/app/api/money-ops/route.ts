@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { botBlock } from "@/lib/botGuard";
 import { writeCardDebitLifecycle } from "@/lib/cardDebitLifecycle";
 import { buildCardSettlementAssistSteps, buildDefaultTransferRails } from "@/lib/cardSettlementBuffer";
 
@@ -46,6 +47,11 @@ export async function POST(req: Request) {
 
   const statusRaw = String(body.status || "draft");
   const status = STATUSES.has(statusRaw) ? statusRaw : "draft";
+  // 下書き・検討中の作成はボットも可。承認以降の状態での作成は止める
+  if (["approved", "executing", "done"].includes(status)) {
+    const blocked = botBlock(user.email, "money");
+    if (blocked) return NextResponse.json(blocked, { status: 403 });
+  }
   const assistIn =
     body.assist_payload && typeof body.assist_payload === "object"
       ? (body.assist_payload as Record<string, unknown>)

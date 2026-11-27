@@ -95,7 +95,7 @@ export async function POST(req: Request) {
       amount_man,
       label,
       is_active: true,
-      created_by: user.id,
+      created_by: user.email ?? user.id,
     })
     .select("*")
     .single();

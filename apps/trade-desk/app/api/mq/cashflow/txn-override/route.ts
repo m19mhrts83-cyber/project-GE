@@ -77,7 +77,7 @@ export async function PATCH(req: Request) {
         business_line: businessLine,
         cashflow_column: cashflowColumn,
         note,
-        created_by: user.id,
+        created_by: user.email ?? user.id,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "txn_id,business_line" }
@@ -103,7 +103,7 @@ export async function PATCH(req: Request) {
         {
           ...payload,
           source_txn_id: txnId,
-          created_by: user.id,
+          created_by: user.email ?? user.id,
           updated_at: new Date().toISOString(),
         },
         {
