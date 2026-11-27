@@ -1,4 +1,4 @@
-# 318 Todoist消化係 — 3分類の基準（Phase 1・2026-11-23）
+# 318 Todoist消化係 — 3分類の基準（Phase 1・2026-11-23／2026-11-27 聞く基準へ）
 #
 # 読むのは scripts/jarvis_todoist_318_triage.py。読めない・壊れている時は安全停止する（基準なしとは扱わない）。
 #
@@ -30,6 +30,12 @@ rules:
     match:
       tags_any: ["表確認", "確認のみ"]
       title_any: ["UI確認"]
+  - id: R1-DEFAULT-62
+    status: adopted
+    decision_id: D-20261127-62-ask-criteria
+    default: true   # ②③の印が一つも無い時の既定。無い・読めない時は②（安全側）
+    source: "62_ボット共通ルール入口「聞く基準」（2026-11-27 松野さん）: 舵取り・経営上重要・方向性で迷う物は松野さん、実務的で影響が小さい・戻せる・どちらでもよい物は AI が決めて事後報告"
+    category: "1"
 
   # ---- ②（松野さんの判断）: adopted --------------------------------------------
   - id: R2-313-OWNER
@@ -48,6 +54,13 @@ rules:
     category: "2"
     match:
       title_any: ["送信", "返信", "振込", "支払", "送金", "契約", "削除", "申込"]
+  - id: R2-62-IMPACT
+    status: adopted
+    decision_id: D-20261127-62-ask-criteria
+    source: "62_「聞く基準」＋5「了承が要ること」（2026-11-27 松野さん）: 影響が大きい・お金・対外送信・削除・取り返せない物・経営上の舵取りだけ②"
+    category: "2"
+    match:
+      title_any: ["経営", "投資", "融資", "借入", "売却", "購入", "発注", "取り返し", "不可逆", "舵取り"]
   - id: R2-HOME-L0
     status: adopted
     decision_id: D-HOME-L0-human-approval

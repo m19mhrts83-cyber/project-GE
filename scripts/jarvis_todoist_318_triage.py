@@ -370,6 +370,7 @@ class Rule:
     labels_any: list[str] = field(default_factory=list)
     marks_any: list[str] = field(default_factory=list)
     tags_any: list[str] = field(default_factory=list)
+    is_default: bool = False  # 当たる語が無い時の既定（①）。62_「聞く基準」: 実務的・影響が小さい・戻せる物は AI で進める
 
 
 @dataclass
@@ -416,6 +417,9 @@ def load_criteria(path: Path) -> tuple[list[Rule], int]:
             raise SafeStop("basis_unreadable", f"採用済み基準 {r.get('id')} に decision_id が無い")
         m = r.get("match") or {}
         words = [str(x) for x in (m.get("title_any") or [])]
+        is_default = bool(r.get("default"))
+        if is_default and (cat != "1" or status != "adopted"):
+            raise SafeStop("basis_unreadable", f"基準 {r.get('id')} の default は採用済みの①だけ")
         if any(len(w) < 2 for w in words):
             raise SafeStop("basis_unreadable", f"基準 {r.get('id')} に1文字の語（誤判定のもと）")
         rules.append(
@@ -429,6 +433,7 @@ def load_criteria(path: Path) -> tuple[list[Rule], int]:
                 labels_any=[str(x) for x in (m.get("labels_any") or [])],
                 marks_any=[str(x) for x in (m.get("marks_any") or [])],
                 tags_any=[str(x) for x in (m.get("tags_any") or [])],
+                is_default=is_default,
             )
         )
     return rules, ignored
@@ -650,6 +655,8 @@ def detect_change(task_id: str, snap: dict[str, str], basis: Basis) -> tuple[str
 
 
 def rule_hits(rule: Rule, t: dict) -> bool:
+    if rule.is_default:
+        return False  # 既定は classify が「当たる語が無い時」にだけ使う
     raw = str(t.get("content") or "").lstrip()
     labels = {str(x) for x in (t.get("labels") or [])}
     tags = title_tags(t)
@@ -666,21 +673,28 @@ def rule_hits(rule: Rule, t: dict) -> bool:
 
 
 def classify(t: dict, rules: list[Rule]) -> dict[str, Any]:
-    """①は adopted の①だけに当たり、②③の印が一つも無い時だけ。迷ったら②。"""
+    """②（影響が大きい・お金・対外送信・削除・取り返せない・舵取り）か③の印が無ければ①。
+
+    62_「聞く基準」（2026-11-27 松野さん）: 実務的・影響が小さい・戻せる・どちらでもよい物は AI で進める。
+    既定の①は基準ファイルに採用済みの default 行がある時だけ。無い・読めない時は従来どおり②（安全側）。
+    """
     hits = [r for r in rules if rule_hits(r, t)]
     by = lambda cat, st=None: [r for r in hits if r.category == cat and (st is None or r.status == st)]  # noqa: E731
     large = bool(by("large"))
     blockers2 = by("2")
     blockers3 = by("3")
     ok1 = by("1", "adopted")
+    default1 = [r for r in rules if r.is_default and r.category == "1" and r.status == "adopted"]
     if blockers3 and not blockers2:
         cat, basis_rules, why = "3", blockers3, "本人の操作が要る手がかり"
     elif blockers2:
         cat, basis_rules, why = "2", blockers2 + blockers3, "松野さんの判断が要る（採用済み基準）"
     elif ok1:
         cat, basis_rules, why = "1", ok1, "AIが進めてよい印・確認のみ（採用済み基準）・止める印なし"
+    elif default1:
+        cat, basis_rules, why = "1", default1, "②③の印なし・実務的で影響が小さく戻せる（62_聞く基準）"
     else:
-        cat, basis_rules, why = "2", [], "迷ったら②（AIだけで進めてよい根拠が無い）"
+        cat, basis_rules, why = "2", [], "既定の①基準が読めないので②（安全側）"
     if cat == "2" and blockers3 and blockers2:
         why += "・本人操作の手がかりもあり"
     return {
