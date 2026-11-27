@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { botBlock } from "@/lib/botGuard";
 import { writeCardDebitLifecycle } from "@/lib/cardDebitLifecycle";
 import type { TransferRailStatus } from "@/lib/cardSettlementBuffer";
 import {
@@ -46,6 +47,8 @@ export async function PATCH(
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  const blocked = botBlock(user.email, "money");
+  if (blocked) return NextResponse.json(blocked, { status: 403 });
 
   const body = await req.json().catch(() => ({}));
   const railId = typeof body.rail_id === "string" ? body.rail_id.trim() : "";

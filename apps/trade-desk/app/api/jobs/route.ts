@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { botBlock } from "@/lib/botGuard";
 
 const ALLOWED = new Set([
   "lifeplan_ingest_actuals",
@@ -53,6 +54,11 @@ export async function POST(req: Request) {
   const job_type = String(body.job_type || "");
   if (!ALLOWED.has(job_type)) {
     return NextResponse.json({ error: "job_type not allowed" }, { status: 400 });
+  }
+
+  if (job_type === "secrets_upsert") {
+    const blocked = botBlock(user.email, "secrets");
+    if (blocked) return NextResponse.json(blocked, { status: 403 });
   }
 
   let title = String(body.title || job_type);

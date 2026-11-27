@@ -11,7 +11,7 @@
     "test:household": "npx --yes tsx lib/householdBsCompose.selftest.ts && npx --yes tsx lib/householdReFlow.selftest.ts && npx --yes tsx lib/householdReFiled.selftest.ts",
     "test:re": "npx --yes tsx lib/rePropertyMaster.selftest.ts && npx --yes tsx lib/reDealsListUi.selftest.ts && npx --yes tsx lib/notionPropertyKeys.selftest.ts && npx --yes tsx lib/reDealStages.selftest.ts && npx --yes tsx lib/reViewingGate.selftest.ts",
     "test": "npm run test:mq && npm run test:re && npm run test:household && npm run test:decisions && npm run test:assets",
-    "test:decisions": "npx --yes tsx lib/kurashiftDecisionLog.selftest.ts",
+    "test:decisions": "npx --yes tsx lib/kurashiftDecisionLog.selftest.ts && npx --yes tsx lib/botGuard.selftest.ts",
     "test:assets": "node --test tests/asset618.test.mjs"
   },
   "dependencies": {
