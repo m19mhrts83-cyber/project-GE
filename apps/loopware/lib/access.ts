@@ -46,6 +46,42 @@ export async function isValidSession(key: string, cookie: string | undefined | n
   return safeEqual(cookie, await sessionValue(key));
 }
 
+/**
+ * 入った人の種類。松野さんの鍵（LOOPWARE_ACCESS_KEY）は owner、ボット用の鍵（LOOPWARE_BOT_ACCESS_KEY）は bot。
+ * ボット用の鍵が松野さんの鍵と同じ・空なら無効（ボットは入れない）。
+ */
+export type Actor = "owner" | "bot";
+export const ACTOR_HEADER = "x-lw-actor";
+
+/** ボット用 Cookie の値。松野さんの Cookie とは別の文字列にして、サーバ側で区別する */
+export async function botSessionValue(botKey: string): Promise<string> {
+  return hmac(botKey, "loopware-bot-session-v1");
+}
+
+export function usableBotKey(key: string, botKey: string | undefined | null): string {
+  const b = String(botKey || "");
+  return b && b !== key ? b : "";
+}
+
+export async function actorFromCookie(
+  key: string,
+  botKey: string | undefined | null,
+  cookie: string | undefined | null,
+): Promise<Actor | null> {
+  if (!cookie) return null;
+  if (await isValidSession(key, cookie)) return "owner";
+  const b = usableBotKey(key, botKey);
+  if (b && safeEqual(cookie, await botSessionValue(b))) return "bot";
+  return null;
+}
+
+/** ボットなら外に届く操作を止める 403 の本文。そうでなければ null */
+export const BOT_FORBIDDEN_BODY = {
+  ok: false,
+  error: "ボット用の入り口では、外に届く操作（送信・Todoist を閉じる・見送り・確定）はできません。",
+  code: "bot_forbidden",
+} as const;
+
 /** Slack などから飛ぶリンクに付ける t= の値 */
 export async function linkToken(key: string, now: Date = new Date(), days = LINK_DAYS): Promise<string> {
   const exp = Math.floor(now.getTime() / 1000) + days * 86400;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { botForbidden } from "@/lib/actor";
 import { serviceClient } from "@/lib/supabase";
 import { writeDecision } from "@/lib/ownerDecisionLog";
 import type { DecisionInput } from "@/lib/decisionContract";
@@ -62,6 +63,8 @@ export async function GET() {
 
 /** 確定。判断の行を全部書いてから、最後に commit（反映の単位）を書く */
 export async function POST(req: Request) {
+  const blocked = await botForbidden(req);
+  if (blocked) return blocked;
   let body: { decisions?: DecisionInput[] };
   try {
     body = await req.json();

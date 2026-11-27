@@ -173,3 +173,12 @@ SQL Editor または CLI で:
 
 - 312: `docs/AIエージェントチーム/…/312_…/docs/ループウェア_入口設計_20261107.md`
 - 313: `docs/AIエージェントチーム/…/313_…/docs/ループウェア_出口設計_20261107.md`
+
+
+## ボット用の入り方（2026-11-27 大佐の決定・アイテム134）
+
+- 環境変数 `LOOPWARE_BOT_ACCESS_KEY`（松野さんの `LOOPWARE_ACCESS_KEY` とは別の値）。`/login` にこの鍵を入れると、別の Cookie（actor=bot）をもらう。松野さんの鍵は actor=owner。
+- 判断ログ（owner_decisions）の `payload.actor` に owner／bot を残す。無い古い行は owner 扱い。
+- actor=bot で止めるもの（403 `{code:"bot_forbidden"}`）: 返信の「送る」、見送り・Todoist・回答不要（判断デスク／次の一手）、312/313 の判断、313 まとめ判断、今週の9件の確定。見る・下書き作成・迷った記録は今までどおり。
+- Jarvis `/api/g/ma/*` へも `actor` を渡し、`actor=bot` なら Jarvis 側でも 403（二重の守り）。
+- 鍵の値は 1Password のエージェント保管庫と Vercel（jarvis-loopware の production/preview）。設定は再デプロイ後に効く。

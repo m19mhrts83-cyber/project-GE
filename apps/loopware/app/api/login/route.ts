@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SESSION_COOKIE, SESSION_DAYS, safeEqual, sessionValue } from "@/lib/access";
+import { SESSION_COOKIE, SESSION_DAYS, botSessionValue, safeEqual, sessionValue, usableBotKey } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -14,13 +14,16 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "bad json" }, { status: 400 });
   }
-  if (!given || !safeEqual(given, key)) {
+  // ボット用の鍵（別の鍵・別の Cookie。入った後は actor=bot として外に届く操作が止まる）
+  const botKey = usableBotKey(key, process.env.LOOPWARE_BOT_ACCESS_KEY);
+  const isBot = !!given && !!botKey && safeEqual(given, botKey);
+  if (!given || (!isBot && !safeEqual(given, key))) {
     // 総当たりを遅らせる
     await new Promise((r) => setTimeout(r, 800));
     return NextResponse.json({ ok: false, error: "wrong key" }, { status: 401 });
   }
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, await sessionValue(key), {
+  const res = NextResponse.json({ ok: true, actor: isBot ? "bot" : "owner" });
+  res.cookies.set(SESSION_COOKIE, isBot ? await botSessionValue(botKey) : await sessionValue(key), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

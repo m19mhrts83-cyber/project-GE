@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { botForbidden } from "@/lib/actor";
 import { serviceClient } from "@/lib/supabase";
 import { writeDecision } from "@/lib/ownerDecisionLog";
 import type { DecisionInput } from "@/lib/decisionContract";
@@ -26,6 +27,8 @@ export async function GET() {
 
 /** 確定。選んだカードだけ判断の行を書く（反映は 30 分ごとのスクリプトが Todoist に行う） */
 export async function POST(req: Request) {
+  const blocked = await botForbidden(req);
+  if (blocked) return blocked;
   let body: { decisions?: DecisionInput[] };
   try {
     body = await req.json();

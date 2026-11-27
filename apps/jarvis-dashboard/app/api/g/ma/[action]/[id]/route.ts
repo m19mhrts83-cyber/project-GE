@@ -157,6 +157,15 @@ export async function POST(
     return htmlPage("認証エラー", "署名が無効です", false);
   }
 
+  // loopware のボット用の入り口（actor=bot）からは、外に届く操作（返信送信・見送り・Todoist・回答不要）を通さない。
+  // loopware 側でも止めているが、こちらでも止める二重の守り（KURASHIFT の botGuard と同じ考え）。
+  if (String(form.get("via") || "") === "loopware" && String(form.get("actor") || "") === "bot") {
+    return NextResponse.json(
+      { ok: false, message: "ボット用の入り口では、この操作はできません。", code: "bot_forbidden" },
+      { status: 403 },
+    );
+  }
+
   if (action === "reply") {
     const body = String(form.get("body") || "");
     const intent = String(form.get("intent") || "send");

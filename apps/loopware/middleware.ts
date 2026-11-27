@@ -5,20 +5,26 @@ import {
   isLegacyOpenPath,
   isPublicPath,
   isValidLinkToken,
-  isValidSession,
+  ACTOR_HEADER,
+  actorFromCookie,
   sessionValue,
 } from "@/lib/access";
 
 /** 入場確認。仕組みは lib/access.ts の説明を参照 */
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  if (isPublicPath(path)) return NextResponse.next();
+  // 外から付けられた actor は必ず捨てる（名乗りは Cookie の署名だけで決める）
+  const clean = new Headers(req.headers);
+  clean.delete(ACTOR_HEADER);
+  if (isPublicPath(path)) return NextResponse.next({ request: { headers: clean } });
 
   const key = process.env.LOOPWARE_ACCESS_KEY || "";
   const isApi = path.startsWith("/api/");
 
   if (!key) {
-    if (process.env.NODE_ENV !== "production" || isLegacyOpenPath(path, req.nextUrl.searchParams)) return NextResponse.next();
+    if (process.env.NODE_ENV !== "production" || isLegacyOpenPath(path, req.nextUrl.searchParams)) {
+      return NextResponse.next({ request: { headers: clean } });
+    }
     if (isApi) {
       return NextResponse.json({ ok: false, error: "loopware_access_key_unset" }, { status: 503 });
     }
@@ -29,9 +35,11 @@ export async function middleware(req: NextRequest) {
   }
 
   const cookie = req.cookies.get(SESSION_COOKIE)?.value;
-  if (await isValidSession(key, cookie)) {
+  const actor = await actorFromCookie(key, process.env.LOOPWARE_BOT_ACCESS_KEY, cookie);
+  if (actor) {
+    clean.set(ACTOR_HEADER, actor);
     // 開くたびに期限を延ばす（使っている端末では鍵を入れ直さずに済む）
-    const res = NextResponse.next();
+    const res = NextResponse.next({ request: { headers: clean } });
     res.cookies.set(SESSION_COOKIE, cookie as string, {
       httpOnly: true,
       secure: true,
