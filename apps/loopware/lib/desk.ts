@@ -6,6 +6,7 @@
  * Slack カードの片付け・Gmail 既読・見送り学習まで1か所で済み、二重実装にならない。
  * 判断ログの行は DB トリガーが残すので、ここでは理由・時間・鍵を後から足す。
  */
+import { currentActor } from "@/lib/actor";
 import { createHmac } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadPolicies } from "@/lib/senderPolicy";
@@ -149,9 +150,11 @@ export async function applyViaDashboard(
   id: string,
   action: "skip" | "todoist" | "done",
 ): Promise<{ ok: boolean; message: string }> {
+  const actor = await currentActor();
+  if (actor === "bot") return { ok: false, message: "bot_forbidden" };
   const s = maSig(id, action);
   if (!s) return { ok: false, message: "MAIL_ACTION_TOKEN が loopware に設定されていません" };
-  const form = new URLSearchParams({ s, intent: "confirm", via: "loopware" });
+  const form = new URLSearchParams({ s, intent: "confirm", via: "loopware", actor });
   try {
     const r = await fetch(`${dashboardBase()}/api/g/ma/${action}/${encodeURIComponent(id)}`, {
       method: "POST",
@@ -402,9 +405,11 @@ export async function sendViaDashboard(
     assist?: { proofread?: number; revise?: number };
   },
 ): Promise<{ ok: boolean; message: string }> {
+  const actor = await currentActor();
+  if (actor === "bot") return { ok: false, message: "bot_forbidden" };
   const s = maSig(id, "reply");
   if (!s) return { ok: false, message: "MAIL_ACTION_TOKEN が loopware に設定されていません" };
-  const form = new URLSearchParams({ s, intent: "send", via: "loopware", body: args.body });
+  const form = new URLSearchParams({ s, intent: "send", via: "loopware", actor, body: args.body });
   if (args.to) form.set("to", args.to);
   if (args.account) form.set("account", args.account);
   if (args.room) form.set("room", args.room);

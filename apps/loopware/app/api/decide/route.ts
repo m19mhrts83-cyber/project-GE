@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { botForbidden } from "@/lib/actor";
 import { serviceClient } from "@/lib/supabase";
 import { persistDecision, type DecideBody } from "@/lib/decideStore";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  const blocked = await botForbidden(req);
+  if (blocked) return blocked;
   let body: DecideBody;
   try {
     body = (await req.json()) as DecideBody;

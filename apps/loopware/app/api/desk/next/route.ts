@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { botForbidden } from "@/lib/actor";
 import { serviceClient } from "@/lib/supabase";
 import { alreadyLogged, applyViaDashboard, snoozeItem } from "@/lib/desk";
 import { writeDecision } from "@/lib/ownerDecisionLog";
@@ -43,6 +44,10 @@ export async function POST(req: Request) {
 
   let done: string | null = null;
   if (b.verdict === "good") {
+    if (effect === "todo" || effect === "skip") {
+      const blocked = await botForbidden(req);
+      if (blocked) return blocked;
+    }
     if (effect === "snooze3") done = (await snoozeItem(sb, id, 3)) ? "snoozed" : null;
     else if (effect === "todo") done = (await applyViaDashboard(id, "todoist")).ok ? "todoist" : null;
     else if (effect === "skip") done = (await applyViaDashboard(id, "skip")).ok ? "skipped" : null;

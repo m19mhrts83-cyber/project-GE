@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { botForbidden } from "@/lib/actor";
 import { serviceClient } from "@/lib/supabase";
 import { alreadyLogged, applyViaDashboard, enrichTriggerRow, markHesitated } from "@/lib/desk";
 import { writeDecision } from "@/lib/ownerDecisionLog";
@@ -67,6 +68,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, logged: r.persisted });
   }
 
+  // 見送り・Todoist・回答不要は Jarvis の状態を変える（外に届く）。ボットは止める
+  const blocked = await botForbidden(req);
+  if (blocked) return blocked;
   const ma = CHOICE_MA[choice];
   if (!ma) return NextResponse.json({ ok: false, error: "choice" }, { status: 400 });
   const res = await applyViaDashboard(id, ma);

@@ -3,6 +3,7 @@
  * 契約は lib/decisionContract.ts。失敗しても画面は止めない。
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { currentActor } from "@/lib/actor";
 import { normalizeDecision, type DecisionInput } from "@/lib/decisionContract";
 
 export type LogResult =
@@ -11,7 +12,9 @@ export type LogResult =
   | { ok: false; error: string };
 
 export async function writeDecision(sb: SupabaseClient | null, input: DecisionInput): Promise<LogResult> {
-  const n = normalizeDecision(input);
+  // 押した人の種類（owner＝松野さん／bot）を残す。無い行は owner 扱い
+  const actor = await currentActor();
+  const n = normalizeDecision({ ...input, payload: { ...(input.payload || {}), actor } });
   if (!n.ok) return { ok: false, error: n.error };
   if (!sb) return { ok: true, persisted: false, reason: "supabase_unconfigured", idemKey: n.idemKey };
   try {

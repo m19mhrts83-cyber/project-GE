@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { botForbidden } from "@/lib/actor";
 import { serviceClient } from "@/lib/supabase";
 import { writeDecision } from "@/lib/ownerDecisionLog";
 import { draftViaDashboard, loadPastReplies, sendViaDashboard, type DraftOp } from "@/lib/desk";
@@ -65,6 +66,8 @@ export async function POST(req: Request) {
   const op = String(b.op || "");
 
   if (op === "send") {
+    const blocked = await botForbidden(req);
+    if (blocked) return blocked;
     const body = String(b.draft || "").trim();
     if (!body) return NextResponse.json({ ok: false, message: "本文が空です" }, { status: 400 });
     const r = await sendViaDashboard(id, {
