@@ -9,7 +9,7 @@
 - [x] runner: 金曜以外は何もしない。318 は 313 が載せた件（8日）を載せない。315-B は週1の監視に
 - [x] 実データ下見 11/24: タスク229件 → A 0件／B 15件（うち「済み？」5件）
 - [ ] 初回本番 2026-11-27（金）20:00 → 結果（A n／B n・閉じた件の誤り）を確かめる
-- [ ] launchd 入れ替え（ラスカル・Mac の `~/git-repos` を main に追従した後）:
+- [ ] launchd 入れ替え（ラス隊長・Mac の `~/git-repos` を main に追従した後）:
   ```bash
   cd ~/git-repos && git pull --ff-only
   zsh launchd/install_jarvis_todoist_313_digest_launchd.sh   # 金曜 20:00（Weekday=5）で入れ直す

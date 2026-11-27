@@ -10,7 +10,7 @@ Phase 3 準備として【318】コメント（`--write-comments`）と 10:30 �
 
 - 状態: **設計中**（registry の status は変えない。昇格は松野さんの了承後）
 - 設計の正本: FlowForge [flow_HMy15MUxWiSpw5QgAPYa_8e4](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_HMy15MUxWiSpw5QgAPYa_8e4)（承認済み 15 ノード・11 接続）。各ノードの説明文が仕様。読み方は [`flow.md`](./flow.md)
-- 仕様を変えたい時は独断で変えない。300 BL（ラスカル）に相談する
+- 仕様を変えたい時は独断で変えない。300 ラス隊長に相談する
 - 実装: `scripts/jarvis_todoist_318_triage.py`（本体）・`scripts/jarvis_todoist_318_handoff.py`（Phase 2 の部品）・`scripts/jarvis_todoist_318_comment.py`（【318】コメント）・`scripts/jarvis_todoist_morning_slot.py`（朝枠の排他）／基準: `config/todoist_318_criteria.yaml`／テスト: `scripts/tests/test_todoist_318_triage.py`・`test_todoist_318_phase2.py`・`test_todoist_318_phase3.py`
 - 10:30 の移管: [`移管手順_10時30分.md`](./移管手順_10時30分.md)（止める順番・戻し方。launchd は 2026-11-23 登録済み）
 - 関係: 起票は [312](../312_Todoist起票整理係/CLAUDE.md)、済み・やめるの週の整理（金曜）は [313](../313_完了候補確認係/CLAUDE.md)、コメント起動は [317](../317_コメント起動係/CLAUDE.md)

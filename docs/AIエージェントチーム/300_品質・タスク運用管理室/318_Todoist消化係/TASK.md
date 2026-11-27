@@ -7,7 +7,7 @@
 | task_id | orca task_1588877e6c3e（Phase 1・PR #582 マージ済）／task_becb7616c903（Phase 2・PR #585 マージ済）／task_0036d777fe4a（Phase 3 準備・PR #586 マージ済）／task_e8849b99d861（①自律実行） |
 | agent_id | 318 |
 | executor | claude_code（Miss Lemon・Orca worker） |
-| status | done（PR レビュー待ち。マージはラスカルが松野さんの了承後） |
+| status | done（PR レビュー待ち。マージはラス隊長が松野さんの了承後） |
 | started_at | 2026-11-23 |
 | finished_at | 2026-11-23 |
 

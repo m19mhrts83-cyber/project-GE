@@ -59,7 +59,7 @@ genres:
     summary: 品質・ミックス取捨・参謀。Jarvis（Mac）× ホークが横のつながり
     leaders:
       grok: ホークアイ（参謀）
-      ai: 001 シャア大佐（全体リーダー）／品質・タスク運用／ミックス・取捨判断（＋ Jarvis 右腕）
+      ai: 000 シャア大佐（全体リーダー）／品質・タスク運用／ミックス・取捨判断（＋ Jarvis 右腕）
     ai_department_ids: ["300", "400"]
     grok_department_ids: ["sanbo", "weather"]
     nav_hints: ["ホーム", "状況ウォッチ", "対応表"]
