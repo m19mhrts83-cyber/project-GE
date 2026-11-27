@@ -32,5 +32,16 @@ class WeatherLayoutTests(unittest.TestCase):
         self.assertIn("A · B", text)
 
 
+class MentionTests(unittest.TestCase):
+    def test_hub_mention_known_and_unknown(self):
+        meta = {"bot": "ホークアイ", "title": "依頼", "channel": "ai-hub", "mention": "大佐, ラスカル"}
+        text = g.build_text(meta, "本文", "x.md")
+        self.assertIn("<@U0CLH5AARJT> ＠ラスカル（ID要確認）\n本文", text)
+
+    def test_no_mention_outside_hub(self):
+        meta = {"bot": "ホーク", "title": "t", "channel": "report", "mention": "大佐"}
+        self.assertNotIn("<@", g.build_text(meta, "本文", "x.md"))
+
+
 if __name__ == "__main__":
     unittest.main()

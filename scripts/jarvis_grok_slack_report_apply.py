@@ -19,6 +19,9 @@ bot: ホークアイ（参謀）
 title: 週次統括 YYYY-MM-DD
 ---
 
+Orca 側へ依頼する時（2026-11-27〜）: channel: ai-hub と mention: 大佐（または担当の隊長名）を付ける。
+本文先頭に <@ID> のメンションが入る（ID は ORCA_MENTION_IDS。不明な名前は平文で「ID要確認」）。
+
 本文（短く。秘密・トークン禁止）
 
 iPhone 可読（必須・2026-10-19）: 先頭に📌要ボス最大3つ（無ければ「要ボス: なし」）／
@@ -47,6 +50,27 @@ PY = Path.home() / "selenium_env" / "venv" / "bin" / "python"
 POST = REPO / "scripts" / "jarvis_slack_webhook_post.py"
 ACTION = "slack_report"
 BODY_LIMIT = 3500
+
+# Orca 側ボットの Slack ユーザーID（メンション用）。IDは秘密ではない。
+# 分からない隊長は入れない（「要確認」）。分かったらここへ足す。
+# 決定 2026-11-27: ホーク(Grok)→Orca への依頼は #ai-hub で大佐か担当の隊長をメンション。
+ORCA_MENTION_IDS: dict[str, str] = {
+    "シャア大佐": "U0CLH5AARJT",
+    "大佐": "U0CLH5AARJT",
+    "番頭さん": "U0CM0MLFBGT",
+}
+
+
+def build_mention_line(raw: str) -> str:
+    """frontmatter `mention: 大佐, ラスカル` → `<@ID> ＠ラスカル`。ID不明は平文（通知されない）。"""
+    parts: list[str] = []
+    for name in re.split(r"[,、，\s]+", (raw or "").strip()):
+        name = name.strip().lstrip("@＠")
+        if not name:
+            continue
+        uid = ORCA_MENTION_IDS.get(name)
+        parts.append(f"<@{uid}>" if uid else f"＠{name}（ID要確認）")
+    return " ".join(parts)
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
@@ -251,6 +275,9 @@ def build_text(meta: dict[str, str], body: str, name: str) -> str:
         filtered.append(line)
     body_clean = "\n".join(filtered).strip() or "（本文なし）"
     body_clean = markdown_to_slack(body_clean)
+    mention_line = build_mention_line(meta.get("mention", ""))
+    if mention_line and channel == "hub":
+        body_clean = f"{mention_line}\n{body_clean}"
     if is_weather:
         # 種別／ch の行は天気では読まないので題だけ（Slack FB 2026-10-29）
         return f"【Grok定型報告】{bot}\n*{title}*\n\n{body_clean}"

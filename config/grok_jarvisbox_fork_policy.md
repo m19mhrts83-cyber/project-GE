@@ -1,5 +1,7 @@
 # Grok ↔ Jarvis — JarvisBox フォーク原則（正本）
 
+> **2026-11-27 注記**: ホーク（Grok）→ Orca 側の依頼口は Slack `#ai-hub` で大佐か担当の隊長をメンションする1本。この文書の入口は主役ではない（整理は [`63_`](../docs/AIエージェントチーム/63_Grok_Orca_受け渡し_Slack中心へ組み直し案_20261127.md)）。
+
 **更新**: 2026-09-21  
 **Drive**: admin `【with Grok bot】/` · 設定: `config/kurashift_grok_bridge_folders.yaml`
 
