@@ -12,7 +12,7 @@
 - 起動は手動。定時（--trigger schedule）は朝枠の担当が 318 の時だけ動く（jarvis_todoist_morning_slot.py）。launchd は未登録
 - ① の自律実行は --execute-auto の時だけ（jarvis_todoist_318_work.py。材料出し → Claude Code → 取り込み。調査・資料確認・文面下書きまで）
   付けない時は「やる予定の内容」を planned_action に記録するだけ
-- 1 回 最大 60 分・処理 5 件
+- 1 回 最大 90 分・処理 15 件（MAX_MINUTES／MAX_TASKS）。①の作業に新しく着手するのは 60 分まで（WORK_MAX_MINUTES）
 
 使い方（Mac）:
   cd ~/git-repos && set -a && source .env.jarvis_private && set +a
@@ -56,6 +56,7 @@ import jarvis_todoist_318_handoff as ho  # noqa: E402  （Phase 2: /313/bulk・�
 import jarvis_todoist_318_comment as cm  # noqa: E402  （Phase 3 準備: 【318】コメント。--write-comments の時だけ）
 import jarvis_todoist_morning_slot as ms  # noqa: E402  （Phase 3 準備: 10:30 の朝枠を 313 0.5 と取り合わない）
 import jarvis_todoist_318_work as wk  # noqa: E402  （①自律実行 2-1・2-2。--execute-auto の時だけ）
+import jarvis_todoist_318_done as dn  # noqa: E402  （済み検出: 根拠つきの「済みらしい」印と大佐向けの一覧）
 from jarvis_todoist_mark import AI_MARK, REQUESTED_MARK, strip_mark  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -63,8 +64,12 @@ AGENT_ID = "318"
 AGENT_ROLE = "Todoist消化"
 PHASE = "phase3-auto"
 HOLD_AFTER_DEFER_DAYS = 14  # /313/bulk で「残す」を選んだら、この日数たってから再評価（cleanup_bulk の HOLD_DAYS と同じ）
-MAX_TASKS = 5
-MAX_MINUTES = 60
+MAX_TASKS = 15  # 1日に分類・着手する件数の上限（2026-11-27 件119: 5→15）
+MAX_MINUTES = 90  # 1回の実行の上限（15件に合わせて60→90）
+WORK_MAX_MINUTES = 60  # ①の作業（自律実行）に新しく着手してよい時間の上限。これを過ぎたら新しく着手しない
+OLD_PICK_STALE = 3  # 毎回、30日以上変化がない物から拾う件数
+OLD_PICK_NODUE = 3  # 毎回、期限なしの古い物から拾う件数
+OLD_DAYS = 30
 COMMENT_FETCH_CAP = 30  # 変化確認でコメントを読む上限（API の呼びすぎ防止。残りは繰越）
 DEADLINE_SOON_DAYS = 3
 OWN_COMMENT_PREFIX = "【318】"  # 自分のコメントは変化に数えない（Phase 3 の循環防止）
@@ -533,6 +538,44 @@ def candidate_filter(tasks: list[dict], user_id: str, today: date) -> list[dict]
     return out
 
 
+def _added_or_updated(t: dict) -> date | None:
+    return max([d for d in (_d(t.get("updated_at")), _d(t.get("added_at"))) if d], default=None)
+
+
+def last_change_day(t: dict, row: dict[str, Any]) -> date | None:
+    """最後に変化があった日: Todoist の更新日・作成日と、318 が最後に分類し直した日の新しい方。"""
+    return max([d for d in (_added_or_updated(t), _d(str(row.get("last_evaluated") or "")[:10])) if d], default=None)
+
+
+def pick_old(
+    tasks: list[dict], user_id: str, today: date, history: dict[str, Any], exclude: set[str],
+) -> list[tuple[dict, str]]:
+    """毎回拾う古い物（見る範囲を「期限今日以前」だけにしない・2026-11-27 件119）。
+
+    - old_stale: 期限（今日より先）か締切があって、30日以上変化がない物 3件
+    - old_nodue: 期限なしで作成から30日以上たった物 3件
+    どちらも「最後に見た日が古い物から」順に拾うので、毎回同じ件に偏らず一巡する。
+    """
+    def eligible(t: dict) -> bool:
+        if t.get("checked") or t.get("is_deleted") or t.get("completed_at") or str(t.get("id")) in exclude:
+            return False
+        return t.get("responsible_uid") in (None, "", user_id)
+
+    def order(t: dict) -> tuple:
+        row = history.get(str(t.get("id"))) or {}
+        return (str(row.get("last_examined") or ""), str(last_change_day(t, row) or ""), str(t.get("id")))
+
+    cutoff = today - timedelta(days=OLD_DAYS)
+    stale = [t for t in tasks if eligible(t) and (due_of(t) or deadline_of(t))
+             and (lc := last_change_day(t, history.get(str(t.get("id"))) or {})) is not None and lc <= cutoff]
+    picked: list[tuple[dict, str]] = [(t, "old_stale") for t in sorted(stale, key=order)[:OLD_PICK_STALE]]
+    taken = {str(t.get("id")) for t, _ in picked}
+    nodue = [t for t in tasks if eligible(t) and str(t.get("id")) not in taken and not due_of(t) and not deadline_of(t)
+             and (ad := _d(t.get("added_at"))) is not None and ad <= cutoff]
+    picked += [(t, "old_nodue") for t in sorted(nodue, key=order)[:OLD_PICK_NODUE]]
+    return picked
+
+
 def rank_key(t: dict, today: date, history: dict[str, Any]) -> tuple:
     """並べ順。313 の点数（min(超過日,60)＋部分一致の加点）を、段のある並べ方に置き換えた。
 
@@ -734,7 +777,7 @@ def apply_ai_answer(cls: dict[str, Any], ans: dict[str, Any] | None, snap_id: st
 
 # ① の「やる予定の内容」（自律実行は未実装。ここでは記録だけ。FlowForge node_run_a の範囲）
 PLAN_DEFAULT = "題・説明・直近コメントから作業を決める（調査・資料確認・文面下書き・許可範囲のコード修正・テスト・PR 作成のどれか）"
-PLAN_LIMITS = "60分・5件の上限内。対外送信・削除・支払い・契約・マージ・デプロイ・他エージェントへの新規依頼はしない。Todoist は閉じない"
+PLAN_LIMITS = "1回90分・15件（①の作業は60分まで）の上限内。対外送信・削除・支払い・契約・マージ・デプロイ・他エージェントへの新規依頼はしない。Todoist は閉じない"
 
 
 def planned_action(cls: dict[str, Any]) -> dict[str, Any]:
@@ -773,6 +816,9 @@ class RunOptions:
     t313_path: Path | None = None  # 313 0.5 の作業ファイル（既定 /tmp/t313_pending.json。テストで差し替え）
     execute_auto: bool = False  # ①自律実行（2-1・2-2）。既定オフ。材料出しと結果の取り込みだけ（AI は Claude Code が回す）
     work_results: list[dict[str, Any]] | None = None  # Claude Code が書いた work/results.json の results
+    work_minutes: int = WORK_MAX_MINUTES  # ①の作業に新しく着手してよい時間の上限（分）
+    detect_done: bool = False  # 済み検出（Gmail・Slack・GitHub の根拠探し。読むだけ）。CLI は既定オン
+    done_sources: list[Any] | None = None  # 読み口（テストで差し替え。None なら既定の3つ）
 
 
 def new_run_id(now: datetime) -> str:
@@ -794,6 +840,14 @@ def build_report_draft(run: dict[str, Any]) -> str:
         lines.append(
             f"①自律 着手 {c.get('work_started', 0)}／やり切り {c.get('work_done', 0)}・途中 {c.get('work_partial', 0)}"
             f"／②へ {c.get('work_to2', 0)}・③へ {c.get('work_to3', 0)}・週次へ {c.get('work_weekly', 0)}"
+        )
+    if c.get("picked_old_stale") or c.get("picked_old_nodue"):
+        lines.append(f"古い物 拾い 変化なし30日〜 {c.get('picked_old_stale', 0)}／期限なし古い {c.get('picked_old_nodue', 0)}")
+    if run.get("done"):
+        d = run["done"]
+        lines.append(
+            f"済み検出 確認 {c.get('done_checked', 0)}（うち②止まり {c.get('done_stuck_rechecked', 0)}）／済みらしい {c.get('done_likely', 0)}"
+            + (f"／読めなかった読み口 {'・'.join(d['unavailable'])}" if d.get("unavailable") else "")
         )
     cmt = run.get("comments") or {}
     if cmt.get("enabled"):
@@ -833,6 +887,11 @@ def _empty_counts() -> dict[str, int]:
         "work_to3": 0,
         "work_weekly": 0,
         "work_discarded": 0,
+        "picked_old_stale": 0,
+        "picked_old_nodue": 0,
+        "done_checked": 0,
+        "done_likely": 0,
+        "done_stuck_rechecked": 0,
     }
 
 
@@ -956,21 +1015,37 @@ def execute(
         hist_tasks = basis.history["tasks"]
         ranked = rank(candidate_filter(active, user_id, today), today, hist_tasks)
         run["counts"]["candidates"] = len(ranked)
+        # 古い物を毎回拾う（期限今日以前の候補とは別枠。上限 max_tasks には数えず、時間・コメント読取の上限は守る）
+        old_picks = pick_old(active, user_id, today, hist_tasks, {str(t.get("id")) for t in ranked})
+        run["counts"]["picked_old_stale"] = sum(1 for _, k in old_picks if k == "old_stale")
+        run["counts"]["picked_old_nodue"] = sum(1 for _, k in old_picks if k == "old_nodue")
+        work_list: list[tuple[dict, str]] = [(t, "") for t in ranked] + old_picks
+        checked_changed: set[str] = set()  # 今回、変化があって見直した件（済み検出の対象）
+        capped = False
 
         comment_reads = 0
-        for pos, t in enumerate(ranked, 1):
+        for pos, (t, pick) in enumerate(work_list, 1):
             tid = str(t.get("id"))
             elapsed_min = (clock() - t0) / 60.0
-            if run["counts"]["processed"] >= opts.max_tasks or comment_reads >= opts.comment_cap:
-                run["counts"]["carried_over"] = len(ranked) - pos + 1
-                break
-            if elapsed_min >= opts.max_minutes:
-                run["counts"]["carried_over"] = len(ranked) - pos + 1
-                run["stop_reason"] = f"時間上限 {opts.max_minutes} 分（安全な区切りで止めた）"
-                break
+            if not pick:
+                if capped:
+                    run["counts"]["carried_over"] += 1
+                    continue
+                if run["counts"]["processed"] >= opts.max_tasks or comment_reads >= opts.comment_cap:
+                    capped = True
+                    run["counts"]["carried_over"] += 1
+                    continue
+                if elapsed_min >= opts.max_minutes:
+                    capped = True
+                    run["counts"]["carried_over"] += 1
+                    run["stop_reason"] = f"時間上限 {opts.max_minutes} 分（安全な区切りで止めた）"
+                    continue
+            elif elapsed_min >= opts.max_minutes or comment_reads >= opts.comment_cap:
+                continue  # 古い物の拾いは次回へ（巡回順なので偏らない）
             entry: dict[str, Any] = {
                 "task_id": tid,
                 "rank": pos,
+                **({"pick": pick} if pick else {}),
                 "rank_key": list(rank_key(t, today, hist_tasks)[:3]),
                 "processed_at": now_fn().isoformat(timespec="seconds"),
             }
@@ -1048,6 +1123,7 @@ def execute(
                 run["tasks"].append(entry)
                 continue
             entry["changed_fields"] = changed
+            checked_changed.add(tid)
             cls = classify(t, basis.rules)
             cls = apply_ai_answer(cls, (opts.ai_answers or {}).get(tid), snap_id)
             cls.pop("blocked_by_adopted_2", None)
@@ -1055,7 +1131,7 @@ def execute(
             if scope is not None and cls["category"] == "1":
                 # 2-2 始める前の確認（停止スイッチ・時間上限・承認待ち・承認が要る語・本人操作・大規模）
                 elapsed = (clock() - t0) / 60.0
-                stop_now = stop_switch_on(paths, env) or (f"時間上限 {opts.max_minutes} 分" if elapsed >= opts.max_minutes else "")
+                stop_now = stop_switch_on(paths, env) or (f"①の作業時間の上限 {opts.work_minutes} 分" if elapsed >= opts.work_minutes else "")
                 if not stop_now and run["counts"]["work_started"] >= opts.max_tasks:
                     stop_now = f"着手は 1 回 {opts.max_tasks} 件まで"
                 text = clean_title(t) + " " + URL_RE.sub(" ", str(t.get("description") or ""))
@@ -1119,6 +1195,9 @@ def execute(
                 packet.append(_packet_row(t, comments, snap_id, cls))
 
         active_by_id = {str(t.get("id")): t for t in active}
+        if opts.detect_done:
+            _run_done_detection(run, paths, opts, env, hist_tasks, active_by_id, checked_changed,
+                                {str(t.get("id")) for t, k in old_picks}, started)
         if scope is not None:
             _run_work(run, paths, opts, env, reader, basis, hist_tasks, active_by_id, children, scope,
                       old_packet, new_items, started, lambda: (clock() - t0) / 60.0)
@@ -1126,7 +1205,8 @@ def execute(
         # 【318】コメントの下書き（変化があって分類した件だけ）。書くのは内部ログを保存した後・--write-comments の時だけ
         # ① の作業を始めた件（結果待ち）は、結果を取り込んだ回にだけコメントする
         for e in run["tasks"]:
-            if e.get("category") and e.get("status") != "work_result" and (e.get("work") or {}).get("state") != "awaiting_ai":
+            if (e.get("category") and e.get("status") != "work_result" and not e.get("done_likely")
+                    and (e.get("work") or {}).get("state") != "awaiting_ai"):
                 e["comment_draft"] = cm.format_comment(e, run_id, published=bool(run.get("published")))
         run["result"] = "partial" if run["errors"] else "success"
     except SafeStop as s:
@@ -1230,7 +1310,7 @@ def _run_work(
         why = stop_switch_on(paths, env)
         if why:
             return f"停止スイッチ（{why}）"
-        return f"時間上限 {opts.max_minutes} 分" if elapsed_min() >= opts.max_minutes else ""
+        return f"①の作業時間の上限 {opts.work_minutes} 分" if elapsed_min() >= opts.work_minutes else ""
 
     if opts.work_results:
         outs, stopped = wk.import_results(
@@ -1276,6 +1356,60 @@ def _run_work(
     except Exception as e:  # noqa: BLE001
         run["errors"].append({"where": "work_packet", "error": f"作業の材料を保存できない（{type(e).__name__}）"})
     run["work"] = work_log
+
+
+def _run_done_detection(
+    run: dict[str, Any], paths: Paths, opts: RunOptions, env: dict[str, str], hist_tasks: dict[str, Any],
+    active_by_id: dict[str, dict], changed_ids: set[str], pick_ids: set[str], started: datetime,
+) -> None:
+    """済み検出（件119の5）。対象: 今回見直した件・古い物の拾い・② で回答がなく止まっている物（7日ごと）。
+
+    根拠があれば判断履歴 done_check に残し、【318】済みらしい コメントの下書きを付ける（書くのは --write-comments の時だけ）。
+    Todoist は閉じない。読み口が使えなかった時は「根拠なし」にせず done_sources に理由を残す。
+    """
+    today = started.date().isoformat()
+    targets: dict[str, str] = {}  # task_id -> 理由
+    for tid in changed_ids | pick_ids:
+        if tid in active_by_id:
+            targets[tid] = "changed" if tid in changed_ids else "old_pick"
+    for tid in dn.stuck_owner_ids(hist_tasks, set(active_by_id)):
+        targets.setdefault(tid, "stuck_owner")
+    targets = {t: why for t, why in targets.items()
+               if dn.due_for_check(hist_tasks.get(t) or {}, today, changed=why == "changed" and t in changed_ids)}
+    sources = opts.done_sources if opts.done_sources is not None else dn.default_sources(env, REPO)
+    docs, unavailable = dn.load_docs(sources, started) if targets else ([], {})
+    run["done"] = {"targets": len(targets), "docs": len(docs), "unavailable": unavailable}
+    if targets and len(unavailable) == len(sources):
+        # 全部の読み口が使えなかった → 「根拠なし」として履歴に書かない（次回また当てる）
+        run["errors"].append({"where": "done_detect", "error": "済み検出の読み口が全部使えなかった（" + "・".join(unavailable) + "）"})
+        return
+    by_tid = {str(e.get("task_id")): e for e in run["tasks"] if e.get("category")}
+    for tid, why in targets.items():
+        t = active_by_id[tid]
+        row = hist_tasks.setdefault(tid, {})
+        ev = dn.find_evidence(str(t.get("content") or ""), docs)
+        prev = row.get("done_check") or {}
+        dc: dict[str, Any] = {"checked_on": today, "likely": bool(ev), "evidence": ev, "why": why,
+                              "found_on": (prev.get("found_on") if prev.get("likely") and ev else today) if ev else ""}
+        row["done_check"] = dc
+        run["counts"]["done_checked"] += 1
+        run["counts"]["done_stuck_rechecked"] += int(why == "stuck_owner")
+        if not ev:
+            continue
+        run["counts"]["done_likely"] += 1
+        body = dn.format_done_comment(ev, run["run_id"], cm.ID_LABEL, cm.PREFIX)
+        if tid in by_tid:
+            by_tid[tid]["comment_draft"] = body  # 同じ件の分類コメントは、済みらしい印に置き換える（コメントは1回に1つ）
+            by_tid[tid]["done_likely"] = True
+        else:
+            run["tasks"].append({"task_id": tid, "status": "done_likely", "category": str(row.get("last_category") or "2"),
+                                 "done_likely": True, "processed_at": started.isoformat(timespec="seconds"),
+                                 "evidence": ev, "comment_draft": body})
+    if not opts.dry_run:
+        try:
+            dn.write_list(paths.root, hist_tasks, active_by_id, started)
+        except Exception as e:  # noqa: BLE001
+            run["errors"].append({"where": "done_list", "error": f"済みらしい一覧を保存できない（{type(e).__name__}）"})
 
 
 def _run_comments(
@@ -1460,6 +1594,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         trigger=args.trigger,
         execute_auto=args.execute_auto,
         work_results=work_results,
+        detect_done=not args.no_detect_done,
     )
     run = execute(paths, Path(args.criteria), dict(os.environ), TodoistReader, opts)
     print(run["report_draft"])
@@ -1522,6 +1657,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--execute-auto", action="store_true",
                    help="①自律実行（既定オフ）: ① の件を実行前確認に通し、作業の材料を work/packet.json に出す。結果は --work-results で取り込む")
     r.add_argument("--work-results", default=None, help="Claude Code が書いた作業の結果（work/results.json）。--execute-auto と一緒に")
+    r.add_argument("--no-detect-done", action="store_true",
+                   help="済み検出（Gmail・Slack・GitHub に終わった跡があるか探す。読むだけ）を止める。既定はオン")
     r.add_argument("--trigger", choices=["manual", "schedule"], default="manual",
                    help="schedule は launchd の定時起動用（朝枠の担当が 318 の時だけ動く）")
     r.set_defaults(func=cmd_run)

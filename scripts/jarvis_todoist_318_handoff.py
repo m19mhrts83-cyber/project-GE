@@ -306,6 +306,8 @@ def hub_report_text(run: dict[str, Any]) -> str:
         f"①{c['cat1']} ②{c['cat2']} ③{c['cat3']}／繰越 {c['carried_over']}",
         f"/313/bulk 待ち {c.get('queued', 0)}／週次へ {c.get('handoff', 0)}",
     ]
+    if run.get("done"):
+        lines.append(f"済みらしい {c.get('done_likely', 0)}（確認 {c.get('done_checked', 0)}）／古い物 {c.get('picked_old_stale', 0) + c.get('picked_old_nodue', 0)}")
     cmt = run.get("comments") or {}
     if cmt.get("enabled"):
         lines.append(f"【318】コメント {cmt.get('posted', 0)}件／照合待ち {cmt.get('unknown', 0)}")
