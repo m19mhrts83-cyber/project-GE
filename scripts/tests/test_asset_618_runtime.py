@@ -4,10 +4,12 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -201,6 +203,8 @@ class WiringTests(unittest.TestCase):
                     path=Path(tmp)/'old.png'
                     from PIL import Image
                     Image.new('RGB',(100,50)).save(path)
+                    # Linux の mtime はカーネルの粗い時計(数ms遅れ)で、開始時刻より前に見えて落ちる。精密な現在時刻を明示する
+                    now=time.time();os.utime(path,(now,now))
                     evidence.RESULTS.append({'status':'ok','name':'old_debug','path':str(path),'note':'copied'})
                 with patch.object(evidence,'capture_sony',side_effect=capture) as sony, patch.object(evidence,'capture_axa',side_effect=AssertionError('wrong scope')), patch.object(evidence,'_write_inventory'), contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(evidence._collect_main(SimpleNamespace(out=tmp,loans_json='none',only='sony',executor='jarvis'),run),0)
