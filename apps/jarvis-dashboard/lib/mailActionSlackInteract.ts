@@ -28,11 +28,14 @@ import {
 } from "@/lib/materialFileSearch";
 import { extractMaterialRequests } from "@/lib/materialRequest";
 import {
+  MA_LATER_TAGS,
   MA_REASON_TAGS,
   loggedLine,
+  maLaterFollowupBlocks,
   maSkipFollowupBlocks,
   parseMaMuteValue,
   parseMaReasonValue,
+  type MaLaterTag,
   type MaReasonTag,
 } from "@/lib/maDecisionBlocks";
 import { decideSenderMute, tagSkipReason, weekDecisionCount } from "@/lib/maDecisionLog";
@@ -1004,6 +1007,21 @@ export async function handleMaBlockAction(opts: {
     };
   }
 
+  // Todoist 登録成功 → 結果の1行に理由タグ（任意）を添える
+  if (action === "todoist" && result.ok && channelId && messageTs) {
+    const row = await fetchMailActionTriage(triageId);
+    return {
+      kind: "replace",
+      text: result.message,
+      blocks: maLaterFollowupBlocks({
+        id: triageId,
+        who: String(row?.partner || row?.from_email || ""),
+        detail: result.message,
+        weekCount: await weekDecisionCount(),
+      }) as ReturnType<typeof maDoneBlocks>,
+    };
+  }
+
   const title =
     action === "done"
       ? result.ok
@@ -1373,14 +1391,28 @@ export async function handleMaFollowupAction(
   const reason = parseMaReasonValue(value);
   if (reason) {
     const tagged = await tagSkipReason(reason.id, reason.tag);
+    if (reason.tag in MA_LATER_TAGS) {
+      const laterTag = reason.tag as MaLaterTag;
+      return {
+        text: `後回しの理由: ${laterTag}`,
+        blocks: maLaterFollowupBlocks({
+          id: reason.id,
+          who: tagged.who,
+          detail: tagged.todoistUrl ? `Todoist に登録しました: ${tagged.todoistUrl}` : "Todoist に登録しました",
+          weekCount: await weekDecisionCount(),
+          tagged: laterTag,
+        }),
+      };
+    }
+    const skipTag = reason.tag as MaReasonTag;
     const ask = tagged.fromEmail ? await isMuteAskPending(tagged.fromEmail) : { pending: false, skips: 0 };
     return {
-      text: `見送りの理由: ${reason.tag}`,
+      text: `見送りの理由: ${skipTag}`,
       blocks: maSkipFollowupBlocks({
         id: reason.id,
         who: tagged.who,
         weekCount: await weekDecisionCount(),
-        tagged: reason.tag,
+        tagged: skipTag,
         askMute: ask.pending ? { skips: ask.skips } : null,
       }),
     };
