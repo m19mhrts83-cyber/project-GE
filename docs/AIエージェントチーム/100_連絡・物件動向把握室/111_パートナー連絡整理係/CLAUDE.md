@@ -28,6 +28,7 @@
 - [x] **人が頼む（副）**: 「パートナー確認して」
   - **ウェイクワード**: 「パートナーからのメールなどを確認して」
   - 上記は Gmail だけの確認ではなく、**Gmail／Chatwork／LINE／メッセージ（必要に応じて iMessage・MailGates・くらさぽ）を最新化して横断確認する依頼**として扱う。
+- [x] **iMessage 自動取込（launchd・2026-11-28〜）**: `com.matsunoma.jarvis.imessage-poll` が **20分おき**に `imessage_to_yoritoori.py` を実行（処理済み ROWID で二重なし）。ログ `~/Library/Logs/jarvis_imessage/`。**フルディスクアクセス要**（実行する python の実体に付与。読めない・連続2回失敗は #ops に1回だけ、復旧で1行）。
 - [ ] 何かが届いたら（将来）
 
 ## 3. 実行権限

@@ -85,6 +85,7 @@ GHA の `schedule` は混雑で **2〜6 時間遅れる**（実測は [`46_週�
 | WeStudy Drive 添付 | `westudy-gdrive-archive` | admin Drive＋Mac |
 | プライベートバックアップ | `private-backup` | ローカル age |
 | **LINE 公式エクスポート定常取込** | `line-export-poll`（15分/RunAtLoad） | EmailMe→Gmail(estate)→inbox→`5.やり取り.md` を自動化。OneDrive 正本＋`.jarvis_state`。2026-09-30 |
+| **iMessage 定常取込** | `imessage-poll`（20分/RunAtLoad） | chat.db（読むだけ）→連絡先一覧の phones で照合→`5.やり取り.md`。要フルディスクアクセス。ログ `~/Library/Logs/jarvis_imessage/`。失敗連続2回で #ops に1回。2026-11-28 |
 | **物件進行ゲート 114** | `property-gate-114`（11:15）＋朝バンドル／昼 Grok取込後 | Supabase＋Slack Webhook。Cursor不要の次善本線。2026-10-12 |
 | 天気朝ブリーフ等 | `weather-morning-brief` 等 | Mac／ローカル前提のもの |
 
