@@ -287,6 +287,15 @@ def release_playwright_lock() -> None:
         pass
 
 
+def describe_fetch_error(exc: BaseException) -> str:
+    """失敗理由を summary に出せる短い日本語にする（型名だけ「Error」では原因が分からない）。"""
+    msg = " ".join(str(exc).split())
+    if "Executable doesn't exist" in msg or "playwright install" in msg:
+        return "Playwright のブラウザ本体が古い（playwright install chromium が必要）"
+    first = msg[:120]
+    return f"{type(exc).__name__}: {first}" if first else type(exc).__name__
+
+
 def fetch_html(*, headless: bool) -> tuple[str | None, dict[str, Any]]:
     """口座一覧を開いて HTML を返す。押す操作はしない。失敗時は (None, {status, reason})。"""
     sys.path.insert(0, str(ZAIM_DIR))
@@ -349,7 +358,7 @@ def cmd_fetch(args: argparse.Namespace) -> int:
     try:
         html, info = fetch_html(headless=args.headless)
     except Exception as exc:  # Playwright の起動失敗など
-        html, info = None, {"status": "fetch_error", "reason": type(exc).__name__}
+        html, info = None, {"status": "fetch_error", "reason": describe_fetch_error(exc)}
     finally:
         release_playwright_lock()
 
