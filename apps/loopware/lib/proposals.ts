@@ -18,6 +18,7 @@ export type Proposal = {
   status?: string; // 原文の作業状況（修正済み など）
   project?: string;
   hypothesis?: string; // AIの推測（本人の理由と見た目で分ける）
+  dupNote?: string; // 前回保留・同じ中身をまとめた など（プログラムの印。AIの推測ではない）
 };
 
 export const NONE = "記載なし";

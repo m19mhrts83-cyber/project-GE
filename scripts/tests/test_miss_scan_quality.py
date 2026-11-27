@@ -39,5 +39,18 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(ms.journal_signal_line("---\na: b\n---\n普通の日記"), "")
 
 
+class DedupeTests(unittest.TestCase):
+    def test_same_journal_line_on_two_days_is_one(self):
+        j = {"source": "obsidian_journal", "snippet": "• 記録を要対応", "hypothesis": "h"}
+        out = ms.dedupe_candidates([{**j, "folder": "2026-11-12.md"}, {**j, "folder": "2026-11-13.md"}])
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["folder"], "2026-11-12.md・2026-11-13.md")
+
+    def test_partner_folders_stay_separate_and_spacing_is_ignored(self):
+        a = {"source": "yoritoori", "folder": "P1", "snippet": "・見積を ご確認ください。"}
+        out = ms.dedupe_candidates([a, {**a, "snippet": "見積をご確認ください"}, {**a, "folder": "P2"}])
+        self.assertEqual([c["folder"] for c in out], ["P1", "P2"])
+
+
 if __name__ == "__main__":
     unittest.main()

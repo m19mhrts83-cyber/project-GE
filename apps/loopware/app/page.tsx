@@ -1,9 +1,11 @@
 import Link from "next/link";
 import FocusCard from "@/components/FocusCard";
 import Icon from "@/components/Icon";
+import { HubBadge, HubCountsProvider, HubSummary } from "@/components/HubBadges";
 
 export default function HubPage() {
   return (
+    <HubCountsProvider>
     <main>
       <div className="brand">
         <div className="logo">
@@ -17,6 +19,8 @@ export default function HubPage() {
 
       <FocusCard />
 
+      <HubSummary />
+
       <Link className="glass nav-card" href="/all">
         <span className="ico">
           <Icon name="list" size={22} />
@@ -25,6 +29,7 @@ export default function HubPage() {
           <strong>まとめて判断</strong>
           <span className="meta">メール・318・313 週の整理・お題・今週の9件・Zaim・ルール候補を1画面で。重要度・期日超過・すぐ決まるで並べて、提案どおりをまとめて確定</span>
         </span>
+        <HubBadge k="all" />
         <Icon name="next" size={18} />
       </Link>
 
@@ -37,6 +42,7 @@ export default function HubPage() {
           <strong>判断デスク</strong>
           <span className="meta">1件ずつ。返信／見送る／ToDo／迷う</span>
         </span>
+        <HubBadge k="desk" />
         <Icon name="next" size={18} />
       </Link>
       <Link className="glass nav-card" href="/desk?surface=triage&view=left">
@@ -47,6 +53,7 @@ export default function HubPage() {
           <strong>残り・次の一手</strong>
           <span className="meta">迷った・見ていないものに次の一手。良い／違う</span>
         </span>
+        <HubBadge k="left" />
         <Icon name="next" size={18} />
       </Link>
       <Link className="glass nav-card" href="/misses?surface=triage">
@@ -57,6 +64,7 @@ export default function HubPage() {
           <strong>見落とし</strong>
           <span className="meta">仕分けが出さなかったもの。要対応だった？</span>
         </span>
+        <HubBadge k="misses" />
         <Icon name="next" size={18} />
       </Link>
 
@@ -68,6 +76,7 @@ export default function HubPage() {
           <strong>下書きを直す</strong>
           <span className="meta">箇所を選んで声でダメ出し → AI が直す → 差分で確認</span>
         </span>
+        <HubBadge k="drafts" />
         <Icon name="next" size={18} />
       </Link>
 
@@ -79,6 +88,7 @@ export default function HubPage() {
           <strong>今週の学び</strong>
           <span className="meta">判断から見つけたルール候補。採用／今回だけ／違う</span>
         </span>
+        <HubBadge k="rules" />
         <Icon name="next" size={18} />
       </Link>
 
@@ -90,6 +100,7 @@ export default function HubPage() {
           <strong>Zaim の見直し</strong>
           <span className="meta">学習で直した費目。正しい／違う</span>
         </span>
+        <HubBadge k="zaim" />
         <Icon name="next" size={18} />
       </Link>
 
@@ -102,6 +113,7 @@ export default function HubPage() {
           <strong>今週の9件</strong>
           <span className="meta">土曜の午前中に。残った理由→おすすめを直して月・水・金に置く</span>
         </span>
+        <HubBadge k="week" />
         <Icon name="next" size={18} />
       </Link>
       <Link className="glass nav-card" href="/312">
@@ -112,6 +124,7 @@ export default function HubPage() {
           <strong>312 入口</strong>
           <span className="meta">いろんなソースから提案を仕分ける。採る／見送る／保留</span>
         </span>
+        <HubBadge k="inlet" />
         <Icon name="next" size={18} />
       </Link>
       <Link className="glass nav-card" href="/313">
@@ -120,8 +133,9 @@ export default function HubPage() {
         </span>
         <span className="txt">
           <strong>313 出口</strong>
-          <span className="meta">まとめて片付ける（基本）／閉じ漏れ／1件ずつ。残り件数はタブのバッジで</span>
+          <span className="meta">まとめて片付ける（基本）／閉じ漏れ／1件ずつ。残り件数は右のバッジとタブで</span>
         </span>
+        <HubBadge k="outlet" />
         <Icon name="next" size={18} />
       </Link>
 
@@ -145,6 +159,7 @@ export default function HubPage() {
           <strong>資料づくり</strong>
           <span className="meta">構成案を選ぶ／直しから次回の基準を決める</span>
         </span>
+        <HubBadge k="slides" />
         <Icon name="next" size={18} />
       </Link>
 
@@ -157,6 +172,7 @@ export default function HubPage() {
           <strong>画面の好み</strong>
           <span className="meta">画面の案を 良い／違う で選ぶ／好み帳を育てる</span>
         </span>
+        <HubBadge k="uiux" />
         <Icon name="next" size={18} />
       </Link>
 
@@ -171,5 +187,6 @@ export default function HubPage() {
         判断は Slack でもここでも同じログに残る。iPhone は Chrome で開く。
       </p>
     </main>
+    </HubCountsProvider>
   );
 }

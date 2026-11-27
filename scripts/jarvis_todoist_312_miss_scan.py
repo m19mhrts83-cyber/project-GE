@@ -123,6 +123,36 @@ def scan_journal(days: int = 3) -> list[dict]:
     return out
 
 
+def _norm_snippet(s: str) -> str:
+    """比べるための本文（loopware lib/proposalDedupe.ts の normSnippet と同じ考え方）"""
+    import unicodedata
+
+    t = unicodedata.normalize("NFKC", s or "")
+    t = re.sub(r"^[\s・•\-*#>]+", "", t)
+    t = re.sub(r"\s+", "", t)
+    t = re.sub(r"[。．.!！🙇]+$", "", t)
+    return t.lower()
+
+
+def dedupe_candidates(cands: list[dict]) -> list[dict]:
+    """同じ中身の候補を1つにする。Journal は日付が違っても同じ行なら同じ案件（やり取りはフォルダごと）"""
+    out: list[dict] = []
+    seen: dict[tuple, dict] = {}
+    for c in cands:
+        src = c.get("source", "")
+        key = (src, c.get("folder", "") if src == "yoritoori" else "", _norm_snippet(c.get("snippet", "")))
+        hit = seen.get(key)
+        if hit is not None:
+            f = c.get("folder", "")
+            if f and f not in hit.get("folder", "").split("・"):
+                hit["folder"] = f"{hit.get('folder', '')}・{f}"
+            continue
+        c = dict(c)
+        seen[key] = c
+        out.append(c)
+    return out
+
+
 def push_supabase(payload: dict) -> bool:
     """候補を sync_meta.loopware_312_candidates に置く（loopware /312 が読む。表の追加なし）。
 
@@ -161,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="--push で置く中身を表示するだけ（書かない）")
     args = ap.parse_args(argv)
 
-    cands = scan_yoritoori() + scan_journal()
+    cands = dedupe_candidates(scan_yoritoori() + scan_journal())
     STATE.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "at": datetime.now(JST).isoformat(timespec="seconds"),
