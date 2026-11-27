@@ -470,17 +470,29 @@ def week9_ids(sb, now: datetime, days: int) -> set[str]:
     return ids
 
 
+def kept_from_rows(rows: list[dict[str, Any]]) -> set[str]:
+    """「残す／先送り」を選んだ件。どの画面から選んでも数える（313 の origin 問わず・ふるい分けの keep も）。"""
+    out: set[str] = set()
+    for r in rows:
+        surface, action = str(r.get("surface") or ""), str(r.get("action") or "")
+        if (surface == SURFACE and action == "defer") or (surface == "todoist_triage" and action == "keep"):
+            out.add(str(r.get("target_id") or ""))
+    out.discard("")
+    return out
+
+
 def kept_ids(sb, now: datetime, days: int) -> set[str]:
-    """313 のカードで「残す」を選んだ件（keep_days 以内）。読めなければ ReadError。"""
+    """「残す／先送り」を選んだ件（keep_days 以内・どの画面からでも）。読めなければ ReadError。"""
     since = (now - timedelta(days=days)).isoformat()
     try:
         rows = sb("owner_decisions", params={
-            "select": "target_id,payload", "surface": f"eq.{SURFACE}", "action": "eq.defer",
-            "target_type": "eq.todoist_task", "decided_at": f"gte.{since}", "limit": "2000",
+            "select": "target_id,surface,action", "target_type": "eq.todoist_task", "decided_at": f"gte.{since}",
+            "or": f"(and(surface.eq.{SURFACE},action.eq.defer),and(surface.eq.todoist_triage,action.eq.keep))",
+            "limit": "2000",
         }) or []
     except Exception as e:  # noqa: BLE001
         raise ReadError(f"「残す」の記録が読めない（{type(e).__name__}）") from e
-    return {str(r["target_id"]) for r in rows if str((r.get("payload") or {}).get("origin") or "") == "313"}
+    return kept_from_rows(rows)
 
 
 def queue_318_ids(sb, now: datetime, stale_days: int) -> set[str]:

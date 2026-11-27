@@ -41,10 +41,13 @@ export async function POST(req: Request) {
   if (!sb) return NextResponse.json({ ok: false, error: "supabase_unconfigured" }, { status: 503 });
   let saved = 0;
   const failed: string[] = [];
+  const savedIds: string[] = [];
   for (const d of list) {
     const r = await writeDecision(sb, { ...d, source: "loopware" });
-    if (r.ok && r.persisted) saved += 1;
-    else failed.push(`${d.action}:${d.targetId}`);
+    if (r.ok && r.persisted) {
+      saved += 1;
+      savedIds.push(d.targetId);
+    } else failed.push(`${d.action}:${d.targetId}`);
   }
-  return NextResponse.json({ ok: failed.length === 0, saved, failed }, { status: failed.length ? 207 : 200 });
+  return NextResponse.json({ ok: failed.length === 0, saved, savedIds, failed }, { status: failed.length ? 207 : 200 });
 }
