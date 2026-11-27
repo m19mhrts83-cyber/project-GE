@@ -31,13 +31,25 @@ export type OwnerDecision = {
   appliedRules?: string[];
   timing?: DecisionInput["timing"];
   payload?: Record<string, unknown>;
+  /** 押した人のアカウント（ユーザーID。メールアドレスは入れない）。payload.actor に残す */
+  actor?: string | null;
 };
+
+/** payload に actor を足す（無ければそのまま） */
+export function withActor(
+  payload: Record<string, unknown> | undefined,
+  actor: string | null | undefined,
+): Record<string, unknown> | undefined {
+  const a = typeof actor === "string" ? actor.trim().slice(0, 80) : "";
+  if (!a) return payload;
+  return { ...(payload || {}), actor: a };
+}
 
 export async function logOwnerDecision(d: OwnerDecision): Promise<void> {
   try {
     const sb = createServiceClient();
     if (!sb) return;
-    const n = normalizeDecision({ ...d, source: d.source || "dashboard" });
+    const n = normalizeDecision({ ...d, payload: withActor(d.payload, d.actor), source: d.source || "dashboard" });
     if (n.ok) {
       const { data: dup } = await sb
         .from("owner_decisions")
@@ -61,7 +73,7 @@ export async function logOwnerDecision(d: OwnerDecision): Promise<void> {
       subject: d.subject ? d.subject.slice(0, 500) : null,
       ai_proposal: d.aiProposal ? d.aiProposal.slice(0, 4000) : null,
       note: d.note || null,
-      payload: { ...(d.payload || {}), contract_error: n.error },
+      payload: { ...withActor(d.payload, d.actor), contract_error: n.error },
     });
     if (error) console.warn(`owner_decisions soft-fail: ${error.message}`);
   } catch (e) {

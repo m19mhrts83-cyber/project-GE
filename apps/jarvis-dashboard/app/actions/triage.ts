@@ -4,6 +4,7 @@ import { BlockedRecipientError } from "@/lib/gmail/blockedRecipient";
 import { deskWorthy } from "@/lib/deskWorthy";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { currentActorId, withActorId } from "@/lib/decisionActor";
 import {
   gmailSendConfigured,
   sendGmailViaEnv,
@@ -128,6 +129,9 @@ export async function setTriageStatus(
   } else if (next === "sent" && kind !== "activity") {
     await resetMailSkipStreak(String(row.from_email || ""));
   }
+
+  // 押した人のアカウント（ユーザーIDのみ）。取れなければ何も足さない
+  payload = withActorId(payload, await currentActorId(supabase));
 
   const { error } = await supabase
     .from("triage_items")
@@ -792,6 +796,8 @@ export async function sendTriageAfterConfirm(
       account: it.account,
       payload,
     });
+
+    payload = withActorId(payload, await currentActorId(supabase));
 
     const { error } = await supabase
       .from("triage_items")
