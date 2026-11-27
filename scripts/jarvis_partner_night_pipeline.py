@@ -158,6 +158,77 @@ def _export_poll_fresh(max_age_sec: int = 7200) -> bool:
     return False
 
 
+HISTORY = REPO / ".jarvis_state" / "partner_111_night_history.jsonl"
+
+
+def build_ops_line(
+    *, line_n: int, export_n: int, fails: list[str], notes: list[str]
+) -> str | None:
+    """スキップ・0件の晩だけ #ops 用の1行を返す。通常（1件以上・失敗なし）は None。
+
+    形は 62_ の報告の型: 【番号 名前：何をする人か】状態｜件｜次
+    """
+    total = line_n + export_n
+    if total > 0 and not fails:
+        return None
+    head = "【111 パートナー連絡整理・夜：LINEの取込】"
+    reasons = list(fails) + list(notes)
+    why = "・".join(reasons) if reasons else "新着なし"
+    if fails:
+        status = "🟡途中" if total > 0 else "🔴止まった"
+        nxt = "LINEを閉じて夜枠を再実行" if any("LINE" in f for f in fails) else "ログ確認"
+    else:
+        status = "0件"
+        nxt = "明晩20:30"
+    return f"{head}{status}（{why}）｜件:—｜次:{nxt}"
+
+
+def _record_history(entry: dict) -> None:
+    """夜ログが空になっても実績が読めるよう、別ファイルに1晩1行残す（値は件数と理由のみ）。"""
+    try:
+        HISTORY.parent.mkdir(parents=True, exist_ok=True)
+        with HISTORY.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError as e:
+        print(f"⚠️ history write failed: {e}", file=sys.stderr)
+
+
+def _ops_notice(
+    *,
+    line_n: int,
+    export_n: int,
+    fails: list[str],
+    notes: list[str],
+    today: str,
+    dry: bool,
+) -> None:
+    text = build_ops_line(line_n=line_n, export_n=export_n, fails=fails, notes=notes)
+    _record_history(
+        {
+            "date": today,
+            "line": line_n,
+            "export": export_n,
+            "fails": fails,
+            "notes": notes,
+            "ops_line": text,
+            "ops_posted": bool(text) and not dry,
+        }
+    )
+    if not text:
+        print("# ops: 通常（1件以上・失敗なし）のため #ops は出さない")
+        return
+    print(f"📎 ops line: {text}")
+    if dry:
+        print("# ops: dry（--push なし／--dry-run-slack）のため投稿しない")
+        return
+    script = REPO / "scripts" / "jarvis_slack_webhook_post.py"
+    code, _ = _run_capture(
+        [PY, str(script), "--channel", "ops", "--text", text, "--signal", "off", "--no-fb-footer"]
+    )
+    if code != 0:
+        print(f"⚠️ #ops 投稿失敗 exit={code}", file=sys.stderr)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--apply", action="store_true", help="取込を実行（無いと dry）")
@@ -214,6 +285,7 @@ def main() -> int:
         _save_state(state)
 
     fails: list[str] = []
+    notes: list[str] = []  # #ops 用の理由（失敗ではないスキップ）
     line_n = 0
     export_n = 0
     rc = 0
@@ -235,6 +307,7 @@ def main() -> int:
             flush=True,
         )
         do_export = False
+        notes.append(f"公式取込は{args.export_fresh_hours:g}h以内に済みで省略")
     if do_export:
         gmail_ex = MANUAL / "line_export_gmail_to_inbox.py"
         inbox_ex = MANUAL / "line_export_inbox_to_yoritoori.py"
@@ -282,6 +355,15 @@ def main() -> int:
         f"📎 night_pipeline counts: line={line_n} export={export_n} "
         f"fails={fails or 'なし'}"
     )
+    if args.apply:
+        _ops_notice(
+            line_n=line_n,
+            export_n=export_n,
+            fails=fails,
+            notes=notes,
+            today=today,
+            dry=args.dry_run_slack or not args.push,
+        )
 
     if not args.push and not args.dry_run_slack:
         if args.apply and not fails:

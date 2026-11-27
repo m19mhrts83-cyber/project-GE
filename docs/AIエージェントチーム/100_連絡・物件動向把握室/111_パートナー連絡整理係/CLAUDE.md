@@ -107,3 +107,11 @@
 | 2026-10-15 | ゼロ日は1行／特記のみ。失敗を人間語化（`line exit=N` 等） |
 | 2026-10-21 | Todoist create は312本線。111は宿題渡し・案提示まで（再検討余地） |
 | 2026-10-27 | 「パートナーからのメールなどを確認して」を全チャネル最新化（Gmail／Chatwork／LINE／メッセージ等）のウェイクワードとして明文化 |
+
+## 夜枠のスキップ・0件の見え方（2026-11-27 件127）
+
+- 夜（20:30）に取込が **スキップ／0件／失敗** の晩は、`#ops` に1行（`【111 …】状態（理由）｜件:—｜次:…`）。1件以上・失敗なしの晩は出さない。`#report` の ⚠️（失敗の人間語）は従来どおりで、重ねない（別の出口）。
+- 実績は `.jarvis_state/partner_111_night_history.jsonl` に1晩1行（件数・理由・#ops 文面）。`~/Library/Logs/jarvis_partner_111_night/night_*.log` は 11/27 00:16 に他の複数ログ置き場（bucho_bridge・todoist_comment 等）と一緒に一括で 0 バイトにされていた（夜スクリプト自身は書いている。切り詰めた主は未特定）ので、実績はこちらを見る。
+- OneDrive 書込で回転した refresh_token は、`launchd/ms_graph_refresh_gha_sync_runner.sh` が1時間ごとに `jarvis_ms_graph_sync_refresh.py --push-gha` へ流す（回転ファイルが無ければ何もしない。失敗時だけ `#ops`）。ログ: `~/Library/Logs/jarvis_ms_graph_sync/sync.log`。
+  - 間隔の根拠: 回転は Mac の Graph 書込のたびに起き（`~/.jarvis_state/ms_graph_new_refresh.env` は 11/27 07:33 に未反映のまま残っていた）、Microsoft 側の refresh は使わない期間が約90日で切れる。1時間なら GHA が古い鍵を持つ時間は短く、無風時のコストはファイル有無の確認だけ。
+  - 登録（マージ後に松野さん側）: `~/git-repos` を main に pull → `launchd/install_ms_graph_refresh_gha_sync_launchd.sh`。確認は `launchctl print gui/$(id -u)/com.matsunoma.jarvis.ms-graph-refresh-gha-sync`。外す時は `launchctl bootout gui/$(id -u)/com.matsunoma.jarvis.ms-graph-refresh-gha-sync`。
