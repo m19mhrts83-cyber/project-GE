@@ -40,6 +40,7 @@ DEFAULT_DASHBOARD_PROJECT = "prj_3rP2c8CCYIhRFyECBycV8Y3gFluG"  # jarvis-dashboa
 
 LOOPWARE_KEYS = (
     "LOOPWARE_ACCESS_KEY",
+    "LOOPWARE_BOT_ACCESS_KEY",  # ボット用の入場鍵（actor=bot。.env.jarvis_private に無ければ飛ばす）
     "MAIL_ACTION_TOKEN",
     "PROPERTY_GATE_ACTION_TOKEN",  # MAIL_ACTION_TOKEN が無い環境の署名鍵（dashboard と同じ値）
     "JARVIS_SUPABASE_URL",
