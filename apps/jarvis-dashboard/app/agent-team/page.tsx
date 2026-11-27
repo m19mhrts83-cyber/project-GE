@@ -2,6 +2,7 @@ import Shell from "@/components/Shell";
 import { Suspense } from "react";
 import AgentTeamClient from "@/components/agent-team/AgentTeamClient";
 import MaturityPanel from "@/components/agent-team/MaturityPanel";
+import TimeUsePanel from "@/components/agent-team/TimeUsePanel";
 import WeeklyActivityPanel from "@/components/agent-team/WeeklyActivityPanel";
 import {
   getAgentTeam,
@@ -24,6 +25,7 @@ export default function AgentTeamPage() {
   return (
     <Shell active="/agent-team">
       <h1>AIエージェントチーム</h1>
+      <TimeUsePanel />
       <AgentTeamClient
         departments={team.departments}
         agents={team.agents}
