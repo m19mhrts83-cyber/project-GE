@@ -158,6 +158,13 @@ python scripts/jarvis_energy_cf_collect.py --push
 
 Mac のみ: Graph 未設定時はローカル CloudStorage へフォールバック。Journal（Google Drive）は GHA スキップ。
 
+### 見る専用ロール（viewer・2026-11-27）
+
+- 付け方: Supabase ユーザーの `app_metadata.role = "viewer"`（本人は書き換え不可。`user_metadata` は使わない）。
+- 強制: ① `middleware.ts` が viewer の POST/PUT/PATCH/DELETE を全パスで 403（サーバーアクション・API 含む。サインアウトのみ可）。② `supabase/migrations/20261127_viewer_readonly_rls.sql` が public 全表と storage.objects の書き込みを RLS で拒否。
+- 新しい表を作る migration では `select public.apply_viewer_readonly('public.<表>'::regclass);` を呼ぶ。
+- 人の承認が要る Slack ボタン等はトークン／署名で守られた別経路で、viewer のセッションでは動かない。
+
 ### Auth Site URL
 
 パスワードログインは現状どおり可。OAuth／マジックリンク用に揃えるなら:

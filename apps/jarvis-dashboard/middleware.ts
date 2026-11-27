@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isViewerUser, viewerMayRequest } from "@/lib/viewerRole";
 
 type CookieToSet = {
   name: string;
@@ -34,6 +35,13 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+  // 見る専用（viewer）は書き込み系を一括で拒否。ボタンを隠すだけにせずサーバー側で止める
+  if (isViewerUser(user) && !viewerMayRequest(request.method, path)) {
+    return NextResponse.json(
+      { ok: false, error: "viewer（見る専用）アカウントでは実行できません" },
+      { status: 403 }
+    );
+  }
   // iOS Shortcuts からの Health ingest（共有シークレットで保護）
   if (path === "/api/quiet-edge/health/ingest") {
     return NextResponse.next({ request });
