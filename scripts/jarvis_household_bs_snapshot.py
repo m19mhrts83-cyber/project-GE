@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -38,7 +39,14 @@ def main(argv: list[str] | None = None) -> int:
             if k and k not in os.environ:
                 os.environ[k] = v
 
-    cmd = ["npx", "--yes", "tsx", "scripts/householdBsSnapshot.ts"]
+    # launchd の最小 PATH には /usr/local/bin が無い
+    env = os.environ.copy()
+    env["PATH"] = f"/usr/local/bin:/opt/homebrew/bin:{env.get('PATH', '/usr/bin:/bin')}"
+    npx = shutil.which("npx", path=env["PATH"])
+    if not npx:
+        print("# household-bs snapshot failed: npx not found", flush=True)
+        return 127
+    cmd = [npx, "--yes", "tsx", "scripts/householdBsSnapshot.ts"]
     if args.year:
         cmd.extend(["--year", str(args.year)])
     if args.dry_run:
@@ -49,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
         cwd=str(REPO / "apps" / "trade-desk"),
         capture_output=True,
         text=True,
-        env=os.environ.copy(),
+        env=env,
     )
     raw = (proc.stdout or "").strip()
     if proc.returncode != 0:
