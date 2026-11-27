@@ -28,7 +28,7 @@ from typing import Any, Callable, Protocol
 
 PREFIX = "【318】"
 ID_LABEL = "処理ID: "
-POST_CAP = 5  # 1 回に書くコメントの上限（処理 5 件と同じ）
+POST_CAP = 25  # 1 回に書くコメントの上限（処理 15 件＋古い物・済みらしい分）
 MAX_ATTEMPTS = 3
 API_BASE = "https://api.todoist.com/api/v1"
 # 送ったかどうか分かる失敗（Todoist が受け付けていない）。ほかは「応答不明」として照合待ちにする

@@ -30,7 +30,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
-MAX_ITEMS = 5
+MAX_ITEMS = 15  # 1回に材料へ出す件数（triage の MAX_TASKS と同じ）
 MAX_ARTIFACTS = 5
 MAX_ARTIFACT_CHARS = 20000
 PACKET_STALE_DAYS = 3  # これより古い材料は取り込まない（内容が変わっていなくても、もう一度材料を出し直す）

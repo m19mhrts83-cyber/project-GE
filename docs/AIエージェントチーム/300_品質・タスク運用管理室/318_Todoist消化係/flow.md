@@ -23,7 +23,7 @@ flowchart LR
 
 | FlowForge ノード | 主体 | Phase 1 の実装 | 状態 |
 |---|---|---|---|
-| start 毎朝の定時実行で起動 | プログラム | `run`（手動）／`run --trigger schedule`（朝枠の担当が 318 の時だけ）。停止スイッチ・朝枠の排他・ロック・313 重なり・接続・本人権限・60分・5件 | 実装（launchd は 2026-11-23 登録済み。移管の記録は `移管手順_10時30分.md`） |
+| start 毎朝の定時実行で起動 | プログラム | `run`（手動）／`run --trigger schedule`（朝枠の担当が 318 の時だけ）。停止スイッチ・朝枠の排他・ロック・313 重なり・接続・本人権限・90分・15件（①の作業着手は60分まで） | 実装（launchd は 2026-11-23 登録済み。移管の記録は `移管手順_10時30分.md`） |
 | node_YopbrZa4 採用済み基準・判断履歴の読込 | プログラム | `load_basis`（基準 YAML の adopted／313 `todoist_313_judgments.json`／318 `history.json`） | 実装 |
 | node_fetch 対象タスクの抽出 | プログラム | `candidate_filter`＋`rank`（313 overdue の順位付けを直して再利用） | 実装 |
 | node_5cc62if9 前回から変化なしの除外 | プログラム | `snapshot`／`detect_change` | 実装 |

@@ -244,10 +244,11 @@ class ExtractTest(Base):
         got = [t["id"] for t in tr.candidate_filter(ts, UID, TODAY)]
         self.assertEqual(got, ["mine"])
 
-    def test_max_five_and_carry_over(self):
-        ts = [task(f"t{i}", days_over=i + 1) for i in range(9)]
+    def test_max_fifteen_and_carry_over(self):
+        self.assertEqual(tr.MAX_TASKS, 15)
+        ts = [task(f"t{i}", days_over=i + 1) for i in range(19)]
         run = self.run_once(FakeReader(ts))
-        self.assertEqual(run["counts"]["processed"], 5)
+        self.assertEqual(run["counts"]["processed"], 15)
         self.assertEqual(run["counts"]["carried_over"], 4)
         self.assertEqual(run["result"], "success")
 
@@ -406,7 +407,7 @@ class SafetyTest(Base):
         self.assertEqual(run["result"], "failed")
 
     def test_time_limit_carries_over(self):
-        ticks = iter([0.0] + [0.0] + [61 * 60.0] * 10)
+        ticks = iter([0.0] + [0.0] + [91 * 60.0] * 10)
         opts = tr.RunOptions(dry_run=True, sb=self.sb)
         run = tr.execute(
             self.paths, CRITERIA, self.env, lambda _t: FakeReader([task("a"), task("b")]), opts,
