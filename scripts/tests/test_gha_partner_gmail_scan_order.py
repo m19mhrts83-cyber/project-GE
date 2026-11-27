@@ -58,7 +58,7 @@ class ScanOrderTest(unittest.TestCase):
         self.assertIn("p1", calls)
         self.assertIn("p2", calls)
         self.assertEqual(calls.count("u3"), 1)  # 両方に出ても1回だけ
-        self.assertEqual(st["scanned"], 3 + 9)  # partner 3 + unread は u3 を除く先頭から 10 件枠
+        self.assertEqual(st["scanned"], 3 + 10)  # partner 3 + unread 別枠10（u3 は除く）
 
     def test_each_query_has_own_limit(self):
         svc = FakeService({"A": [f"a{i}" for i in range(30)], "B": [f"b{i}" for i in range(30)]})
