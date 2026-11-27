@@ -25,6 +25,7 @@ from pathlib import Path
 
 import yaml
 
+from line_export_routes_io import read_routes_text
 from line_export_to_yoritoori import ExportTarget, import_line_export_file
 from line_to_yoritoori_clip import load_env as _clip_load_env
 
@@ -109,7 +110,7 @@ def default_routes_path() -> Path:
 def load_routes(path: Path) -> list[ExportRoute]:
     if not path.is_file():
         raise FileNotFoundError(f"ルート定義がありません: {path}")
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data = yaml.safe_load(read_routes_text(path)) or {}
     raw = data.get("routes") if isinstance(data, dict) else data
     if not isinstance(raw, list):
         return []

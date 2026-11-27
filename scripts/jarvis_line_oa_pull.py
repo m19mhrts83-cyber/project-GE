@@ -39,6 +39,8 @@ YOUBI = "月火水木金土日"
 if str(MANUAL) not in sys.path:
     sys.path.insert(0, str(MANUAL))
 
+from line_export_routes_io import read_routes_text  # noqa: E402
+
 
 def _supabase() -> tuple[str, str]:
     url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip().rstrip("/")
@@ -106,7 +108,7 @@ def resolve_name(group_id: str, user_id: str | None, cache: dict, token: str) ->
 
 
 def route_config(routes_path: Path, route_id: str) -> dict:
-    data = yaml.safe_load(routes_path.read_text(encoding="utf-8")) or {}
+    data = yaml.safe_load(read_routes_text(routes_path)) or {}
     for item in data.get("routes") or []:
         if isinstance(item, dict) and str(item.get("id") or "").strip() == route_id:
             return item
@@ -114,7 +116,7 @@ def route_config(routes_path: Path, route_id: str) -> dict:
 
 
 def oa_group_id(routes_path: Path, route_id: str) -> str | None:
-    data = yaml.safe_load(routes_path.read_text(encoding="utf-8")) or {}
+    data = yaml.safe_load(read_routes_text(routes_path)) or {}
     oa = data.get("line_oa") or {}
     gids = oa.get("group_ids") or {}
     gid = gids.get(route_id)
@@ -219,7 +221,7 @@ def build_export_txt(
 
 def oa_group_ids(routes_path: Path) -> list[tuple[str, str]]:
     """line_export_routes.yaml の line_oa.group_ids（route id → groupId）を列挙。"""
-    data = yaml.safe_load(routes_path.read_text(encoding="utf-8")) or {}
+    data = yaml.safe_load(read_routes_text(routes_path)) or {}
     gids = ((data.get("line_oa") or {}).get("group_ids")) or {}
     out: list[tuple[str, str]] = []
     for rid, gid in gids.items():
