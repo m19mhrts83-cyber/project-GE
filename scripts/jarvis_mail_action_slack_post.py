@@ -1480,6 +1480,60 @@ def post_run_report(rc: int) -> None:
 
 
 FRESH_HOURS = 48
+MORNING_ZERO_META_KEY = "mail_action_morning_zero_line_on"
+
+
+def morning_zero_line_text(stats: dict[str, Any]) -> str:
+    """朝の回でカード 0 件のとき #report に出す 1 行（止まったのか 0 件なのかを見分ける用）。"""
+    return (
+        f"🟢 116 要対応0件（流し読み{int(stats.get('skim_skip') or 0)}"
+        f"・業者返信{int(stats.get('vendor_skip') or 0)}）"
+    )
+
+
+def morning_zero_line_due(*, morning: bool, from_triage: bool, posted: int, final_rows: int) -> bool:
+    """朝の回・カード 0 件のときだけ 1 行を出す。"""
+    return bool(morning and from_triage and posted == 0 and final_rows == 0)
+
+
+def notify_morning_zero_line(sb: Any | None, stats: dict[str, Any], *, dry_run: bool) -> bool:
+    """1日1回まで。dry-run は文だけ表示し、送信も記録もしない。"""
+    text = morning_zero_line_text(stats)
+    if dry_run:
+        print("# dry-run morning zero line: " + text)
+        return True
+    today = datetime.now(JST).strftime("%Y-%m-%d")
+    if sb is not None:
+        try:
+            r = sb.table("sync_meta").select("value").eq("key", MORNING_ZERO_META_KEY).limit(1).execute()
+            raw = ((r.data or [{}])[0] or {}).get("value")
+            obj = json.loads(raw) if isinstance(raw, str) and raw.strip() else (raw or {})
+            if str((obj or {}).get("date") or "") == today:
+                print("# morning zero line skip（今日は出し済み）", file=sys.stderr)
+                return False
+        except Exception as e:  # noqa: BLE001
+            print(f"# morning zero meta load skip: {e}", file=sys.stderr)
+    post = REPO / "scripts" / "jarvis_slack_webhook_post.py"
+    if not post.is_file():
+        return False
+    import subprocess
+
+    subprocess.run(
+        [sys.executable, str(post), "--channel", "report", "--text", text, "--username", "116 メール要対応"],
+        cwd=str(REPO),
+        check=False,
+        timeout=60,
+    )
+    if sb is not None:
+        try:
+            sb.table("sync_meta").upsert(
+                {"key": MORNING_ZERO_META_KEY, "value": json.dumps({"date": today}, ensure_ascii=False),
+                 "updated_at": now_iso()},
+                on_conflict="key",
+            ).execute()
+        except Exception as e:  # noqa: BLE001
+            print(f"# morning zero meta save skip: {e}", file=sys.stderr)
+    return True
 ALL_EXCLUDED_META_KEY = "mail_action_all_excluded_ops_at"
 
 
@@ -2076,6 +2130,11 @@ def main() -> int:
         help=f"バッチあたり最大件数（既定{DEFAULT_LIMIT}・スコア上位）",
     )
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--morning",
+        action="store_true",
+        help="朝の回。カード 0 件の日だけ #report に 1 行（1日1回）",
+    )
     ap.add_argument("--url-buttons", action="store_true")
     ap.add_argument("--webhook", action="store_true", help="Bot を使わず Webhook")
     ap.add_argument(
@@ -2166,6 +2225,13 @@ def main() -> int:
                     notify_all_excluded_ops(None if args.dry_run else _sb(), stats, dry_run=args.dry_run)
                 except Exception as e:  # noqa: BLE001 — 注意の失敗で本線を止めない
                     print(f"# all_excluded ops skip: {e}", file=sys.stderr)
+            if morning_zero_line_due(
+                morning=args.morning, from_triage=args.from_triage, posted=0, final_rows=0
+            ):
+                try:
+                    notify_morning_zero_line(None if args.dry_run else _sb(), stats, dry_run=args.dry_run)
+                except Exception as e:  # noqa: BLE001
+                    print(f"# morning zero line skip: {e}", file=sys.stderr)
         return 0
 
     for i, row in enumerate(rows, 1):
