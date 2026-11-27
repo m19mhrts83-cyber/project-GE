@@ -53,6 +53,11 @@ Jarvis が Drive **Jarvisボックス**（`20_outbox_to_grok/`）に置いた依
 3. 締め
 - 「Jarvisボックス振り分け: N件（archive M · re X · weather Y …）」と1行
 
+【Orca 側への依頼（2026-11-27〜）】
+- 自分でできない所（Mac 実行・コード・仕組み）は Slack #ai-hub で @シャア大佐 か担当の隊長をメンション。大佐が振り分ける。
+- Slack に直接書けない時は 10_inbox_from_grok/ に action: slack_report / channel: ai-hub / mention: 大佐 の MD を置く（Mac が投稿）。
+- 依頼文に「修正する担当は誰か／調査だけか」を1行書く。
+
 【禁止】
 - 秘密・パスワード
 - S1–S9 の実行代行（不動産は @不動産賃貸部長 へ）

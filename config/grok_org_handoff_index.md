@@ -1,5 +1,7 @@
 # Grok 組織索引 — AI三柱＋全部署
 
+> **2026-11-27 注記**: ホーク（Grok）→ Orca 側の依頼口は Slack `#ai-hub` で大佐か担当の隊長をメンションする1本。この文書の入口は主役ではない（整理は [`63_`](../docs/AIエージェントチーム/63_Grok_Orca_受け渡し_Slack中心へ組み直し案_20261127.md)）。
+
 **更新**: 2026-10-17（Grok記号 H/C/S/S1–S13/R/F*/M*/P*/A/W（リーダー1文字） — [`29_Grok記号割当`](../docs/AIエージェントチーム/29_Grok記号割当_20261017.md)）  
 **方針**: 各 Bot の Instructions 正本は下表の paste。本ファイルは索引のみ。記号の正本は `config/grok_bots_registry.yaml` の `code:`。
 
