@@ -1,0 +1,318 @@
+# Grok × Orca 関係表（ダッシュ /agent-team「関係」タブ・投影用）
+# 人向け正本: docs/AIエージェントチーム/64_Grok_Orca_関係表_20261127.md
+# 同期: scripts/jarvis_agent_team_status_sync.py → apps/jarvis-dashboard/data/agentTeam.json の grok_orca
+# 決定: 2026-11-27 松野さん（領域ごとに「競う／補う／片方だけ」を整理して見えるように）
+#
+# 書き方
+# - orca.ids は agents_registry.yaml の社員 ID。名前は同期時に registry から引く（ずれ防止）
+# - grok.codes は grok_bots_registry.yaml の記号。公開リポなので人名の社員は label に役割名を書く
+# - relation: compete=競う / complement=補う / one_side=片方だけ
+# - confirm: true は「この分類は文書からの読み取り。松野さんの了承待ち」
+# - 取引先名・物件名・金額・会員情報・家族や職場の個人名は書かない
+
+updated: "2026-11-27"
+doc: docs/AIエージェントチーム/64_Grok_Orca_関係表_20261127.md
+
+relation_defs:
+  compete:
+    label: 競う
+    meaning: 同じ領域で両方が成果を出し、品質を比べて学び合う（採用の最終判断は松野さん／Jarvis）
+  complement:
+    label: 補う
+    meaning: 片方ができない所をもう片方が受け持つ。同じ仕事を二重に実行しない
+  one_side:
+    label: 片方だけ
+    meaning: 相手側に対応する担当がまだない。無理に作らず、必要になったら足す
+
+# 比べる物差し（共通。62_ の「運用」へ上げる基準と同じ数え方）
+measures:
+  - id: output
+    label: 成果の数
+    how: 期間内に出た成果物（下書き・判断メモ・報告）の件数。実ログで数える
+  - id: rework
+    label: 直し回数
+    how: 松野さんの手直し・やり直し指示の回数（62_ の基準3。2回以下が目安）
+  - id: stall
+    label: 止まった回数
+    how: 予定どおり動かなかった回数。0件の日に ⚪ を出さず黙った日も数える
+
+# 横のつながり（領域をまたぐ3者）
+horizontal:
+  - id: hawk
+    side: grok
+    name: ★[H] ホークアイ（参謀）
+    role: 攻めのおせっかい。目標・優先順位・仕事の割当。依頼は Slack #ai-hub でメンション
+  - id: banto
+    side: both
+    name: 番頭さん（Muse）
+    role: 守り・先回り。朝・昼・夜の巡回で停滞・忘れ物を見つけ、解決確認まで責任を持つ
+  - id: shaa
+    side: orca
+    name: ★000 シャア大佐
+    role: Orca 側の全体リーダー。隊長たちの上。室をまたぐ件の振り分け
+horizontal_note: >-
+  横の3者は同格で並ぶ。ホークの依頼は #ai-hub のメンションで大佐か担当の隊長へ。
+  どちらが先に気づいたかを比べる所は要確認。
+
+domains:
+  # ───── 不動産 ─────
+  - id: re_screening
+    group: 不動産
+    name: 物件の一次判定
+    relation: compete
+    confirm: true
+    grok:
+      codes: ["S1"]
+      label: S1 物件調査（本日分ゲート）
+    orca:
+      ids: ["114"]
+    measures: ["output", "rework", "stall"]
+    note: S1 のゲートと114は重なりやすい（16_）。並べて比べる相手。置き換えではない
+  - id: re_inquiry
+    group: 不動産
+    name: 問合せ文案→送信準備
+    relation: complement
+    grok:
+      codes: ["S1"]
+      label: S1 物件調査（問合せ文案）
+    orca:
+      ids: ["511"]
+    measures: ["output", "rework", "stall"]
+    note: Grok=調査・問合せ文案／Orca=送信準備・対外了承前の整形
+  - id: re_reply
+    group: 不動産
+    name: 仲介返信の判断と取込
+    relation: complement
+    grok:
+      codes: ["S", "S3", "S5"]
+      label: 不動産賃貸部長＋S3 需給＋S5 ペルソナ
+    orca:
+      ids: ["512", "513"]
+    measures: ["output", "rework", "stall"]
+    note: Grok=判断本文／Orca=取込・整理・Obsidian／deals突合・停滞見回り
+  - id: re_loan
+    group: 不動産
+    name: 融資の打診
+    relation: complement
+    grok:
+      codes: ["S7"]
+      label: S7 融資相談
+    orca:
+      ids: ["514"]
+    measures: ["output", "rework", "stall"]
+    note: Grok=打診論点／Orca=書類・下書き検収（送信は人）
+  - id: re_creative
+    group: 不動産
+    name: 購入後クリエイティブ
+    relation: complement
+    grok:
+      codes: ["S10", "S11", "S12", "S13"]
+      label: S10–S13（周辺マップ・マイソク・ウェルカムボード・命名）
+    orca:
+      ids: ["515"]
+    measures: ["output", "rework", "stall"]
+    note: Grok=文案・Canva下準備／Orca=Drive・Prompt同期点検
+  - id: re_vendor
+    group: 不動産
+    name: 業者開拓
+    relation: complement
+    grok:
+      codes: ["S2", "S4", "S9"]
+      label: S2 物件業者・S4 修繕業者・S9 管理会社の開拓
+    orca:
+      ids: ["516"]
+    measures: ["output", "rework", "stall"]
+    note: 実行=Grok（検索・定型送信・mark）／見守り=516。定型は都度許可不要・非定型は松野確認。二重実行しない
+  - id: re_daily
+    group: 不動産
+    name: 部長Daily と買進め確認
+    relation: complement
+    confirm: true
+    grok:
+      codes: ["S"]
+      label: 不動産賃貸部長（Daily・日報）
+    orca:
+      ids: ["113"]
+    measures: ["output", "stall"]
+    note: 弱い対応（主は KURASHIFT 見回り）。分担の線引きは要確認
+  - id: re_deal
+    group: 不動産
+    name: 買付交渉・ライフライン
+    relation: one_side
+    grok:
+      codes: ["S6", "S8"]
+      label: S6 買付交渉・S8 物件ライフライン
+    orca:
+      ids: []
+    measures: []
+    note: Orca 側に対応する社員はない
+  - id: re_contact
+    group: 不動産
+    name: 連絡・メール・修繕・返信文面
+    relation: one_side
+    confirm: true
+    grok:
+      codes: []
+      label: （対応する Bot なし）
+    orca:
+      ids: ["111", "112", "115", "116", "211"]
+    measures: []
+    note: Jarvis／Slack 本線の社員。文面は Grok の文案と材料化して比べる余地あり（要確認）
+
+  # ───── お金 ─────
+  - id: money_resource
+    group: お金
+    name: リソース制約の要約
+    relation: complement
+    grok:
+      codes: ["R"]
+      label: R リソース経営部長（brush-up・MQ・制約）
+    orca:
+      ids: ["611"]
+    measures: ["output", "rework", "stall"]
+    note: Grok=制約伝達／Orca=週次要約の Mac 側
+  - id: money_ledger
+    group: お金
+    name: 家計・課金・資金・資産記録
+    relation: one_side
+    grok:
+      codes: []
+      label: （対応する Bot なし）
+    orca:
+      ids: ["612", "613", "614", "615", "616", "617", "618"]
+    measures: []
+    note: Zaim・課金ガード・資金移動など。送金・OTP・銀行 IB は Claude は実行しない（617 は Jarvis・Codex が了承のうえ）
+
+  # ───── コーチング・家族 ─────
+  - id: family_weekly
+    group: コーチング・家族
+    name: 家族の週次評価と会議
+    relation: complement
+    grok:
+      codes: ["F"]
+      label: F 家族コーチ統括（Journal／会議読取・週次評価）
+    orca:
+      ids: ["711", "715"]
+    measures: ["output", "rework", "stall"]
+    note: Grok=週次評価／Orca=Journal 材料抽出・家族会議の週次
+  - id: coaching_pack
+    group: コーチング・家族
+    name: アドバイザー週次パック
+    relation: complement
+    grok:
+      codes: ["C"]
+      label: C コーチング部長（週次パック）
+    orca:
+      ids: ["712"]
+    measures: ["output", "rework", "stall"]
+    note: Grok=パック利用／Orca=材料整形
+  - id: family_coaches
+    group: コーチング・家族
+    name: 家族向けの専属コーチ・アドバイザー
+    relation: one_side
+    grok:
+      codes: ["F1", "F2", "F3", "F4", "F5"]
+      label: F1–F5（家族・夫婦・空手の専属コーチ／アドバイザー）
+    orca:
+      ids: []
+    measures: []
+    note: 統括 F 経由で動く。Orca 側に対応する社員はない
+
+  # ───── 総務・本業 ─────
+  - id: somu_pack
+    group: 総務・本業
+    name: 総務・DX の週次材料
+    relation: complement
+    grok:
+      codes: ["M"]
+      label: M 総務計画T統括（振り分け・助言）
+    orca:
+      ids: ["713"]
+    measures: ["output", "rework", "stall"]
+    note: Grok=振り分け・助言／Orca=週次材料整理
+  - id: somu_minutes
+    group: 総務・本業
+    name: 議事録のまとめ
+    relation: one_side
+    grok:
+      codes: []
+      label: （対応する Bot なし）
+    orca:
+      ids: ["714"]
+    measures: []
+    note: 52_議事録のまとめ方 に従う
+  - id: somu_advisors
+    group: 総務・本業
+    name: 職場向けのコーチ・アドバイザー
+    relation: one_side
+    grok:
+      codes: ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10"]
+      label: M1–M10（職場の各役職向けコーチ・アドバイザー）
+    orca:
+      ids: []
+    measures: []
+    note: 個人名・役職名の詳細は非公開メモリ側。この表には役割名だけ書く
+  - id: partner_dx
+    group: 総務・本業
+    name: パートナー DX
+    relation: one_side
+    grok:
+      codes: ["P", "P1", "P2"]
+      label: P パートナーDX統括＋P1–P2（取引先向けアドバイザー）
+    orca:
+      ids: []
+    measures: []
+    note: 取引先名は書かない。Orca 側に対応する社員はない
+
+  # ───── アプリ・UI ─────
+  - id: app_ui
+    group: アプリ・UI
+    name: ダッシュボード・アプリの点検と更新
+    relation: complement
+    confirm: true
+    grok:
+      codes: ["A"]
+      label: A アプリ開発統括（週次点検・怪しさ・壁打ち。コード実装はしない）
+    orca:
+      ids: ["811", "812", "813", "814", "815", "816"]
+    measures: ["output", "rework", "stall"]
+    note: Grok=提案まで／Orca・Jarvis=実装・投影更新。競わせるかは要確認
+
+  # ───── 天気 ─────
+  - id: weather
+    group: 天気
+    name: 朝の天気お知らせ
+    relation: one_side
+    grok:
+      codes: ["W"]
+      label: W 天気お知らせ（毎朝 6:30・ホーク傘下）
+    orca:
+      ids: []
+    measures: []
+    note: 定型。Orca 側に対応はない。材料は Jarvis が Drive へ置く
+
+  # ───── 横断 ─────
+  - id: cross_mix
+    group: 横断（参謀・品質）
+    name: 参謀の振り分けと、両系統の取捨
+    relation: compete
+    confirm: true
+    grok:
+      codes: ["H"]
+      label: H ホークアイ（参謀）
+    orca:
+      ids: ["411", "412", "413", "414", "415"]
+      lead_label: ★000 シャア大佐
+    measures: ["output", "rework", "stall"]
+    note: 400室（411–415）が両系統を並べて差分を出し、採用／却下の案を作る。最終採用は Jarvis／松野さん
+  - id: cross_quality
+    group: 横断（参謀・品質）
+    name: 品質・Todoist・連携の点検
+    relation: one_side
+    grok:
+      codes: []
+      label: （対応する Bot なし）
+    orca:
+      ids: ["311", "312", "313", "314", "315", "316", "317", "318"]
+    measures: []
+    note: 300室（ラス隊長）。Grok に同型はない

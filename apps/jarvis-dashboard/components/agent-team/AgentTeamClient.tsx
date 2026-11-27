@@ -17,6 +17,7 @@ import {
   type AgentTeamAgent,
   type AgentTeamDept,
   type AgentTeamGenre,
+  type GrokOrcaRelations,
   type GrokPayload,
   type OpsMeta,
   type PermissionsMeta,
@@ -31,7 +32,7 @@ function genreHashDomId(): string | null {
 }
 
 const STATUS_FILTERS = ["すべて", "運用確認", "設計中", "運用", "候補", "停止"] as const;
-type Tab = "genre" | "ai" | "grok" | "map" | "perms" | "ops" | "maturity" | "activity";
+type Tab = "genre" | "ai" | "grok" | "relation" | "map" | "perms" | "ops" | "maturity" | "activity";
 type PermsSide = "ai" | "grok" | "site";
 type OpsView = "triggers" | "procedures" | "reports";
 
@@ -43,6 +44,128 @@ const STATUS_LEGEND = [
   { status: "候補", icon: "⚪", meaning: "指示書スタブのみ（未着手）" },
   { status: "停止", icon: "⛔", meaning: "止めている" },
 ] as const;
+
+const REL_LABEL: Record<string, string> = {
+  compete: "競う",
+  complement: "補う",
+  one_side: "片方だけ",
+};
+
+/** Grok と Orca の関係（領域ごと）。左＝Grok／右＝Orca。データは config/grok_orca_relations.yaml */
+function RelationView({
+  data,
+  filter,
+  onFilter,
+}: {
+  data: GrokOrcaRelations;
+  filter: string;
+  onFilter: (v: string) => void;
+}) {
+  const shown = data.domains.filter((d) => filter === "すべて" || d.relation === filter);
+  const groups = Array.from(new Set(shown.map((d) => d.group)));
+  const total = data.domains.length;
+  return (
+    <>
+      <p className="at-hint">
+        領域ごとに Grok（左）と Orca（右）を並べ、関係を3つに分けています。
+        {(["compete", "complement", "one_side"] as const).map((k) => (
+          <span key={k} className="at-rel-def">
+            <span className={`at-rel at-rel-${k}`}>{data.relation_defs[k]?.label ?? REL_LABEL[k]}</span>
+            {data.relation_defs[k]?.meaning}
+          </span>
+        ))}
+        <span className="at-rel-def">
+          <span className="at-rel-confirm">要確認</span>
+          分類は文書からの読み取り。松野さんの了承待ち
+        </span>
+        {data.doc ? ` 詳細: ${data.doc}` : null}
+      </p>
+
+      <section className="at-rel-horizontal" aria-label="横のつながり">
+        <h2 className="at-rel-h2">横のつながり</h2>
+        <div className="at-rel-hgrid">
+          {data.horizontal.map((h) => (
+            <div key={h.id} className={`at-rel-hcard is-${h.side}`}>
+              <strong>{h.name}</strong>
+              <span>{h.role}</span>
+            </div>
+          ))}
+        </div>
+        {data.horizontal_note ? <p className="meta">{data.horizontal_note}</p> : null}
+      </section>
+
+      <div className="at-counts" aria-label="関係フィルタ">
+        {(
+          [
+            ["すべて", "すべて", total],
+            ["compete", "競う", data.counts.compete ?? 0],
+            ["complement", "補う", data.counts.complement ?? 0],
+            ["one_side", "片方だけ", data.counts.one_side ?? 0],
+          ] as const
+        ).map(([key, label, n]) => (
+          <button
+            key={key}
+            type="button"
+            className={`at-count ${filter === key ? "is-on" : ""}`}
+            onClick={() => onFilter(key)}
+          >
+            <span>{label}</span>
+            <strong>{n}</strong>
+          </button>
+        ))}
+      </div>
+
+      <p className="meta">
+        比べる物差し：
+        {data.measures.map((m) => m.label).join("・")}（数え方は関係表の docs を参照）
+      </p>
+
+      {groups.map((g) => (
+        <section key={g} className="at-rel-group">
+          <h2 className="at-rel-h2">{g}</h2>
+          {shown
+            .filter((d) => d.group === g)
+            .map((d) => (
+              <article key={d.id} className="at-rel-card">
+                <header className="at-rel-head">
+                  <h3>{d.name}</h3>
+                  <span className={`at-rel at-rel-${d.relation}`}>
+                    {data.relation_defs[d.relation]?.label ?? REL_LABEL[d.relation] ?? d.relation}
+                  </span>
+                  {d.confirm ? <span className="at-rel-confirm">要確認</span> : null}
+                </header>
+                <div className="at-rel-cols">
+                  <div className="at-rel-col is-grok">
+                    <span className="at-rel-side">Grok</span>
+                    <p>{d.grok.label}</p>
+                  </div>
+                  <div className="at-rel-col is-orca">
+                    <span className="at-rel-side">Orca</span>
+                    {d.orca.leads.length ? <p className="at-rel-lead">{d.orca.leads.join(" ／ ")}</p> : null}
+                    {d.orca.members.length ? (
+                      <ul>
+                        {d.orca.members.map((m) => (
+                          <li key={m.id}>
+                            {m.id} {m.name}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="at-rel-none">（対応する社員なし）</p>
+                    )}
+                  </div>
+                </div>
+                {d.note ? <p className="at-rel-note">{d.note}</p> : null}
+                {d.measures.length ? (
+                  <p className="at-rel-measure">物差し：{d.measures.join("・")}</p>
+                ) : null}
+              </article>
+            ))}
+        </section>
+      ))}
+    </>
+  );
+}
 
 type Props = {
   departments: AgentTeamDept[];
@@ -56,6 +179,7 @@ type Props = {
   builderUrl: string;
   builderTitle: string;
   grok: GrokPayload;
+  grokOrca?: GrokOrcaRelations;
   permissionsMeta?: PermissionsMeta;
   permissionsUpdated?: string;
   opsMeta?: OpsMeta;
@@ -78,6 +202,7 @@ export default function AgentTeamClient({
   builderUrl,
   builderTitle,
   grok,
+  grokOrca,
   permissionsMeta,
   permissionsUpdated,
   opsMeta,
@@ -97,6 +222,7 @@ export default function AgentTeamClient({
   const [deptFilter, setDeptFilter] = useState<string>("すべて");
   const [grokDeptFilter, setGrokDeptFilter] = useState<string>("すべて");
   const [mapFilter, setMapFilter] = useState<string>("すべて");
+  const [relFilter, setRelFilter] = useState<string>("すべて");
   const [permsSide, setPermsSide] = useState<PermsSide>("ai");
   const [opsView, setOpsView] = useState<OpsView>("triggers");
   const [opsKindFilter, setOpsKindFilter] = useState<string>("すべて");
@@ -271,6 +397,7 @@ export default function AgentTeamClient({
             ["genre", "ジャンル", genres.length],
             ["ai", "AIエージェントチーム", agents.length],
             ["grok", "Grok Bot", grok.bots.length],
+            ["relation", "関係", grokOrca?.domains.length ?? 0],
             ["map", "対応表", grok.mapping_counts?.all ?? grok.mappings.length],
             [
               "perms",
@@ -821,6 +948,14 @@ export default function AgentTeamClient({
             </div>
           </section>
         </>
+      ) : null}
+
+      {tab === "relation" ? (
+        grokOrca ? (
+          <RelationView data={grokOrca} filter={relFilter} onFilter={setRelFilter} />
+        ) : (
+          <p className="at-hint">関係表のデータがまだありません（sync を実行してください）。</p>
+        )
       ) : null}
 
       {tab === "map" ? (

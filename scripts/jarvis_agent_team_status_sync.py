@@ -30,6 +30,7 @@ HUB = REPO / "docs" / "AIエージェントチーム"
 REG = HUB / "agents_registry.yaml"
 GROK_REG = REPO / "config" / "grok_bots_registry.yaml"
 GENRE_REG = REPO / "config" / "agent_team_genres.yaml"
+RELATIONS_REG = REPO / "config" / "grok_orca_relations.yaml"
 PERMS_REG = REPO / "config" / "agent_team_permissions.yaml"
 OPS_REG = REPO / "config" / "agent_team_ops.yaml"
 PERM_MD = HUB / "25_実行権限一覧_20261015.md"
@@ -920,6 +921,82 @@ def load_grok_registry() -> dict:
     return yaml.safe_load(GROK_REG.read_text(encoding="utf-8")) or {}
 
 
+def build_grok_orca(data: dict, grok_reg: dict) -> dict:
+    """config/grok_orca_relations.yaml → ダッシュ「関係」タブ用。名前は registry から引く。"""
+    if not RELATIONS_REG.is_file():
+        return {}
+    reg = yaml.safe_load(RELATIONS_REG.read_text(encoding="utf-8")) or {}
+    agents = data.get("agents") or {}
+    depts = data.get("departments") or {}
+    grok_codes = {
+        str(b.get("code")): b
+        for d in (grok_reg.get("departments") or [])
+        for b in (d.get("bots") or [])
+    }
+    rel_defs = reg.get("relation_defs") or {}
+    measures = {m["id"]: m for m in (reg.get("measures") or [])}
+    domains: list[dict] = []
+    for d in reg.get("domains") or []:
+        rel = str(d.get("relation") or "")
+        if rel not in rel_defs:
+            print(f"  ⚠ 関係表: {d.get('id')} の relation が不明: {rel}", file=sys.stderr)
+        g = d.get("grok") or {}
+        for c in g.get("codes") or []:
+            if str(c) not in grok_codes:
+                print(f"  ⚠ 関係表: {d.get('id')} の Grok 記号 {c} が registry に無い", file=sys.stderr)
+        o = d.get("orca") or {}
+        members: list[dict] = []
+        rooms: list[str] = []
+        for aid in o.get("ids") or []:
+            a = agents.get(str(aid))
+            if not a:
+                print(f"  ⚠ 関係表: {d.get('id')} の社員 {aid} が registry に無い", file=sys.stderr)
+                continue
+            members.append({"id": str(aid), "name": a.get("name") or "", "status": a.get("status") or "候補"})
+            rooms.append(str(aid)[0] + "00")
+        leads: list[str] = []
+        for rid in dict.fromkeys(rooms):
+            lead = ((depts.get(rid) or {}).get("lead") or {})
+            if lead.get("kind") == "orca_bot" and lead.get("name"):
+                leads.append(f"{rid}室 {lead['name']}")
+            elif rid in depts:
+                leads.append(f"{rid}室（隊長これから）")
+        if o.get("lead_label"):
+            leads.insert(0, str(o["lead_label"]))
+        domains.append(
+            {
+                "id": d.get("id") or "",
+                "group": d.get("group") or "",
+                "name": d.get("name") or "",
+                "relation": rel,
+                "confirm": bool(d.get("confirm")),
+                "grok": {
+                    "codes": [str(c) for c in (g.get("codes") or [])],
+                    "label": g.get("label") or "",
+                },
+                "orca": {"members": members, "leads": leads},
+                "measures": [
+                    (measures.get(m) or {}).get("label") or str(m)
+                    for m in (d.get("measures") or [])
+                ],
+                "note": d.get("note") or "",
+            }
+        )
+    counts = {k: 0 for k in rel_defs}
+    for d in domains:
+        counts[d["relation"]] = counts.get(d["relation"], 0) + 1
+    return {
+        "updated": reg.get("updated") or "",
+        "doc": reg.get("doc") or "",
+        "relation_defs": rel_defs,
+        "measures": reg.get("measures") or [],
+        "horizontal": reg.get("horizontal") or [],
+        "horizontal_note": reg.get("horizontal_note") or "",
+        "counts": counts,
+        "domains": domains,
+    }
+
+
 def load_genre_registry() -> dict:
     if not GENRE_REG.is_file():
         return {}
@@ -1423,6 +1500,7 @@ def write_dashboard_json(data: dict, dry: bool) -> Path:
         "departments": dept_list,
         "agents": agent_list,
         "grok": grok_payload,
+        "grok_orca": build_grok_orca(data, load_grok_registry()),
         "permissions_meta": {
             "defaults": perms_reg.get("defaults") or {},
             "site_login_agent_ids": site_login_agent_ids,
