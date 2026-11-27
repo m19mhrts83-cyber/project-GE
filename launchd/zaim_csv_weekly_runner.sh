@@ -7,7 +7,9 @@
 # - source .env 前に set -u だと $ を含むパスワードで落ちる
 # - OneDrive CSV 直後の読取は Resource deadlock になりやすい → ローカルコピー＋再試行
 # - export 成功後の push 失敗で last_ok=false にしない（失敗理由を分類して state に残す）
+# 教訓（2026-11）: launchd の PATH に /usr/local/bin は無い → MQ 月次の npx が見つからず停止
 set -euo pipefail
+export PATH="/usr/local/bin:/opt/homebrew/bin:${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}"
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ZAIM_DIR="${REPO_DIR}/215_kamiooya/C1_cursor/finance/zaim_budget_sync"
 PY="${HOME}/selenium_env/venv/bin/python"

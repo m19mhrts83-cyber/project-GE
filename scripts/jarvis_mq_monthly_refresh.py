@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -138,9 +139,28 @@ def ingest_finance_years(years: list[int], *, dry_run: bool) -> list[dict]:
     return results
 
 
+_EXTRA_BIN = "/usr/local/bin:/opt/homebrew/bin"
+
+
+def find_npx(path: str) -> str | None:
+    """launchd の最小 PATH でも npx を探す（無ければ None）。"""
+    found = shutil.which("npx", path=path)
+    if found:
+        return found
+    for cand in ("/usr/local/bin/npx", "/opt/homebrew/bin/npx"):
+        if os.access(cand, os.X_OK):
+            return cand
+    return None
+
+
 def mq_refresh_year(year: int, *, dry_run: bool, force: bool) -> dict:
+    env = os.environ.copy()
+    env["PATH"] = f"{_EXTRA_BIN}:{env.get('PATH', '/usr/bin:/bin')}"
+    npx = find_npx(env["PATH"])
+    if not npx:
+        return {"year": year, "ok": False, "rc": None, "stderr": "npx not found", "stdout": ""}
     cmd = [
-        "npx",
+        npx,
         "--yes",
         "tsx",
         "scripts/mqYearRefresh.ts",
@@ -151,7 +171,6 @@ def mq_refresh_year(year: int, *, dry_run: bool, force: bool) -> dict:
         cmd.append("--dry-run")
     if force:
         cmd.append("--force")
-    env = os.environ.copy()
     proc = subprocess.run(
         cmd,
         cwd=str(REPO / "apps" / "trade-desk"),
