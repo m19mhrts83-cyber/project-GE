@@ -100,12 +100,19 @@ export default function CleanupBulkClient() {
     setMsg("");
     try {
       const r = await fetch("/api/cleanup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ decisions: rows }) });
-      const j = await r.json();
-      if (!j.ok && !j.saved) throw new Error(j.error || "保存できませんでした");
-      const done = new Set(rows.map((x) => x.targetId));
+      const j = await r.json().catch(() => ({}));
+      const savedIds: string[] = Array.isArray(j.savedIds) ? j.savedIds : [];
+      if (!savedIds.length) throw new Error(`保存できませんでした（${j.error || r.status}）。選んだ内容はそのまま残しています。もう一度「確定する」を押してください`);
+      // 保存できた件だけ画面から外す。保存できなかった件は選択も残して、失敗と分かるようにする
+      const done = new Set(savedIds);
       setSnap({ ...snap, cards: cards.filter((c) => !done.has(c.id)) });
-      setCh({});
-      setMsg(`${j.saved} 件を記録しました。30分以内に Todoist へ反映されます${j.failed?.length ? `（記録できなかった ${j.failed.length} 件）` : ""}`);
+      setCh((p) => Object.fromEntries(Object.entries(p).filter(([id]) => !done.has(id))));
+      const nFail = rows.length - savedIds.length;
+      setMsg(
+        nFail > 0
+          ? `⚠ ${savedIds.length} 件を記録、${nFail} 件は記録できませんでした（選択は残してあります。もう一度「確定する」を押してください）`
+          : `${savedIds.length} 件を記録しました。30分以内に Todoist へ反映されます`,
+      );
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
     } finally {
@@ -144,7 +151,14 @@ export default function CleanupBulkClient() {
           {saving ? "保存中…" : "確定する"}
         </button>
       </div>
-      {msg && <div className="wk-banner ok"><span>{msg}</span></div>}
+      {msg && (
+        <div
+          className={`wk-banner ${/^(⚠|保存できません)/.test(msg) ? "" : "ok"}`}
+          style={/^(⚠|保存できません)/.test(msg) ? { borderColor: "var(--negative, #e5484d)", color: "var(--negative, #e5484d)" } : undefined}
+        >
+          <span>{msg}</span>
+        </div>
+      )}
 
       <div className="glass wk-card">
         <div className="meta">チェックしたものを まとめて（{nPicked} 件）</div>

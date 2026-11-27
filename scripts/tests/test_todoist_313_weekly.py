@@ -132,6 +132,25 @@ class StaleTests(unittest.TestCase):
         self.assertIsNone(w.stale_reason(t, last, NOW, cfg()))
 
 
+class KeptTests(unittest.TestCase):
+    def test_any_surface_keep_counts(self):
+        rows = [
+            {"target_id": "1", "surface": "todoist_313", "action": "defer", "payload": {"origin": "318"}},
+            {"target_id": "2", "surface": "todoist_313", "action": "defer", "payload": {"origin": "313"}},
+            {"target_id": "3", "surface": "todoist_triage", "action": "keep"},
+            {"target_id": "4", "surface": "todoist_313", "action": "close"},
+            {"target_id": "5", "surface": "todoist_triage", "action": "drop"},
+        ]
+        self.assertEqual(w.kept_from_rows(rows), {"1", "2", "3"})
+
+    def test_kept_are_skipped_and_counted(self):
+        old = "2026-09-01T00:00:00Z"
+        p = w.plan([task(1, added=old), task(2, added=old)], {}, {}, cfg=cfg(), now=NOW,
+                   exclude_ids=set(), week9_ids=set(), kept_ids={"1"})
+        self.assertEqual([r["task"]["id"] for r in p["b"]], ["2"])
+        self.assertEqual(p["skipped"]["kept"], 1)
+
+
 class PlanTests(unittest.TestCase):
     def plan(self, tasks, comments=None, status=None, **kw):
         args = {"exclude_ids": set(), "week9_ids": set(), "kept_ids": set(), **kw}
