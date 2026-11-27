@@ -226,6 +226,47 @@ def process_one(
     return "appended"
 
 
+def scan_queries(
+    service: Any,
+    resolver: Any,
+    queries: list[str],
+    *,
+    limit: int,
+    dry_run: bool,
+    stats: dict[str, int],
+) -> None:
+    """クエリごとに別枠の上限 limit で走査。同一メッセージは1回だけ処理（二重追記は process_one が件名+日付で抑止）。"""
+    seen: set[str] = set()
+    for q in queries:
+        result = (
+            service.users()
+            .messages()
+            .list(userId="me", q=q, maxResults=min(100, max(limit, 20)))
+            .execute()
+        )
+        taken = 0
+        for msg in result.get("messages") or []:
+            mid = msg.get("id") or ""
+            if not mid or mid in seen:
+                continue
+            if taken >= limit:
+                break
+            seen.add(mid)
+            taken += 1
+            stats["scanned"] += 1
+            try:
+                st = process_one(service, mid, resolver, dry_run=dry_run, mark_read=True)
+            except Exception as e:
+                print(f"# process fail {mid}: {e}", file=sys.stderr)
+                stats["fail"] += 1
+                continue
+            if st in ("appended", "dup", "no_partner", "dry_run"):
+                stats[st] += 1
+            else:
+                stats["fail"] += 1
+                print(f"# skip {mid}: {st}", file=sys.stderr)
+
+
 def run(*, dry_run: bool, limit: int, newer_days: int) -> dict[str, int]:
     import yaml
     from gmail_to_yoritoori import PartnerResolver, build_service_for_token  # type: ignore
@@ -259,50 +300,17 @@ def run(*, dry_run: bool, limit: int, newer_days: int) -> dict[str, int]:
         if not service:
             raise SystemExit(f"Gmail service failed: {token}")
 
-        # 未読＋直近パートナー from（漏れ）をまとめて走査
+        # 2026-11-27: パートナー from 検索を先に、未読は別枠（各 limit）。
+        # 以前は未読が先で limit に達し、パートナー検索まで進まなかった。
         parts = resolver.gmail_from_query_parts()
-        queries = ["is:unread"]
+        queries: list[str] = []
         if parts:
             from_q = " OR ".join(parts[:40])  # Gmail クエリ長対策
             queries.append(f"({from_q}) newer_than:{max(1, newer_days)}d")
-
-        seen: set[str] = set()
-        for q in queries:
-            result = (
-                service.users()
-                .messages()
-                .list(userId="me", q=q, maxResults=min(100, max(limit, 20)))
-                .execute()
-            )
-            for msg in result.get("messages") or []:
-                mid = msg.get("id") or ""
-                if not mid or mid in seen:
-                    continue
-                seen.add(mid)
-                if stats["scanned"] >= limit:
-                    break
-                stats["scanned"] += 1
-                try:
-                    st = process_one(
-                        service, mid, resolver, dry_run=dry_run, mark_read=True
-                    )
-                except Exception as e:
-                    print(f"# process fail {mid}: {e}", file=sys.stderr)
-                    stats["fail"] += 1
-                    continue
-                if st == "appended":
-                    stats["appended"] += 1
-                elif st == "dup":
-                    stats["dup"] += 1
-                elif st == "no_partner":
-                    stats["no_partner"] += 1
-                elif st == "dry_run":
-                    stats["dry_run"] += 1
-                else:
-                    stats["fail"] += 1
-                    print(f"# skip {mid}: {st}", file=sys.stderr)
-            if stats["scanned"] >= limit:
-                break
+        queries.append("is:unread")
+        scan_queries(
+            service, resolver, queries, limit=limit, dry_run=dry_run, stats=stats
+        )
     return stats
 
 
