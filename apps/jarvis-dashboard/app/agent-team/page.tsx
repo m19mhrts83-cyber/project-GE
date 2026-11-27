@@ -7,6 +7,7 @@ import {
   getAgentTeam,
   getGenres,
   getGrok,
+  getGrokOrca,
   getOpsMeta,
   getPermissionsMeta,
 } from "@/lib/agentTeam";
@@ -35,6 +36,7 @@ export default function AgentTeamPage() {
         builderUrl={team.builder.url}
         builderTitle={team.builder.title}
         grok={grok}
+        grokOrca={getGrokOrca()}
         permissionsMeta={permissionsMeta}
         permissionsUpdated={team.permissions_updated}
         opsMeta={opsMeta}

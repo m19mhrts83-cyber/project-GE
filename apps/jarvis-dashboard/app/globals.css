@@ -5617,3 +5617,74 @@ tr.at-map-ai-only .at-map-missing {
 .stg-watch ul { margin: 6px 0 0; padding-left: 18px; }
 .stg-watch li { margin: 4px 0; }
 .wa-band-stage { margin-top: 8px; }
+
+/* Grok × Orca 関係タブ（2026-11-27） */
+.at-rel-def { display: block; margin-top: 4px; }
+.at-rel {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.at-rel-compete { background: #fee2e2; color: #991b1b; }
+.at-rel-complement { background: #dcfce7; color: #166534; }
+.at-rel-one_side { background: #e2e8f0; color: #334155; }
+.at-rel-confirm {
+  display: inline-block;
+  padding: 1px 8px;
+  margin-right: 6px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  background: #fef3c7;
+  color: #92400e;
+  white-space: nowrap;
+}
+.at-rel-h2 { font-size: 1.05rem; margin: 18px 0 8px; }
+.at-rel-hgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+.at-rel-hcard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+.at-rel-hcard.is-grok { border-left: 4px solid #6366f1; }
+.at-rel-hcard.is-orca { border-left: 4px solid var(--accent); }
+.at-rel-hcard.is-both { border-left: 4px solid #d97706; }
+.at-rel-card {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.at-rel-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin-bottom: 8px; }
+.at-rel-head h3 { flex: 1 1 100%; margin: 0 0 2px; font-size: 0.98rem; }
+.at-rel-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.at-rel-col {
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.at-rel-col.is-grok { background: #eef2ff; }
+.at-rel-col.is-orca { background: #f0fdfa; }
+.at-rel-col p { margin: 2px 0 0; }
+.at-rel-col ul { margin: 2px 0 0; padding-left: 1.1em; }
+.at-rel-side { font-size: 0.7rem; font-weight: 700; color: var(--muted); }
+.at-rel-lead { font-weight: 600; }
+.at-rel-none { color: var(--muted); }
+.at-rel-note, .at-rel-measure { margin: 6px 0 0; font-size: 0.8rem; color: #475569; line-height: 1.4; }

@@ -260,6 +260,7 @@ export type AgentTeamPayload = {
   counts: Record<string, number>;
   genres?: AgentTeamGenre[];
   genre_note?: string;
+  grok_orca?: GrokOrcaRelations;
   /** チーム Orca の全体リーダー（隊長たちの上） */
   team_lead?: { id: string; name: string; role?: string; does?: string };
   departments: AgentTeamDept[];
@@ -267,6 +268,34 @@ export type AgentTeamPayload = {
   grok?: GrokPayload;
   permissions_meta?: PermissionsMeta;
   ops_meta?: OpsMeta;
+};
+
+export type RelationKind = "compete" | "complement" | "one_side";
+
+export type GrokOrcaDomain = {
+  id: string;
+  group: string;
+  name: string;
+  relation: RelationKind | string;
+  confirm: boolean;
+  grok: { codes: string[]; label: string };
+  orca: {
+    members: { id: string; name: string; status: string }[];
+    leads: string[];
+  };
+  measures: string[];
+  note: string;
+};
+
+export type GrokOrcaRelations = {
+  updated: string;
+  doc: string;
+  relation_defs: Record<string, { label: string; meaning: string }>;
+  measures: { id: string; label: string; how: string }[];
+  horizontal: { id: string; side: string; name: string; role: string }[];
+  horizontal_note: string;
+  counts: Record<string, number>;
+  domains: GrokOrcaDomain[];
 };
 
 export function getPermissionsMeta(): PermissionsMeta {
@@ -334,6 +363,10 @@ export function getGrok(): GrokPayload {
       mappings: [],
     }
   );
+}
+
+export function getGrokOrca(): GrokOrcaRelations | undefined {
+  return getAgentTeam().grok_orca;
 }
 
 export function getGenres(): AgentTeamGenre[] {
