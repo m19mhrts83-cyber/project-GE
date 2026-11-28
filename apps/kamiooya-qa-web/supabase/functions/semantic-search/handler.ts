@@ -52,6 +52,8 @@ type SemanticSearchRequest = {
   chat_title?: string;
   /** スレッド番号を付ける（スイッチ openchat_threads の人だけ画面が付ける、2026-11-17） */
   with_threads?: boolean;
+  /** スイッチ video_finder が見える人の質問だけ raimo-auth が付ける（2026-11-27） */
+  video_finder?: boolean;
   /** 一覧でスレッドごとに読む: chat_title（完全一致）＋この番号のスレッドの書き込みを古い順に返す */
   thread_no?: number;
   secret?: string;
@@ -491,11 +493,119 @@ function displaySourceTitle(title: string): string {
   return title.replace(/^\s*【[^】]*(?:暫定|自動字幕)[^】]*】\s*/, "").replace(/\s*[（(]動画\s*[0-9０-９]+[）)]/g, "").trim();
 }
 
+// 「〇〇の講座動画を探して」への対応（2026-11-27 目黒さん指摘）。
+// 動画は文字起こしの意味検索だけで探していたため、タイトルに「公庫」とある講座が出てこなかった。
+// 講座・動画を探す質問のときは、タイトルからも探して回答の最初に一覧を出し、その動画の中身も参考情報に入れる。
+const VIDEO_WORD_RE = /(動画|講座|セミナー|グルコン|レッスン)/;
+const FIND_WORD_RE = /(探|教えて|一覧|どれ|どこ|ありますか|ある[？?]|見たい|見れる|見られる|知りたい|おすすめ|オススメ|紹介)/;
+const TOPIC_CUT_RE = /^(.*?)(について|に関する|に関して|を解説|が分かる|がわかる|を学べる|を学ぶ|の(?:講座|動画|セミナー|グルコン|レッスン))/;
+const FINDER_NOISE_RE = /(講座|動画|セミナー|グルコン|レッスン|を?探して(?:ください|下さい)?|探す|教えて(?:ください|下さい)?|ありますか|一覧|見たい|おすすめ|オススメ|紹介して|解説している|解説|知りたい)/g;
+export const VIDEO_FINDER_LIST_LIMIT = 8;
+const VIDEO_FINDER_CONTEXT_SOURCES = 3;
+const VIDEO_FINDER_CHUNKS_PER_SOURCE = 2;
+
+/** 講座動画を探す質問なら、タイトルで探す語を返す。そうでなければ null。 */
+export function videoFinderKeywords(query: string): string[] | null {
+  const s = String(query || "").normalize("NFKC").replace(/[\s。．!！]+/g, " ").trim();
+  if (!VIDEO_WORD_RE.test(s) || !FIND_WORD_RE.test(s)) return null;
+  const cut = s.match(TOPIC_CUT_RE);
+  const topic = cut && cut[1].trim() ? cut[1] : s.replace(FINDER_NOISE_RE, " ");
+  const words = topic
+    .replace(/[?？「」『』"'()（）\\*%,]/g, " ")
+    .split(/[\s、・&＆/]+|や|と(?=[^\s]{2,})/)
+    .map((w) => w.replace(/^(の|を|は|が|で|に)+|(の|を|は|が|で|に|など|とか)+$/g, "").trim())
+    .filter((w) => w.length >= 2 && !/^(神大家|神・大家|神大家さん倶楽部|会員サイト|サイト内)$/.test(w));
+  const unique = Array.from(new Set(words)).slice(0, 4);
+  return unique.length ? unique : null;
+}
+
+type VideoMatch = { id: number; title: string; course: string; lessonUrl: string; hits: number; groupConsult: boolean };
+
+function sourceMeta(row: Record<string, unknown>): Record<string, unknown> {
+  let meta = row.meta_json as unknown;
+  if (typeof meta === "string") { try { meta = JSON.parse(meta); } catch { meta = {}; } }
+  return meta && typeof meta === "object" ? meta as Record<string, unknown> : {};
+}
+
+/** タイトル一致の数が多い順。同じなら単独の講座をグルコンより先、コース順（1.基礎→2.応用…）。 */
+export function rankVideoMatches(rows: Array<Record<string, unknown>>, keywords: string[]): VideoMatch[] {
+  return rows.map((row) => {
+    const title = displaySourceTitle(asString(row.title));
+    const meta = sourceMeta(row);
+    const course = asString(meta.course);
+    const lessonUrl = /^https:\/\/westudy\.co\.jp\/lesson\//.test(asString(meta.lesson_url)) ? asString(meta.lesson_url) : "";
+    return { id: Number(row.id), title, course, lessonUrl,
+      hits: keywords.filter((k) => title.includes(k)).length,
+      groupConsult: /グルコン/.test(course) || /グルコン/.test(title) };
+  }).filter((m) => m.hits > 0).sort((a, b) =>
+    b.hits - a.hits || Number(a.groupConsult) - Number(b.groupConsult) ||
+    a.course.localeCompare(b.course, "ja") || a.id - b.id);
+}
+
+/** 回答の最初に付ける講座動画の一覧（Markdown）。 */
+export function videoFinderHeader(matches: VideoMatch[], keywords: string[]): string {
+  if (!matches.length) return "";
+  const shown = matches.slice(0, VIDEO_FINDER_LIST_LIMIT);
+  const label = keywords.map((k) => `「${k}」`).join("・");
+  const lines = shown.map((m, i) => {
+    const name = m.title.length > 70 ? m.title.slice(0, 70) + "…" : m.title;
+    const linked = m.lessonUrl ? `[${name.replace(/[\[\]]/g, "")}](${m.lessonUrl})` : name;
+    return `${i + 1}. ${linked}${m.course ? `（${m.course}）` : ""}`;
+  });
+  const more = matches.length > shown.length ? `\nほかに${matches.length - shown.length}本あります。言葉を足して聞くと絞り込めます。` : "";
+  return `**${label}がタイトルに入っている講座動画**\n${lines.join("\n")}${more}\n\n---\n\n`;
+}
+
+async function findVideosByTitle(sb: SupabaseClient, keywords: string[]): Promise<{ matches: VideoMatch[]; rows: Array<Record<string, unknown>> }> {
+  const or = keywords.map((k) => `title.ilike."*${k.replace(/["\\]/g, "")}*"`).join(",");
+  const { data, error } = await sb.from("knowledge_sources")
+    .select("id,source_key,title,video_url,origin_path,content_channel,meta_json").eq("content_channel", "seminar_video").or(or).limit(60);
+  if (error) throw new Error(`knowledge_sources title search failed: ${error.message}`);
+  const rows = (data || []) as Array<Record<string, unknown>>;
+  return { matches: rankVideoMatches(rows, keywords), rows };
+}
+
+/** タイトルで見つけた動画のうち、意味検索で拾えていない上位の動画の冒頭部分を参考情報に足す。 */
+async function videoFinderChunks(
+  sb: SupabaseClient, matches: VideoMatch[], already: Set<number>
+): Promise<ChunkRow[]> {
+  const ids = matches.map((m) => m.id).filter((id) => !already.has(id)).slice(0, VIDEO_FINDER_CONTEXT_SOURCES);
+  if (!ids.length) return [];
+  const { data, error } = await sb.from("knowledge_chunks")
+    .select("chunk_key,source_id,start_sec,end_sec,speaker,content").in("source_id", ids)
+    .order("source_id").order("start_sec").limit(ids.length * 40);
+  if (error) return [];
+  const perSource = new Map<number, number>();
+  const out: ChunkRow[] = [];
+  for (const row of (data || []) as Array<Record<string, unknown>>) {
+    const sid = Number(row.source_id);
+    const n = perSource.get(sid) || 0;
+    if (n >= VIDEO_FINDER_CHUNKS_PER_SOURCE) continue;
+    perSource.set(sid, n + 1);
+    out.push({ chunk_key: asString(row.chunk_key), source_id: sid, start_sec: asNullableNumber(row.start_sec),
+      end_sec: asNullableNumber(row.end_sec), speaker: asString(row.speaker) || null,
+      content: buildSnippet(row.content), similarity: 1 });
+  }
+  // タイトル一致の順に並べる
+  return out.sort((a, b) => ids.indexOf(Number(a.source_id)) - ids.indexOf(Number(b.source_id)) || (a.start_sec ?? 0) - (b.start_sec ?? 0));
+}
+
+// 自動字幕は「公庫」を「高校」と聞き取ることが多い（11/27 調べ: 公庫の講座で区切りの半数前後）。
+// 融資の話の中だけ、AIに渡す本文で直す。学校の話（高校生・受験・通学など）は直さない。DBの本文は変えない。
+const LOAN_CONTEXT_RE = /(融資|借入|借り入れ|借りる|借り|金利|審査|政策金融|創業|返済|支店|貸付|銀行|信金|信用金庫|ローン)/;
+const SCHOOL_CONTEXT_RE = /(高校生|受験|通学|学生|大学|中学|小学|学区|偏差値|進学)/;
+export function fixLoanMishearing(text: string): string {
+  const s = String(text || "");
+  if (!s.includes("高校") || !LOAN_CONTEXT_RE.test(s) || SCHOOL_CONTEXT_RE.test(s)) return s;
+  return s.replace(/高校/g, "公庫");
+}
+
 function buildAnswerContext(
   comments: CommentRow[],
   chunks: ChunkRow[],
   sourcesById: Map<number, Record<string, unknown>>,
-  openchats: OpenchatRow[] = []
+  openchats: OpenchatRow[] = [],
+  fixMishearing = false
 ): string {
   const parts: string[] = [];
   comments.forEach((row, index) => {
@@ -506,7 +616,8 @@ function buildAnswerContext(
     );
   });
   chunks.forEach((row, index) => {
-    const body = buildSnippet(row.content, ANSWER_SNIPPET_LIMIT);
+    const snippet = buildSnippet(row.content, ANSWER_SNIPPET_LIMIT);
+    const body = fixMishearing ? fixLoanMishearing(snippet) : snippet;
     if (!body) return;
     const sourceId = row.source_id != null ? Number(row.source_id) : null;
     const title = displaySourceTitle(
@@ -1027,6 +1138,11 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       }
     }
     const vectorQuery = plan ? plan.searchQuery : searchQuery;
+    const finderOn = body?.video_finder === true;
+    const finderKeywords = skipAnswer || !finderOn ? null : videoFinderKeywords(query);
+    const finderResult = finderKeywords
+      ? findVideosByTitle(sb, finderKeywords).catch(() => ({ matches: [] as VideoMatch[], rows: [] as Array<Record<string, unknown>> }))
+      : Promise.resolve({ matches: [] as VideoMatch[], rows: [] as Array<Record<string, unknown>> });
 
     // Keyword retrieval does not depend on the vector. Start it immediately,
     // while retaining its rejection for the eventual join (including embed failure).
@@ -1129,20 +1245,43 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       commentKey,
       recencyScore
     );
-    const chunksForAnswer = relatedChunks
+    let chunksForAnswer = relatedChunks
       .slice()
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, Math.min(liteAnswer ? LITE_LIMITS.chunks : ANSWER_CHUNK_LIMIT, relatedChunks.length));
 
-    const answerContext = buildAnswerContext(
+    const finder = await finderResult;
+    if (finder.matches.length) {
+      for (const row of finder.rows) {
+        const id = Number(row.id);
+        if (!sourceById.has(id)) {
+          const src = { id, source_key: asString(row.source_key), title: asString(row.title), video_url: asString(row.video_url) || null,
+            origin_path: asString(row.origin_path) || null, content_channel: asString(row.content_channel) || null };
+          sourceById.set(id, src);
+          relatedSources.push(src);
+        }
+      }
+      const already = new Set(chunksForAnswer.map((row) => Number(row.source_id)));
+      const extra = (await videoFinderChunks(sb, finder.matches, already)).map((row) => ({
+        ...row, source_key: asString(sourceById.get(Number(row.source_id))?.source_key) || null }));
+      const known = new Set(relatedChunks.map((row) => row.chunk_key));
+      extra.forEach((row) => { if (!known.has(row.chunk_key)) relatedChunks.push(row); });
+      chunksForAnswer = [...extra, ...chunksForAnswer.filter((row) => !extra.some((e) => e.chunk_key === row.chunk_key))];
+    }
+    const finderNote = finder.matches.length
+      ? `[講座一覧] この質問は講座動画を探す依頼です。タイトルが合う講座動画: ${finder.matches.slice(0, VIDEO_FINDER_LIST_LIMIT).map((m) => m.title).join(" / ")}。一覧は画面で回答の最初に表示されるので、本文では各動画で何を話しているかを動画ごとに短く紹介すること。\n\n`
+      : "";
+    const answerContext = finderNote + buildAnswerContext(
       commentsForAnswer,
       chunksForAnswer,
       sourceById,
-      openchatsForAnswer
+      openchatsForAnswer,
+      finderOn
     );
     const retrievalMs=Math.round(performance.now()-retrievalStarted);
-    const answer = skipAnswer ? "" : await summarizeAnswer(query, answerContext, geminiUsage, req.signal, liteAnswer, history, plan ? plan.searchQuery : "");
+    const answerBody = skipAnswer ? "" : await summarizeAnswer(query, answerContext, geminiUsage, req.signal, liteAnswer, history, plan ? plan.searchQuery : "");
 
+    const answer = answerBody ? videoFinderHeader(finder.matches, finderKeywords || []) + answerBody : answerBody;
     const referenceLabels=labelAnswerSources(commentsForAnswer,chunksForAnswer,openchatsForAnswer);
     const knownLabels=new Set([...Object.values(referenceLabels.comments),...Object.values(referenceLabels.chunks),...Object.values(referenceLabels.openchats)]);
     const mentioned=mentionedSourceLabels(answer,knownLabels);
@@ -1181,7 +1320,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
       used_sources: usedSources,
       result_status: "ok",
       ...usageColumns(geminiUsage),
-      meta:{...(plan?{rewritten_query:plan.searchQuery}:{}),embedding_cache_hit:cached.cacheHit,embedding_ms:embeddingMs,embedding_provider_calls:embeddingProviderCalls,retrieval_ms:retrievalMs},
+      meta:{...(plan?{rewritten_query:plan.searchQuery}:{}),...(finderKeywords?{video_finder:{keywords:finderKeywords,matched:finder.matches.slice(0,VIDEO_FINDER_LIST_LIMIT).map((m)=>m.id)}}:{}),embedding_cache_hit:cached.cacheHit,embedding_ms:embeddingMs,embedding_provider_calls:embeddingProviderCalls,retrieval_ms:retrievalMs},
     });
 
     return json({

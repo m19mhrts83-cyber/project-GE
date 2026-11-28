@@ -99,3 +99,15 @@ test('chat_context: off or not named means no history (unchanged behaviour)',asy
   assert.equal(f.semanticInputs[0].clarify,undefined);
  }
 });
+
+// スイッチ video_finder（2026-11-27）: 講座動画を探す質問でタイトルからも探す。見える人の質問だけ意味検索に知らせる。
+test('video_finder: only people the switch allows ask the search to look at lesson titles',async()=>{
+ const on=fixture({flags:[{feature:'video_finder',stage:'owner',owner_ids:['owner@example.test']}]}),t1=await login(on);
+ await on.request('/chat-sessions/mine/answer-jobs',input('semantic'),t1);await Promise.all(on.tasks);
+ assert.equal(on.semanticInputs[0].video_finder,true);
+ for(const flags of [[],[{feature:'video_finder',stage:'off',owner_ids:['owner@example.test']}],[{feature:'video_finder',stage:'owner',owner_ids:['someone@else.test']}]]){
+  const f=fixture({flags}),token=await login(f);
+  await f.request('/chat-sessions/mine/answer-jobs',input('semantic'),token);await Promise.all(f.tasks);
+  assert.equal(f.semanticInputs[0].video_finder,undefined);
+ }
+});
