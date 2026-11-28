@@ -7,7 +7,7 @@ import vm from 'node:vm';
 function load() {
   const els = { semanticModeHint: { textContent: '通常検索はキーワード一致を優先し…' } };
   const document = { getElementById: id => els[id] || null, addEventListener() {}, createElement: () => ({}) };
-  const app = vm.runInNewContext(readFileSync(new URL('../public/raimo/app.js', import.meta.url), 'utf8') + '\nApp;', { document, window: {}, console, URL });
+  const app = vm.runInNewContext(readFileSync(new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js', import.meta.url), 'utf8') + '\nApp;', { document, window: {}, console, URL });
   app.authGatewayBase = 'https://g.example';
   // 2026-11-19 ボタンはスイッチの形（中身は innerHTML、状態は aria-label / aria-pressed）
   app.elements.semanticModeToggle = { innerHTML: '', className: '', title: '', attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } };

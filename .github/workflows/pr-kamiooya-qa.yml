@@ -29,7 +29,7 @@ jobs:
         with:
           node-version: "22"
       - run: node --experimental-strip-types --test apps/kamiooya-qa-web/tests/*.test.mjs
-      - run: node --check apps/kamiooya-qa-web/public/raimo/app.js
+      - run: node --check "215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js"
       - name: Attachment source PostgreSQL integration (local WASM, no external database)
         run: |
           npm install --prefix "$RUNNER_TEMP/openchat-pg" --no-save --ignore-scripts @electric-sql/pglite@0.5.15

@@ -18,7 +18,7 @@ function load(path,transport) {
   const app=vm.runInNewContext(readFileSync(path, 'utf8') + '\nApp;', { document, window, console, URL, fetch: transport || (() => { throw new Error('unexpected fetch'); }) });
   app.testWindow=window;return app;
 }
-const sources = [new URL('../public/raimo/app.js', import.meta.url), new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js', import.meta.url)];
+const sources = [new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js', import.meta.url)];
 for (const source of sources) {
   test(source.pathname + ': late login response cannot overwrite another user', async () => {
     const app = load(source); let resolve;
