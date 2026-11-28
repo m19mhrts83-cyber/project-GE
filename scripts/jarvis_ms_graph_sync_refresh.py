@@ -75,8 +75,7 @@ def apply_rotated_refresh(
         text = text.rstrip() + f"\nMS_GRAPH_REFRESH_TOKEN={qtoken}\n"
     PRIVATE.write_text(text, encoding="utf-8")
     os.environ["MS_GRAPH_REFRESH_TOKEN"] = token
-    if NEW_REFRESH.is_file():
-        NEW_REFRESH.unlink()
+    # pending は GHA への push が成功した後でだけ消す（失敗時は残して次の回でやり直す）
 
     from jarvis_ms_graph_refresh_store import fingerprint, persist_refresh, use_sync_meta
 
@@ -106,6 +105,8 @@ def apply_rotated_refresh(
         out["gha_tail"] = (r.stdout + r.stderr)[-400:]
         if r.returncode != 0:
             raise SystemExit(f"GHA secrets push failed:\n{r.stdout}\n{r.stderr}")
+    if NEW_REFRESH.is_file():
+        NEW_REFRESH.unlink()
     return out
 
 

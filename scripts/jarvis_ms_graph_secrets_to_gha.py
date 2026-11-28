@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
+from pathlib import Path
 import sys
 
 REPO = os.environ.get("GITHUB_GMAIL_SECRET_REPO") or "m19mhrts83-cyber/project-GE"
@@ -25,6 +26,20 @@ KEYS = (
     "MS_GRAPH_USER_UPN",
     "MS_GRAPH_DRIVE_ID",
 )
+
+
+def find_gh() -> str:
+    """launchd の PATH（/usr/bin:/bin:...）には gh が無いので、よくある場所も探す。"""
+    import shutil
+
+    found = shutil.which("gh")
+    if found:
+        return found
+    for d in (Path.home() / "bin", Path("/opt/homebrew/bin"), Path("/usr/local/bin")):
+        c = d / "gh"
+        if c.is_file() and os.access(c, os.X_OK):
+            return str(c)
+    return "gh"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -65,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"would set {k} (len={len(v)})")
             continue
         p = subprocess.run(
-            ["gh", "secret", "set", k, "--repo", args.repo],
+            [find_gh(), "secret", "set", k, "--repo", args.repo],
             input=v.encode(),
             capture_output=True,
         )
