@@ -151,6 +151,7 @@ def sync_and_verify(
     pusher: Callable[[], int] | None = None,
     fetcher: Callable[[list[str]], dict[str, dict[str, Any] | None]] | None = None,
     retries: int = 1,
+    remedy_system: str | None = None,
 ) -> dict[str, Any]:
     """保存済み state から push → 行を読み戻して照合。失敗・不一致は最大 retries 回だけ再 push。
 
@@ -158,16 +159,46 @@ def sync_and_verify(
     display=unverified は『読み戻せなかった（資格情報・ネットワーク等）』。成功に数えない。"""
     res: dict[str, Any] = {"push": "failed", "display": "unverified", "attempts": 0, "mismatches": [], "error": ""}
     try:
-        return _sync_and_verify(ids, pusher or default_pusher, fetcher or default_row_fetcher, retries, res)
+        return _sync_and_verify(ids, pusher or default_pusher, fetcher or default_row_fetcher, retries, res,
+                                remedy_system)
     except Exception as e:  # noqa: BLE001 — 画面反映の失敗で呼び出し元（月印・短報）を落とさない
         res["display"] = "unverified"
         res["error"] = f"画面反映の確認中に想定外のエラー（{type(e).__name__}）"
         return res
 
 
-def _sync_and_verify(ids, push, fetch, retries, res) -> dict[str, Any]:
+def _gate_repush(res, remedy_system):
+    """2回目以降の push の前に、自動対策として実行してよいか確かめる。許可なら ticket、停止なら None を返し res に理由を足す。"""
+    if not remedy_system:
+        return "ok", None
+    import jarvis_614_incidents as incidents
+
+    stage, code = ("push", "push_failed") if res["push"] != "success" else ("display", "display_failed")
+    try:
+        t = incidents.remedy_ticket(remedy_system, stage, code, "repush", fact=(res.get("error") or "")[:120])
+    except Exception:  # noqa: BLE001 — 履歴の不調では再 push しない（安全側）
+        res["error"] = (res.get("error") or "") + "（再 push の可否を確認できず停止）"
+        return "stop", None
+    if not t.allowed:
+        res["error"] = (res.get("error") or "") + f"（再 push は停止中: {t.reason}）"
+        return "stop", None
+    return "ok", t
+
+
+def _sync_and_verify(ids, push, fetch, retries, res, remedy_system=None) -> dict[str, Any]:
     expected = {i: expected_for(i) for i in ids}
+    ticket = None
+
+    def done() -> dict[str, Any]:
+        if ticket is not None:  # 再 push をした時だけ、その結果（失敗も）を障害履歴に残す。連続回数は戻さない
+            ticket.done(res["display"] == "success", (res.get("error") or "再 push で画面の値が一致")[:120])
+        return res
+
     for attempt in range(retries + 1):
+        if attempt >= 1:
+            verdict, ticket = _gate_repush(res, remedy_system)
+            if verdict == "stop":
+                return res
         res["attempts"] = attempt + 1
         rc = push()
         res["push"] = "success" if rc == 0 else "failed"
@@ -180,7 +211,7 @@ def _sync_and_verify(ids, push, fetch, retries, res) -> dict[str, Any]:
         except Exception as e:  # noqa: BLE001 — 資格情報なし・ネットワーク・ImportError
             res["display"] = "unverified"
             res["error"] = f"読み戻せず（{type(e).__name__}）"
-            return res  # 読めない時に再 push しても確認できるようにはならない
+            return done()  # 読めない時に再 push しても確認できるようにはならない
         mism: list[str] = []
         for i in ids:
             mism += [f"{i}:{f}" for f in diff_fields(expected[i], actual_from_row(i, rows.get(i)))]
@@ -188,7 +219,7 @@ def _sync_and_verify(ids, push, fetch, retries, res) -> dict[str, Any]:
         if not mism:
             res["display"] = "success"
             res["error"] = ""
-            return res
+            return done()
         res["display"] = "failed"
         res["error"] = "画面の値が保存済み state と違う: " + ", ".join(mism[:6])
-    return res
+    return done()

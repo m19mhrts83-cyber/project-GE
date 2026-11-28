@@ -97,7 +97,7 @@ def _slack(*extra: str) -> int:
 
 
 SYS = "card_benefit"
-_STAGE_LABEL = {"fetch": "n13/n14 取込", "save": "n16 保存", "stamp": "n26 月印", "push": "n17 画面反映(push)",
+_STAGE_LABEL = {"criteria": "n24 有効基準の取得", "fetch": "n13/n14 取込", "save": "n16 保存", "stamp": "n26 月印", "push": "n17 画面反映(push)",
                 "display": "n18 画面反映の確認", "slack": "n19 Slack 短報"}
 
 
@@ -159,6 +159,12 @@ def run(args: argparse.Namespace, rec: runlog614.RunRecord) -> int:
                 "state ファイルの破損を確認（.bak から戻す）", dry)
         return 1
     cfg = cbw.load_config()
+    # 実行前に、寄せ先の推奨が依存する有効な判断基準を取得し、適用した decision_id を run に残す（P2・工程24）。
+    # 読めない時は『基準なし』とみなさず、推奨だけを保留する（取得・保存・月印は止めない）。期限切れは再判断待ち
+    crit = rec.apply_criteria(SYS)
+    if crit["status"] == "read_error":
+        _notify(rec, "criteria", "判断基準（判断ログ）を読めず、寄せ先の推奨を保留した（取得・保存は続行）",
+                "decisions.jsonl の壊れた行を確認（読み飛ばさず停止する設計）", dry)
     mon = _month_progress(st, month)
     fetched: dict[str, str] = dict(mon.get("fetched") or {})
     if args.all:
@@ -226,7 +232,7 @@ def run(args: argparse.Namespace, rec: runlog614.RunRecord) -> int:
         rec.stage(SYS, "push", "skipped", "全取得元が失敗（新しい値なし）")
         rec.stage(SYS, "display", "skipped", "全取得元が失敗（新しい値なし）")
     else:
-        sync = display614.sync_and_verify(["vpoint"])
+        sync = display614.sync_and_verify(["vpoint"], remedy_system=SYS)
         rec.stage(SYS, "push", "success" if sync["push"] == "success" else "failed",
                   f"{sync['attempts']}回目まで", None if sync["push"] == "success" else "push_failed")
         disp = {"success": "success", "failed": "failed"}.get(sync["display"], "unverified")

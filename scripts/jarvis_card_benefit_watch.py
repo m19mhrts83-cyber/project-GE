@@ -127,7 +127,7 @@ def save_state_verified(data: dict[str, Any], path: Path | None = None) -> dict[
     """tmp→置換→読み戻し照合。失敗時は pending に残し、保存だけ1回やり直す（外部は取り直さない）。"""
     p = path or state_path()
     data["updated_at"] = datetime.now(JST).isoformat(timespec="seconds")
-    return vs.save_json_verified(p, data, pending_path=_pending_for(p))
+    return vs.save_json_verified(p, data, pending_path=_pending_for(p), remedy_system="card_benefit")
 
 
 def save_state(data: dict[str, Any], path: Path | None = None) -> Path:
@@ -783,22 +783,46 @@ def build_vpoint_exits(cfg: dict[str, Any]) -> dict[str, Any]:
     return {"items": items, "official_sources": ex.get("official_sources") or []}
 
 
-def compute(cfg: dict[str, Any], state: dict[str, Any], today: date | None = None) -> dict[str, Any]:
+def _load_criteria() -> dict[str, Any]:
+    """寄せ先の推奨が依存する判断基準（P2・工程24）。読めない時は『基準なし』にせず read_error を返す。"""
+    try:
+        import jarvis_614_decisions as dec
+
+        return dec.criteria_for("card_benefit")
+    except Exception as e:  # noqa: BLE001
+        return {"system": "card_benefit", "status": "read_error", "applied": [], "waiting": [], "reference": [],
+                "error": f"判断基準の取得で想定外のエラー（{type(e).__name__}）", "keys": []}
+
+
+def compute(cfg: dict[str, Any], state: dict[str, Any], today: date | None = None,
+            criteria: dict[str, Any] | None = None) -> dict[str, Any]:
+    """criteria=None は判断基準に依存させない（従来どおり）。compute_from_files は基準を取得して渡す。"""
     today = today or datetime.now(JST).date()
     cards = [compute_card(cid, cfg, state, today) for cid in cfg["cards"]]
+    recommendation = recommend(cards)
+    if criteria is not None:
+        import jarvis_614_decisions as dec
+
+        recommendation = dec.gate_recommendation(recommendation, criteria)
     return {
         "olive_history": build_olive_history(cfg, state),
         "vpoint_exits": build_vpoint_exits(cfg),
         "today": today.isoformat(),
         "computed_at": datetime.now(JST).isoformat(timespec="seconds"),
         "cards": cards,
-        "recommendation": recommend(cards),
+        "recommendation": recommendation,
+        "criteria": None if criteria is None else {
+            "status": criteria["status"],
+            "applied_ids": [a["decision_id"] for a in criteria["applied"]],
+            "waiting": [{"decision_id": w["decision_id"], "expires_at": w.get("expires_at")} for w in criteria["waiting"]],
+            "reference_ids": [r["decision_id"] for r in criteria["reference"]],
+        },
         "scope_note": "いまは Olive Infinite と Marriott Bonvoy の2枚だけを見る（汎用化しない）",
     }
 
 
 def compute_from_files(today: date | None = None) -> dict[str, Any]:
-    return compute(load_config(), load_state(), today)
+    return compute(load_config(), load_state(), today, criteria=_load_criteria())
 
 
 # ---------------------------------------------------------------- 表示
@@ -955,7 +979,7 @@ def main(argv: list[str] | None = None) -> int:
         except LockBusy:
             print("⏭ 別の年間特典の取込が実行中のため何もしません", file=sys.stderr)
             return 3
-    result = compute(cfg, load_state(), today)
+    result = compute(cfg, load_state(), today, criteria=_load_criteria())
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     elif args.show or args.fetch_olive or args.refresh or args.refresh_bonvoy:

@@ -88,16 +88,34 @@ def save_json_verified(
     verify: Callable[[dict[str, Any], dict[str, Any]], list[str]] | None = None,
     pending_path: Path | None = None,
     retries: int = 1,
+    remedy_system: str | None = None,
 ) -> dict[str, Any]:
     """書いて読み戻し、照合する。返り値: {"ok": bool, "attempts": int, "errors": [..]}。
 
     失敗時は data を pending_path（非公開の state 領域）へ残す。外部取得はやり直さず保存だけ retries 回。
-    成功したら pending は消す。直前の正常ファイルは .bak に残す（読めた時だけ）。"""
+    成功したら pending は消す。直前の正常ファイルは .bak に残す（読めた時だけ）。
+
+    remedy_system を渡すと、この『保存だけやり直し』が自動対策 save_retry として障害履歴の対象になる
+    （同一障害が連続3回目ならやり直さず停止・失敗した対策も残す。P2・工程34）。渡さなければ従来どおり。"""
     check = verify or _default_verify
     expected = roundtrip(data)
     errors: list[str] = []
     attempts = 0
+    ticket = None
     for attempt in range(retries + 1):
+        if attempt >= 1 and remedy_system:
+            try:
+                import jarvis_614_incidents as incidents
+
+                ticket = incidents.remedy_ticket(
+                    remedy_system, "save_verify", "save_verify_mismatch", "save_retry",
+                    fact=("; ".join(errors))[:120],
+                )
+            except Exception:  # noqa: BLE001 — 履歴の不調で保存を止めない代わりに、安全側で再試行しない
+                break
+            if not ticket.allowed:
+                errors = errors + [f"保存のやり直しは停止中: {ticket.reason}"]
+                break
         attempts = attempt + 1
         try:
             if attempt == 0 and path.is_file():  # 検証に失敗した書き込みで .bak を上書きしない
@@ -118,8 +136,12 @@ def save_json_verified(
             if pending_path is not None:
                 with contextlib.suppress(OSError):
                     pending_path.unlink()
+            if ticket is not None:
+                ticket.done(True, "やり直しで保存・読み戻し一致")
             return {"ok": True, "attempts": attempts, "errors": []}
         _write_pending(pending_path, data)
+    if ticket is not None and ticket.allowed:
+        ticket.done(False, ("; ".join(errors))[:120])
     return {"ok": False, "attempts": attempts, "errors": errors}
 
 
