@@ -20,22 +20,16 @@ fi
 {
   echo "# start $(date '+%Y-%m-%d %H:%M:%S %z')"
   # P0: カード引落収集（金額未確定なら Vpass も試す。失敗しても push は続ける）
-  if ! "$PY" "${REPO_DIR}/scripts/jarvis_card_debit_watch.py" --fetch-vpass-if-pending; then
-    echo "# card_debit_watch exit=$? (continue)"
-  fi
-  if ! "$PY" "${REPO_DIR}/scripts/jarvis_situation_watch.py"; then
-    echo "# situation_watch exit=$? (continue)"
-  fi
+  "$PY" "${REPO_DIR}/scripts/jarvis_card_debit_watch.py" --fetch-vpass-if-pending || echo "# card_debit_watch exit=$? (continue)"
+  # WeStudy 取込 CI の連続成功は --mark-checked でしか進まず、人が回さないと state が古いまま「失敗」と出続けた（314 2026-11-28）。ここで毎回進める（同じ run は重複カウントしない）
+  "$PY" "${REPO_DIR}/scripts/jarvis_westudy_weekly_check.py" --mark-checked >/dev/null || echo "# westudy_weekly_check exit=$? (continue)"
+  "$PY" "${REPO_DIR}/scripts/jarvis_situation_watch.py" || echo "# situation_watch exit=$? (continue)"
   "$PY" "${REPO_DIR}/scripts/jarvis_dashboard_push.py"
   # 611: AI 使用量のいまの値を /ai-usage へ写す（失敗しても push 本体は成功扱い）
-  if ! "$PY" "${REPO_DIR}/scripts/jarvis_ai_usage_snapshot.py" --push >/dev/null; then
-    echo "# ai_usage_snapshot exit=$? (continue)"
-  fi
+  "$PY" "${REPO_DIR}/scripts/jarvis_ai_usage_snapshot.py" --push >/dev/null || echo "# ai_usage_snapshot exit=$? (continue)"
   # Phase L: 814/815 鮮度を Slack #ops へ（失敗しても push 本体は成功扱い）
   if [[ "${JARVIS_UI_CYCLE_DISABLE:-}" != "1" ]]; then
-    if ! "$PY" "${REPO_DIR}/scripts/jarvis_ui_cycle_814_815.py" --agent both --post; then
-      echo "# ui_cycle_814_815 exit=$? (continue)"
-    fi
+    "$PY" "${REPO_DIR}/scripts/jarvis_ui_cycle_814_815.py" --agent both --post || echo "# ui_cycle_814_815 exit=$? (continue)"
   fi
   echo "# end exit=$?"
 } >>"$LOG" 2>&1

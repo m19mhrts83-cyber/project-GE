@@ -50,16 +50,22 @@ ZERO_COUNT_RE = re.compile(
 OK_MARK_RE = re.compile(r"^[\s·・\-*]*(\[(ok|update)\]|✅)", re.I)
 
 
+QUOTED_BODY_RE = re.compile(r"^\s*本文:")
+
+
 def is_error_line(ln: str) -> bool:
-    """launchd ログの1行がエラーか。正常の集計行（failed=0）と [ok] 印の行は除く。"""
-    if OK_MARK_RE.match(ln):
+    """launchd ログの1行がエラーか。正常の集計行（failed=0）と [ok] 印の行、
+    読んだコメントの引用（`本文:` 行。Todoist コメントの中身に failure や Error が入る）は除く。"""
+    if OK_MARK_RE.match(ln) or QUOTED_BODY_RE.match(ln):
         return False
     return bool(ERROR_RE.search(ZERO_COUNT_RE.sub("", ln)))
 
 
 AI_CALL_RE = re.compile(
     r"openai|anthropic|chat\.completions|find_cursor_agent|launch_cloud_agent"
-    r"|api\.x\.ai|generativelanguage|claude -p|cursor-agent"
+    # cursor-agent は status/login（トークン更新・ログイン確認。モデルは呼ばない）と文中の言及（「cursor-agent の…」）は除く（2026-11-28 誤検知2件）
+    r"|api\.x\.ai|generativelanguage|claude -p"
+    r"|cursor-agent(?![\"',\s]+(?:status|login|logout|--version)\b)(?!\s*の)"
     # Gemini（聞くエンジン・議事録整形など）。2026-10-31 追加: 今週の追加が素通りしていた
     r"|geminiReply|gemini\.generate|jarvis_gemini_research|GEMINI_API_KEY"
 )
