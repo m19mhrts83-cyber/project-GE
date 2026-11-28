@@ -85,6 +85,97 @@ SKIM_HINT_RE = re.compile(
 )
 
 
+# --- 取込の上限・クエリ（2026-11-28 松野さん決定: 重要な自動通知が40件上限と no-reply 除外で落ちていた） ---
+# 取得上限（threads.list の打ち切り）。環境変数 GENERAL_MAX_THREADS または引数で上書き可。
+DEFAULT_MAX_THREADS = 200
+# True: 母数を未読に絞る（既読は対応済みとみなす）。False か環境変数 GENERAL_UNREAD_ONLY=0 で従来クエリへ戻せる。
+UNREAD_ONLY = True
+
+# no-reply 系でも残す「本人の対応が要る自動通知」の件名語（迷ったら従来どおり捨てる側）
+NOREPLY_ADDR_ONLY_RE = re.compile(
+    r"(noreply|no-reply|no_reply|donotreply|do-not-reply)", re.I
+)
+NOREPLY_URGENT_SUBJECT_RE = re.compile(
+    r"(未済|未払|未納|エラー|期限|提出|再認証|残高不足|引き落とし|引落|督促|"
+    r"ご対応のお願い|ご対応願い|ご対応ください|連携が(切れ|解除|失敗)|"
+    r"action\s+required|payment\s+(failed|overdue))",
+    re.I,
+)
+# 配信停止語のある販促・広告・新規登録通知は強語があっても残さない（#662 の決まり）
+NOREPLY_PROMO_RE = re.compile(
+    r"(キャンペーン|お得|セール|クーポン|ポイント(付与|還元|アップ)|広告|プロモーション|"
+    r"配信停止|unsubscribe|新規登録|sale|coupon)",
+    re.I,
+)
+
+
+def resolve_max_threads(max_threads: int | None = None) -> int:
+    if max_threads is not None and int(max_threads) > 0:
+        return int(max_threads)
+    try:
+        v = int(os.environ.get("GENERAL_MAX_THREADS") or 0)
+    except ValueError:
+        v = 0
+    return v if v > 0 else DEFAULT_MAX_THREADS
+
+
+def resolve_unread_only(unread_only: bool | None = None) -> bool:
+    if unread_only is not None:
+        return bool(unread_only)
+    env = (os.environ.get("GENERAL_UNREAD_ONLY") or "").strip().lower()
+    if env in ("0", "false", "no", "off"):
+        return False
+    if env in ("1", "true", "yes", "on"):
+        return True
+    return UNREAD_ONLY
+
+
+def build_general_query(lookback_days: int, unread_only: bool | None = None) -> str:
+    q = f"in:inbox newer_than:{max(1, lookback_days)}d -category:promotions -category:social"
+    if resolve_unread_only(unread_only):
+        q += " is:unread"
+    return q
+
+
+def is_noreply_urgent_notice(from_email: str, subject: str) -> bool:
+    """no-reply 系の自動通知のうち、件名に強い要対応語があり販促でないもの。"""
+    if not NOREPLY_ADDR_ONLY_RE.search(from_email or ""):
+        return False
+    subj = subject or ""
+    if NOREPLY_PROMO_RE.search(subj):
+        return False
+    return bool(NOREPLY_URGENT_SUBJECT_RE.search(subj))
+
+
+def metadata_exclusion_reason(
+    from_raw: str,
+    subject: str,
+    *,
+    partner_emails: set[str],
+    partner_domains: set[str],
+) -> str | None:
+    """format=metadata（差出人・件名のみ）で先に判定する除外理由。None なら full 取得へ進む。
+
+    "self" 自分発信 / "partner" パートナー / "noise" NOISE / "purchase" 購入語 / "exception" no-reply 例外で残す（理由ではない）
+    """
+    from jarvis_kurashift_re_inquiry_channel import is_self_email
+
+    _, from_email = parseaddr(from_raw or "")
+    from_email = (from_email or "").lower()
+    if is_self_email(from_email) or is_self_email(from_raw or ""):
+        return "self"
+    if is_partner_address(from_email, partner_emails, partner_domains):
+        return "partner"
+    if NOISE_SUBJECT_RE.search(subject or ""):
+        return "noise"
+    if NOISE_FROM_RE.search(from_email) or NOISE_FROM_RE.search(from_raw or ""):
+        if not is_noreply_urgent_notice(from_email, subject):
+            return "noise"
+    if is_kurashift_property_mail(subject, ""):
+        return "purchase"
+    return None
+
+
 def is_kurashift_property_mail(subject: str, body: str = "") -> bool:
     """物件紹介・購入メールか（KURASHIFT 評価対象のシグナル）。
 
@@ -95,20 +186,51 @@ def is_kurashift_property_mail(subject: str, body: str = "") -> bool:
     return bool(RE_PURCHASE_MAIL_RE.search(blob))
 
 
-def classify_general_kind(subject: str, body: str = "", from_email: str = "") -> str:
+def classify_general_kind(
+    subject: str,
+    body: str = "",
+    from_email: str = "",
+    *,
+    list_unsubscribe: bool = False,
+    replied_before: bool = True,
+) -> str:
     """general 取込の kind: mail（要確認）| skim（要約用）。
 
     依頼語（ご確認・お願い）は自動送信にも必ず入るため、人が書いたメールだけを mail にする
     （jarvis_mail_human.looks_human_mail。2026-11-04: 依頼語判定ではカード・銀行・販促が要対応に並んでいた）。
+
+    IMP-001: List-Unsubscribe ヘッダつき かつ 過去にこちらから返信していない差出人は skim に落とす。
+    ただし no-reply の要対応通知（#723）と強い判断語（#661/#662）は先に当たるので従来どおり mail。
+    replied_before の既定は True（取れない時は従来どおり上げる側）。
     """
     if NOISE_FROM_RE.search(from_email or ""):
-        return "skim"
+        # no-reply 系でも件名に強い要対応語があれば残す（販促・新規登録は除く）
+        return "mail" if is_noreply_urgent_notice(from_email, subject) else "skim"
     from jarvis_mail_human import has_strong_action_signal, looks_human_mail
 
-    if looks_human_mail(from_email, subject, body):
+    if has_strong_action_signal(from_email, subject, body):
         return "mail"
+    if list_unsubscribe and not replied_before:
+        return "skim"
     # 強い判断語（承認・ご返信など）があれば人判定が偽でも残す（NOISE_FROM は上で除外済み）
-    return "mail" if has_strong_action_signal(from_email, subject, body) else "skim"
+    return "mail" if looks_human_mail(from_email, subject, body) else "skim"
+
+
+def has_replied_to_sender(service, from_email: str) -> bool:
+    """こちらから from_email 宛に送ったことがあるか。確実に取れない時は True（従来どおり上げる）。"""
+    addr = (from_email or "").strip().lower()
+    if not addr or "@" not in addr:
+        return True
+    try:
+        r = (
+            service.users()
+            .messages()
+            .list(userId="me", q=f"in:sent to:{addr}", maxResults=1)
+            .execute()
+        )
+        return bool(r.get("messages"))
+    except Exception:
+        return True
 
 
 def resolve_contact_yaml(explicit: Path | None = None) -> Path:
@@ -473,36 +595,77 @@ def _parse_internal_dt(ms: str) -> datetime | None:
         return None
 
 
+def _fetch_threads(
+    service: Any, q: str, max_threads: int
+) -> tuple[list[dict], bool]:
+    """threads.list を pageToken で上限まで取る。戻り値は (threads, 上限で打ち切ったか)。"""
+    threads: list[dict] = []
+    page_token = None
+    truncated = False
+    while True:
+        kwargs: dict[str, Any] = {"userId": "me", "q": q, "maxResults": min(100, max_threads - len(threads))}
+        if page_token:
+            kwargs["pageToken"] = page_token
+        resp = service.users().threads().list(**kwargs).execute()
+        threads.extend(resp.get("threads") or [])
+        page_token = resp.get("nextPageToken")
+        if len(threads) >= max_threads:
+            truncated = bool(page_token)
+            break
+        if not page_token:
+            break
+    return threads[:max_threads], truncated
+
+
 def find_general_unreplied(
     *,
     contact_yaml: Path,
     lookback_days: int = 14,
-    max_threads: int = 40,
+    max_threads: int | None = None,
+    unread_only: bool | None = None,
 ) -> list[dict[str, Any]]:
     """admin INBOX の未返信スレッド（パートナー除外）。"""
     from jarvis_kurashift_re_inquiry_channel import is_self_email
 
     service, my_email = build_admin_gmail_service()
     emails, domains = load_partner_filters(contact_yaml)
-    q = f"in:inbox newer_than:{max(1, lookback_days)}d -category:promotions -category:social"
-    threads: list[dict] = []
-    page_token = None
-    while len(threads) < max_threads:
-        kwargs: dict[str, Any] = {"userId": "me", "q": q, "maxResults": min(50, max_threads - len(threads))}
-        if page_token:
-            kwargs["pageToken"] = page_token
-        resp = service.users().threads().list(**kwargs).execute()
-        threads.extend(resp.get("threads") or [])
-        page_token = resp.get("nextPageToken")
-        if not page_token:
-            break
+    max_threads = resolve_max_threads(max_threads)
+    q = build_general_query(lookback_days, unread_only)
+    threads, truncated = _fetch_threads(service, q, max_threads)
 
+    stats = {"fetched": 0, "noise": 0, "exception": 0}
     candidates: list[dict[str, Any]] = []
-    for th in threads[:max_threads]:
+    for th in threads:
         tid = th.get("id")
         if not tid:
             continue
+        # 先に metadata（差出人・件名ヘッダのみ）で NOISE 等を判定し、通ったものだけ full 取得
+        meta = (
+            service.users()
+            .threads()
+            .get(userId="me", id=tid, format="metadata", metadataHeaders=["From", "Subject", "List-Unsubscribe"])
+            .execute()
+        )
+        mmsgs = sorted(meta.get("messages") or [], key=lambda m: int(m.get("internalDate") or 0))
+        if not mmsgs:
+            continue
+        mh = _header_map(mmsgs[-1].get("payload") or {})
+        reason = metadata_exclusion_reason(
+            mh.get("from", ""),
+            mh.get("subject") or "",
+            partner_emails=emails,
+            partner_domains=domains,
+        )
+        if reason is not None:
+            if reason == "noise":
+                stats["noise"] += 1
+            continue
+        _, mfrom = parseaddr(mh.get("from", ""))
+        if NOISE_FROM_RE.search((mfrom or "").lower()) or NOISE_FROM_RE.search(mh.get("from", "")):
+            stats["exception"] += 1
+
         full = service.users().threads().get(userId="me", id=tid, format="full").execute()
+        stats["fetched"] += 1
         msgs = full.get("messages") or []
         if not msgs:
             continue
@@ -518,19 +681,6 @@ def find_general_unreplied(
         message_id_hdr = headers.get("message-id") or ""
         dt = _parse_internal_dt(str(last.get("internalDate") or "0"))
         received_at = dt.strftime("%Y/%m/%d %H:%M") if dt else ""
-
-        # 自分発信（m19m / admin / estate / 法人ドメイン）→ 要確認対象外
-        # （BCC 控えが INBOX に入っても From が自分なら除外）
-        if is_self_email(from_email) or is_self_email(from_raw):
-            continue
-
-        if is_partner_address(from_email, emails, domains):
-            # 最優先: 連絡先一覧のパートナーは partner レーン担当（ここでは general に載せない）
-            continue
-        if NOISE_FROM_RE.search(from_email) or NOISE_FROM_RE.search(from_raw):
-            continue
-        if NOISE_SUBJECT_RE.search(subject):
-            continue
 
         body = _extract_body(payload)
         # 非パートナーの物件紹介・購入 → KURASHIFT（Jarvis 要確認から除外）
@@ -557,7 +707,20 @@ def find_general_unreplied(
 
         eid = hashlib.sha1(f"general|{tid}|{last.get('id')}".encode()).hexdigest()[:12]
         display_name = from_raw.split("<")[0].strip().strip('"') or from_email
-        kind = classify_general_kind(subject, body, from_email)
+        # IMP-001: ヘッダの有無（真偽）だけ使う。値（配信停止URL）は保存しない
+        list_unsub = bool(headers.get("list-unsubscribe") or mh.get("list-unsubscribe"))
+        replied_before = True
+        if list_unsub:
+            replied_before = any(not m_["inbound"] for m_ in ctx) or has_replied_to_sender(
+                service, from_email
+            )
+        kind = classify_general_kind(
+            subject,
+            body,
+            from_email,
+            list_unsubscribe=list_unsub,
+            replied_before=replied_before,
+        )
         candidates.append(
             {
                 "id": eid,
@@ -580,11 +743,18 @@ def find_general_unreplied(
                 "gmail_message_id": last.get("id") or "",
                 "from_email": from_email,
                 "message_id_header": message_id_hdr,
+                "list_unsubscribe": list_unsub,
+                "replied_before": replied_before,
                 "priority": "high" if kind == "mail" else "low",
             }
         )
 
     candidates.sort(key=lambda x: x.get("received_at") or "", reverse=True)
+    print(
+        f"取込: 候補{len(candidates)}スレッド・取得{stats['fetched']}"
+        f"（list {len(threads)}）・上限打ち切り{'あり' if truncated else 'なし'}"
+        f"・NOISE除外{stats['noise']}・no-reply例外で残した{stats['exception']}"
+    )
     return candidates
 
 

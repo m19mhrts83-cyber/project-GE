@@ -1,4 +1,4 @@
-# Grok材料取込係
+# 【停止】Grok材料取込係
 
 - **AIオートメーション（FlowForge）**: [flow_0CETz0AjmFUkUarpofjGHAp0](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_0CETz0AjmFUkUarpofjGHAp0)
 

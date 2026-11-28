@@ -69,3 +69,11 @@
 - 実装: `scripts/jarvis_stall_watch_315b.py`、`config/freshness_slo.yaml` の `stall_watch_315b`、`launchd/freshness_watch_runner.sh`（相乗り）、Dashboard `StallWatchSection`。
 - 完了条件: 工程対応、基準の読取失敗を正常にしない、311・313 の反復をテストで検知、異常継続中の重複なし、回復 1 回、通知失敗後の再送、成功／部分成功／失敗の区別、315-A 退行なし。
 - 詳細・未確認: [`315-B_停止空回り監視_20261122.md`](./315-B_停止空回り監視_20261122.md)。マージ・Mac 追従は本人。
+
+## 2026-11-28 安定週も異常0件を報告
+
+- task_id: task_6f9981d2e35f / executor: codex / status: done（実装・検証完了、PR確認・反映を続行）
+- 依頼: 正常な週も #ops に `:large_green_circle: 315 連携 異常0件` を必ず含める。異常時の本文・名義・宛先は維持。
+- 完了条件: 安定・異常のdry-run（実投稿・復旧なし）、PRチェック緑とレビュー確認、mainとMac本体への反映、日曜21:45のlaunchd確認。
+- 検証: `python3 -m unittest scripts.tests.test_ops_health_315 -v` 21件成功。正常・異常・確認不能のfixtureでmainのdry-runを通し、投稿・復旧・markなし、異常本文の完全一致を確認。quiet-green-afterは既存11/22修正で除去済み。
+- 実行経路: GHA日曜21:00はmainをcheckout。Mac日曜21:45は `~/git-repos/launchd/ops_health_315_runner.sh` から本体Pythonを毎回起動。マージ後、本体をmainでpullすれば適用（plist変更・再読込不要）。

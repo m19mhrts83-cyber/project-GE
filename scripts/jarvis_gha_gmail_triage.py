@@ -100,6 +100,7 @@ def _mail_payload(
         "source": "gha_gmail_triage",
         "message_id_header": c.get("message_id_header"),
         "ingest_kind": kind,
+        "list_unsubscribe": bool(c.get("list_unsubscribe")),
     }
     # 判断デスクで「自分が送った1つ前のメール」を見せる
     from jarvis_thread_context import compact_context
@@ -152,6 +153,8 @@ def candidates_to_rows(
             c.get("subject") or "",
             body_full,
             c.get("from_email") or "",
+            list_unsubscribe=bool(c.get("list_unsubscribe")),
+            replied_before=c.get("replied_before", True) is not False,
         )
         priority = "high" if kind == "mail" else "low"
         if c.get("priority") in ("high", "med", "low"):

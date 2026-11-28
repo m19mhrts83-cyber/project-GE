@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-22T01:33:18+09:00",
+  "updated": "2026-11-28T16:53:35+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -12,11 +12,13 @@
     "share_id": "uksxiDIzE1AEckKH"
   },
   "counts": {
-    "候補": 22,
+    "候補": 16,
     "設計中": 11,
     "運用確認": 11,
     "運用": 0,
     "停止": 0,
+    "停止（凍結・600室へ移管 2026-11-28）": 1,
+    "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）": 5,
     "廃止（611へ統合）": 1
   },
   "genres": [
@@ -1482,7 +1484,7 @@
           },
           {
             "kind": "完了・生存",
-            "destination": "2026-11-22 までは毎回 `#report` に🟢1通（変更直後の確認用・松野さん 11/15）。以後は不要（カード自体が入口）",
+            "destination": "朝の回（mac_morning_refresh）でカード0件の日だけ `#report` に🟢1行（例: 要対応0件（流し読み・業者返信の数））、1日1回まで（松野さん 2026-11-27）。カードがある日は従来どおり1行は足さない。昼・夕の回は出さない。止まったのか0件なのかを見分けるため。`--morning` / `--dry-run` で文を確認",
             "channels": [
               "report"
             ]
@@ -2194,8 +2196,8 @@
           {
             "id": "schedule",
             "on": true,
-            "detail": "00** launchd `com.matsunoma.jarvis.todoist-313-digest` → L1 `#consult`。自動closeなし＝ソフト運用）",
-            "raw": "時間（**毎日20:00** launchd `com.matsunoma.jarvis.todoist-313-digest` → L1 `#consult`。自動closeなし＝ソフト運用）"
+            "detail": "00** launchd `com.matsunoma.jarvis.todoist-313-digest` → 週の整理。2026-11-24 に毎日→金曜だけに変更。plist 入れ替え前でも runner が金曜以外は何もしない）",
+            "raw": "時間（**金曜 20:00** launchd `com.matsunoma.jarvis.todoist-313-digest` → 週の整理。2026-11-24 に毎日→金曜だけに変更。plist 入れ替え前でも runner が金曜以外は何もしない）"
           },
           {
             "id": "event",
@@ -2671,6 +2673,12 @@
             "kind": "doc"
           },
           {
+            "title": "315a-alignment.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/315a-alignment.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/315a-alignment.md",
+            "kind": "doc"
+          },
+          {
             "title": "incident-flow.md",
             "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/incident-flow.md",
             "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/315_連携健全性点検係/docs/incident-flow.md",
@@ -2695,7 +2703,7 @@
             "kind": "doc"
           }
         ],
-        "procedure_count": 11,
+        "procedure_count": 12,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -2707,7 +2715,7 @@
       "department_name": "品質・タスク運用管理室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "候補",
+      "status": "停止（凍結・600室へ移管 2026-11-28）",
       "status_icon": "⚪",
       "report": "ops",
       "trigger": "時間",
@@ -2715,7 +2723,7 @@
       "tool_assigned": "claude_code",
       "tool_fit": "B",
       "tool_notes": "日次／夜間データ点検。将来Claude",
-      "note": "",
+      "note": "【凍結・移管】2026-11-28 松野さん決定: 構想（Zaim財務夜間分析・FlowForge flow_TA9fHAyKHFlfTFb8fvpDG6Nh）は600室ラコ隊長へ移管。300室では凍結。フォルダは残す",
       "summary": "（ビルダー叩き台・候補。詳細は CLAUDE.md）",
       "flow_summary": "",
       "builder_tag": "",
@@ -3098,8 +3106,8 @@
       "tool_assigned": "",
       "tool_fit": "",
       "tool_notes": "",
-      "note": "2026-11-22 フロー設計中（たたき台）。フォルダ・実装は未作成。",
-      "summary": "2026-11-22 フロー設計中（たたき台）。フォルダ・実装は未作成。",
+      "note": "2026-11-22 フロー設計（FlowForge 承認済み15ノード）。2026-11-23 フォルダ作成・Phase 1（読むだけ・手動）実装 scripts/jarvis_todoist_318_triage.py。定期起動は未登録",
+      "summary": "2026-11-22 フロー設計（FlowForge 承認済み15ノード）。2026-11-23 フォルダ作成・Phase 1（読むだけ・手動）実装 scripts/jarvis_todoist_318_triage.py。定期起動は未登録",
       "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "",
@@ -3109,9 +3117,30 @@
       "flowforge_share_url": "https://flowforge-259747770348.asia-northeast1.run.app/share/DJc5DtKvcq5ZgjiV",
       "flowforge_edit_url": "https://accounts.google.com/AccountChooser?Email=m19m.hrts83%40gmail.com&continue=https%3A%2F%2Fflowforge-259747770348.asia-northeast1.run.app%2Fflows%2Fflow_HMy15MUxWiSpw5QgAPYa_8e4",
       "permissions": {
-        "can_do": "2026-11-22 フロー設計中（たたき台）。フォルダ・実装は未作成。",
-        "methods": [],
-        "methods_filled": false,
+        "can_do": "2026-11-22 フロー設計（FlowForge 承認済み15ノード）。2026-11-23 フォルダ作成・Phase 1（読むだけ・手動）実装 scripts/jarvis_todoist_318_triage.py。定期起動は未登録",
+        "methods": [
+          {
+            "name": "外部連携（API）",
+            "level": "○（読むだけ＋コメント追記）",
+            "detail": "Todoist API v1 を GET。`--write-comments` の時だけ POST /comments（【318】で始まるものだけ）。`TODOIST_API_TOKEN_OWNER`（本人権限）。分身トークンでは読まない"
+          },
+          {
+            "name": "CLI",
+            "level": "○",
+            "detail": "`scripts/jarvis_todoist_318_triage.py`"
+          },
+          {
+            "name": "Slack",
+            "level": "×",
+            "detail": "Phase 1 は送らない"
+          },
+          {
+            "name": "画面操作",
+            "level": "×",
+            "detail": ""
+          }
+        ],
+        "methods_filled": true,
         "env_keys": [],
         "site_logins": [],
         "site_logins_summary": "なし",
@@ -3124,16 +3153,15 @@
         "trigger_kinds": [
           {
             "id": "human",
-            "on": false,
-            "detail": "",
-            "raw": ""
+            "on": true,
+            "detail": "人が頼む（手動実行だけ。Phase 1）",
+            "raw": "人が頼む（手動実行だけ。Phase 1）"
           },
           {
             "id": "schedule",
-            "on": true,
-            "detail": "時間",
-            "raw": "",
-            "from_registry": true
+            "on": false,
+            "detail": "30。**2026-11-23 登録済み**。雛形 `launchd/com.matsunoma.jarvis.todoist-318.plist.template`・取り決め `jarvis_todoist_morning_slot.py` は用意済み。移管の結果・戻し方は [`移管手順_10時30分.md`](./移管手順_10時30分.md)）",
+            "raw": "時間（毎朝 10:30。**2026-11-23 登録済み**。雛形 `launchd/com.matsunoma.jarvis.todoist-318.plist.template`・取り決め `jarvis_todoist_morning_slot.py` は用意済み。移管の結果・戻し方は [`移管手順_10時30分.md`](./移管手順_10時30分.md)）"
           },
           {
             "id": "event",
@@ -3149,11 +3177,11 @@
           }
         ],
         "trigger_kinds_on": [
-          "schedule"
+          "human"
         ],
-        "trigger_kinds_label": "時間",
+        "trigger_kinds_label": "人依頼",
         "triggers_filled": true,
-        "when": "時間",
+        "when": "人が頼む（手動実行だけ。Phase 1）",
         "registry_trigger": "時間",
         "registry_schedule": "",
         "primary_report": "",
@@ -3165,9 +3193,39 @@
             "path": "",
             "url": "https://flowforge-259747770348.asia-northeast1.run.app/share/DJc5DtKvcq5ZgjiV",
             "kind": "flowforge"
+          },
+          {
+            "title": "CLAUDE.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/318_Todoist消化係/CLAUDE.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/318_Todoist消化係/CLAUDE.md",
+            "kind": "doc"
+          },
+          {
+            "title": "TASK.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/318_Todoist消化係/TASK.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/318_Todoist消化係/TASK.md",
+            "kind": "doc"
+          },
+          {
+            "title": "flow.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/318_Todoist消化係/flow.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/318_Todoist消化係/flow.md",
+            "kind": "doc"
+          },
+          {
+            "title": "PROGRESS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/318_Todoist消化係/PROGRESS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/318_Todoist消化係/PROGRESS.md",
+            "kind": "doc"
+          },
+          {
+            "title": "AGENTS.md",
+            "path": "docs/AIエージェントチーム/300_品質・タスク運用管理室/318_Todoist消化係/AGENTS.md",
+            "url": "https://github.com/m19mhrts83-cyber/project-GE/blob/main/docs/AIエージェントチーム/300_品質・タスク運用管理室/318_Todoist消化係/AGENTS.md",
+            "kind": "doc"
           }
         ],
-        "procedure_count": 1,
+        "procedure_count": 6,
         "source": "claude+registry+ops_yaml"
       }
     },
@@ -3179,7 +3237,7 @@
       "department_name": "ミックス・取捨判断室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "候補",
+      "status": "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）",
       "status_icon": "⚪",
       "report": "consult",
       "trigger": "時間",
@@ -3187,7 +3245,7 @@
       "tool_assigned": "grok_bot",
       "tool_fit": "A",
       "tool_notes": "Grok材料一覧。取捨はJarvis",
-      "note": "",
+      "note": "【統合済み・停止】2026-11-28 に000（大佐）の月1「Grok×Orca 比べ」へ統合。フォルダは残す",
       "summary": "10_inbox_from_grok / outbox要約を週次・日次で一覧化",
       "flow_summary": "",
       "builder_tag": "〔ミックスレーン〕",
@@ -3374,7 +3432,7 @@
       "department_name": "ミックス・取捨判断室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "候補",
+      "status": "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）",
       "status_icon": "⚪",
       "report": "consult",
       "trigger": "人依頼＋時間",
@@ -3382,7 +3440,7 @@
       "tool_assigned": "jarvis",
       "tool_fit": "A",
       "tool_notes": "両系統比較。指揮はJarvis",
-      "note": "",
+      "note": "【統合済み・停止】2026-11-28 に000（大佐）の月1「Grok×Orca 比べ」へ統合。フォルダは残す",
       "summary": "同一テーマでGrok案とAIチーム案を差分表にする",
       "flow_summary": "",
       "builder_tag": "〔ミックスレーン〕",
@@ -3577,7 +3635,7 @@
       "department_name": "ミックス・取捨判断室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "候補",
+      "status": "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）",
       "status_icon": "⚪",
       "report": "consult",
       "trigger": "人依頼",
@@ -3585,7 +3643,7 @@
       "tool_assigned": "jarvis",
       "tool_fit": "A",
       "tool_notes": "取捨ドラフト",
-      "note": "",
+      "note": "【統合済み・停止】2026-11-28 に000（大佐）の月1「Grok×Orca 比べ」へ統合。フォルダは残す",
       "summary": "採用／保留／却下の案をJarvis向けに1枚にまとめる",
       "flow_summary": "",
       "builder_tag": "〔ミックスレーン〕",
@@ -3772,7 +3830,7 @@
       "department_name": "ミックス・取捨判断室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "候補",
+      "status": "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）",
       "status_icon": "⚪",
       "report": "report",
       "trigger": "人依頼",
@@ -3780,7 +3838,7 @@
       "tool_assigned": "jarvis",
       "tool_fit": "A",
       "tool_notes": "FB返送文言",
-      "note": "",
+      "note": "【統合済み・停止】2026-11-28 に000（大佐）の月1「Grok×Orca 比べ」へ統合。フォルダは残す",
       "summary": "採用結果をoutbox/Todoist/エージェントflowへ戻す文言を作る",
       "flow_summary": "",
       "builder_tag": "〔ミックスレーン〕",
@@ -3968,7 +4026,7 @@
       "department_name": "ミックス・取捨判断室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "候補",
+      "status": "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）",
       "status_icon": "⚪",
       "report": "ops",
       "trigger": "時間",
@@ -3976,7 +4034,7 @@
       "tool_assigned": "gencode",
       "tool_fit": "A+B",
       "tool_notes": "二重起票見回り",
-      "note": "",
+      "note": "【統合済み・停止】2026-11-28 に000（大佐）の月1「Grok×Orca 比べ」へ統合。フォルダは残す",
       "summary": "同趣旨のTodoist／inbox二重を検知して統合提案",
       "flow_summary": "",
       "builder_tag": "〔ミックスレーン〕",
@@ -5630,7 +5688,7 @@
       "tool_notes": "鮮度＋費目学習。Mac Playwright／GHAはcheckのみ",
       "note": "指示書充填済（2026-10-14）。役割=連携鮮度・二重取込・費目学習。出口=/zaim。FlowForge作り込み待ち。status上げは了承後。Slack短報は次波（異常時#ops）。",
       "summary": "銀行連携の鮮度・二重取込の安全直し・費目学習。開いたとき `/zaim` が整っている状態へ",
-      "flow_summary": "開始（火金09／火金12／キュー／人）→ **鮮度 check→（Mac）stale更新** と **CSV→learn→費目・集計 apply** を分岐 → **同じ `/zaim` 投影**に合流 → 異常時だけ `#ops`。",
+      "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "none",
       "grok_counterpart": "",
@@ -5849,7 +5907,7 @@
       "tool_notes": "得る側（テイチャン／ETC還元／Vポイント定例）→/vpoint・/etc＋Slack#report。612（払う側）と分離",
       "note": "2026-10-17 テイチャン単体から拡大改名。正本 jarvis_points_rebate_slack_report.py。FlowForge作り込み待ち。",
       "summary": "2026-10-17 テイチャン単体から拡大改名。正本 jarvis_points_rebate_slack_report.py。FlowForge作り込み待ち。",
-      "flow_summary": "開始（月木テイチャン／20–26日ETC／窓CVポイント／朝取りこぼし／人）→ 各取得・確認 → **ダッシュ投影** と **Slack `#report`【614｜種別】** に合流。失敗は `#ops`。払う側は **612** に渡さない。",
+      "flow_summary": "",
       "builder_tag": "",
       "mixup_kind": "none",
       "grok_counterpart": "",
@@ -11944,7 +12002,7 @@
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+        "role_split": "【凍結・移管】2026-11-28 松野さん決定: 構想（Zaim財務夜間分析・FlowForge flow_TA9fHAyKHFlfTFb8fvpDG6Nh）は600室ラコ隊長へ移管。300室では凍結。フォルダは残す"
       },
       {
         "side": "ai_only",
@@ -11968,7 +12026,7 @@
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "2026-11-22 フロー設計中（たたき台）。フォルダ・実装は未作成。"
+        "role_split": "2026-11-22 フロー設計（FlowForge 承認済み15ノード）。2026-11-23 フォルダ作成・Phase 1（読むだけ・手動）実装 scripts/jarvis_todoist_318_triage.py。定期起動は未登録"
       },
       {
         "side": "paired",
@@ -13491,27 +13549,27 @@
             {
               "id": "411",
               "name": "Grok材料取込係",
-              "status": "候補"
+              "status": "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）"
             },
             {
               "id": "412",
               "name": "両系統比較係",
-              "status": "候補"
+              "status": "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）"
             },
             {
               "id": "413",
               "name": "取捨判断ドラフト係",
-              "status": "候補"
+              "status": "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）"
             },
             {
               "id": "414",
               "name": "フィードバック返送係",
-              "status": "候補"
+              "status": "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）"
             },
             {
               "id": "415",
               "name": "二重起票・競合監視係",
-              "status": "候補"
+              "status": "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）"
             }
           ],
           "leads": [
@@ -13566,7 +13624,7 @@
             {
               "id": "316",
               "name": "データアナリスト",
-              "status": "候補"
+              "status": "停止（凍結・600室へ移管 2026-11-28）"
             },
             {
               "id": "317",

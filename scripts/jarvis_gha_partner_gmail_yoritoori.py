@@ -237,7 +237,7 @@ def scan_queries(
 ) -> None:
     """クエリごとに別枠の上限 limit で走査。同一メッセージは1回だけ処理（二重追記は process_one が件名+日付で抑止）。"""
     seen: set[str] = set()
-    for q in queries:
+    for idx, q in enumerate(queries):
         result = (
             service.users()
             .messages()
@@ -245,7 +245,13 @@ def scan_queries(
             .execute()
         )
         taken = 0
-        for msg in result.get("messages") or []:
+        hits = result.get("messages") or []
+        # 2026-11-28: クエリごとの当たり件数（中身は出さない）。次便でどのクエリが空か区別する。
+        print(
+            f"# query[{idx}] hits={len(hits)} (page max={min(100, max(limit, 20))}) len={len(q)}",
+            file=sys.stderr,
+        )
+        for msg in hits:
             mid = msg.get("id") or ""
             if not mid or mid in seen:
                 continue
@@ -303,6 +309,13 @@ def run(*, dry_run: bool, limit: int, newer_days: int) -> dict[str, int]:
         # 2026-11-27: パートナー from 検索を先に、未読は別枠（各 limit）。
         # 以前は未読が先で limit に達し、パートナー検索まで進まなかった。
         parts = resolver.gmail_from_query_parts()
+        print(
+            f"# resolver: emails={len(resolver.email_to_partner)} "
+            f"domains={len(resolver.domain_to_partner)} "
+            f"hints={len(resolver.hint_partners)} from_parts={len(parts)} "
+            f"(query uses {min(len(parts), 40)})",
+            file=sys.stderr,
+        )
         queries: list[str] = []
         if parts:
             from_q = " OR ".join(parts[:40])  # Gmail クエリ長対策

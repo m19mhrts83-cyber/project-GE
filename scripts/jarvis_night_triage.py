@@ -1337,6 +1337,8 @@ def process_candidates_heuristic(
                     c.get("subject") or "",
                     c.get("body") or "",
                     c.get("from_email") or "",
+                    list_unsubscribe=bool(c.get("list_unsubscribe")),
+                    replied_before=c.get("replied_before", True) is not False,
                 )
             except Exception:
                 kind = "mail"
@@ -1765,7 +1767,7 @@ def main() -> int:
             g_cands = find_general_unreplied(
                 contact_yaml=contact_yaml_path(),
                 lookback_days=general_lookback,
-                max_threads=int(cfg.get("general_max_threads") or 40),
+                max_threads=int(cfg.get("general_max_threads") or 0) or None,
             )
             print(f"# general unreplied candidates: {len(g_cands)}")
             all_cands.extend(g_cands)

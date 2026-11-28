@@ -159,8 +159,29 @@ class PipelineTest(unittest.TestCase):
         self.assertIn('要フォロー', out)
 
     def test_normal_posts_without_consult(self):
-        _, _, posts, consult, runs, _ = self.execute(['--post'], 'OK')
+        _, _, posts, consult, runs, out = self.execute(['--post'], 'OK')
         self.assertEqual((posts, len(consult), runs), (1, 0, 0))
+        self.assertIn(':large_green_circle: 315 連携 異常0件', out)
+
+    def test_stable_and_abnormal_dry_run_messages(self):
+        for level in ('OK', '異常', '確認不能'):
+            with self.subTest(level=level):
+                _, _, posts, consult, runs, out = self.execute(
+                    ['--post', '--mark-checked', '--remediate-once', '--dry-run'], level)
+                self.assertEqual((posts, len(consult), runs), (0, 0, 0))
+                self.assertEqual(':large_green_circle: 315 連携 異常0件' in out, level == 'OK')
+                if level == 'OK':
+                    self.assertTrue(out.startswith('【315 連携健全性点検係：連携の週次点検】✅済｜—｜次:来週日曜21:45\n'))
+                else:
+                    self.assertTrue(out.startswith('【ops】315 連携健全性・点検（Mac）\n判定: 🔴未解決'))
+
+    def test_abnormal_message_unchanged(self):
+        msg = ops.build_message('OK', '', 'OK', [], overall_override='要フォロー')
+        self.assertEqual(msg, (
+            '【ops】315 連携健全性・点検（Mac）\n判定: 🔴要フォロー\n\n'
+            '🟢 WeStudy週次: OK\n\n🟢 オプチャ: OK\n\n🟢 Gmail token: OK\n\n'
+            f'<{ops.FLOW_URL}|フロー>'
+        ))
 
     def test_weekly_post_has_no_quiet_green(self):
         with patch.dict(ops.os.environ, {'SLACK_WEBHOOK_AI_TEAM_OPS': 'test-only'}), patch.object(ops, '_run', return_value=(0, '')) as run, redirect_stdout(io.StringIO()):

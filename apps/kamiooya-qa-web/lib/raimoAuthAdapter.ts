@@ -278,7 +278,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
       const cfg=await deps.semanticConfig!();
       await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'user',content:job.query},signal);
       // (1) 使用量の削減。スイッチ cost_saving が見える人の質問だけ。読めなければ今までどおり。
-      let saving=false,withContext=false;
+      let saving=false,withContext=false,videoFinder=false;
       try{
         const flags=await deps.featureFlags!();const list=Array.isArray(flags)?flags:[];
         // オフ・全員公開のときは本人を引き直さない（会員情報の読み出しを増やさない）
@@ -293,7 +293,9 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         saving=await allowed('cost_saving');
         // 同じチャットの直前のやり取りを踏まえて探す・答える（スイッチ chat_context、2026-11-11）。
         withContext=await allowed('chat_context');
-      }catch{saving=false;withContext=false;}
+        // 「〇〇の講座動画を探して」でタイトルからも探し、回答の最初に講座一覧を出す（スイッチ video_finder、2026-11-27）。
+        videoFinder=await allowed('video_finder');
+      }catch{saving=false;withContext=false;videoFinder=false;}
       let history:{question:string;answer:string}[]=[];
       if(withContext){
         try{
@@ -319,7 +321,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         }catch{/* 使い回しが読めなくても答えは作る */}
       }
       const tier=saving&&!deep?answerTier(job.query):'standard';
-      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret,'X-Gateway-Proof':c.gatewaySecret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{}),...(history.length?{history}:{}),...(withContext?{clarify:true}:{})}),signal}));
+      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret,'X-Gateway-Proof':c.gatewaySecret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{}),...(history.length?{history}:{}),...(withContext?{clarify:true}:{}),...(videoFinder?{video_finder:true}:{})}),signal}));
       const result=await response.json();
       if(!response.ok){if(signal.aborted)throw signal.reason;throw new UpstreamError(result?.code==='semantic_disabled'?'semantic_disabled':'operation_failed',503);}
       const answer=String(result.answer||'').trim();if(!answer)throw new Error('empty_answer');

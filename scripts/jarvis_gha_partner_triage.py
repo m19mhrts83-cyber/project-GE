@@ -226,6 +226,154 @@ def candidates_from_partners(
         return cands
 
 
+# ---- IMP-002 / IMP-005（2026-11-28）: 111 の候補を出す前の絞り込み ----------------
+# どちらも「取れなければ従来どおり出す」。読取失敗で候補が消える事故を避けるため、
+# 例外は握って None（＝絞らない）を返す。
+
+
+def chat_message_key(folder: str, channel_raw: str, body: str) -> str:
+    """同じ Chatwork 発言を指す鍵: パートナー＋ルーム＋本文の正規化ハッシュ。
+
+    md には発言 ID が残らないため、ルーム（見出しのルーム名）と本文で同一発言を見分ける。
+    """
+    from jarvis_night_triage import chat_channel_kind, chat_thread_key
+
+    room_key = chat_thread_key(folder or "", channel_raw or "", chat_channel_kind(channel_raw or "") or "")
+    norm = "".join((body or "").split())[:300]
+    return room_key + "|" + hashlib.sha1(norm.encode("utf-8")).hexdigest()[:16]
+
+
+def load_skipped_chat_keys(sb: Any, *, limit: int = 1000) -> set[str] | None:
+    """見送り済み（status=skipped）の Chatwork 行の鍵。取れなければ None。"""
+    try:
+        r = (
+            sb.table("triage_items")
+            .select("folder,original_body,payload")
+            .eq("lane", "partner")
+            .eq("kind", "chat")
+            .eq("status", "skipped")
+            .order("updated_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        keys: set[str] = set()
+        for row in r.data or []:
+            payload = row.get("payload") or {}
+            ch = payload.get("channel_raw") or ""
+            if not ch or not row.get("original_body"):
+                continue
+            keys.add(chat_message_key(row.get("folder") or "", ch, row.get("original_body") or ""))
+        return keys
+    except Exception as e:  # noqa: BLE001
+        print(f"# skipped-keys lookup soft-fail: {type(e).__name__}", file=sys.stderr)
+        return None
+
+
+def drop_already_skipped(
+    cands: list[dict[str, Any]], skipped_keys: set[str] | None
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """IMP-002: 一度見送りになった同じ Chatwork 発言を候補から外す。(残す, 外した)。"""
+    if not skipped_keys:
+        return cands, []
+    kept: list[dict[str, Any]] = []
+    dropped: list[dict[str, Any]] = []
+    for c in cands:
+        if (c.get("channel") or "") == "Chatwork" and chat_message_key(
+            c.get("folder") or "", c.get("channel_raw") or "", c.get("body") or ""
+        ) in skipped_keys:
+            dropped.append(c)
+        else:
+            kept.append(c)
+    return kept, dropped
+
+
+def load_sent_rows(sb: Any, *, limit: int = 500) -> list[dict[str, Any]] | None:
+    """判断デスクで「送信済み」になった partner 行（folder と送信時刻）。取れなければ None。"""
+    try:
+        r = (
+            sb.table("triage_items")
+            .select("folder,payload,updated_at")
+            .eq("lane", "partner")
+            .eq("status", "sent")
+            .order("updated_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return list(r.data or [])
+    except Exception as e:  # noqa: BLE001
+        print(f"# sent-rows lookup soft-fail: {type(e).__name__}", file=sys.stderr)
+        return None
+
+
+def _later_than(sent_at: datetime, received_raw: str) -> bool:
+    """送信が受信より後か。受信が日付だけのときは、翌日以降の送信だけを「後」とみなす（同日は絞らない）。"""
+    from datetime import timedelta
+
+    from jarvis_night_triage import parse_received_at
+
+    rec = parse_received_at(received_raw)
+    if rec is None:
+        return False
+    if len((received_raw or "").strip()) < 16:  # 日付のみ
+        return sent_at >= rec + timedelta(days=1)
+    return sent_at > rec
+
+
+def _sent_at_from_row(row: dict[str, Any]) -> datetime | None:
+    raw = ((row.get("payload") or {}).get("sent_at")) or row.get("updated_at") or ""
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00")).astimezone(JST)
+    except ValueError:
+        return None
+
+
+def drop_replied_after(
+    cands: list[dict[str, Any]],
+    md_entries: list[dict[str, Any]],
+    sent_rows: list[dict[str, Any]] | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """IMP-005: 相手の発言より後に、同じパートナーへこちらから送った記録があれば候補に上げない。
+
+    記録 = やり取り台帳 md の「自分から送信」行（チャネル不問）＋判断デスクの送信済み行。
+    """
+    from jarvis_night_triage import parse_received_at
+
+    out_by_folder: dict[str, list[datetime]] = {}
+    for e in md_entries or []:
+        if e.get("inbound"):
+            continue
+        ch = e.get("channel") or ""
+        if "自分から送信" not in ch:
+            continue
+        dt = parse_received_at(e.get("received_at") or "")
+        if dt:
+            out_by_folder.setdefault(e.get("folder") or "", []).append(dt)
+    for row in sent_rows or []:
+        dt = _sent_at_from_row(row)
+        if dt:
+            out_by_folder.setdefault(row.get("folder") or "", []).append(dt)
+
+    kept: list[dict[str, Any]] = []
+    dropped: list[dict[str, Any]] = []
+    for c in cands:
+        times = out_by_folder.get(c.get("folder") or "", [])
+        if any(_later_than(t, c.get("received_at") or "") for t in times):
+            dropped.append(c)
+        else:
+            kept.append(c)
+    return kept, dropped
+
+
+def _readonly_client():
+    from supabase import create_client
+
+    url = (os.environ.get("JARVIS_SUPABASE_URL") or "").strip()
+    key = (os.environ.get("JARVIS_SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+    if not url or not key:
+        return None
+    return create_client(url, key)
+
+
 def row_from_candidate(c: dict[str, Any], judge: dict[str, Any]) -> dict[str, Any] | None:
     from jarvis_kurashift_re_inquiry_channel import looks_like_self_outbound_body
 
@@ -435,6 +583,20 @@ def main(argv: list[str] | None = None) -> int:
         max_partners=args.max_partners,
         collect=md_entries,
     )
+    try:
+        sb_ro = _readonly_client()
+    except Exception as e:  # noqa: BLE001
+        print(f"# triage lookup client soft-fail: {type(e).__name__}", file=sys.stderr)
+        sb_ro = None
+    sent_rows = load_sent_rows(sb_ro) if sb_ro else None
+    cands, replied = drop_replied_after(cands, md_entries, sent_rows)  # IMP-005
+    skipped_keys = load_skipped_chat_keys(sb_ro) if sb_ro else None
+    cands, reshown = drop_already_skipped(cands, skipped_keys)  # IMP-002
+    if replied or reshown:
+        print(
+            f"# dropped: replied_after={len(replied)} already_skipped={len(reshown)}",
+            file=sys.stderr,
+        )
     n_mail = sum(1 for c in cands if (c.get("channel") or "Gmail") == "Gmail")
     n_cw = sum(1 for c in cands if (c.get("channel") or "") == "Chatwork")
     print(
