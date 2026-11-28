@@ -8,6 +8,8 @@ import type { GatewayDependencies } from './raimoAuthGateway.ts';
 export type RuntimeConfig = { origin: string; raimoBase: string; gatewaySecret: string; projectUrl: string; serviceKey: string; proxySecret: string; githubDispatchToken?: string };
 // 運営分析の「ランキングを作り直す」で起動する Actions（2026-11-23）。鍵は Actions の起動だけができる、このリポジトリ限定のもの。
 const REBUILD_WORKFLOW='https://api.github.com/repos/m19mhrts83-cyber/project-GE/actions/workflows/course-theme-weekly.yml/dispatches';
+// gateway の証明（X-Gateway-Proof）で呼んでよいサーバー側の窓口。
+export const SERVER_FUNCTIONS=['qa-analytics','srt-ingest','qa-search-log'] as const;
 export const digest = async (s: string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))), b => b.toString(16).padStart(2, '0')).join('');
 export class UpstreamError extends Error {
   code: string; status: number;
@@ -47,6 +49,7 @@ export function backendCodeFromMessage(message: string): string {
 export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, stored: string) => Promise<boolean>, hash: (raw: string) => Promise<string>, transport: typeof fetch = fetch, jobsRuntime?:{schedule(task:Promise<void>):void;semantic(req:Request):Promise<Response>}) {
   if (!/^https:\/\//.test(c.raimoBase) || !c.raimoBase.startsWith(c.origin+'/miniAppApi/') ||
       !/^https:\/\/[a-z]+\.supabase\.co$/.test(c.projectUrl) || [c.gatewaySecret,c.proxySecret].some(v=>v.length<32) || !c.serviceKey) throw new Error('invalid_configuration');
+  const semanticUrl=c.projectUrl+'/functions/v1/semantic-search';
   const auth = { apikey:c.serviceKey, Authorization:'Bearer '+c.serviceKey, 'Content-Type':'application/json' };
   const rest = async (path: string, options: RequestInit={}) => {
     const r=await transport(c.projectUrl+'/rest/v1/'+path,{...options,headers:{...auth,...options.headers},signal:AbortSignal.timeout(20000)});
@@ -213,12 +216,22 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     saveThemeDecision:async row=>{await rest('qa_theme_decisions?on_conflict=round_id,theme_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
     listChangeLog:async()=>rest('qa_change_log?visible=is.true&select=released_on,title,body,trigger&order=released_on.desc,id.desc&limit=200'),
     saveFeedback:async row=>{await rest('qa_answer_feedback?on_conflict=user_id,chat_id,message_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});},
-    semanticConfig:async()=>{
-      const r=await backend('POST','/semantic-search-config',{});
-      if(r?.url!==c.projectUrl+'/functions/v1/semantic-search' || typeof r.secret!=='string' ||
-        r.secret.length<32 || r.secret.length>256 || [c.gatewaySecret,c.proxySecret,c.serviceKey].includes(r.secret))throw new Error('invalid_semantic_configuration');
-      // Explicit projection: only the existing client-side search credential, never backend extras.
-      return {url:r.url,secret:r.secret};
+    // オプチャ一覧・検索（AI を使わない list_openchat）。会員は gateway 経由だけ。本人は gateway が確かめた user_id。
+    openchatSearch:async(userId,input)=>{
+      const body=JSON.stringify({...input,list_openchat:true,user_id:userId,session_id:null});
+      const headers={'Content-Type':'application/json','X-Gateway-Proof':c.gatewaySecret};
+      const r=jobsRuntime?await jobsRuntime.semantic(new Request(semanticUrl,{method:'POST',headers,body})):await transport(semanticUrl,{method:'POST',headers,body,signal:AbortSignal.timeout(30000)});
+      const data=await r.json().catch(()=>null);
+      if(!r.ok||!data||typeof data!=='object')throw new UpstreamError('operation_failed',503);
+      return data;
+    },
+    // 分析・字幕取込・検索記録の窓口。会員に配る鍵は使わず、gateway の証明だけで呼ぶ（行き先は決め打ち）。
+    serverFunction:async(name,input)=>{
+      if(!SERVER_FUNCTIONS.includes(name))throw new UpstreamError('route_not_reviewed',403);
+      const r=await transport(c.projectUrl+'/functions/v1/'+name,{method:'POST',headers:{'Content-Type':'application/json','X-Gateway-Proof':c.gatewaySecret},
+        body:JSON.stringify(input),signal:AbortSignal.timeout(name==='srt-ingest'?140000:60000)});
+      const data=await r.json().catch(()=>({}));
+      return {status:r.status,body:data&&typeof data==='object'?data:{}};
     },
     publicAction:async(path,input)=>{
       const email=String(input.email||'').trim().toLowerCase();
@@ -275,7 +288,6 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         await recordMeta(job,result.answer,{mode:job.mode==='fast'?'fast':'normal',tier:'standard',model:RAIMO_ANSWER_MODEL,reused:false});
         return result;
       }
-      const cfg=await deps.semanticConfig!();
       await backend('POST','/chat-sessions/'+job.chat_id+'/messages-append',{role:'user',content:job.query},signal);
       // (1) 使用量の削減。スイッチ cost_saving が見える人の質問だけ。読めなければ今までどおり。
       let saving=false,withContext=false,videoFinder=false;
@@ -321,7 +333,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
         }catch{/* 使い回しが読めなくても答えは作る */}
       }
       const tier=saving&&!deep?answerTier(job.query):'standard';
-      const response=await jobsRuntime.semantic(new Request(cfg.url,{method:'POST',headers:{'Content-Type':'application/json','X-Semantic-Shared-Secret':cfg.secret,'X-Gateway-Proof':c.gatewaySecret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{}),...(history.length?{history}:{}),...(withContext?{clarify:true}:{}),...(videoFinder?{video_finder:true}:{})}),signal}));
+      const response=await jobsRuntime.semantic(new Request(semanticUrl,{method:'POST',headers:{'Content-Type':'application/json','X-Gateway-Proof':c.gatewaySecret},body:JSON.stringify({query:job.query,session_id:job.chat_id,user_id:job.user_id,comment_limit:100,chunk_limit:50,openchat_limit:20,match_threshold:0.22,...(tier==='lite'?{answer_tier:'lite'}:{}),...(history.length?{history}:{}),...(withContext?{clarify:true}:{}),...(videoFinder?{video_finder:true}:{})}),signal}));
       const result=await response.json();
       if(!response.ok){if(signal.aborted)throw signal.reason;throw new UpstreamError(result?.code==='semantic_disabled'?'semantic_disabled':'operation_failed',503);}
       const answer=String(result.answer||'').trim();if(!answer)throw new Error('empty_answer');

@@ -13,7 +13,10 @@ class GuardRaimoTest(unittest.TestCase):
         source = next(ROOT.glob('215_kamiooya/**/WeStudy_API_secret_admin_upgrade.yaml'))
         original = yaml.safe_load(source.read_text())
         guarded = module.guard_definition(original)
-        self.assertEqual(len(guarded['api']), 60)
+        self.assertEqual(len(guarded['api']), 59)
+        # 検索用の鍵を返す道は持たない。Raimo から意味検索へはサーバーの証明（X-Gateway-Proof）で呼ぶ
+        self.assertFalse(any(r['endpoint'] == 'POST /semantic-search-config' for r in guarded['api']))
+        self.assertNotIn('__SEMANTIC_SEARCH_SHARED_SECRET__', source.read_text())
         for before, after in zip(original['api'], guarded['api']):
             self.assertIn('__RAIMO_AUTH_GATEWAY_SECRET__', after['steps'][0]['check']['condition'])
             self.assertEqual(after['steps'][1:], before['steps'])

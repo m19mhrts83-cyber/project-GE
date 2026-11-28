@@ -82,20 +82,14 @@ def inject_runtime_placeholders(api_yaml: str) -> str:
         out = out.replace("__NOTIFY_SHARED_SECRET__", secret)
         print("notify placeholders: injected (webhook+secret)")
 
-    if "__SEMANTIC_SEARCH_URL__" in out or "__SEMANTIC_SEARCH_SHARED_SECRET__" in out:
-        semantic_url = (os.environ.get("SEMANTIC_SEARCH_URL") or "").strip()
-        # 接続先（KAMIOOYA_PROJECT_REF）を東京へ変えたとき、.env の SEMANTIC_SEARCH_URL が旧のままだと
-        # raimo-auth の照合（URL が自分のプロジェクトと一致すること）で回答が全部止まる。接続先から作り直す。
-        if re.fullmatch(r"https://[a-z0-9]{20}\.supabase\.co/functions/v1/semantic-search", semantic_url):
-            semantic_url = _kamiooya_base() + "/functions/v1/semantic-search"
-        semantic_secret = (os.environ.get("SEMANTIC_SEARCH_SHARED_SECRET") or "").strip()
-        if not semantic_url:
-            raise SystemExit("SEMANTIC_SEARCH_URL が未設定です。.env.jarvis_private を確認してください。")
-        if not semantic_secret:
-            raise SystemExit("SEMANTIC_SEARCH_SHARED_SECRET が未設定です。")
+    if "__SEMANTIC_SEARCH_SHARED_SECRET__" in out:
+        # 検索用の鍵を Raimo の定義に入れない（会員に配る道になる）。サーバーどうしは X-Gateway-Proof を使う。
+        raise SystemExit("API YAML に __SEMANTIC_SEARCH_SHARED_SECRET__ が残っています。X-Gateway-Proof に置き換えてください。")
+    if "__SEMANTIC_SEARCH_URL__" in out:
+        # 接続先（KAMIOOYA_PROJECT_REF）から作る。.env の SEMANTIC_SEARCH_URL が旧のままでも東京へそろえる。
+        semantic_url = _kamiooya_base() + "/functions/v1/semantic-search"
         out = out.replace("__SEMANTIC_SEARCH_URL__", semantic_url)
-        out = out.replace("__SEMANTIC_SEARCH_SHARED_SECRET__", semantic_secret)
-        print("semantic placeholders: injected (url+secret)")
+        print("semantic placeholders: injected (url only)")
 
     return out
 

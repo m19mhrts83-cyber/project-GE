@@ -32,9 +32,9 @@ Deno.test('高校 is read as 公庫 only inside loan talk',()=>{
 });
 
 Deno.test('a "find the 公庫 lesson video" question lists title matches first and feeds their transcript to the answer',async()=>{
- const keys=['GEMINI_API_KEY','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SEMANTIC_SEARCH_SHARED_SECRET','SEMANTIC_SEARCH_DISABLED'];
+ const keys=['GEMINI_API_KEY','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','QA_OPS_SERVER_SECRET','SEMANTIC_SEARCH_DISABLED'];
  const saved=keys.map(k=>Deno.env.get(k)),originalFetch=globalThis.fetch;
- ['fixture-provider','https://fixture.supabase.co','fixture-service','fixture-semantic','0'].forEach((v,i)=>Deno.env.set(keys[i],v));
+ ['fixture-provider','https://fixture.supabase.co','fixture-service','fixture-ops-secret-0123456789abcdef','0'].forEach((v,i)=>Deno.env.set(keys[i],v));
  const prompts:string[]=[],events:any[]=[];
  globalThis.fetch=async(input,init)=>{
   const url=new URL(input instanceof Request?input.url:String(input));
@@ -52,7 +52,7 @@ Deno.test('a "find the 公庫 lesson video" question lists title matches first a
   throw new Error('unexpected '+url.pathname);
  };
  try{
-  const r=await handleSemanticSearch(new Request('https://fixture.supabase.co/functions/v1/semantic-search',{method:'POST',headers:{'x-semantic-shared-secret':'fixture-semantic'},body:JSON.stringify({query:'公庫について解説している講座の動画を探して',video_finder:true})}));
+  const r=await handleSemanticSearch(new Request('https://fixture.supabase.co/functions/v1/semantic-search',{method:'POST',headers:{'x-qa-ops-secret':'fixture-ops-secret-0123456789abcdef'},body:JSON.stringify({query:'公庫について解説している講座の動画を探して',video_finder:true})}));
   assert.equal(r.status,200);const out=await r.json();
   assert.ok(out.answer.startsWith('**「公庫」がタイトルに入っている講座動画**\n1. [【実践】公庫の基本を知る](https://westudy.co.jp/lesson/kihon_kouko)（神大家2.応用）'));
   assert.ok(out.answer.endsWith('公庫の基本を知るでは制度の全体を話しています（セミナー1）'));
@@ -62,7 +62,7 @@ Deno.test('a "find the 公庫 lesson video" question lists title matches first a
   assert.ok(!prompts[0].includes('chunk=k2'));
   assert.ok(out.relatedSources.some((s:any)=>s.id===115));
   assert.deepEqual(events[0].meta.video_finder,{keywords:['公庫'],matched:[115]});
-  const off=await (await handleSemanticSearch(new Request('https://fixture.supabase.co/functions/v1/semantic-search',{method:'POST',headers:{'x-semantic-shared-secret':'fixture-semantic'},body:JSON.stringify({query:'公庫について解説している講座の動画を探して'})}))).json();
+  const off=await (await handleSemanticSearch(new Request('https://fixture.supabase.co/functions/v1/semantic-search',{method:'POST',headers:{'x-qa-ops-secret':'fixture-ops-secret-0123456789abcdef'},body:JSON.stringify({query:'公庫について解説している講座の動画を探して'})}))).json();
   assert.equal(off.answer,'公庫の基本を知るでは制度の全体を話しています（セミナー1）');
   assert.ok(!prompts[1].includes('[講座一覧]'));assert.equal(events[1].meta.video_finder,undefined);
  }finally{globalThis.fetch=originalFetch;keys.forEach((k,i)=>saved[i]===undefined?Deno.env.delete(k):Deno.env.set(k,saved[i]!));}

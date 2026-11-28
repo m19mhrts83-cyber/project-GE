@@ -37,7 +37,6 @@ function fixture(opts={}){
    if(path.startsWith('/internal/auth-user/'))return Response.json({user});
    if(path==='/internal/read/chat-sessions/mine')return Response.json({session:{user_id:'one'}});
    if(path==='/internal/read/chat-sessions/theirs')return Response.json({session:{user_id:'two'}});
-   if(path==='/semantic-search-config')return Response.json({url:c.projectUrl+'/functions/v1/semantic-search',secret:'s'.repeat(43)});
    if(path==='/chat-sessions/mine/messages-append'){assert.ok(['user','assistant'].includes(body.role));return Response.json({ok:true});}
    if(path==='/chat-sessions/mine/messages')return new Promise(resolve=>{modelResolve=()=>resolve(Response.json({answer:'normal answer',usedSources:'{}'}));});
   }
@@ -45,7 +44,7 @@ function fixture(opts={}){
  };
  const adapter=createProductionAdapter(c,async(a,b)=>a===b,async()=>'',transport,{
   schedule:p=>tasks.push(p),
-  semantic:async request=>{const input=await request.json();semanticInputs.push(input);assert.equal(request.headers.get('x-semantic-shared-secret'),'s'.repeat(43));assert.equal(input.user_id,'one');return Response.json({answer:'semantic answer',usedSources:'{"chunk_keys":["video"]}',relatedChunks:[{chunk_key:'video',start_sec:90,citation_label:'セミナー1'}]});}
+  semantic:async request=>{const input=await request.json();semanticInputs.push(input);assert.equal(request.url,c.projectUrl+'/functions/v1/semantic-search');assert.equal(request.headers.get('x-semantic-shared-secret'),null);assert.equal(request.headers.get('x-gateway-proof'),c.gatewaySecret);assert.equal(input.user_id,'one');return Response.json({answer:'semantic answer',usedSources:'{"chunk_keys":["video"]}',relatedChunks:[{chunk_key:'video',start_sec:90,citation_label:'セミナー1'}]});}
  });
  const gateway=createRaimoAuthGateway(adapter.deps);
  const request=(path,body,token='',method='POST')=>gateway(new Request('https://gateway.example'+path,{method,headers:{Origin:c.origin,Authorization:'Bearer '+token},...(body!==undefined?{body:JSON.stringify(body)}:{})}));
