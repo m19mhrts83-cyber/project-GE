@@ -95,3 +95,11 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 | 2026-10-20 | Bot/Signing 無しは URL ボタン自動フォールバック。Dashboard ログイン後に `/mail/{id}` へ復帰 |
 | 2026-10-20 | スコア上位5・ダイジェスト＋抽出要約（Plan A）。本文全文は Dashboard。Slack出した件はGmail既読。見送りでカード削除。ダイジェストは残 pending で更新／残0で削除 |
 | 2026-10-19 | 新設（設計中）。T1〜T5 確定。硬化（連続見送り・unmute CLI・Todoist GenMail型） |
+
+## 取込の上限と no-reply 例外（2026-11-28 松野さん決定）
+
+- 取得上限は `scripts/jarvis_night_triage_general.py` の `DEFAULT_MAX_THREADS`（200。環境変数 `GENERAL_MAX_THREADS` で上書き可）。pageToken で上限まで取る。
+- クエリに `is:unread` を足して母数を未読に絞る（既読は対応済み）。`UNREAD_ONLY = False` か環境変数 `GENERAL_UNREAD_ONLY=0` で従来クエリへ戻せる。
+- 先に `format=metadata`（差出人・件名のみ）で自分発信・パートナー・NOISE・購入語を判定し、通ったものだけ full 取得する。
+- no-reply 系でも、件名に強い要対応語（未済・エラー・期限・提出・再認証・残高不足・引落・督促・ご対応のお願い など）があれば kind=mail で残す。販促語・配信停止語・「新規登録」を含むものは従来どおり捨てる。
+- 取込の最後に1行ログ（候補・取得・上限打ち切り・NOISE除外・no-reply例外）を標準出力へ出す。件名・差出人は出さない。
