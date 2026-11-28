@@ -60,3 +60,13 @@ Deploy後に発行されるURLを共有すれば、誰でも使えます。
 - `POST /api/search` `{ "query": "..." }`
 - `POST /api/chat` `{ "message": "..." }`
 
+
+## 運用メモ: 講座動画探し（スイッチ `video_finder`、PR #709 の続き）
+
+2026-11-28 に本番で使える状態にした記録（会員情報・鍵は書かない）。
+
+- 本番（東京プロジェクト）の `semantic-search`（v6）と `raimo-auth`（v11）はどちらも #709 のコード（`video_finder`）を含むことを関数本体で確認した。再 deploy は不要だった。
+- スイッチ表 `qa_feature_flags` の `video_finder` を `owner`（名指し1人）→ `admins`（管理者・master_admin の役割の人全員。`lib/featureFlags.ts` の STAFF_ROLES）に変更。会員全体（`all`）には広げていない。
+- 確かめ: gateway 証明（`X-Gateway-Proof`）で本番 `semantic-search` に `video_finder:true` で「公庫について解説している講座の動画を探して」を1回投げた。回答の最初に「公庫」がタイトルに入る5件（先頭が「【実践】公庫の基本を知る」）が出た。検索ログ `app_qa_search_events` に確かめ分は1件（session_id `verify-709-20261128`）。
+- 注意: `~/git-repos/.env.jarvis_private` の `SEMANTIC_SEARCH_URL` は移行前の旧プロジェクトを指していて、確かめには使えない（東京の `/functions/v1/semantic-search` を使う）。
+- 全員に広げる手順（松野さんの了承後）: `update public.qa_feature_flags set stage='all' where feature='video_finder';` 戻す時は `'admins'` または `'off'`。
