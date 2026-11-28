@@ -1765,7 +1765,7 @@ def main() -> int:
             g_cands = find_general_unreplied(
                 contact_yaml=contact_yaml_path(),
                 lookback_days=general_lookback,
-                max_threads=int(cfg.get("general_max_threads") or 40),
+                max_threads=int(cfg.get("general_max_threads") or 0) or None,
             )
             print(f"# general unreplied candidates: {len(g_cands)}")
             all_cands.extend(g_cands)
