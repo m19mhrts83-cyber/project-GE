@@ -206,6 +206,33 @@ def build_block(state: dict, runs: list[dict], *, force: bool) -> tuple[str, dic
     }
 
 
+def advance_state(state: dict, runs: list[dict], preview: dict, *, now: datetime) -> dict:
+    """--mark-checked の中身。最新 run の結果で連続成功を更新（同一 run_id は重複カウントしない）。
+    連続成功が SUCCESS_NEEDED に届いたら **一度だけ** 監視を終える（disabled=true）。
+    松野さん承認 2026-11-28（アイテム145「連続成功2回で監視を終える」）。"""
+    latest = runs[0]
+    conclusion = (latest.get("conclusion") or "").strip()
+    run_id = latest.get("databaseId")
+    prev_id = state.get("last_run_id")
+    consec = int(state.get("consecutive_successes") or 0)
+    if conclusion == "success":
+        if str(run_id) != str(prev_id or ""):
+            consec += 1
+    elif conclusion in ("failure", "timed_out", "cancelled"):
+        if str(run_id) != str(prev_id or ""):
+            consec = 0
+    state["consecutive_successes"] = consec
+    state["last_run_id"] = run_id
+    state["last_conclusion"] = conclusion or latest.get("status")
+    state["last_checked_at"] = now.isoformat(timespec="seconds")
+    state["last_result_note"] = preview.get("last_result_note") or ""
+    if consec >= SUCCESS_NEEDED and not state.get("disabled") and state["last_conclusion"] == "success":
+        state["disabled"] = True
+        state["auto_stable_at"] = state["last_checked_at"]
+        state["note"] = "連続成功 %d 回で自動終了（松野さん承認 2026-11-28）。再開は disabled:false" % consec
+    return state
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="WeStudy 取込 CI 結果チェック（毎朝コメント＋新しい lesson／日曜全部取り直し）")
     ap.add_argument("--json", action="store_true", help="JSON 出力")
@@ -247,25 +274,7 @@ def main() -> int:
     block, preview = build_block(state, runs, force=args.force)
 
     if args.mark_checked and runs:
-        latest = runs[0]
-        conclusion = (latest.get("conclusion") or "").strip()
-        run_id = latest.get("databaseId")
-        prev_id = state.get("last_run_id")
-        consec = int(state.get("consecutive_successes") or 0)
-        if conclusion == "success":
-            if str(run_id) != str(prev_id or ""):
-                consec += 1
-        elif conclusion in ("failure", "timed_out", "cancelled"):
-            if str(run_id) != str(prev_id or ""):
-                consec = 0
-        state["consecutive_successes"] = consec
-        state["last_run_id"] = run_id
-        state["last_conclusion"] = conclusion or latest.get("status")
-        state["last_checked_at"] = datetime.now(JST).isoformat(timespec="seconds")
-        state["last_result_note"] = preview.get("last_result_note") or ""
-        if consec >= SUCCESS_NEEDED:
-            # 自動解除はしない（ユーザー合意）。記録のみ
-            pass
+        state = advance_state(state, runs, preview, now=datetime.now(JST))
         save_state(state)
         block, _ = build_block(state, runs, force=True)
 
