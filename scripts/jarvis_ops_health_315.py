@@ -523,6 +523,10 @@ def build_message(
         head = f"判定: {'🟢' if ok else '🔴'}{res}"
     src = "GHA" if cloud else "Mac"
     lines = [f"【ops】315 連携健全性・点検（{src}）", head]
+    if overall == "OK":
+        # Weekly liveness is required even after the service has stabilized.
+        lines[0] = "【315 連携健全性点検係：連携の週次点検】✅済｜—｜次:来週日曜21:45"
+        lines.insert(1, ":large_green_circle: 315 連携 異常0件")
 
     w_bad = _westudy_bad(westudy_line) or _westudy_unknown(westudy_line)
     w_state = "確認不能" if _westudy_unknown(westudy_line) else ("失敗" if w_bad else "OK")

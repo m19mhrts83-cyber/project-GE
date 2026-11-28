@@ -133,7 +133,7 @@ cd ~/git-repos && set -a && source .env.jarvis_private && set +a
 ## 315-A 確定工程への整合（2026-11-22）
 
 - 実装計画・工程別照合・安全境界・検証は [`docs/315a-alignment.md`](docs/315a-alignment.md)。315-Bの日次監視とは独立。
-- 正常時も週次 #ops 報告を通す（確定FlowForgeの終了工程に合わせ quiet-green 抑止を外す）。専用Webhook欠落時は未投稿エラーとし、#reportへ転送しない。
+- 安定が7日を超えても毎週 #ops に `:large_green_circle: 315 連携 異常0件` を含めて報告する（異常時の本文・名義・宛先は維持）。正常時も週次 #ops 報告を通す（確定FlowForgeの終了工程に合わせ quiet-green 抑止を外す）。専用Webhook欠落時は未投稿エラーとし、#reportへ転送しない。
 - 「点検実行」の成功／部分成功／失敗と、健全性OK／要フォロー／未解決は別に表示する。cloudのMac委譲は部分成功。
 - Squareは常駐の状態ファイルで判定: state=running・最終確認(heartbeat_at)が24時間以内・書込エラーなしでOK。stopped/書込エラーは異常、ファイルなし・古い(24h超)・不正は確認不能（理由つき）として#ops／#consult。上限24hの理由: 常駐はheartbeatを約1分ごとに更新するため、週次174hでは停止を1週間見逃す。スリープ・再起動の余裕として24h。最終追記時刻は参考表示のみ（新着なしは正常）。手動の保存済みprobe（`.jarvis_state/square_probe.json`）は判定に使わず表示もしない（手動・7/5以降未更新で、常駐の判定と食い違うため）。途中承認・AI分析・新規復旧は足さない。
 
