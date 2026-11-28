@@ -48,7 +48,7 @@ test('real adapters persist only token hashes and survive a new gateway instance
  const next=createRaimoAuthGateway(f.adapter.deps);const r=await next(new Request('https://gateway.example/comments',{headers:{Origin:origin,Authorization:'Bearer '+token}}));assert.equal(r.status,200);
  assert.equal((await f.request('/chat-sessions/theirs/messages',{message:'x'},token)).status,403);
  assert.equal((await f.request('/chat-sessions/mine/messages',{user_id:'2',message:'x'},token)).status,200);
- const status=await f.adapter.status('1',await digest(token));assert.equal(status.session_active,true);
+ const status=await f.adapter.status('1',await digest(token));assert.equal(status.session_active,true);assert.equal(status.email,'user@example.test');
  assert.equal((await f.adapter.status('2',await digest(token))).session_active,false);
  await f.request('/auth/logout',{},token);assert.equal((await f.adapter.status('1',await digest(token))).session_active,false);
 });

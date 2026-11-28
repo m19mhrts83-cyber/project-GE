@@ -145,7 +145,7 @@ test('concurrent sessions remain bound to the authenticated user', async () => {
   const results = await Promise.all(tokens.map(token=>s.handler(req('/auth/attachment-session',token,{user_id:'spoof'})).then(r=>r.json())));
   assert.deepEqual(results.map(r=>r.token), ['attachment-for-u','attachment-for-a','attachment-for-m']);
 });
-for (const path of [new URL('../public/raimo/app.js',import.meta.url),new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js',import.meta.url)]) {
+for (const path of [new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js',import.meta.url)]) {
   test('actual frontend login/API/logout with offline gateway: '+path.pathname,async()=>{
     const s=setup();
     const fields={loginEmail:{value:'u@example.test'},loginPassword:{value:'fixture-password'}};

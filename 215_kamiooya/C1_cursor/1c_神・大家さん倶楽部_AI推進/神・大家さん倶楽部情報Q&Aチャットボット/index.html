@@ -12,12 +12,12 @@
   <meta name="application-name" content="神大家AIナビ" />
   <meta name="theme-color" content="#11366A" />
   <title>神・大家さん倶楽部Q&Aチャットボット</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <!-- 外部の部品は版を固定し、改ざん検知（integrity）を付ける（2026-11-28）。Tailwind は style.css の末尾に書き出し済み（scripts/build_tailwind_css.mjs） -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20261125a" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
+    <link rel="stylesheet" href="style.css?v=20261128a" /><!-- 版を変えるたびに v を変える。古い見た目が残らないように -->
   <!-- (5) ロゴに合わせた配色: この端末で見えていた人は、ログイン画面から同じ色で出す（applyTheme が覚える） -->
   <!-- 2026-11-20 新しい配色は全員に公開済み（design_theme=all）。初めて開く人も新しい配色で出す。スイッチで外れた人だけ '0' を覚えて旧配色 -->
   <script>try{var dt=null;try{dt=localStorage.getItem('qa_design_theme');}catch(e){}if(dt!=='0'){document.documentElement.classList.add('theme-a');document.title='神大家AIナビ';}}catch(e){}</script>
@@ -1038,8 +1038,8 @@
     </div>
   </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.18/dist/purify.min.js" integrity="sha384-lkArbWjiZKuE+bzKbj1vOEF7DKYBDNvgwZMCt5OH8bdRB92zpzyNska9Q/XKPHQD" crossorigin="anonymous"></script>
     <!-- Raimo 公開時は jsContent が app.js として自動挿入される（ローカル検証時のみ下を有効化） -->
 </body>
 </html>

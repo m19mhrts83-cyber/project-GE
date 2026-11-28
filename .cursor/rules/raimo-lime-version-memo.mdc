@@ -3,7 +3,6 @@ description: Raimo（LIME TOOLS）ミニアプリのバージョン管理メモ�
 globs:
   - "**/神・大家さん倶楽部情報Q&Aチャットボット/**"
   - "**/publish_raimo_1346.py"
-  - "**/apps/kamiooya-qa-web/public/raimo/**"
 alwaysApply: false
 ---
 

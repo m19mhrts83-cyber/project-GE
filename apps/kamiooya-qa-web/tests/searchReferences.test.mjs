@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {labelAnswerSources,attachReferenceLabels,mentionedSourceLabels} from '../lib/searchReferences.ts';
-const load=()=>vm.runInNewContext(readFileSync(new URL('../public/raimo/app.js',import.meta.url),'utf8')+'\nApp;',{
+const load=()=>vm.runInNewContext(readFileSync(new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js',import.meta.url),'utf8')+'\nApp;',{
  document:{addEventListener(){},getElementById:()=>null},window:{setTimeout},console,URL,fetch,Intl,Date
 });
 test('published HTML does not suppress Raimo automatic app.js injection with a commented script tag',()=>{
- const html=readFileSync(new URL('../public/raimo/index.html',import.meta.url),'utf8');
+ const html=readFileSync(new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/index.html',import.meta.url),'utf8');
  assert.equal(/<!--[\s\S]*?<script\s+src=["']app\.js["'][\s\S]*?-->/.test(html),false);
 });
 test('abbreviated answer markers retain their explicit context identities',()=>{
@@ -120,7 +120,7 @@ test('fully labelled cached reference history skips redundant server retrieval w
 });
 
 test('category choices are available before and while the community listing loads, and partial pages are shown',async()=>{
- const app=vm.runInNewContext(readFileSync(new URL('../public/raimo/app.js',import.meta.url),'utf8')+'\nApp;',{
+ const app=vm.runInNewContext(readFileSync(new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js',import.meta.url),'utf8')+'\nApp;',{
   document:{addEventListener(){},getElementById:()=>null,createElement:()=>({})},window:{setTimeout,FORUM_CATEGORY_LOOKUP:{'1':'DIY部','2':'月次活動報告'}},console,URL,fetch,Intl,Date
  });
  const options=[];const select={value:'',attrs:{},get options(){return options;},set innerHTML(v){options.length=0;options.push({value:''});},appendChild(o){options.push(o);},getAttribute(k){return this.attrs[k];},setAttribute(k,v){this.attrs[k]=v;}};

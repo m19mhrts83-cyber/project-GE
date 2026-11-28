@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 function load(){
  const values=new Map();const storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
- const app=vm.runInNewContext(readFileSync(new URL('../public/raimo/app.js',import.meta.url),'utf8')+'\nApp;',{
+ const app=vm.runInNewContext(readFileSync(new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js',import.meta.url),'utf8')+'\nApp;',{
   document:{addEventListener(){},getElementById:()=>null},window:{setTimeout,clearTimeout},console,URL,fetch,Intl,Date,crypto,AbortSignal,AbortController,sessionStorage:storage
  });
  app.authGatewayBase='https://gateway.example';app.state.currentUser={id:'one'};app.retryDelay=async()=>{};app.answerPollDelay=async()=>{};return {app,storage};

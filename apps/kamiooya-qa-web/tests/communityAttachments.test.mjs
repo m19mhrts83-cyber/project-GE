@@ -117,9 +117,9 @@ test('LINE delivery uses exact source IDs, bounded pages and only validated priv
   const token=await issueSession('12',cfg.sessionSecret,now);
   let res=await handler(request({operation:'list',source:'openchat',source_log_id:'oc_'+id},token));
   assert.equal(res.status,200);
-  assert.equal(calls[0].pathname,'/rest/v1/openchat_member_attachments');
-  assert.equal(calls[0].searchParams.get('source_log_id'),'eq.oc_'+id);
-  assert.ok(calls[0].searchParams.get('select').includes('source_log_id'));
+  const meta=calls.find(u=>u.pathname==='/rest/v1/openchat_member_attachments');
+  assert.equal(meta.searchParams.get('source_log_id'),'eq.oc_'+id);
+  assert.ok(meta.searchParams.get('select').includes('source_log_id'));
   res=await handler(request({operation:'open',source:'openchat',attachment_id:id,storage_path:'../other'},token));
   assert.equal(res.status,200);assert.match((await res.json()).url,/\/openchat-attachments\/objects\//);
   stored={...stored,bucket:'community-attachments'};
@@ -144,4 +144,71 @@ test('LINE attachment delivery rechecks every role and its active parent login',
     assert.equal((await handler(request({operation:'index',source:'openchat',user_id:'another'},token))).status,expected);
     assert.equal((await handler(request({operation:'index',source:'openchat'},''))).status,401);
   }
+});
+
+// 見られる人を限るオプチャ（lib/openchatAccess.ts）は、添付の窓口でも同じ判定で隠す（2026-11-28）。
+test('restricted LINE rooms are hidden from attachment index, list and open unless the switch allows the viewer', async () => {
+  const open = { id, source_log_id: 'oc_' + id, original_name: 'a.pdf', bucket: 'openchat-attachments', storage_path: 'objects/' + 'c'.repeat(64), route_id: 'room_x', chat_title: '一般の部屋', chat_name: '一般の部屋' };
+  const limited = { ...open, id: 'e'.repeat(64), source_log_id: 'oc_' + 'e'.repeat(64), route_id: '23_saisei_ap_ms_challenge_g', chat_title: '23再生AP/MS 限定', chat_name: '23再生AP/MS 限定' };
+  const byTitle = { ...limited, id: 'f'.repeat(64), route_id: 'attachment', chat_title: '23再生AP/MS チャレンジ' };
+  const run = async ({ flags, flagsOk = true, email = 'member@example.com', role = 'user' }, body) => {
+    const handler = createHandler(cfg, async url => {
+      if (url === cfg.statusUrl) return response({ user_id: '12', status: 'approved', role, email });
+      const u = new URL(url);
+      if (u.pathname === '/rest/v1/qa_feature_flags') return flagsOk ? response(flags) : response({ message: 'down' }, 500);
+      if (u.pathname === '/rest/v1/openchat_member_attachments') {
+        assert.match(u.searchParams.get('select'), /route_id,chat_title,chat_name/);
+        const all = [open, limited, byTitle];
+        const idFilter = u.searchParams.get('id');
+        return response(idFilter ? all.filter(r => 'eq.' + r.id === idFilter) : all);
+      }
+      return response({ signedURL: '/object/sign/openchat-attachments/' + open.storage_path + '?token=t' });
+    }, () => now);
+    return handler(request({ source: 'openchat', ...body }, await issueSession('12', cfg.sessionSecret, now)));
+  };
+  const ids = async res => (await res.json()).attachments.map(r => r.id);
+  const owner = [{ feature: 'openchat_23', stage: 'owner', owner_ids: ['owner@example.com'] }];
+  // 会員: 限定の部屋（route_id でも題名でも）は一覧に出ず、開けない
+  for (const op of ['index', 'list']) {
+    const res = await run({ flags: owner }, { operation: op, source_log_id: 'oc_' + id });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await ids(res), [id]);
+  }
+  assert.equal((await run({ flags: owner }, { operation: 'open', attachment_id: limited.id })).status, 404);
+  assert.equal((await run({ flags: owner }, { operation: 'open', attachment_id: byTitle.id })).status, 404);
+  assert.equal((await run({ flags: owner }, { operation: 'open', attachment_id: id })).status, 200);
+  // 判定に使った部屋の情報は返さない
+  const listed = (await (await run({ flags: owner }, { operation: 'index' })).json()).attachments[0];
+  assert.equal('route_id' in listed || 'chat_title' in listed || 'chat_name' in listed, false);
+  // 名指しの本人（メール）・会員全員に出す段階では見える
+  assert.deepEqual(await ids(await run({ flags: owner, email: 'Owner@example.com' }, { operation: 'index' })), [id, limited.id, byTitle.id]);
+  assert.equal((await run({ flags: owner, email: 'owner@example.com' }, { operation: 'open', attachment_id: limited.id })).status, 200);
+  assert.deepEqual(await ids(await run({ flags: [{ feature: 'openchat_23', stage: 'all' }] }, { operation: 'index' })), [id, limited.id, byTitle.id]);
+  // 管理者に出す段階: 管理者だけ見える
+  const admins = [{ feature: 'openchat_23', stage: 'admins' }];
+  assert.deepEqual(await ids(await run({ flags: admins, role: 'admin' }, { operation: 'index' })), [id, limited.id, byTitle.id]);
+  assert.deepEqual(await ids(await run({ flags: admins, role: 'user' }, { operation: 'index' })), [id]);
+  // スイッチが読めない・無い時は隠す側
+  assert.deepEqual(await ids(await run({ flagsOk: false }, { operation: 'index' })), [id]);
+  assert.deepEqual(await ids(await run({ flags: [] }, { operation: 'index' })), [id]);
+  // 隠した分があっても、次のページの位置は絞る前の件数で決まる
+  const full = Array.from({ length: 500 }, (_, i) => ({ ...limited, id: i.toString(16).padStart(64, '0') }));
+  const pageHandler = createHandler(cfg, async url => {
+    if (url === cfg.statusUrl) return response({ user_id: '12', status: 'approved', role: 'user', email: 'm@example.com' });
+    if (new URL(url).pathname === '/rest/v1/qa_feature_flags') return response(owner);
+    return response(full);
+  }, () => now);
+  const page = await (await pageHandler(request({ source: 'openchat', operation: 'index' }, await issueSession('12', cfg.sessionSecret, now)))).json();
+  assert.deepEqual(page, { attachments: [], next_offset: 500 });
+});
+
+test('community (non-LINE) attachments do not read the LINE room switch', async () => {
+  const handler = createHandler(cfg, async url => {
+    if (url === cfg.statusUrl) return response({ user_id: '12', status: 'approved', role: 'user' });
+    assert.notEqual(new URL(url).pathname, '/rest/v1/qa_feature_flags');
+    assert.doesNotMatch(new URL(url).searchParams.get('select') || '', /route_id/);
+    return response([{ id, comment_id: '1' }]);
+  }, () => now);
+  const res = await handler(request({ operation: 'index' }, await issueSession('12', cfg.sessionSecret, now)));
+  assert.equal(res.status, 200);
 });

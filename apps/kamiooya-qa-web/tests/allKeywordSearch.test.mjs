@@ -7,7 +7,7 @@ import vm from 'node:vm';
 function load() {
   const els = {};
   const document = { getElementById: id => els[id] || null, addEventListener() {}, createElement: () => ({}), querySelectorAll: () => [] };
-  const app = vm.runInNewContext(readFileSync(new URL('../public/raimo/app.js', import.meta.url), 'utf8') + '\nApp;', { document, window: {}, console, URL });
+  const app = vm.runInNewContext(readFileSync(new URL('../../../215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js', import.meta.url), 'utf8') + '\nApp;', { document, window: {}, console, URL });
   app.showToast = () => {};
   return { app, els };
 }

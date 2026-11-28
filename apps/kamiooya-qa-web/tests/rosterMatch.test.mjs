@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createRaimoAuthGateway } from '../lib/raimoAuthGateway.ts';
-import { normalizeMemberNo, normalizeName, rosterHash, matchPending } from '../lib/rosterMatch.ts';
+import { normalizeMemberNo, normalizeName, rosterHash, matchPending, memberNoAlreadyApproved } from '../lib/rosterMatch.ts';
 
 const script = fileURLToPath(new URL('../../../scripts/kamiooya_roster_sync.py', import.meta.url));
 
@@ -61,7 +61,7 @@ test('照合 API は「管理者」かつ「スイッチで見える人」だけ
 });
 
 import { createProductionAdapter } from '../lib/raimoAuthAdapter.ts';
-function registerFixture({ stage = 'all', owners = [], roster = [], pending = [] } = {}) {
+function registerFixture({ stage = 'all', owners = [], roster = [], pending = [], approved = [], approvedDown = false } = {}) {
   const calls = [];
   const c = { origin: 'https://app.example', raimoBase: 'https://app.example/miniAppApi/test', projectUrl: 'https://fixture.supabase.co', serviceKey: 'service-only', gatewaySecret: 'g'.repeat(40), proxySecret: 'p'.repeat(40) };
   const transport = async (url, options = {}) => {
@@ -73,6 +73,7 @@ function registerFixture({ stage = 'all', owners = [], roster = [], pending = []
     const path = u.pathname.slice('/miniAppApi/test'.length);
     if (path === '/auth/register') return Response.json({ id: 'u9' });
     if (path === '/internal/auth-user/email') return Response.json({ user: { id: 'u9', email: body.email, status: 'pending', role: 'user' } });
+    if (path === '/internal/read/admin/users') return approvedDown ? Response.json({ error: 'down' }, { status: 500 }) : Response.json({ users: approved });
     if (path === '/internal/read/admin/users/pending') return Response.json({ users: [{ id: 'u9', member_no: '123', name: '山田 太郎' }, ...pending] });
     if (path === '/admin/users/u9/approve' || path === '/notify/approval' || path === '/notify/registration') return Response.json({ ok: true });
     throw new Error('unexpected ' + url);
@@ -106,4 +107,26 @@ test('自動承認しない: 名前が違う／同じ番号の承認待ちがい
   }
   const tester = registerFixture({ stage: 'owner', owners: ['new@example.test'], roster: await rosterOf() });
   assert.equal((await tester.register({})).auto_approved, 'true'); // 試験：名指しのメールの人だけ自動承認
+});
+
+// 2026-11-28: 同じ会員番号で承認済みのアカウントがあれば、名簿と合っていても人の確認へ回す。
+test('自動承認しない: 同じ会員番号の承認済みアカウントがある／承認済みの一覧が読めない', async () => {
+  const taken = registerFixture({ roster: await rosterOf(), approved: [{ id: 'u1', member_no: '０１２３', name: '山田 太郎' }] });
+  assert.equal((await taken.register({})).auto_approved, undefined);
+  const down = registerFixture({ roster: await rosterOf(), approvedDown: true });
+  assert.equal((await down.register({})).auto_approved, undefined);
+  for (const f of [taken, down]) {
+    assert.equal(f.calls.some(x => x.path.endsWith('/approve')), false);
+    assert.equal(f.calls.find(x => x.path.endsWith('/notify/registration')).body.note, 'アプリ登録');
+  }
+  // 別の番号の承認済みしかいなければ、これまでどおり自動承認
+  const other = registerFixture({ roster: await rosterOf(), approved: [{ id: 'u1', member_no: '999', name: '別人' }, { id: 'u9', member_no: '123' }] });
+  assert.equal((await other.register({})).auto_approved, 'true');
+});
+
+test('memberNoAlreadyApproved: 表記ゆれをそろえて比べ、本人と空の番号は数えない', () => {
+  assert.equal(memberNoAlreadyApproved([{ id: 'a', member_no: '00123' }], '123', 'b'), true);
+  assert.equal(memberNoAlreadyApproved([{ id: 'b', member_no: '123' }], '123', 'b'), false);
+  assert.equal(memberNoAlreadyApproved([{ id: 'a', member_no: '' }], '', 'b'), false);
+  assert.equal(memberNoAlreadyApproved([{ id: 'a', member_no: '124' }], '123', 'b'), false);
 });
