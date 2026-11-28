@@ -1,6 +1,6 @@
 import {createAnswerJobs,createRestAnswerStore,compactAnswerResult} from './qaAnswerJobs.ts';
 import {featureAllowed} from './featureFlags.ts';
-import {matchPending} from './rosterMatch.ts';
+import {matchPending,memberNoAlreadyApproved} from './rosterMatch.ts';
 import {answerTier,cacheable,queryKey,fresh} from './answerCost.ts';
 import {answerHash,cleanMeta,RAIMO_ANSWER_MODEL,type AnswerMeta} from './answerMeta.ts';
 // Runtime-neutral production adapters. Secrets are injected only by the Edge entrypoint.
@@ -112,6 +112,10 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
     users.push({id:String(u.id),member_no:memberNo,name});
     const result=(await matchPending(users,rosterHas))[String(u.id)];
     if(result!=='match')return false;
+    // 同じ会員番号の承認済みアカウントがあれば人の確認へ（一覧が読めない時は例外で止まり、承認待ちのまま）
+    const approved=await backend('GET','/admin/users',{});
+    if(!Array.isArray(approved?.users))return false;
+    if(memberNoAlreadyApproved(approved.users,memberNo,String(u.id)))return false;
     await backend('PUT','/admin/users/'+encodeURIComponent(String(u.id))+'/approve',{});
     await backend('POST','/notify/approval',{email}).catch(()=>{}); // メールが失敗しても承認は済んでいる（ログインはできる）
     return true;

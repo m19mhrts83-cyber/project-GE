@@ -37,3 +37,10 @@ export async function matchPending(users: Pending[], lookup: (hashes: string[]) 
   for (const k of keyed) out[k.id] = found.has(k.pair) ? 'match' : found.has(k.no) ? 'number_only' : 'none';
   return out;
 }
+
+// 同じ会員番号で、もう承認済みのアカウントがあるか（2026-11-28）。あれば自動承認せず人の確認へ回す。
+// 番号を知っている別人が自分のメールで登録しても、名簿一致だけでは通らないようにする。
+export function memberNoAlreadyApproved(approved: Pending[], memberNo: unknown, selfId: string): boolean {
+  const n = normalizeMemberNo(memberNo);
+  return !!n && approved.some(u => String(u.id) !== String(selfId) && normalizeMemberNo(u.member_no) === n);
+}
