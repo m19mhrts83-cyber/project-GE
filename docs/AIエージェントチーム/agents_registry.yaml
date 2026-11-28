@@ -45,6 +45,7 @@ departments:
     lead:
       name: 隊長これから
       kind: pending
+    note: 【統合済み・停止】2026-11-28 に411〜415を000（大佐）の月1「Grok×Orca 比べ」（毎月第1土曜10時）へ統合。フォルダは残す
   '300':
     name: 品質・タスク運用管理室
     path: 300_品質・タスク運用管理室
@@ -286,7 +287,8 @@ agents:
     path: 400_ミックス・取捨判断室/411_Grok材料取込係
     flowforge_id: flow_0CETz0AjmFUkUarpofjGHAp0
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_0CETz0AjmFUkUarpofjGHAp0
-    status: 候補
+    status: 停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）
+    note: 【統合済み・停止】2026-11-28 に000（大佐）の月1「Grok×Orca 比べ」へ統合。フォルダは残す
     report: consult
     tool_fit: A
     mixup_kind: lane
@@ -301,7 +303,8 @@ agents:
     path: 400_ミックス・取捨判断室/412_両系統比較係
     flowforge_id: flow_-9F4-5weQBcdsima3vddp_BQ
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_-9F4-5weQBcdsima3vddp_BQ
-    status: 候補
+    status: 停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）
+    note: 【統合済み・停止】2026-11-28 に000（大佐）の月1「Grok×Orca 比べ」へ統合。フォルダは残す
     report: consult
     tool_fit: A
     mixup_kind: lane
@@ -315,7 +318,8 @@ agents:
     path: 400_ミックス・取捨判断室/413_取捨判断ドラフト係
     flowforge_id: flow_ke1371iDffRaTdOwDs6WJAtC
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_ke1371iDffRaTdOwDs6WJAtC
-    status: 候補
+    status: 停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）
+    note: 【統合済み・停止】2026-11-28 に000（大佐）の月1「Grok×Orca 比べ」へ統合。フォルダは残す
     report: consult
     tool_fit: A
     mixup_kind: lane
@@ -329,7 +333,8 @@ agents:
     path: 400_ミックス・取捨判断室/414_フィードバック返送係
     flowforge_id: flow_y_dlQIKJ1HHXApQeHD8pBaov
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_y_dlQIKJ1HHXApQeHD8pBaov
-    status: 候補
+    status: 停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）
+    note: 【統合済み・停止】2026-11-28 に000（大佐）の月1「Grok×Orca 比べ」へ統合。フォルダは残す
     report: report
     tool_fit: A
     mixup_kind: lane
@@ -343,7 +348,8 @@ agents:
     path: 400_ミックス・取捨判断室/415_二重起票・競合監視係
     flowforge_id: flow_bfH_iUwm7JmE7XLpfzGIRXL0
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_bfH_iUwm7JmE7XLpfzGIRXL0
-    status: 候補
+    status: 停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）
+    note: 【統合済み・停止】2026-11-28 に000（大佐）の月1「Grok×Orca 比べ」へ統合。フォルダは残す
     report: ops
     tool_fit: A+B
     mixup_kind: lane
