@@ -254,7 +254,8 @@ agents:
     path: 300_品質・タスク運用管理室/316_データアナリスト
     flowforge_id: flow_TA9fHAyKHFlfTFb8fvpDG6Nh
     flowforge_url: https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_TA9fHAyKHFlfTFb8fvpDG6Nh
-    status: 候補
+    status: 停止（凍結・600室へ移管 2026-11-28）
+    note: '【凍結・移管】2026-11-28 松野さん決定: 構想（Zaim財務夜間分析・FlowForge flow_TA9fHAyKHFlfTFb8fvpDG6Nh）は600室ラコ隊長へ移管。300室では凍結。フォルダは残す'
     report: ops
     trigger: 時間
     tool_assigned: claude_code
