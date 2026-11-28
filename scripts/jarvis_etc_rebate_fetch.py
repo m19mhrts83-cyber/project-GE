@@ -83,7 +83,8 @@ def save_state(state: dict[str, Any]) -> None:
 def save_state_verified(state: dict[str, Any]) -> dict[str, Any]:
     """tmp→置換→読み戻し照合。失敗時は取得済みの結果を非公開の pending に残し、保存だけ1回やり直す。"""
     return vs.save_json_verified(
-        STATE_PATH, state, pending_path=STATE_PATH.with_name(STATE_PATH.stem + ".pending.json")
+        STATE_PATH, state, pending_path=STATE_PATH.with_name(STATE_PATH.stem + ".pending.json"),
+        remedy_system="etc",
     )
 
 
@@ -654,7 +655,8 @@ def _main() -> int:
             sv = save_state_verified(state)
             report["save_verify"] = {"ok": sv["ok"], "errors": sv["errors"]}
             _stage("save", "success" if sv["ok"] else "failed", "取得待ちの記録（etc_wait）")
-            _stage("save_verify", "success" if sv["ok"] else "failed", "; ".join(sv["errors"])[:100])
+            _stage("save_verify", "success" if sv["ok"] else "failed", "; ".join(sv["errors"])[:100],
+                   None if sv["ok"] else "save_verify_mismatch")
         else:
             _stage("save", "not_applicable", "dry-run／--apply なし")
         _stage("stamp", "skipped", "取得待ちのため月印なし")
@@ -747,7 +749,7 @@ def _main() -> int:
 
     if args.push:
         # 保存済み state から push → 実表示を読み戻して照合（不一致は最大1回再 push）。失敗しても取得・保存は取り消さない
-        sync = display614.sync_and_verify(["etc_mileage"])
+        sync = display614.sync_and_verify(["etc_mileage"], remedy_system=SYS)
         report["push"] = sync
         _stage("push", "success" if sync["push"] == "success" else "failed", f"{sync['attempts']}回目まで",
                None if sync["push"] == "success" else "push_failed")

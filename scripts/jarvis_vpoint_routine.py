@@ -88,7 +88,7 @@ def save_monthly_verified(monthly: dict[str, Any], expect: dict[str, Any]) -> di
 
     return vs.save_json_verified(
         MONTHLY_PATH, monthly, verify=verify,
-        pending_path=MONTHLY_PATH.with_name(MONTHLY_PATH.stem + ".pending.json"),
+        pending_path=MONTHLY_PATH.with_name(MONTHLY_PATH.stem + ".pending.json"), remedy_system="vpoint",
     )
 
 
@@ -650,7 +650,7 @@ def _main() -> int:
         else:
             # 保存済み state から push → 実表示（/vpoint の行）を読み戻して照合。不一致は最大1回再 push。
             # 失敗しても取得・保存・月印は取り消さない
-            sync = display614.sync_and_verify(["vpoint"])
+            sync = display614.sync_and_verify(["vpoint"], remedy_system=SYS)
             report["push"] = {"ok": sync["push"] == "success", **{k: sync[k] for k in ("display", "attempts", "error")}}
             _stage("push", "success" if sync["push"] == "success" else "failed", f"{sync['attempts']}回目まで",
                    None if sync["push"] == "success" else "push_failed")

@@ -29,7 +29,7 @@ JST = ZoneInfo("Asia/Tokyo")
 REPO = Path(__file__).resolve().parents[1]
 
 SYSTEMS = ("teiki", "etc", "vpoint", "card_benefit")
-STAGES = ("fetch", "save", "save_verify", "stamp", "push", "display", "slack")
+STAGES = ("criteria", "fetch", "save", "save_verify", "stamp", "push", "display", "slack")  # criteria＝実行前の有効基準の取得（P2・工程24）
 STATUSES = ("success", "partial", "waiting", "failed", "unverified", "skipped", "not_applicable")
 SEVERITY = {"failed": 4, "unverified": 3, "partial": 2, "waiting": 1, "success": 0}
 RETENTION_DETAIL_DAYS = 180
@@ -80,6 +80,7 @@ class RunRecord:
         self.script = script
         self.started_at = now_iso()
         self.systems: dict[str, dict[str, Any]] = {}
+        self.applied_decisions: list[dict[str, Any]] = []  # 適用した decision_id と結果（P2・工程24）
         self.note = ""
 
     def stage(self, system: str, stage: str, status: str, detail: str = "", error_code: str | None = None) -> None:
@@ -92,6 +93,33 @@ class RunRecord:
             "error_code": error_code,
             "at": now_iso(),
         }
+
+    def apply_criteria(self, system: str, now: datetime | None = None) -> dict[str, Any]:
+        """実行前に、この系統の有効な基準を取得して適用IDを記録する（工程24）。
+
+        返り値は jarvis_614_decisions.criteria_for の結果。read_error は『基準なし』とみなさず、
+        呼び出し側が基準に依存する出力だけを止める。基準が登録されていない系統は not_applicable。"""
+        import jarvis_614_decisions as dec  # 循環 import を避けて遅延
+
+        res = dec.criteria_for(system, now)
+        if res["status"] == "none":
+            self.stage(system, "criteria", "not_applicable", "この系統に登録された判断基準なし")
+        elif res["status"] == "read_error":
+            self.stage(system, "criteria", "failed", (res["error"] or "判断ログを読めず")[:120], "criteria_read_error")
+        elif res["waiting"]:
+            self.stage(system, "criteria", "partial",
+                       "再判断待ち（期限切れ）: " + ",".join(w["decision_id"] for w in res["waiting"]), "criteria_expired")
+        elif res["applied"]:
+            self.stage(system, "criteria", "success", "適用: " + ",".join(a["decision_id"] for a in res["applied"]))
+        else:
+            self.stage(system, "criteria", "not_applicable", "採用済みの有効な基準なし（従来どおり）")
+        for a in res["applied"]:
+            self.applied_decisions.append({"system": system, "decision_id": a["decision_id"], "key": a["key"],
+                                           "result": "applied"})
+        for w in res["waiting"]:
+            self.applied_decisions.append({"system": system, "decision_id": w["decision_id"], "key": w["key"],
+                                           "result": "expired_not_applied"})
+        return res
 
     def to_dict(self) -> dict[str, Any]:
         systems = {}
@@ -106,12 +134,24 @@ class RunRecord:
             "ended_at": now_iso(),
             "outcome": derive_outcome({n: {"status": s["outcome"]} for n, s in systems.items()}),
             "systems": systems,
+            "applied_decisions": self.applied_decisions,
             "note": self.note[:200],
         }
 
     def finish(self) -> dict[str, Any]:
         rec = self.to_dict()
         append_run(rec)
+        try:  # 障害の識別・連続回数（P2・工程33〜35）。失敗しても本線を落とさない
+            import jarvis_614_incidents as incidents
+
+            incidents.observe_run(rec)
+        except Exception as e:  # noqa: BLE001
+            try:
+                import jarvis_614_ops as ops
+
+                ops.emergency_log(f"incidents.observe_run 例外 {type(e).__name__}")
+            except Exception:  # noqa: BLE001
+                pass
         return rec
 
 

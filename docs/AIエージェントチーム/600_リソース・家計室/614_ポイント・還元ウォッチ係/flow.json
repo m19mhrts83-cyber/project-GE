@@ -1,7 +1,7 @@
 {
   "flow_id": "614-point-rebate-watch",
   "title": "ポイント・還元ウォッチ係（614）作業フロー",
-  "version": "2026-11-23 第2稿（Codex レビュー反映）＋2026-11-24 第3稿 PR-P0a（年間特典の P0 反映）＋2026-11-25 第3稿 Tサイト定期取得（n33）・Vpass残高（n34）を追記＋2026-11-25 PR-P1（画面照合・Slack 重複防止・#ops・run 集約）",
+  "version": "2026-11-23 第2稿（Codex レビュー反映）＋2026-11-24 第3稿 PR-P0a（年間特典の P0 反映）＋2026-11-25 第3稿 Tサイト定期取得（n33）・Vpass残高（n34）を追記＋2026-11-25 PR-P1（画面照合・Slack 重複防止・#ops・run 集約）＋2026-11-28 第3稿 P2（判断ログ・有効基準・障害対応・ナレッジ生成。TASK 工程22〜24・33〜36）",
   "reference_date": "2026-11-23",
   "purpose": "得る側（テイチャン・ETC還元・Vポイント定例・年間特典）が動いたかを1係で見せ、松野さんが寄せ先などを判断する材料を出す",
   "runtime_ai_nodes": 0,
@@ -115,6 +115,10 @@
     {
       "id": "human",
       "title": "人の判断と次回基準"
+    },
+    {
+      "id": "incident",
+      "title": "障害対応・自動復旧（TASK 工程33〜36）"
     }
   ],
   "nodes": [
@@ -506,7 +510,7 @@
       "implementation": "実装済（年間特典の直接 push・失敗時の再 push は PR-P1・本番未確認）",
       "confirmed": "確認済み",
       "run_state": "一部",
-      "evidence": "teiki 11/23 05:13 の push は ok・returncode 0。dashboard-push の最終実行ログは 11/22 12:30。年間特典の画面反映は『最短で当日12:30』の見込み（未確認）",
+      "evidence": "teiki 11/23 05:13 の push は ok・returncode 0。dashboard-push の最終実行ログは 11/22 12:30。年間特典の画面反映は『最短で当日12:30』の見込み（未確認）。P2（2026-11-28 実装・本番未確認）：再 push を自動対策 repush として連続3回の停止に接続（n36）",
       "source_id": "614-N17"
     },
     {
@@ -610,64 +614,64 @@
       "executor": "松野さん（iPhone の Slack、/vpoint、/etc）",
       "trigger": "Slack 短報・画面の更新",
       "input": "短報、画面、条件金額の確かさ（確認済み／推定／要確認）",
-      "process": "D1 寄せ先（Olive／Bonvoy）／D2 条件金額の確認／D3 Vポイントの出口／D4 テイチャンの扱い／D5 Slack の出し方／D6 Tサイト取得の時期／D7 画面確認の自動化",
+      "process": "D1 寄せ先（Olive／Bonvoy）／D2 条件金額の確認／D3 Vポイントの出口／D4 テイチャンの扱い／D5 Slack の出し方／D6 Tサイト取得の時期／D7 画面確認の自動化。判断が出たら Claude Code／Jarvis が CLI（jarvis_614_decisions.py record／revise／revoke）で記録する（本人の述べた理由は原文のまま・無ければ『理由なし』）",
       "output": "判断（今回だけ／次回基準）",
       "screen": "—",
       "report": "チャット（音声）。Slack は出口だけ",
       "success": "判断が出て記録される",
       "partial": "保留",
-      "failure": "未判断のまま→基準にしない",
+      "failure": "未判断のまま→基準にしない（見送り・保留・今回だけは次回基準に入れない）",
       "decision": "上記 D1〜D7",
-      "implementation": "手動",
+      "implementation": "手動＋記録CLI実装済",
       "confirmed": "確定",
       "run_state": "未実行",
-      "evidence": "寄せ先の方針メモ（定期払いは Olive に寄せ済み／今後の支払いを Bonvoy に寄せて狙い、狙えなければ打ち切り・年会費の前に判断）は既存。判断の記録場所は未整備",
+      "evidence": "寄せ先の方針メモ（定期払いは Olive に寄せ済み／今後の支払いを Bonvoy に寄せて狙い、狙えなければ打ち切り・年会費の前に判断）は既存。P2（2026-11-28 実装・本番未確認）：判断の記録は decisions.jsonl（n23）へ。判断の中身（D1〜D7）はまだ1件も登録していない",
       "source_id": "614-N22"
     },
     {
       "id": "n23",
       "number": 23,
       "lane": "human",
-      "title": "【提案・実装予定】判断ログに記録",
+      "title": "判断ログに記録（追記専用・非公開側）",
       "actor": "プログラム",
-      "executor": "未実装。保存先の案: .jarvis_state の JSON（非公開）。決めるのは松野さん（D8）",
+      "executor": "scripts/jarvis_614_decisions.py（CLI: record／revise／revoke／list）。保存先は既存の 614_watch/decisions.jsonl（.jarvis_state・gitignore 済み。TASK 4.12 の『既存の非公開領域を優先』に従う）。実行時に AI は呼ばない",
       "trigger": "ノード22で判断が出た時",
       "input": "事項・AI案・本人選択・本人の述べた理由（AI が補作しない）・対象・今回だけ／次回基準・期限／取消／改定・run_id",
-      "process": "1判断1行で追記。必須項目は既存ルール5のとおり（事項・AI案・本人選択・本人の述べた理由・対象・今回だけ／次回基準・期限／取消／改定・run_id）。未判断・見送りは『採用』にしない。必須の記録要件は既存ルールとして先に進めてよく、保存先だけ D8 で決める",
-      "output": "decision_id つきの判断記録",
+      "process": "1判断1イベントで追記（decided／revised／revoked。履歴は消さず、現在の姿はログから数える）。decision_id・判断事項・AI案・本人の選択（採用／見送り／保留）・本人が述べた理由の原文（無ければ None＝補作しない）・対象・今回だけ／次回基準・期限（その日の終わりまで有効）・run_id・incident_id・改定／取消。見送り・保留・今回だけは次回基準に採用しない。判断ログが壊れている時は追記しない（読み飛ばして取消が効かなくなるのを防ぐ）。記録のたびに参照用 Markdown を作り直す（n38）",
+      "output": "decision_id つきの判断記録（decisions.jsonl）",
       "screen": "—",
       "report": "なし",
       "success": "記録できた",
       "partial": "理由が無い→『理由なし』のまま保存",
-      "failure": "保存失敗→今回の判断だけ有効・次回基準にしない",
-      "decision": "D8: 判断ログを作るか／保存先",
-      "implementation": "未実装(提案)",
-      "confirmed": "提案",
-      "run_state": "未実行",
-      "evidence": "今ある近い物: config/card_benefit_watch.yaml の threshold_status と、各 state の services.status（excluded_keep_paypay 等）。run_id・理由は持っていない",
+      "failure": "追記できない・ログが壊れている→記録せず停止（今回の判断だけ有効・次回基準にしない）",
+      "decision": "D8（保存先）は TASK 4.12 に従い既存の 614_watch に実装。変えたければ指示",
+      "implementation": "実装済（P2・本番未確認）",
+      "confirmed": "確認済み（単体テスト）",
+      "run_state": "未検証",
+      "evidence": "P2（2026-11-28 実装・本番未確認）。scripts/tests/test_614_p2.py：理由の原文保持と補作なし・見送り／保留／今回だけを採用しない・改定／取消の履歴・壊れたログへ追記しない。実際の判断はまだ登録していない（空のログ）",
       "source_id": "614-N23"
     },
     {
       "id": "n24",
       "number": 24,
       "lane": "human",
-      "title": "次回開始時：有効な基準を取得し、適用IDを追跡（config 読込は既存／他は実装予定）",
+      "title": "次回開始時：有効な基準を取得し、適用IDを追跡",
       "actor": "プログラム",
-      "executor": "config 読込は既存（card_benefit_watch.yaml・teiki services）。判断ログからの取得と適用ID記録は未実装",
+      "executor": "jarvis_614_decisions.criteria_for（RunRecord.apply_criteria から呼ぶ）。いま判断に依存する出力は年間特典の『寄せ先の推奨』だけ（基準キー card_benefit.allocation）。config の読込（card_benefit_watch.yaml・teiki services）は従来どおり",
       "trigger": "次回の起動（ノード5の前）",
       "input": "採用済みで期限内の基準だけ",
-      "process": "（実装予定）実行前に有効・期限内の採用済み基準を取得→適用した decision_id と結果を記録。読取失敗は『基準なし』にせず、**その系統だけ**止めて知らせる（他の系統の定例は止めない）。現行は config 読込のみ",
+      "process": "実行前に、採用済み・次回基準・期限内・取消なしの判断だけを取得し、適用した decision_id を run（runs.jsonl の applied_decisions と criteria 工程）に記録。期限切れは適用を止めて『再判断待ち』にし、過去の判断を参考表示（以前の基準へ自動で戻らない）。推奨だけを止め、取得済みの事実・数値は表示し続ける。判断ログを読めない時は『基準なし』にせず、その系統の推奨だけを保留して #ops（他の系統・取得・保存・月印は止めない）。基準が1件も登録されていない間は従来どおり（既存の挙動を変えない）",
       "output": "適用した decision_id と結果",
-      "screen": "（提案）画面に『適用中の基準』",
-      "report": "読取失敗時だけ #ops",
-      "success": "有効な基準が取れ、適用IDが追える",
-      "partial": "config だけ取れる（今の姿）",
-      "failure": "読取失敗→保留",
+      "screen": "推奨欄に『再判断待ち（期限切れ）』または『判断基準を読めず保留』を出す（Vポイント画面・短報）",
+      "report": "読取失敗時だけ #ops。期限切れは画面・短報の推奨欄に出る",
+      "success": "有効な基準が取れ、適用IDが run に残る（または登録なしで従来どおり）",
+      "partial": "期限切れ→再判断待ち（推奨だけ停止・数値は表示）",
+      "failure": "読取失敗→その系統の推奨を保留・#ops（基準なしとはみなさない）",
       "decision": "D2: 条件金額を公式確認して confirmed に上げた時は config を直し、ノード15へ戻る",
-      "implementation": "一部実装",
-      "confirmed": "確認済み",
-      "run_state": "一部",
-      "evidence": "config の threshold_status・pace・zaim_stale_days が実質の基準として読まれている。decision_id による追跡は無い",
+      "implementation": "一部実装（P2・年間特典のみ接続）",
+      "confirmed": "確認済み（単体テスト）",
+      "run_state": "未検証",
+      "evidence": "P2（2026-11-28 実装・本番未確認）。テスト：期限内は適用してIDが run に残る／期限切れは適用せず参考表示・推奨停止／新しい見送り・保留では古い基準へ戻らない／読取失敗は基準なしにしない／他の系統は影響なし。テイチャン・ETC・Vポイントは判断に依存する出力がまだ無いため未接続（接続する時は CRITERIA_CONSUMERS と読む側を同じ PR で足す）",
       "source_id": "614-N24"
     },
     {
@@ -762,7 +766,7 @@
       "implementation": "実装済（Vポイント・年間特典・ETC の保存読み戻しは PR-P0a／P0b・本番未確認）",
       "confirmed": "提案",
       "run_state": "未実行",
-      "evidence": "D6 で保存の順を直した（routine.py：PDCA の子プロセスの前に last_routine_at／asks を保存し、後でも再適用）。単体テストで『子が state を書き直しても残る』を確認。年間特典は PR-P0a、Vポイント・ETC は PR-P0b で jarvis_614_verified_state.py により読み戻し照合（PR-P0b（2026-11-24 実装・本番未確認。マージは 11/25 09:40 の窓C の後））。読み戻し不一致では保存を pending に残し、保存だけ1回再試行、なお不一致なら #ops（失敗）・終了コード1・ダッシュボード push なし。旧記述: 現行コードは pdca 後の再読込で last_routine_at と asks が失われていた（Codex 確認）",
+      "evidence": "D6 で保存の順を直した（routine.py：PDCA の子プロセスの前に last_routine_at／asks を保存し、後でも再適用）。単体テストで『子が state を書き直しても残る』を確認。年間特典は PR-P0a、Vポイント・ETC は PR-P0b で jarvis_614_verified_state.py により読み戻し照合（PR-P0b（2026-11-24 実装・本番未確認。マージは 11/25 09:40 の窓C の後））。読み戻し不一致では保存を pending に残し、保存だけ1回再試行、なお不一致なら #ops（失敗）・終了コード1・ダッシュボード push なし。旧記述: 現行コードは pdca 後の再読込で last_routine_at と asks が失われていた（Codex 確認）。P2（2026-11-28 実装・本番未確認）：保存だけのやり直しを自動対策 save_retry として連続3回の停止に接続（n36）",
       "source_id": "614-N28",
       "added_in": "第2稿"
     },
@@ -834,7 +838,7 @@
       "implementation": "実装済（PR-P1・本番未確認）",
       "confirmed": "提案",
       "run_state": "未実行",
-      "evidence": "現行は保存・push の失敗がログのみだった。PR-P1（2026-11-25 実装・本番未確認。マージは 11/28 の年間特典の初回の結果を確認した後）：scripts/jarvis_614_runlog.py を年間特典・ETC・Vポイント・テイチャン（粗い記録）に組み込み。単体テストで、工程の独立・dry-run／スキップ／未確認は成功に数えない・記録失敗で本線を落とさない・削除しない を確認。月次集約は未実装（集計関数は success_count／stage_counts）",
+      "evidence": "現行は保存・push の失敗がログのみだった。PR-P1（2026-11-25 実装・本番未確認。マージは 11/28 の年間特典の初回の結果を確認した後）：scripts/jarvis_614_runlog.py を年間特典・ETC・Vポイント・テイチャン（粗い記録）に組み込み。単体テストで、工程の独立・dry-run／スキップ／未確認は成功に数えない・記録失敗で本線を落とさない・削除しない を確認。月次集約は未実装（集計関数は success_count／stage_counts）。P2（2026-11-28 実装・本番未確認）：実行前の有効基準取得（criteria 工程・applied_decisions）を run に追加し、run の終了時に障害の識別（n35）へ渡す",
       "source_id": "614-N31",
       "added_in": "第2稿"
     },
@@ -909,6 +913,106 @@
       "evidence": "11/25 調査（読み取り専用・Vpass ログイン4回成功・OTP なし）。Vpass は付与履歴を出さない（ID連携後の履歴は Vサイトへ誘導）ので、照合できるのは残高だけ",
       "source_id": "614-N34",
       "added_in": "第3稿"
+    },
+    {
+      "lane": "incident",
+      "actor": "プログラム",
+      "implementation": "実装済（P2・本番未確認）",
+      "confirmed": "確認済み（単体テスト）",
+      "run_state": "未検証",
+      "added_in": "第3稿 P2",
+      "id": "n35",
+      "number": 35,
+      "task_step": 33,
+      "title": "障害の識別・履歴検索（TASK 工程33）",
+      "executor": "scripts/jarvis_614_incidents.py（begin_occurrence／search_history／observe_run）。RunRecord.finish() から呼ぶ。実行時に AI は呼ばない",
+      "trigger": "run の終了時（失敗・確認不能の工程があった時）／自動対策の直前",
+      "input": "run の工程結果（系統・工程・結果・error_code）",
+      "process": "同一障害＝『系統＋工程＋障害分類（failed／unverified）＋エラーコード』（コード欠落は no_code。症状による代替識別は未決＝実装しない）。同じ run の同じ障害は1回に数える。過去の障害対応を決定論（同じ障害→同じ系統＋工程の順）で検索し、事実・確認済みの原因・推定の原因・本人判断（decision_id）を分けて返す。部分成功・取得待ちは障害にしない",
+      "output": "incident_id と連続回数（incidents.jsonl の occurred）",
+      "screen": "なし",
+      "report": "なし（停止・未承認の時だけ n36 経由で #ops）",
+      "success": "障害を識別して記録できた",
+      "partial": "コード欠落（no_code）で識別",
+      "failure": "障害履歴を扱えない→自動対策は実行しない（安全側）",
+      "decision": "エラーコード欠落時の代替識別（未決・実装しない）",
+      "evidence": "scripts/tests/test_614_p2.py：識別の粒度・同一 run の二重計上なし・検索の決定論と事実／原因／本人判断の分離・壊れたログでは自動対策を実行しない・dry-run は記録しない",
+      "source_id": "614-N35"
+    },
+    {
+      "lane": "incident",
+      "actor": "プログラム",
+      "implementation": "実装済（P2・本番未確認）",
+      "confirmed": "確認済み（単体テスト）",
+      "run_state": "未検証",
+      "added_in": "第3稿 P2",
+      "id": "n36",
+      "number": 36,
+      "task_step": 34,
+      "title": "安全な自動復旧と連続3回の停止（TASK 工程34）",
+      "executor": "scripts/jarvis_614_incidents.py（REMEDIES／Occurrence.may_auto／approve_resume）。既存の再試行箇所に接続：jarvis_614_verified_state.save_json_verified（保存だけやり直し）・jarvis_614_display.sync_and_verify（再 push）",
+      "trigger": "既存の再試行の直前（保存の読み戻し不一致・画面反映の失敗／不一致）",
+      "input": "障害の key・連続回数・停止中の対策・事前承認済みの対策一覧（コード）",
+      "process": "事前承認された安全な対策（save_retry・repush）だけを自動実行。過去に成功したことは根拠にしない。同一障害の連続3回目はその自動対策を実行せず停止（他の系統は継続）し #ops へ。自動復旧が成功しただけでは連続回数を戻さない。次回の該当系統・工程の通常実行が success の時だけ戻す（正常スキップ・停止中・dry-run・別系統の成功では戻さない）。停止した対策は、原因・対策・検証結果の記録と本人の明示承認（approve-resume）があるまで再開しない。未承認の対策（draw_retry＝二重抽選の恐れで保留）は実行せず、過去事例と候補を本人へ出す。1回の障害での再試行上限（1回）と、複数 run にまたがる連続回数は別に数える",
+      "output": "対策の結果（success／failed／blocked／not_approved）を incidents.jsonl の remedy に追記",
+      "screen": "なし",
+      "report": "停止した時・未承認の時だけ #ops（過去の関連事例の件数つき）",
+      "success": "承認済みの対策で復旧し、検証結果を記録",
+      "partial": "対策は成功したが連続回数は戻らない（次回の通常成功待ち）",
+      "failure": "3回目で停止／未承認／履歴を扱えない→自動対策を実行せず人へ",
+      "decision": "抽選済みか不明な時の自動再抽選（保留）。Slack の控え保存・投稿のやり直しはこの停止に未接続（台帳で二重投稿を防止）",
+      "evidence": "scripts/tests/test_614_p2.py：3回目で停止（保存・再 push の実接続）・自動復旧の成功だけでは戻らない・次回通常成功で戻る・スキップ／停止／dry-run／別系統では戻らない・停止は回数が戻っても残り承認でだけ再開・記録が揃わないと承認できない・未承認の対策は実行しない",
+      "source_id": "614-N36"
+    },
+    {
+      "lane": "incident",
+      "actor": "プログラム",
+      "implementation": "実装済（P2・本番未確認）",
+      "confirmed": "確認済み（単体テスト）",
+      "run_state": "未検証",
+      "added_in": "第3稿 P2",
+      "id": "n37",
+      "number": 37,
+      "task_step": 35,
+      "title": "障害対応履歴の記録（TASK 工程35）",
+      "executor": "scripts/jarvis_614_incidents.py（annotate／remedy の CLI）。保存先 614_watch/incidents.jsonl（追記専用・非公開側）",
+      "trigger": "n35 の識別時／対策の実行時／人が原因・対策・検証結果を記録する時",
+      "input": "incident_id・run_id・関連 decision_id・事実・原因（確認済み／推定）・対策・検証結果",
+      "process": "incident_id・run_id・decision_id を結んで、発生の事実・原因・対策・検証結果・再発回数を追記。失敗した対策・止めた対策も残す。履歴は消さない（保持は継続・年1回点検）。実額・秘密は書かない",
+      "output": "incidents.jsonl（occurred／annotate／remedy／suspended／resume_approved／reset）",
+      "screen": "なし",
+      "report": "なし",
+      "success": "3つのログ（runs・decisions・incidents）を ID で追える",
+      "partial": "原因・検証が未記録（再開の承認はできない）",
+      "failure": "追記できない→緊急ログ（~/Library/Logs/jarvis_614/emergency.log）",
+      "decision": "主・代替保存先の全面障害時の安全停止・復旧（未決）",
+      "evidence": "scripts/tests/test_614_p2.py：runs ↔ incidents ↔ decisions を ID で追える・失敗した対策も残る・壊れたログでも本線を落とさない",
+      "source_id": "614-N37"
+    },
+    {
+      "lane": "incident",
+      "actor": "プログラム",
+      "implementation": "実装済（P2・本番未確認）",
+      "confirmed": "確認済み（単体テスト）",
+      "run_state": "未検証",
+      "added_in": "第3稿 P2",
+      "id": "n38",
+      "number": 38,
+      "task_step": 36,
+      "title": "参照用ナレッジの自動生成（TASK 工程36）",
+      "executor": "scripts/jarvis_614_knowledge.py（--check で食い違い検出）。出力 614_watch/knowledge/decisions.md・incident-playbook.md（フォルダ 0700・ファイル 0600）",
+      "trigger": "判断・障害の記録のたび／run の終了時に変化があった時／手動",
+      "input": "decisions.jsonl・incidents.jsonl（正本）",
+      "process": "正本から判断履歴と障害対応事例の Markdown をプログラムで生成（同じ入力→同じ出力）。手で直さない（二重管理しない）。参照できるのは Mac 上の許可された人・AI 社員だけ（非公開側に置き、公開リポには出さない）",
+      "output": "decisions.md・incident-playbook.md",
+      "screen": "なし",
+      "report": "なし",
+      "success": "正本から再生成でき、--check で食い違いなし",
+      "partial": "期限切れの判定日が変わると内容が変わる（再生成で追従）",
+      "failure": "正本を読めない→生成せず停止（古い Markdown は残る）",
+      "decision": "なし",
+      "evidence": "scripts/tests/test_614_p2.py：決定論・非公開権限・手編集の検出と再生成・記録のたびの自動生成",
+      "source_id": "614-N38"
     }
   ],
   "edges": [
@@ -1314,16 +1418,16 @@
     {
       "from": "n22",
       "to": "n23",
-      "condition": "判断が出た",
+      "condition": "判断が出た（CLI で記録）",
       "kind": "branch",
-      "status": "提案"
+      "status": "現行"
     },
     {
       "from": "n23",
       "to": "n24",
       "condition": "記録した",
       "kind": "normal",
-      "status": "提案"
+      "status": "現行"
     },
     {
       "from": "n22",
@@ -1370,9 +1474,9 @@
     {
       "from": "n24",
       "to": "n05",
-      "condition": "【次回基準】次回開始時に有効な基準を取得して要否判定へ（実装予定。失敗時はその系統だけ止める）",
+      "condition": "【次回基準】次回開始時に有効な基準を取得（年間特典の推奨だけ接続済み。失敗時はその系統の推奨だけ保留）",
       "kind": "next_run",
-      "status": "提案"
+      "status": "現行"
     },
     {
       "from": "n24",
@@ -1429,6 +1533,90 @@
       "condition": "【提案】Tサイトと同じ基準日なら残高の一致を見る（定例への組み込みは P1 後）",
       "kind": "normal",
       "status": "提案"
+    },
+    {
+      "from": "n31",
+      "to": "n35",
+      "condition": "失敗・確認不能の工程を障害として識別",
+      "kind": "normal",
+      "status": "現行"
+    },
+    {
+      "from": "n35",
+      "to": "n36",
+      "condition": "承認済みの安全な対策だけ（連続3回目は停止）",
+      "kind": "branch",
+      "status": "現行"
+    },
+    {
+      "from": "n35",
+      "to": "n37",
+      "condition": "発生を記録",
+      "kind": "normal",
+      "status": "現行"
+    },
+    {
+      "from": "n36",
+      "to": "n37",
+      "condition": "対策と結果・検証を記録（失敗も）",
+      "kind": "normal",
+      "status": "現行"
+    },
+    {
+      "from": "n36",
+      "to": "n16",
+      "condition": "【取り直し】保存だけ1回（外部は取り直さない・連続3回目は停止）",
+      "kind": "retry",
+      "status": "現行"
+    },
+    {
+      "from": "n36",
+      "to": "n17",
+      "condition": "【取り直し】保存済み state から再 push 1回（連続3回目は停止）",
+      "kind": "retry",
+      "status": "現行"
+    },
+    {
+      "from": "n36",
+      "to": "n20",
+      "condition": "停止・未承認：過去事例と候補を #ops へ",
+      "kind": "branch",
+      "status": "現行"
+    },
+    {
+      "from": "n37",
+      "to": "n38",
+      "condition": "正本から自動生成",
+      "kind": "normal",
+      "status": "現行"
+    },
+    {
+      "from": "n23",
+      "to": "n38",
+      "condition": "判断履歴を自動生成",
+      "kind": "normal",
+      "status": "現行"
+    },
+    {
+      "from": "n38",
+      "to": "n22",
+      "condition": "参照：過去の判断・障害対応事例",
+      "kind": "normal",
+      "status": "現行"
+    },
+    {
+      "from": "n22",
+      "to": "n36",
+      "condition": "【次回基準】停止した自動対策の再開は本人の明示承認（approve-resume）",
+      "kind": "next_run",
+      "status": "現行"
+    },
+    {
+      "from": "n37",
+      "to": "n24",
+      "condition": "関連 decision_id を結ぶ",
+      "kind": "normal",
+      "status": "現行"
     }
   ],
   "decisions": [
@@ -1497,7 +1685,7 @@
       "id": "D8",
       "nodes": "n23・n24",
       "item": "判断ログ（ルール5・6）の**保存先**。必須の記録要件（事項・AI案・本人選択・理由・対象・今回だけ／次回基準・期限／取消／改定・run_id・採用ID取得・失敗時の対象限定停止）は既存ルールとして先に進めてよい",
-      "reason": "今は config の確かさだけ。理由・適用IDの記録がない",
+      "reason": "今は config の確かさだけ。理由・適用IDの記録がない。P2 で TASK 4.12 に従い既存の 614_watch に実装済み（置き場を変えたければ指示）",
       "if_held": "今回の判断はチャット記録のみ・次回基準にしない",
       "proceed": "**必須の記録要件は既存ルールとして先に進めてよい**（保存先だけ決める）",
       "related": "—"
@@ -1646,6 +1834,41 @@
       "related": "n27・n33",
       "item": "『付与予定日以降を成功条件に足すか』",
       "note": "未決のため実装しない。Olive クレジットは利用月の翌月10日頃付与なので、10月分は 11/10 以降の取得で完全（今回の取り直しは 11/25＝条件を満たす）。窓C前日（24日）の取得は毎月この条件を満たす"
+    },
+    {
+      "id": "U20",
+      "priority": true,
+      "related": "n23〜n24・n35〜n38",
+      "item": "P2（判断ログ・有効基準・障害対応・自動復旧・ナレッジ生成）の本番での動作",
+      "note": "単体テストのみ。実際の判断も障害もまだ1件も記録されていない。マージは松野さんの判断。最初の確認は『判断を1件記録→ Markdown が出る』と、実障害での連続回数の動き"
+    },
+    {
+      "id": "U21",
+      "priority": false,
+      "related": "n35",
+      "item": "エラーコードが無い障害の識別（症状による代替識別）",
+      "note": "未決のため実装しない。今は no_code で、工程＋障害分類までで同一視する"
+    },
+    {
+      "id": "U22",
+      "priority": false,
+      "related": "n37",
+      "item": "主・代替の保存先がどちらも使えない時の安全停止と復旧",
+      "note": "未決。今は緊急ログ（~/Library/Logs/jarvis_614/emergency.log）に残すだけで、自動対策は実行しない（履歴を扱えないため）"
+    },
+    {
+      "id": "U23",
+      "priority": false,
+      "related": "n36・n19・n21",
+      "item": "Slack の控え保存・投稿のやり直しを連続3回の停止に接続するか",
+      "note": "未接続。二重投稿は台帳（jarvis_614_slack_ledger）で防いでいる。保存・再 push だけが接続済み"
+    },
+    {
+      "id": "U24",
+      "priority": false,
+      "related": "n24",
+      "item": "判断に依存する出力をテイチャン・ETC・Vポイントにも作るか（D1〜D7 の判断をいつ登録するか）",
+      "note": "いまは年間特典の寄せ先推奨だけが接続。判断が1件も登録されていない間は従来どおり動く"
     }
   ],
   "findings_not_fixed": [
@@ -1727,7 +1950,7 @@
       "nodes": "n23・n24",
       "findings": "—",
       "proposal": "判断ログと採用ID取得、読取失敗時の対象限定停止（必須要件は既存ルール）",
-      "when": "D8（保存先）の回答後"
+      "when": "実装済み（P2・2026-11-28。本番未確認）。保存先は既存の 614_watch（TASK 4.12）"
     }
   ]
 }
