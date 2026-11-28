@@ -47,6 +47,21 @@ test('real PostgreSQL: saved attachments have exact, searchable sources, private
   await db.exec(migration);
   assert.equal((await db.query('select * from openchat_member_attachments')).rows.length,0);
   assert.equal((await db.query('select ingest_status from line_openchat_logs')).rows[0].ingest_status,'excluded');
+  // 2026-11-28: 添付の窓口が限定オプチャを絞れるよう、view にルームの情報を足す。権限は service_role のまま。
+  await db.exec("update line_openchat_logs set ingest_status='ready'");
+  await db.query(`update openchat_attachments set source_context=$1 where id=$2`,[JSON.stringify({chat_title:'23再生AP/MS 限定',route_id:'23_saisei_ap_ms_challenge_g'}),id]);
+  const room=readFileSync(new URL('apps/kamiooya-qa-web/supabase/migrations/20261128_openchat_member_attachments_room.sql',base),'utf8');
+  await db.exec(room);await db.exec(room);
+  const viewRow=(await db.query('select * from openchat_member_attachments')).rows[0];
+  assert.equal(viewRow.route_id,'23_saisei_ap_ms_challenge_g');assert.equal(viewRow.chat_title,'23再生AP/MS 限定');
+  for(const role of ['anon','authenticated']){
+   await db.exec('set role '+role);
+   await assert.rejects(db.query('select * from openchat_member_attachments'),/permission denied/);
+   await db.exec('reset role');
+  }
+  await db.exec('set role service_role');
+  assert.equal((await db.query('select id from openchat_member_attachments')).rows.length,1);
+  await db.exec('reset role');
   await db.query(`update openchat_attachments set source_context='{"posted_at":"invalid"}' where id=$1`,[id]);
   assert.equal((await db.query('select posted_at from line_openchat_logs')).rows[0].posted_at,null);
  }finally{await db.close();}

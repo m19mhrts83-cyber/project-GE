@@ -1,6 +1,8 @@
 // Raimo authenticates the password locally. Only its backend can issue sessions.
 // Each metadata/read request rechecks the current Raimo membership status.
 declare const Deno: { env: { get(key: string): string | undefined }; serve(handler: (req: Request) => Promise<Response>): void };
+import { RESTRICTED_OPENCHATS, filterOpenchatRows, hiddenOpenchats } from "../../../lib/openchatAccess.ts";
+import type { FeatureFlag } from "../../../lib/featureFlags.ts";
 
 type Config = { projectUrl: string; serviceKey: string; proxySecret: string; sessionSecret: string; raimoOrigin: string; statusUrl: string; memberReadsEnabled: boolean; requireParentSession?: boolean };
 const BUCKET = "community-attachments";
@@ -79,12 +81,24 @@ export function createHandler(cfg: Config, transport: typeof fetch = fetch, now:
       const bucket = isOpenchat ? "openchat-attachments" : BUCKET;
       const table = isOpenchat ? "openchat_member_attachments" : "community_attachments";
       const auth = { apikey: cfg.serviceKey, Authorization: "Bearer " + cfg.serviceKey };
+      // 見られる人を限るオプチャ（lib/openchatAccess.ts）は、意味検索・一覧と同じ判定で添付も隠す。
+      // スイッチが読めない時は隠す側に倒す（hiddenOpenchats に null を渡す）。
+      let hidden: ReturnType<typeof hiddenOpenchats> = [];
+      if (isOpenchat) {
+        let flags: FeatureFlag[] | null = null;
+        const flagQuery = new URLSearchParams({ select: "feature,stage,owner_ids,reviewer_ids", feature: "in.(" + RESTRICTED_OPENCHATS.map(r => r.feature).join(",") + ")" });
+        const flagResponse = await transport(cfg.projectUrl + "/rest/v1/qa_feature_flags?" + flagQuery, { headers: auth, signal: AbortSignal.timeout(15000) }).catch(() => null);
+        if (flagResponse?.ok) { const data = await flagResponse.json().catch(() => null); if (Array.isArray(data)) flags = data; }
+        hidden = hiddenOpenchats(flags, { id: uid, email: String(member.email ?? ""), role: String(member.role) });
+      }
+      const roomColumns = isOpenchat ? ",route_id,chat_title,chat_name" : "";
+      const stripRoom = <T extends Record<string, unknown>>(r: T) => { if (!isOpenchat) return r; const { route_id: _a, chat_title: _b, chat_name: _c, ...rest } = r; return rest; };
       const query = new URLSearchParams();
       if (op === "open") {
         if (!/^[0-9a-f]{64}$/.test(body.attachment_id || "")) return json({ error: "invalid_attachment" }, 400);
-        query.set("select", "id,bucket,storage_path"); query.set("id", "eq." + body.attachment_id); query.set("limit", "1");
+        query.set("select", "id,bucket,storage_path" + roomColumns); query.set("id", "eq." + body.attachment_id); query.set("limit", "1");
       } else {
-        query.set("select", "id," + (isOpenchat ? "source_log_id" : "comment_id") + ",original_name,content_type,byte_size"); query.set("order", "id.asc");
+        query.set("select", "id," + (isOpenchat ? "source_log_id" : "comment_id") + ",original_name,content_type,byte_size" + roomColumns); query.set("order", "id.asc");
         if (op === "list") {
           if (isOpenchat) {
             if (!/^oc_[0-9a-f]{64}$/.test(body.source_log_id || "")) return json({ error: "invalid_source_log" }, 400);
@@ -103,8 +117,11 @@ export function createHandler(cfg: Config, transport: typeof fetch = fetch, now:
       const metaResponse = await transport(cfg.projectUrl + "/rest/v1/" + table + "?" + query, { headers: auth, signal: AbortSignal.timeout(15000) });
       if (!metaResponse.ok) return json({ error: "attachments_unavailable" }, 503);
       const rows = await metaResponse.json();
-      if (op !== "open") return json({ attachments: rows, next_offset: op === "index" && rows.length === 500 ? (body.offset ?? 0) + 500 : null });
-      const row = rows[0];
+      if (!Array.isArray(rows)) return json({ error: "attachments_unavailable" }, 503);
+      const visible = filterOpenchatRows(rows, hidden);
+      // next_offset は絞る前の件数で決める（隠した分で一覧が途中で止まらないように）。
+      if (op !== "open") return json({ attachments: visible.map(stripRoom), next_offset: op === "index" && rows.length === 500 ? (body.offset ?? 0) + 500 : null });
+      const row = visible[0];
       if (!row) return json({ error: "not_found" }, 404);
       const validPath = isOpenchat ? /^objects\/[0-9a-f]{64}$/.test(row.storage_path) : /^comments\/[0-9]+\/[0-9a-f]{64}\.(jpg|png|pdf|xlsx|docx|pptx|zip|webp|heic|doc|csv)$/.test(row.storage_path);
       if (row.bucket !== bucket || !validPath) return json({ error: "invalid_storage_record" }, 500);

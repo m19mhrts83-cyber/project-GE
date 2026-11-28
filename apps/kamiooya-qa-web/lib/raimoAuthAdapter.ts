@@ -92,7 +92,7 @@ export function createProductionAdapter(c: RuntimeConfig, verify: (raw: string, 
   const status = async (uid:string,ref:string) => {
     if(!/^[0-9a-f]{64}$/.test(ref))return {user_id:uid,session_active:false};
     const [s,u]=await Promise.all([parentSession(ref),lookup({user_id:uid}).then(memberOf)]);
-    return {user_id:uid,status:u?.status,role:u?.role,session_active:sessionActive(uid,s,u)};
+    return {user_id:uid,status:u?.status,role:u?.role,email:u?.email,session_active:sessionActive(uid,s,u)};
   };
 
   const rosterHas=async(hashes:string[])=>{
