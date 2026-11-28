@@ -25,7 +25,10 @@ export type GatewayDependencies = {
   referenceMetadata?(): Promise<unknown>;
   // 根拠の「本文を見る」用: コメントを comment_id で数件だけ取る（全件26,000件を読まずに済むように。2026-11-19）
   commentsByIds?(ids: string[]): Promise<unknown[]>;
-  semanticConfig?(): Promise<{url: string; secret: string}>;
+  // オプチャ一覧・検索（AI を使わない）。本人は gateway が確かめた user_id で渡す。
+  openchatSearch?(userId: string, input: Record<string, unknown>): Promise<unknown>;
+  // 分析・字幕取込・検索記録の窓口を、会員に配らない証明で呼ぶ（行き先は adapter が決め打ち）。
+  serverFunction?(name: 'qa-analytics' | 'srt-ingest' | 'qa-search-log', input: Record<string, unknown>): Promise<{status: number; body: unknown}>;
   publicAction?(path: string, input: Record<string, unknown>): Promise<unknown>;
   // 段階公開スイッチ（lib/featureFlags.ts）。未設定なら全機能オフ。
   featureFlags?(): Promise<FeatureFlag[]>;
@@ -51,6 +54,11 @@ export type GatewayDependencies = {
   now?: () => number;
 };
 const approved = (u: Member | null): u is Member => !!u && u.status === 'approved' && ['user', 'admin', 'master_admin'].includes(u.role) && !!u.authVersion;
+// 画面から受け取る項目は名前を決めて拾う（鍵・本人・役割などを素通ししない）。
+const str = (v: unknown, max: number) => typeof v === 'string' ? v.slice(0, max) : undefined;
+const num = (v: unknown, min: number, max: number) => { const n = Number(v); return v == null || v === '' || !Number.isFinite(n) ? undefined : Math.max(min, Math.min(max, Math.floor(n))); };
+const pick = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
+const SRT_INGEST_MAX_CHARS = 1_600_000;
 const publicUser = (u: Member) => ({ id: u.id, email: u.email, role: u.role, status: u.status, ...(u.name !== undefined ? {name:u.name}:{}), ...(u.member_no !== undefined ? {member_no:u.member_no}:{}), ...(u.prefecture !== undefined ? {prefecture:u.prefecture}:{}) });
 // Only explicitly reviewed operations may pass; all other legacy routes stay closed.
 function permission(method: string, path: string): 'member' | 'staff' | 'master' | 'chat' | 'own-list' | null {
@@ -103,7 +111,8 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
       // Keep paths canonical; no query-based credentials, actors or alternate route syntax.
       if (url.search || /%|\/\//.test(path)) return json({ error: 'invalid_request' }, 400);
       const text = await req.text();
-      if (text.length > 65536) return json({ error: 'request_too_large' }, 413);
+      // 字幕取込（運営）だけは SRT 本文を受けるので大きめ。中で管理者かを確かめる。
+      if (text.length > (req.method === 'POST' && path === '/admin/srt-ingest' ? SRT_INGEST_MAX_CHARS : 65536)) return json({ error: 'request_too_large' }, 413);
       let input: Record<string, unknown> = {};
       if (text) {
         try { input = JSON.parse(text); } catch { return json({ error: 'invalid_request' }, 400); }
@@ -288,8 +297,34 @@ export function createRaimoAuthGateway(d: GatewayDependencies) {
         if(!ids.length||ids.length>20||ids.some((x:string)=>!/^[A-Za-z0-9_.:-]{1,100}$/.test(x)))return json({error:'invalid_request'},400);
         return json({comments:await d.commentsByIds([...new Set(ids)] as string[])});
       }
-      // This legacy browser search credential is separate from every privileged server secret.
-      if(path==='/semantic-search-config' && req.method==='POST' && d.semanticConfig)return json(await d.semanticConfig());
+      // 意味検索の鍵は画面に渡さない（/semantic-search-config は廃止）。オプチャ一覧は gateway が本人を付けて中継する。
+      if(path==='/openchat-search' && req.method==='POST' && d.openchatSearch){
+        const threadNo=num(input.thread_no,1,100000);
+        return json(stripPrivate(await d.openchatSearch(user.id,pick({query:str(input.query,2000)??'',chat_title:str(input.chat_title,200),openchat_id:str(input.openchat_id,100),
+          thread_no:threadNo,with_threads:input.with_threads===true||undefined,only_attachments:input.only_attachments===true||undefined,openchat_limit:num(input.openchat_limit,1,200)}))));
+      }
+      const relay=async(name:'qa-analytics'|'srt-ingest'|'qa-search-log',body:Record<string,unknown>)=>{
+        const r=await d.serverFunction!(name,body);
+        const status=[200,400,404,413].includes(r.status)?r.status:503;
+        return json(stripPrivate(status===503?{errorMessage:'service_unavailable'}:r.body),status);
+      };
+      // 検索の記録。本人・チャットは gateway が確かめた値だけを付ける。
+      if(path==='/qa-search-log' && req.method==='POST' && d.serverFunction){
+        const chat=str(input.session_id,100);
+        const sessionId=chat&&/^[a-zA-Z0-9_-]+$/.test(chat)&&await d.chatOwner(chat)===user.id?chat:null;
+        const hits=input.hits&&typeof input.hits==='object'&&!Array.isArray(input.hits)?input.hits:undefined;
+        const meta=input.meta&&typeof input.meta==='object'&&!Array.isArray(input.meta)?input.meta:undefined;
+        return relay('qa-search-log',pick({search_mode:str(input.search_mode,20),query_text:str(input.query_text??input.query,2000),session_id:sessionId,user_id:user.id,
+          comment_hit_count:num(input.comment_hit_count,0,1e6),chunk_hit_count:num(input.chunk_hit_count,0,1e6),used_sources:input.used_sources??undefined,meta,
+          result_status:str(input.result_status,20),error_message:str(input.error_message,500),hits,term_count:num(input.term_count,0,1000),has_or:input.has_or===true||undefined}));
+      }
+      // 運営分析・字幕取込は管理者だけ。会員の画面には鍵を持たせない。
+      if((path==='/admin/qa-analytics'||path==='/admin/srt-ingest') && req.method==='POST' && d.serverFunction){
+        if(!['admin','master_admin'].includes(user.role))return json({error:'forbidden'},403);
+        if(path==='/admin/qa-analytics')return relay('qa-analytics',pick({days:num(input.days,1,365),since:str(input.since,10),until:str(input.until,10)}));
+        return relay('srt-ingest',pick({title:str(input.title,500),video_id:str(input.video_id,200),video_url:str(input.video_url,2000),instructor:str(input.instructor,200),
+          srt_text:str(input.srt_text,SRT_INGEST_MAX_CHARS),skip_embed:input.skip_embed===true||undefined}));
+      }
       if (path === '/auth/attachment-session' && req.method === 'POST') {
         // Identity comes solely from the verified session; input password/user/role ignored.
         const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token!)));

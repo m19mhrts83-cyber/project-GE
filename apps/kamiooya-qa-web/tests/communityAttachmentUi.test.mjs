@@ -60,35 +60,36 @@ for (const source of sources) {
     assert.ok(html.includes('data-src-kind="openchat" data-src-key="'+sid+'" data-src-title="修繕" data-src-label="LINEオプチャ1"'));assert.ok(html.includes('data-message-id="m"'));
   });
   test(source.pathname + ': LINE source table renders its own attachment and filename search preserves source identity',async()=>{
-    const id='a'.repeat(64),sid='oc_'+id,requests=[];
+    const id='a'.repeat(64),sid='oc_'+id,requests=[],urls=[],heads=[];
     const row={id:sid,chat_title:'修繕',content:'【LINE添付・内容未解析】見積.pdf'};
-    const app=load(source,async(url,opts)=>{requests.push(JSON.parse(opts.body));return {ok:true,text:async()=>JSON.stringify({relatedOpenchat:[row]})};});
+    const app=load(source,async(url,opts)=>{urls.push(url);heads.push(opts.headers);requests.push(JSON.parse(opts.body));return {ok:true,status:200,json:async()=>({relatedOpenchat:[row]})};});
     const slot=new Element();slot.getAttribute=k=>k==='data-openchat-source-id'?sid:'';
     const tbody={innerHTML:'',querySelectorAll:()=>[slot]};
     app.elements.openchatTableBody=tbody;app.elements.openchatSearchInput={value:'見積.pdf'};
     app.elements.openchatAttachmentsOnly={checked:true};app.elements.openchatTitleFilter={value:''};
     app.renderOpenchatTitleFilterOptions=()=>{};
-    app.resolveSemanticConfig=async()=>({url:'https://gateway.example',secret:'fixture'});
+    app.authGatewayBase='https://gateway.example';
     app.state.attachmentIndex={['openchat:'+sid]:[{id,original_name:'見積.pdf'}]};
     await app.loadOpenchatLogs();
     assert.equal(requests[0].only_attachments,true);assert.equal(requests[0].query,'見積.pdf');
+    assert.equal(urls[0],'https://gateway.example/openchat-search');assert.equal('user_id' in requests[0],false);assert.equal('viewer_token' in requests[0],false);assert.equal(JSON.stringify(heads[0]).includes('Secret'),false);
     assert.ok(tbody.innerHTML.includes(sid));assert.equal(slot.children[0].children[1].textContent,'見積.pdf');
   });
   test(source.pathname + ': a LINE source read finishing after logout cannot restore its data',async()=>{
     let resolve,started;
     const reached=new Promise(r=>{started=r;});
     const app=load(source,()=>new Promise(r=>{resolve=r;started();}));
-    app.resolveSemanticConfig=async()=>({url:'https://gateway.example',secret:'fixture'});
+    app.authGatewayBase='https://gateway.example';
     app.state.currentUser={id:'one'};app.state.attachmentGeneration=1;
     const pending=app.loadOpenchatLogs();await reached;
     app.state.currentUser=null;app.state.attachmentGeneration=2;
-    resolve({ok:true,text:async()=>JSON.stringify({relatedOpenchat:[{id:'old-user-data'}]})});
+    resolve({ok:true,status:200,json:async()=>({relatedOpenchat:[{id:'old-user-data'}]})});
     await pending;assert.equal(app.state.openchatLogs.length,0);
   });
   test(source.pathname + ': changing LINE search ignores an older response arriving last',async()=>{
     const pending=[],starts=[];
     const app=load(source,()=>new Promise(resolve=>{pending.push(resolve);if(starts[pending.length-1])starts[pending.length-1]();}));
-    app.resolveSemanticConfig=async()=>({url:'https://gateway.example',secret:'fixture'});
+    app.authGatewayBase='https://gateway.example';
     app.elements.openchatSearchInput={value:'old.pdf'};
     app.renderOpenchatTitleFilterOptions=()=>{};
     const rendered=[];app.renderOpenchatTable=()=>rendered.push(app.state.openchatLogs[0].id);
@@ -97,7 +98,7 @@ for (const source of sources) {
     app.elements.openchatSearchInput.value='new.pdf';
     const secondStarted=new Promise(r=>{starts[1]=r;});
     const newer=app.loadOpenchatLogs();await secondStarted;
-    const result=id=>({ok:true,text:async()=>JSON.stringify({relatedOpenchat:[{id}]})});
+    const result=id=>({ok:true,status:200,json:async()=>({relatedOpenchat:[{id}]})});
     pending[1](result('new'));await newer;
     pending[0](result('old'));await older;
     assert.equal(app.state.openchatLogs[0].id,'new');assert.deepEqual(rendered,['new']);

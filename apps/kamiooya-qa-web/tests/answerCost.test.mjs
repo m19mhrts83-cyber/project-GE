@@ -51,7 +51,6 @@ function fixture(stage) {
       const path = u.pathname.slice('/miniAppApi/test'.length);
       if (path.startsWith('/internal/auth-user/')) return Response.json({ user });
       if (path === '/internal/read/chat-sessions/mine') return Response.json({ session: { user_id: 'one' } });
-      if (path === '/semantic-search-config') return Response.json({ url: c.projectUrl + '/functions/v1/semantic-search', secret: 's'.repeat(43) });
       if (path === '/chat-sessions/mine/messages-append') { appended.push(body); return Response.json({ ok: true }); }
     }
     throw new Error('unexpected ' + url);

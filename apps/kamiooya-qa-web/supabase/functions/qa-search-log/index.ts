@@ -1,7 +1,9 @@
 // Phase 13: log normal/semantic search events from the Raimo frontend.
-// Auth: X-Semantic-Shared-Secret. Deploy with --no-verify-jwt.
+// Auth: サーバー側の鍵だけ（raimo-auth の X-Gateway-Proof か、運営用スクリプトの X-Qa-Ops-Secret）。
+// 会員のブラウザから直接は呼ばない。Deploy with --no-verify-jwt.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { SERVER_AUTH_HEADERS, serverAuthorized } from "../../../lib/serverAuth.ts";
 
 type LogBody = {
   search_mode?: string;
@@ -15,7 +17,6 @@ type LogBody = {
   meta?: Record<string, unknown>;
   result_status?: string;
   error_message?: string;
-  secret?: string;
   /** keyword のとき: データソースごとの当たり件数 */
   hits?: Record<string, unknown>;
   term_count?: number;
@@ -25,8 +26,7 @@ type LogBody = {
 function corsHeaders(): HeadersInit {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type, x-semantic-shared-secret",
+    "Access-Control-Allow-Headers": SERVER_AUTH_HEADERS,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
@@ -42,14 +42,6 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value : value == null ? "" : String(value);
 }
 
-function isAuthorized(req: Request, body: LogBody | null): boolean {
-  const expected = (Deno.env.get("SEMANTIC_SEARCH_SHARED_SECRET") || "").trim();
-  if (!expected) return true;
-  const headerSecret = (req.headers.get("x-semantic-shared-secret") || "").trim();
-  const bodySecret = asString(body?.secret).trim();
-  return headerSecret === expected || bodySecret === expected;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders() });
@@ -59,7 +51,7 @@ Deno.serve(async (req) => {
   }
 
   const body = (await req.json().catch(() => null)) as LogBody | null;
-  if (!isAuthorized(req, body)) {
+  if (!(await serverAuthorized(req, (name) => Deno.env.get(name)))) {
     return json({ errorMessage: "forbidden" }, 403);
   }
 

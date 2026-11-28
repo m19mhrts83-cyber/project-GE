@@ -1,9 +1,7 @@
 const App = {
   // Offline repair candidate: stay on the existing backend until an approved cutover.
   authGatewayBase: '', // Release publisher sets the verified gateway URL.
-  // 公開 Edge URL（シークレットは /semantic-search-config から取得）
-  semanticEdgeUrl: 'https://sufbsyddqgekvcgadhpv.supabase.co/functions/v1/semantic-search',
-  _semanticSecret: null,
+  // 意味検索・オプチャ一覧・分析・字幕取込は、ログインの証明つきで gateway（raimo-auth）を通す。画面は検索用の鍵を持たない。
 
   state: {
     currentUser: null,
@@ -1910,8 +1908,7 @@ const App = {
     const sequence=(App.state.openchatRequestSequence||0)+1;
     App.state.openchatRequestSequence=sequence;
     const current=()=>generation===App.state.attachmentGeneration&&userId===String((App.state.currentUser||{}).id||'')&&sequence===App.state.openchatRequestSequence;
-    const cfg = await App.resolveSemanticConfig();
-    if(!current())return;
+    if(!App.authGatewayBase)throw new Error('LINEオプチャ一覧はログインし直してから開いてください');
     const q = (App.elements.openchatSearchInput && App.elements.openchatSearchInput.value) || '';
     const title =
       (App.elements.openchatTitleFilter && App.elements.openchatTitleFilter.value) || '';
@@ -1927,11 +1924,8 @@ const App = {
       only_attachments: !openchatId && !threadReq && !!(App.elements.openchatAttachmentsOnly && App.elements.openchatAttachmentsOnly.checked),
       query: openchatId ? openchatId : String(q || '').trim(),
       chat_title: openchatId ? undefined : String(title || '').trim() || undefined,
-      openchat_limit: 40,
-      session_id: App.state.currentSessionId || undefined,
-      user_id: (App.state.currentUser && App.state.currentUser.id) || undefined,
-      // 限定オプチャ（23番）を見てよい人かは、サーバーがこのログイン証明で確かめる（2026-11-18）
-      viewer_token: App.state.attachmentToken || undefined
+      // 本人・限定オプチャ（23番）を見てよい人かは、gateway がログインの証明で確かめる
+      openchat_limit: 40
     };
     if (openchatId) {
       body.openchat_id = openchatId;
@@ -1941,29 +1935,7 @@ const App = {
       body.thread_no = threadReq.threadNo;
       body.openchat_limit = undefined;
     }
-    const response = await fetch(cfg.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Semantic-Shared-Secret': cfg.secret
-      },
-      body: JSON.stringify(body)
-    });
-    const text = await response.text();
-    if(!current())return;
-    let data = {};
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        data = { _rawBody: text };
-      }
-    }
-    if (!response.ok) {
-      throw new Error(
-        data.errorMessage || data.message || data.error || 'LINEオプチャ一覧の取得に失敗しました'
-      );
-    }
+    const data = (await App.apiClient('POST', '/openchat-search', body)) || {};
     if(!current())return;
     App.state.openchatLogs = App.normalizeRelatedList(data.relatedOpenchat || []);
     if (Array.isArray(data.openchatRooms)) App.state.openchatRooms = data.openchatRooms;
@@ -4927,62 +4899,28 @@ const App = {
 
   messageEndpointForMode: (sessionId, fast) => {
     const base = '/chat-sessions/' + sessionId;
-    // 意味検索は Edge 直呼び（設定は /semantic-search-config）。messages-semantic は使わない
+    // 意味検索は gateway の回答ジョブ（answer-jobs）だけ。messages-semantic は使わない
     return base + (fast ? '/messages-fast' : '/messages');
-  },
-
-  resolveSemanticConfig: async () => {
-    let url = String(App.semanticEdgeUrl || '').trim();
-    let secret = String(App._semanticSecret || '').trim();
-    if (secret && url.indexOf('http') === 0) {
-      return { url: url, secret: secret };
-    }
-    const cfg = await App.apiClient('POST', '/semantic-search-config', {});
-    const cfgUrl = String((cfg && cfg.url) || '').trim();
-    const cfgSecret = String((cfg && cfg.secret) || '').trim();
-    if (cfgUrl.indexOf('http') === 0) {
-      url = cfgUrl;
-      App.semanticEdgeUrl = cfgUrl;
-    }
-    if (cfgSecret) {
-      secret = cfgSecret;
-      App._semanticSecret = cfgSecret;
-    }
-    if (!url || url.indexOf('http') !== 0 || !secret) {
-      throw new Error(
-        '意味検索の接続情報を取得できませんでした。再読み込み後に再試行してください'
-      );
-    }
-    return { url: url, secret: secret };
   },
 
   // Phase 13: 通常検索の利用ログ（意味検索は Edge 側でも記録）
   logQaSearchEvent: async (payload) => {
     try {
-      const cfg = await App.resolveSemanticConfig();
-      const logUrl = String(cfg.url || '').replace(/semantic-search\/?$/, 'qa-search-log');
-      if (!logUrl || logUrl === cfg.url) return;
-      await fetch(logUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Semantic-Shared-Secret': cfg.secret
-        },
-        body: JSON.stringify({
-          search_mode: payload.search_mode || 'normal',
-          query_text: String(payload.query || '').slice(0, 2000),
-          session_id: App.state.currentSessionId || null,
-          user_id: (App.state.currentUser && App.state.currentUser.id) || null,
-          comment_hit_count: payload.comment_hit_count,
-          chunk_hit_count: payload.chunk_hit_count,
-          used_sources: payload.used_sources || null,
-          meta: payload.meta || {},
-          result_status: payload.result_status || 'ok',
-          error_message: payload.error_message || null,
-          hits: payload.hits,
-          term_count: payload.term_count,
-          has_or: payload.has_or
-        })
+      if (!App.authGatewayBase) return;
+      // 本人は gateway がログインの証明で付ける（画面から user_id は送らない）
+      await App.apiClient('POST', '/qa-search-log', {
+        search_mode: payload.search_mode || 'normal',
+        query_text: String(payload.query || '').slice(0, 2000),
+        session_id: App.state.currentSessionId || null,
+        comment_hit_count: payload.comment_hit_count,
+        chunk_hit_count: payload.chunk_hit_count,
+        used_sources: payload.used_sources || null,
+        meta: payload.meta || {},
+        result_status: payload.result_status || 'ok',
+        error_message: payload.error_message || null,
+        hits: payload.hits,
+        term_count: payload.term_count,
+        has_or: payload.has_or
       });
     } catch (e) {
       /* analytics must not break chat */
@@ -5151,8 +5089,7 @@ const App = {
   // LINEオプチャは一覧と同じくサーバーで探す（全件を画面に持たないため）。サーバーには一番長い語を渡し、
   // 残りの語は戻ってきた中で絞る。サーバーは新しい順に最大200件までなので、件数は「200件以上」と出す。
   allSearchOpenchat: async (query) => {
-    const cfg = await App.resolveSemanticConfig();
-    const lists = await Promise.all(query.map(function (g) { return App.allSearchOpenchatOne(cfg, g.slice().sort(function (a, b) { return b.length - a.length; })[0]); }));
+    const lists = await Promise.all(query.map(function (g) { return App.allSearchOpenchatOne(g.slice().sort(function (a, b) { return b.length - a.length; })[0]); }));
     const seen = {};
     const rows = [];
     let capped = false;
@@ -5168,23 +5105,9 @@ const App = {
     rows.sort(function (a, b) { return String(b.posted_at || '').localeCompare(String(a.posted_at || '')); });
     return { rows: rows, total: rows.length, capped: capped };
   },
-  allSearchOpenchatOne: async (cfg, first) => {
-    const response = await fetch(cfg.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Semantic-Shared-Secret': cfg.secret },
-      body: JSON.stringify({
-        list_openchat: true,
-        query: first,
-        openchat_limit: 40,
-        session_id: App.state.currentSessionId || undefined,
-        user_id: (App.state.currentUser && App.state.currentUser.id) || undefined,
-        viewer_token: App.state.attachmentToken || undefined
-      })
-    });
-    const text = await response.text();
-    let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch (e) { data = {}; }
-    if (!response.ok) throw new Error(data.errorMessage || data.message || data.error || 'LINEオプチャの検索に失敗しました');
+  allSearchOpenchatOne: async (first) => {
+    if (!App.authGatewayBase) throw new Error('LINEオプチャの検索はログインし直してから使ってください');
+    const data = (await App.apiClient('POST', '/openchat-search', { query: first, openchat_limit: 40 })) || {};
     return App.normalizeRelatedList(data.relatedOpenchat || []);
   },
   runAllSearch: async () => {
@@ -5879,31 +5802,8 @@ const App = {
     const since = sinceInput && /^\d{4}-\d{2}-\d{2}$/.test(sinceInput.value) ? sinceInput.value : '';
     if (statusEl) statusEl.textContent = '読み込み中…';
     try {
-      const cfg = await App.resolveSemanticConfig();
-      const analyticsUrl = String(cfg.url || '').replace(/semantic-search\/?$/, 'qa-analytics');
-      if (!analyticsUrl || analyticsUrl === cfg.url) {
-        throw new Error('分析APIのURLを解決できませんでした');
-      }
-      const response = await fetch(analyticsUrl + '?days=' + encodeURIComponent(String(days)), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Semantic-Shared-Secret': cfg.secret
-        },
-        body: JSON.stringify(since ? { days: days, since: since } : { days: days })
-      });
-      const text = await response.text();
-      let data = {};
-      if (text) {
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          data = { errorMessage: text.slice(0, 200) };
-        }
-      }
-      if (!response.ok) {
-        throw new Error(data.errorMessage || data.message || '分析APIエラー HTTP ' + response.status);
-      }
+      // 管理者だけ。gateway がログインと役割を確かめてから分析の窓口を呼ぶ
+      const data = (await App.apiClient('POST', '/admin/qa-analytics', since ? { days: days, since: since } : { days: days })) || {};
       App.state.analyticsOverview = data;
       App.renderAnalytics();
       if (statusEl) {
@@ -6561,81 +6461,6 @@ const App = {
       '</p>';
   },
 
-  callSemanticSearch: async (query, fetchOptions) => {
-    const cfg = await App.resolveSemanticConfig();
-    const options = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Semantic-Shared-Secret': cfg.secret
-      },
-      body: JSON.stringify({
-        query: query,
-        comment_limit: 100,
-        chunk_limit: 50,
-        openchat_limit: 20,
-        match_threshold: 0.22,
-        session_id: App.state.currentSessionId || undefined,
-        user_id: (App.state.currentUser && App.state.currentUser.id) || undefined,
-        viewer_token: App.state.attachmentToken || undefined
-      })
-    };
-    if (fetchOptions && fetchOptions.signal) options.signal = fetchOptions.signal;
-    const response = await fetch(cfg.url, options);
-    const text = await response.text();
-    let data = {};
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        data = { _rawBody: text };
-      }
-    }
-    if (!response.ok) {
-      const msg =
-        data.errorMessage ||
-        data.message ||
-        data.error ||
-        (data._rawBody ? String(data._rawBody).slice(0, 200) : '') ||
-        '意味検索APIエラー';
-      const err = new Error(msg);
-      err.httpStatus = response.status;
-      err.code = data.code || '';
-      throw err;
-    }
-    if (data && data.errorMessage) {
-      throw new Error(String(data.errorMessage));
-    }
-    return data;
-  },
-
-  sendQuestionSemantic: async (sessionId, questionText, signal) => {
-    await App.apiClient(
-      'POST',
-      '/chat-sessions/' + sessionId + '/messages-append',
-      { role: 'user', content: questionText },
-      { signal: signal }
-    );
-    const sem = await App.callSemanticSearch(questionText, { signal: signal });
-    const answer =
-      String((sem && sem.answer) || '').trim() ||
-      '参照内で確証が取れないため、お答えすることができません。';
-    await App.apiClient(
-      'POST',
-      '/chat-sessions/' + sessionId + '/messages-append',
-      { role: 'assistant', content: answer },
-      { signal: signal }
-    );
-    return {
-      answer: answer,
-      usedSources: (sem && sem.usedSources) || '',
-      relatedComments: (sem && sem.relatedComments) || [],
-      relatedChunks: (sem && sem.relatedChunks) || [],
-      relatedSources: (sem && sem.relatedSources) || [],
-      relatedOpenchat: (sem && sem.relatedOpenchat) || []
-    };
-  },
-
   citationAnchor: (c, messageId) => 'reference-' + encodeURIComponent(String(messageId || 'answer')) + '-' + encodeURIComponent(String(c.kind || '')) + '-' + encodeURIComponent(String(c.commentId || c.openchatId || c.chunkKey || '')),
 
   referenceDateParts: (value) => {
@@ -7012,13 +6837,6 @@ const App = {
             const pending=App.state.pendingAnswerRequest||App.readPendingAnswer();
             const mode=pending?pending.mode:App.currentAnswerMode(fast);
             msgRes=await App.runAnswerJob(sessionId,questionText,mode,controller.signal);
-          } else if (App.state.semanticMode && !fast) {
-            // 意味検索: Raimo api ネスト障害を避け、Edge をブラウザから直接呼ぶ
-            msgRes = await App.sendQuestionSemantic(
-              sessionId,
-              questionText,
-              controller.signal
-            );
           } else {
             msgRes = await App.apiClient(
               'POST',
@@ -7435,38 +7253,15 @@ const App = {
       if (!String(srtText || '').trim()) {
         throw new Error('SRTの内容が空です');
       }
-      const cfg = await App.resolveSemanticConfig();
-      const ingestUrl = String(cfg.url || '').replace(/semantic-search\/?$/, 'srt-ingest');
-      if (!ingestUrl || ingestUrl === cfg.url) {
-        throw new Error('SRT取込APIのURLを解決できませんでした');
-      }
       if (resultEl) resultEl.textContent += 'Supabase へ送信中…\n';
-      const response = await fetch(ingestUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Semantic-Shared-Secret': cfg.secret
-        },
-        body: JSON.stringify({
+      // 管理者だけ。gateway がログインと役割を確かめてから字幕取込の窓口を呼ぶ
+      const data = (await App.apiClient('POST', '/admin/srt-ingest', {
           title: title,
           video_id: videoId,
           video_url: videoUrl,
           instructor: instructor,
           srt_text: srtText
-        })
-      });
-      const text = await response.text();
-      let data = {};
-      if (text) {
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          data = { errorMessage: text.slice(0, 300) };
-        }
-      }
-      if (!response.ok) {
-        throw new Error(data.errorMessage || data.message || 'SRT取込失敗 HTTP ' + response.status);
-      }
+        })) || {};
 
       const sourceKey = data.source_key || 'notta:' + videoId;
       const chunks = Array.isArray(data.chunks) ? data.chunks : [];

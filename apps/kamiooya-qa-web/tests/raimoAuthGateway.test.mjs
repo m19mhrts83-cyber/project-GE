@@ -188,3 +188,31 @@ test('根拠の「本文を見る」: ログインした会員だけ、comment_i
   assert.equal((await h(req('/comments-by-id', token, { ids: ['a b'] }))).status, 400);
   assert.equal((await h(req('/comments-by-id', token, { ids: Array.from({ length: 21 }, (_, i) => String(i)) }))).status, 400);
 });
+test('オプチャ検索・検索記録・運営の分析と字幕取込は gateway が本人と役割を付けて中継し、鍵は画面に渡さない', async () => {
+  const s = setup(), sent = [];
+  s.d.openchatSearch = async (uid, input) => { sent.push({ kind: 'openchat', uid, input }); return { relatedOpenchat: [], secret: 'never' }; };
+  s.d.serverFunction = async (name, input) => { sent.push({ kind: name, input }); return { status: 200, body: { ok: true, secret: 'never' } }; };
+  assert.equal((await s.handler(req('/openchat-search', '', { query: 'x' }))).status, 401);
+  const token = await s.login('u');
+  const r = await s.handler(req('/openchat-search', token, { query: 'x', user_id: 'm', viewer_token: 'forged', list_openchat: false, secret: 'forged', openchat_limit: 9999 }));
+  assert.equal(r.status, 200); assert.equal((await r.text()).includes('never'), false);
+  assert.deepEqual(sent[0], { kind: 'openchat', uid: 'u', input: { query: 'x', openchat_limit: 200 } });
+  await s.handler(req('/qa-search-log', token, { search_mode: 'normal', query: 'q', user_id: 'm', session_id: 'theirs' }));
+  assert.equal(sent[1].input.user_id, 'u'); assert.equal(sent[1].input.session_id, null); assert.equal(sent[1].input.query_text, 'q');
+  await s.handler(req('/qa-search-log', token, { search_mode: 'normal', query: 'q', session_id: 'mine' }));
+  assert.equal(sent[2].input.session_id, 'mine');
+  // 会員は運営の窓口を開けない
+  assert.equal((await s.handler(req('/admin/qa-analytics', token, { days: 7 }))).status, 403);
+  assert.equal((await s.handler(req('/admin/srt-ingest', token, { video_id: 'v', srt_text: 'x' }))).status, 403);
+  assert.equal(sent.length, 3);
+  const admin = await s.login('a');
+  assert.equal((await s.handler(req('/admin/qa-analytics', admin, { days: 9999, secret: 'forged' }))).status, 200);
+  assert.deepEqual(sent[3], { kind: 'qa-analytics', input: { days: 365 } });
+  const big = 'x'.repeat(100000);
+  assert.equal((await s.handler(req('/admin/srt-ingest', admin, { title: 't', video_id: 'v', srt_text: big }))).status, 200);
+  assert.equal(sent[4].input.srt_text.length, 100000);
+  assert.equal((await s.handler(req('/openchat-search', token, { query: big }))).status, 413);
+  s.d.serverFunction = async () => ({ status: 500, body: { errorMessage: 'upstream detail' } });
+  const failed = await s.handler(req('/admin/qa-analytics', admin, {}));
+  assert.equal(failed.status, 503); assert.equal((await failed.text()).includes('upstream detail'), false);
+});

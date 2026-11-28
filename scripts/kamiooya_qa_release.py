@@ -122,7 +122,8 @@ def step_check_analytics(dry: bool) -> None:
     req = urllib.request.Request(
         url, data=json.dumps({"days": 30}).encode(),
         headers={"Content-Type": "application/json", "User-Agent": UA,
-                 "X-Semantic-Shared-Secret": need("SEMANTIC_SEARCH_SHARED_SECRET")},
+                 # 運営用スクリプトの鍵（会員の画面には配らない）。値は .env.jarvis_private にだけ置く。
+                 "X-Qa-Ops-Secret": need("QA_OPS_SERVER_SECRET")},
     )
     try:
         with urllib.request.urlopen(req, timeout=60) as r:

@@ -2,8 +2,9 @@ import {labelAnswerSources,attachReferenceLabels,mentionedSourceLabels} from '..
 import {createQueryEmbeddingCache,embeddingKey} from '../../../lib/queryEmbeddingCache.ts';
 import {RESTRICTED_OPENCHATS,filterOpenchatRows,hiddenOpenchats,isRestrictedOpenchat,needsViewer,sameSecret,viewerFromToken,type RestrictedOpenchat} from '../../../lib/openchatAccess.ts';
 import type {FeatureFlag} from '../../../lib/featureFlags.ts';
+import {sameServerSecret,serverAuthorized} from '../../../lib/serverAuth.ts';
 // Supabase Edge Function: semantic search + answer summary.
-// Auth: X-Semantic-Shared-Secret (or body.secret). Deploy with --no-verify-jwt.
+// Auth: サーバー側の鍵だけ（X-Gateway-Proof / X-Qa-Ops-Secret。lib/serverAuth.ts）。Deploy with --no-verify-jwt.
 //
 // Thoroughness over speed: recall at least as many hits as normal search (100/50),
 // blend recent posts into answer context, allow longer summaries (within ~150s wall clock).
@@ -292,7 +293,7 @@ function corsHeaders(): HeadersInit {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type, x-semantic-shared-secret",
+      "authorization, x-client-info, apikey, content-type, x-gateway-proof, x-qa-ops-secret, x-semantic-shared-secret",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
@@ -374,12 +375,15 @@ async function openchatHiddenFor(
   return hiddenOpenchats(flags, { id: uid, email: await viewerEmail(uid) });
 }
 
-function isAuthorized(req: Request, body: SemanticSearchRequest | null): boolean {
-  const expected = (Deno.env.get("SEMANTIC_SEARCH_SHARED_SECRET") || "").trim();
-  if (!expected) return false;
-  const headerSecret = (req.headers.get("x-semantic-shared-secret") || "").trim();
-  const bodySecret = asString(body?.secret).trim();
-  return headerSecret === expected || bodySecret === expected;
+/** 通すのはサーバー側の呼び出しだけ（raimo-auth の回答ジョブ・オプチャ検索の中継＝X-Gateway-Proof、運営用スクリプト＝X-Qa-Ops-Secret）。
+ *  移行中だけ: 旧画面のオプチャ一覧（AI を使わない list_openchat）に限り、旧い検索用の鍵を受ける。
+ *  SEMANTIC_SEARCH_SHARED_SECRET を Secrets から消せば、この道も閉じる。AI 回答・記録には旧い鍵を使わせない。 */
+async function isAuthorized(req: Request, body: SemanticSearchRequest | null): Promise<boolean> {
+  const env = (name: string) => Deno.env.get(name);
+  if (await serverAuthorized(req, env)) return true;
+  if (body?.list_openchat !== true) return false;
+  const legacy = (Deno.env.get("SEMANTIC_SEARCH_SHARED_SECRET") || "").trim();
+  return sameServerSecret((req.headers.get("x-semantic-shared-secret") || "").trim(), legacy);
 }
 
 function commentKey(row: CommentRow): string {
@@ -919,7 +923,7 @@ export async function handleSemanticSearch(req: Request): Promise<Response> {
   }
 
   const body = (await req.json().catch(() => null)) as SemanticSearchRequest | null;
-  if (!isAuthorized(req, body)) {
+  if (!(await isAuthorized(req, body))) {
     return json({ errorMessage: "forbidden" }, 403);
   }
 
