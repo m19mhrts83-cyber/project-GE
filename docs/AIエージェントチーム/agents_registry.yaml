@@ -283,6 +283,14 @@ agents:
     status: 設計中
     trigger: 時間
     note: 2026-11-22 フロー設計（FlowForge 承認済み15ノード）。2026-11-23 フォルダ作成・Phase 1（読むだけ・手動）実装 scripts/jarvis_todoist_318_triage.py。定期起動は未登録
+  '319':
+    name: アプリ安全点検係（仮）
+    path: 300_品質・タスク運用管理室/319_アプリ安全点検係
+    status: 設計中
+    trigger: 時間＋手動（案・確定は松野さんが流れ図を見て）
+    tool_assigned: claude_code
+    tool_notes: 深い安全点検。道具は webapp-security-review。点検と提案だけ（直しは別アイテム・別PR）。1本目は KURASHIFT の内部点検。定時実行は未登録
+    note: 2026-11-28 新設（アイテム150・松野さん了承）。CLAUDE.md 下書きと流れ図まで。FlowForge 未登録・flow_confirmed_at なし（流れ図は松野さんの確認待ち）。実点検・定時実行はしていない
   '411':
     name: Grok材料取込係
     path: 400_ミックス・取捨判断室/411_Grok材料取込係
