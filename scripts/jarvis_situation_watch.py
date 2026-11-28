@@ -16,7 +16,7 @@ import json
 import os
 import re
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -1122,6 +1122,21 @@ def eval_line_export(meta: dict, data: dict | None) -> dict[str, Any]:
     )
 
 
+WESTUDY_STALE_DAYS = 2
+
+
+def _westudy_state_age_days(iso: Any, now: datetime | None = None) -> float | None:
+    if not iso:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(iso))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return ((now or datetime.now(timezone.utc)) - dt).total_seconds() / 86400
+
+
 def eval_westudy(meta: dict, data: dict | None) -> dict[str, Any]:
     title = meta["title"]
     prompt = meta.get("cursor_prompt") or ""
@@ -1150,6 +1165,19 @@ def eval_westudy(meta: dict, data: dict | None) -> dict[str, Any]:
     succ = data.get("consecutive_successes") or 0
     need = data.get("success_needed") or 2
     level = "ok" if conc == "success" else "attention"
+    # state が古いまま「failure」を出し続けない（2026-11-28: 11/22 の失敗が6日残り、GHA は毎日成功だった）
+    age_days = _westudy_state_age_days(data.get("last_checked_at"))
+    if conc != "success" and age_days is not None and age_days > WESTUDY_STALE_DAYS:
+        return card(
+            item_id=meta["id"],
+            title=title,
+            category=meta.get("category") or "",
+            level="warn",
+            summary=f"点検が {age_days:.0f} 日止まっている（最後の記録は {conc}）· 最新の run は未確認",
+            detail="jarvis_westudy_weekly_check.py --mark-checked で更新",
+            cursor_prompt=prompt,
+            source=src,
+        )
     if conc == "success" and succ < need:
         level = "info"
     return card(
