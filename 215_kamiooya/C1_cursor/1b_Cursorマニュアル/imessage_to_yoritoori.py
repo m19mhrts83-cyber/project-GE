@@ -340,7 +340,11 @@ def _open_chat_db():
         print("フルディスクアクセスを付与するか、Mac で iMessage を有効にしてください。", file=sys.stderr)
         sys.exit(1)
     try:
-        return sqlite3.connect(str(db_path), timeout=5)
+        conn = sqlite3.connect(str(db_path), timeout=5)
+        # connect は遅延評価。フルディスクアクセスが無いとここで authorization denied になる
+        conn.execute("SELECT 1 FROM message LIMIT 1").fetchone()
+        print("chat.db を開けました")
+        return conn
     except sqlite3.OperationalError as e:
         print(f"エラー: chat.db に接続できません: {e}", file=sys.stderr)
         print(
@@ -472,6 +476,8 @@ def sync_new_messages(conn, phone_to_partner) -> int:
             appended += 1
             print(f"追記: {partner['name']} ({handle_id}) - {body[:40]}...")
 
+    # 件数だけ出す（相手名・本文はログに出さない運用のため、launchd ログ確認用）
+    print(f"chat.db 確認: 新着 {len(rows)} 件を走査（ROWID>{max_rowid}）、追記 {appended} 件")
     if appended > 0:
         save_processed(new_max_rowid)
 

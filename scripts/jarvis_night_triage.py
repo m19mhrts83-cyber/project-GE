@@ -1337,6 +1337,8 @@ def process_candidates_heuristic(
                     c.get("subject") or "",
                     c.get("body") or "",
                     c.get("from_email") or "",
+                    list_unsubscribe=bool(c.get("list_unsubscribe")),
+                    replied_before=c.get("replied_before", True) is not False,
                 )
             except Exception:
                 kind = "mail"

@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-28T10:05:39+09:00",
+  "updated": "2026-11-28T16:53:35+09:00",
   "registry_updated": "2026-10-21",
   "permissions_updated": "2026-10-19",
   "flowforge_base": "https://flowforge-259747770348.asia-northeast1.run.app/",
@@ -12,11 +12,12 @@
     "share_id": "uksxiDIzE1AEckKH"
   },
   "counts": {
-    "候補": 17,
+    "候補": 16,
     "設計中": 11,
     "運用確認": 11,
     "運用": 0,
     "停止": 0,
+    "停止（凍結・600室へ移管 2026-11-28）": 1,
     "停止（000 月1の Grok×Orca 比べへ統合 2026-11-28）": 5,
     "廃止（611へ統合）": 1
   },
@@ -2714,7 +2715,7 @@
       "department_name": "品質・タスク運用管理室",
       "genre_id": "jarvis_cross",
       "genre_name": "Jarvis横断",
-      "status": "候補",
+      "status": "停止（凍結・600室へ移管 2026-11-28）",
       "status_icon": "⚪",
       "report": "ops",
       "trigger": "時間",
@@ -2722,7 +2723,7 @@
       "tool_assigned": "claude_code",
       "tool_fit": "B",
       "tool_notes": "日次／夜間データ点検。将来Claude",
-      "note": "",
+      "note": "【凍結・移管】2026-11-28 松野さん決定: 構想（Zaim財務夜間分析・FlowForge flow_TA9fHAyKHFlfTFb8fvpDG6Nh）は600室ラコ隊長へ移管。300室では凍結。フォルダは残す",
       "summary": "（ビルダー叩き台・候補。詳細は CLAUDE.md）",
       "flow_summary": "",
       "builder_tag": "",
@@ -12001,7 +12002,7 @@
         "grok_ids": [],
         "grok_labels": [],
         "grok_department": "",
-        "role_split": "Grok同型なし（Jarvis／Slack／Mac本線）"
+        "role_split": "【凍結・移管】2026-11-28 松野さん決定: 構想（Zaim財務夜間分析・FlowForge flow_TA9fHAyKHFlfTFb8fvpDG6Nh）は600室ラコ隊長へ移管。300室では凍結。フォルダは残す"
       },
       {
         "side": "ai_only",
@@ -13623,7 +13624,7 @@
             {
               "id": "316",
               "name": "データアナリスト",
-              "status": "候補"
+              "status": "停止（凍結・600室へ移管 2026-11-28）"
             },
             {
               "id": "317",

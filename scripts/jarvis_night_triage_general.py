@@ -186,21 +186,51 @@ def is_kurashift_property_mail(subject: str, body: str = "") -> bool:
     return bool(RE_PURCHASE_MAIL_RE.search(blob))
 
 
-def classify_general_kind(subject: str, body: str = "", from_email: str = "") -> str:
+def classify_general_kind(
+    subject: str,
+    body: str = "",
+    from_email: str = "",
+    *,
+    list_unsubscribe: bool = False,
+    replied_before: bool = True,
+) -> str:
     """general 取込の kind: mail（要確認）| skim（要約用）。
 
     依頼語（ご確認・お願い）は自動送信にも必ず入るため、人が書いたメールだけを mail にする
     （jarvis_mail_human.looks_human_mail。2026-11-04: 依頼語判定ではカード・銀行・販促が要対応に並んでいた）。
+
+    IMP-001: List-Unsubscribe ヘッダつき かつ 過去にこちらから返信していない差出人は skim に落とす。
+    ただし no-reply の要対応通知（#723）と強い判断語（#661/#662）は先に当たるので従来どおり mail。
+    replied_before の既定は True（取れない時は従来どおり上げる側）。
     """
     if NOISE_FROM_RE.search(from_email or ""):
         # no-reply 系でも件名に強い要対応語があれば残す（販促・新規登録は除く）
         return "mail" if is_noreply_urgent_notice(from_email, subject) else "skim"
     from jarvis_mail_human import has_strong_action_signal, looks_human_mail
 
-    if looks_human_mail(from_email, subject, body):
+    if has_strong_action_signal(from_email, subject, body):
         return "mail"
+    if list_unsubscribe and not replied_before:
+        return "skim"
     # 強い判断語（承認・ご返信など）があれば人判定が偽でも残す（NOISE_FROM は上で除外済み）
-    return "mail" if has_strong_action_signal(from_email, subject, body) else "skim"
+    return "mail" if looks_human_mail(from_email, subject, body) else "skim"
+
+
+def has_replied_to_sender(service, from_email: str) -> bool:
+    """こちらから from_email 宛に送ったことがあるか。確実に取れない時は True（従来どおり上げる）。"""
+    addr = (from_email or "").strip().lower()
+    if not addr or "@" not in addr:
+        return True
+    try:
+        r = (
+            service.users()
+            .messages()
+            .list(userId="me", q=f"in:sent to:{addr}", maxResults=1)
+            .execute()
+        )
+        return bool(r.get("messages"))
+    except Exception:
+        return True
 
 
 def resolve_contact_yaml(explicit: Path | None = None) -> Path:
@@ -613,7 +643,7 @@ def find_general_unreplied(
         meta = (
             service.users()
             .threads()
-            .get(userId="me", id=tid, format="metadata", metadataHeaders=["From", "Subject"])
+            .get(userId="me", id=tid, format="metadata", metadataHeaders=["From", "Subject", "List-Unsubscribe"])
             .execute()
         )
         mmsgs = sorted(meta.get("messages") or [], key=lambda m: int(m.get("internalDate") or 0))
@@ -677,7 +707,20 @@ def find_general_unreplied(
 
         eid = hashlib.sha1(f"general|{tid}|{last.get('id')}".encode()).hexdigest()[:12]
         display_name = from_raw.split("<")[0].strip().strip('"') or from_email
-        kind = classify_general_kind(subject, body, from_email)
+        # IMP-001: ヘッダの有無（真偽）だけ使う。値（配信停止URL）は保存しない
+        list_unsub = bool(headers.get("list-unsubscribe") or mh.get("list-unsubscribe"))
+        replied_before = True
+        if list_unsub:
+            replied_before = any(not m_["inbound"] for m_ in ctx) or has_replied_to_sender(
+                service, from_email
+            )
+        kind = classify_general_kind(
+            subject,
+            body,
+            from_email,
+            list_unsubscribe=list_unsub,
+            replied_before=replied_before,
+        )
         candidates.append(
             {
                 "id": eid,
@@ -700,6 +743,8 @@ def find_general_unreplied(
                 "gmail_message_id": last.get("id") or "",
                 "from_email": from_email,
                 "message_id_header": message_id_hdr,
+                "list_unsubscribe": list_unsub,
+                "replied_before": replied_before,
                 "priority": "high" if kind == "mail" else "low",
             }
         )
