@@ -30,6 +30,10 @@ jobs:
           node-version: "22"
       - run: node --experimental-strip-types --test apps/kamiooya-qa-web/tests/*.test.mjs
       - run: node --check "215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/app.js"
+      - name: Tailwind written into style.css is up to date (no CDN at runtime)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/tw" --no-save --ignore-scripts tailwindcss@3.4.17 postcss@8.4.49 autoprefixer@10.4.20
+          NODE_PATH="$RUNNER_TEMP/tw/node_modules" node "215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/scripts/build_tailwind_css.mjs" --check
       - name: Attachment source PostgreSQL integration (local WASM, no external database)
         run: |
           npm install --prefix "$RUNNER_TEMP/openchat-pg" --no-save --ignore-scripts @electric-sql/pglite@0.5.15
