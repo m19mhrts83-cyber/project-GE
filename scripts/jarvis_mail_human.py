@@ -113,3 +113,38 @@ def has_strong_action_signal(from_email: str, subject: str, body: str) -> bool:
         # 新規登録の承認通知は拾わない（松野さん 2026-11-25）。承認以外の強語は従来どおり
         return bool(STRONG_ACTION_RE_NO_APPROVAL.search(text))
     return bool(STRONG_ACTION_RE.search(text))
+
+
+# 自動送信でも本人の対応が要る種類（2026-11-28 松野さん決定）。
+# 連携エラー・支払い未済・書類や手続きの依頼は noreply 系から届くのが普通なので、送信元では落とさない。
+SELF_ACTION_RE = re.compile(
+    r"(連携エラー|連携が切れ|再連携|再認証|再ログインが必要|接続エラー"
+    r"|引き?落と?し?(が)?(できません|未済)|残高不足|お支払いが確認できません|未払い|支払期限|督促"
+    r"|ご提出ください|提出のお願い|提出依頼|書類のご提出|ご対応のお願い|至急ご確認)"
+)
+SELF_ACTION_UNSUB_RE = re.compile(r"(配信停止|unsubscribe)", re.I)
+SELF_ACTION_AD_RE = re.compile(r"(キャンペーン|お得|セール|ポイント)")
+
+
+def noreply_self_action(from_email: str, subject: str, body: str) -> bool:
+    """noreply 系の送信元でも、自動通知の対応語があれば NOISE_FROM の除外を外してよい。"""
+    return bool(NOREPLY_ADDR_RE.search(_addr(from_email))) and has_self_action_notice(
+        from_email, subject, body
+    )
+
+
+def has_self_action_notice(from_email: str, subject: str, body: str) -> bool:
+    """件名または本文冒頭300字に「本人の対応が要る自動通知」の語がある。noreply 系でも True。
+
+    配信停止語のある販促・ニュースレター、明らかな広告語は False。
+    """
+    subject = str(subject or "")
+    body = str(body or "")
+    head = f"{subject}\n{body[:300]}"
+    if not SELF_ACTION_RE.search(head):
+        return False
+    if SELF_ACTION_UNSUB_RE.search(f"{subject}\n{body}"):
+        return False
+    if SELF_ACTION_AD_RE.search(head):
+        return False
+    return True

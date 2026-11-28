@@ -1659,7 +1659,12 @@ def load_pending_from_supabase(
         print(f"# loopware miss load soft-fail: {e}", file=sys.stderr)
     from jarvis_kurashift_re_inquiry_channel import is_mail_action_excluded
     from jarvis_learned_rules import apply_to_row, load_rulebook
-    from jarvis_mail_human import has_strong_action_signal, looks_human_mail
+    from jarvis_mail_human import (
+        has_self_action_notice,
+        has_strong_action_signal,
+        looks_human_mail,
+        noreply_self_action,
+    )
     from jarvis_night_triage_general import NOISE_FROM_RE
 
     book = load_rulebook("116")
@@ -1722,11 +1727,25 @@ def load_pending_from_supabase(
             fresh_excluded += _is_fresh(row)
             continue
         strong = bool(
-            not NOISE_FROM_RE.search(str(row.get("from_email") or ""))
-            and has_strong_action_signal(
-                str(row.get("from_email") or ""),
-                subj,
-                str(row.get("original_body") or ""),
+            (
+                not NOISE_FROM_RE.search(str(row.get("from_email") or ""))
+                or noreply_self_action(
+                    str(row.get("from_email") or ""),
+                    subj,
+                    str(row.get("original_body") or ""),
+                )
+            )
+            and (
+                has_strong_action_signal(
+                    str(row.get("from_email") or ""),
+                    subj,
+                    str(row.get("original_body") or ""),
+                )
+                or has_self_action_notice(
+                    str(row.get("from_email") or ""),
+                    subj,
+                    str(row.get("original_body") or ""),
+                )
             )
         )
         if kind == "skim" and pri != "high" and not strong and not (row.get("draft_text") or "").strip():

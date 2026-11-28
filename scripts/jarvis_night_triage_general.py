@@ -101,14 +101,24 @@ def classify_general_kind(subject: str, body: str = "", from_email: str = "") ->
     依頼語（ご確認・お願い）は自動送信にも必ず入るため、人が書いたメールだけを mail にする
     （jarvis_mail_human.looks_human_mail。2026-11-04: 依頼語判定ではカード・銀行・販促が要対応に並んでいた）。
     """
-    if NOISE_FROM_RE.search(from_email or ""):
+    from jarvis_mail_human import (
+        has_self_action_notice,
+        has_strong_action_signal,
+        looks_human_mail,
+        noreply_self_action,
+    )
+
+    # noreply 系は自動送信が普通。本人の対応が要る種類の語があるときだけ除外を外す
+    if NOISE_FROM_RE.search(from_email or "") and not noreply_self_action(from_email, subject, body):
         return "skim"
-    from jarvis_mail_human import has_strong_action_signal, looks_human_mail
 
     if looks_human_mail(from_email, subject, body):
         return "mail"
     # 強い判断語（承認・ご返信など）があれば人判定が偽でも残す（NOISE_FROM は上で除外済み）
-    return "mail" if has_strong_action_signal(from_email, subject, body) else "skim"
+    if has_strong_action_signal(from_email, subject, body):
+        return "mail"
+    # 自動送信でも本人の対応が要る種類（連携エラー・支払い未済・書類提出依頼）
+    return "mail" if has_self_action_notice(from_email, subject, body) else "skim"
 
 
 def resolve_contact_yaml(explicit: Path | None = None) -> Path:

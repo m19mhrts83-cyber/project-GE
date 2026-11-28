@@ -9,7 +9,11 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts"))
 
-from jarvis_mail_human import has_strong_action_signal, looks_human_mail  # noqa: E402
+from jarvis_mail_human import (  # noqa: E402
+    has_self_action_notice,
+    has_strong_action_signal,
+    looks_human_mail,
+)
 from jarvis_night_triage_general import classify_general_kind  # noqa: E402
 
 
@@ -76,6 +80,34 @@ class StrongActionTest(unittest.TestCase):
 
     def test_beyond_600_chars_ignored(self) -> None:
         self.assertFalse(has_strong_action_signal("service@ex.example.com", "案内", "あ" * 601 + "承認"))
+
+
+class SelfActionNoticeTest(unittest.TestCase):
+    NR = "noreply@ex.example.com"
+
+    def test_revived_kinds_even_from_noreply(self) -> None:
+        for subj in ("口座連携エラーのお知らせ", "再認証が必要です", "引き落としできませんでした",
+                     "残高不足のお知らせ", "書類のご提出のお願い", "至急ご確認ください"):
+            self.assertTrue(has_self_action_notice(self.NR, subj, ""), subj)
+            self.assertEqual(classify_general_kind(subj, "", self.NR), "mail", subj)
+
+    def test_body_head_300(self) -> None:
+        self.assertTrue(has_self_action_notice(self.NR, "お知らせ", "ご利用の口座で残高不足です。"))
+        self.assertFalse(has_self_action_notice(self.NR, "お知らせ", "あ" * 301 + "残高不足"))
+
+    def test_unsubscribe_and_ads_not_revived(self) -> None:
+        self.assertFalse(has_self_action_notice(self.NR, "未払いのお知らせ", "配信停止はこちら"))
+        self.assertFalse(has_self_action_notice(self.NR, "再認証のお願い", "To unsubscribe click"))
+        self.assertFalse(has_self_action_notice(self.NR, "セール開催中 支払期限間近", ""))
+        self.assertFalse(has_self_action_notice(self.NR, "ポイント失効前に再ログインが必要", ""))
+
+    def test_signup_approval_and_plain_notice_not_revived(self) -> None:
+        self.assertFalse(has_self_action_notice(self.NR, "新規登録のご承認のお知らせ", ""))
+        self.assertEqual(classify_general_kind("新規登録のご承認のお知らせ", "", self.NR), "skim")
+        self.assertFalse(has_self_action_notice(self.NR, "ご利用ありがとうございます", "ご確認ください。"))
+
+    def test_noise_from_not_revived(self) -> None:
+        self.assertEqual(classify_general_kind("残高不足のお知らせ", "", "alerts@github.com"), "skim")
 
 
 if __name__ == "__main__":
