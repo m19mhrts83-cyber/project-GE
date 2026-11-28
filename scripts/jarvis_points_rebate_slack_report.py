@@ -26,6 +26,15 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jarvis_614_ops as ops614  # noqa: E402
+import jarvis_614_runlog as runlog614  # noqa: E402
+import jarvis_614_slack_ledger as ledger614  # noqa: E402
+
+EXIT_HELD = 3  # 控えを保存できず投稿を保留
+EXIT_SKIPPED = 5  # 614 全体停止中のため送らなかった（送っていない。『投稿済み』として数えない）
+EXIT_UNKNOWN = 4  # 結果不明（jarvis_slack_webhook_post.EXIT_UNKNOWN と同じ）。再投稿しない
+
 REPO = Path(__file__).resolve().parents[1]
 POST = REPO / "scripts" / "jarvis_slack_webhook_post.py"
 TEIKI_STATE = REPO / ".jarvis_state" / "teiki_barai_chance.json"
@@ -75,25 +84,65 @@ def reports_dir(tag: str) -> Path:
     return base / ("card_benefit_reports" if tag.startswith("card_benefit") else "points_rebate_reports")
 
 
-def _archive(text: str, tag: str, *, dry_run: bool = False) -> None:
+def _archive_path(tag: str, *, dry_run: bool = False) -> Path:
+    day = datetime.now(JST).strftime("%Y-%m-%d")
+    # dry-run の控えは別名（配信の証拠にしない・F8/n21）
+    suffix = "_dryrun" if dry_run else ""
+    return reports_dir(tag) / f"{day}_{tag}{suffix}.md"
+
+
+def _write_archive(path: Path, body: str) -> bool:
     try:
-        out_dir = reports_dir(tag)
-        out_dir.mkdir(parents=True, exist_ok=True)
-        day = datetime.now(JST).strftime("%Y-%m-%d")
-        # dry-run の控えは別名（配信の証拠にしない・F8/n21）
-        suffix = "_dryrun" if dry_run else ""
-        path = out_dir / f"{day}_{tag}{suffix}.md"
-        path.write_text(
-            f"# Slack #report 控え{'（dry-run・未配信）' if dry_run else ''} — {day} / {tag}\n\n```\n{text}\n```\n",
-            encoding="utf-8",
-        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body, encoding="utf-8")
+        return True
+    except OSError as e:
+        print(f"⚠️ report archive failed: {e}", file=sys.stderr)
+        return False
+
+
+def _archive(text: str, tag: str, *, dry_run: bool = False) -> None:
+    """（後方互換）控えを書く。dry-run の控えは別名・冒頭に『dry-run・未配信』。"""
+    path = _archive_path(tag, dry_run=dry_run)
+    day = datetime.now(JST).strftime("%Y-%m-%d")
+    ok = _write_archive(
+        path,
+        f"# Slack #report 控え{'（dry-run・未配信）' if dry_run else ''} — {day} / {tag}\n\n```\n{text}\n```\n",
+    )
+    if ok:
         try:
             shown = path.relative_to(REPO)
         except ValueError:
             shown = path
         print(f"📎 report archive: {shown}")
-    except OSError as e:
-        print(f"⚠️ report archive failed: {e}", file=sys.stderr)
+
+
+def _archive_before(text: str, tag: str, run_id: str) -> Path | None:
+    """投稿の前に本文の控えを保存する（P1・工程21）。失敗したら保存だけ1回やり直す。なお失敗なら None。"""
+    path = _archive_path(tag)
+    day = datetime.now(JST).strftime("%Y-%m-%d")
+    body = (
+        f"# Slack #report 控え — {day} / {tag}\n\n- run: {run_id}\n- 状態: 送信前（投稿結果は下に追記される）\n\n"
+        f"```\n{text}\n```\n"
+    )
+    for _ in range(2):
+        if _write_archive(path, body):
+            return path
+    return None
+
+
+def _archive_append_result(path: Path | None, line: str) -> bool:
+    """投稿後に結果を追記する。失敗したら追記だけ1回やり直す（投稿はやり直さない）。"""
+    if path is None:
+        return False
+    for _ in range(2):
+        try:
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(f"\n- {datetime.now(JST).isoformat(timespec='seconds')} {line}\n")
+            return True
+        except OSError as e:
+            print(f"⚠️ report archive append failed: {e}", file=sys.stderr)
+    return False
 
 
 def _header(scope: str) -> list[str]:
@@ -293,6 +342,35 @@ def _remember_post(kind: str, text: str) -> None:
         print(f"⚠️ dedupe state save failed: {e}", file=sys.stderr)
 
 
+_OPS_EXTRA: dict[str, str] = {}  # main が --stage / --next を入れる（#ops の障害通知に工程・次の対応を足す）
+
+
+def _with_ops_extra(channel: str, text: str, run_id: str) -> str:
+    if channel != "ops" or not _OPS_EXTRA:
+        return text
+    lines = [text]
+    if _OPS_EXTRA.get("stage"):
+        lines.append(f"・工程: {_OPS_EXTRA['stage']}")
+    if _OPS_EXTRA.get("next"):
+        lines.append(f"・次の対応: {_OPS_EXTRA['next']}")
+    lines.append(f"・run: {run_id}")
+    return "\n".join(lines)
+
+
+def _run_post(channel: str, text: str) -> int:
+    env = os.environ.copy()
+    if channel == "ops":
+        env["JARVIS_614_OPS_ACTIVE"] = "1"  # ops 送信中の失敗から通知を作らない（再帰防止）
+    try:
+        return subprocess.run(
+            [sys.executable, str(POST), "--channel", channel, "--text", text],
+            cwd=str(REPO), env=env, check=False,
+        ).returncode
+    except OSError as e:
+        print(f"❌ post spawn failed: {e}", file=sys.stderr)
+        return 1
+
+
 def _post(
     channel: str,
     text: str,
@@ -302,6 +380,13 @@ def _post(
     kind: str,
     force: bool = False,
 ) -> int:
+    """投稿の流れ（P1・工程19/21）。終了コード: 0=送信済み/対象外、3=控えを保存できず保留、
+    4=結果不明（再投稿していない）、それ以外=送信失敗（届いていない）。
+
+    1) 投稿前に本文の控えを保存（失敗は保存だけ1回再試行→なお失敗なら投稿を保留）
+    2) 台帳で再投稿してよい状態か確認（sent／unknown／sending は再投稿しない）
+    3) 投稿。結果不明（タイムアウト等）は Slack の履歴で送信済みか確認 → 無かった時だけ1回再試行
+    4) 結果を控えに追記（追記だけ失敗しても再投稿しない）"""
     if _should_skip_duplicate(kind, text, force=force):
         return 0
     if dry_run:
@@ -313,15 +398,69 @@ def _post(
     if not POST.is_file():
         print(f"❌ missing {POST}", file=sys.stderr)
         return 2
-    proc = subprocess.run(
-        [sys.executable, str(POST), "--channel", channel, "--text", text],
-        cwd=str(REPO),
-        check=False,
-    )
-    if int(proc.returncode) == 0:
-        _archive(text, archive_tag)
+    run_id = runlog614.new_run_id(kind)
+    is_ops = channel == "ops"
+    text = _with_ops_extra(channel, text, run_id)
+    if ops614.global_stop():
+        # 全体停止中は送らない。障害通知は保留に積み、停止を解いた次回起動で再送する
+        if is_ops:
+            ops614.enqueue_pending(text, nid=ledger614.fingerprint(text), system=kind, stage="slack", run_id=run_id)
+        print("⏭ 614 全体停止中 — Slack 投稿せず保留" if is_ops else "⏭ 614 全体停止中 — Slack 投稿スキップ")
+        return EXIT_SKIPPED
+    k = ledger614.key(kind, channel, text)
+    blocked = ledger614.should_skip(k)
+    if blocked and not (force and blocked == "sent"):
+        print(f"⏭ {kind} Slack skip（台帳: {blocked}。再投稿しない） key={k.split('|')[-1]}")
+        return 0
+
+    path = _archive_before(text, archive_tag, run_id)
+    if path is None and not is_ops:
+        # 控えを保存できない時は投稿を保留し、#ops へ（#ops 自身の控え失敗では再通知しない）
+        ledger614.record(k, "held", run_id=run_id, note="archive_failed")
+        ops614.notify_ops(
+            system=kind, stage="n21 Slack 控え保存", run_id=run_id,
+            cause="投稿前の控えを保存できず、短報を保留した",
+            next_action="state 領域の空き・権限を確認。直るまで短報は出ません（取得・保存は済み）",
+        )
+        return EXIT_HELD
+
+    ledger614.record(k, "sending", run_id=run_id)
+    rc = _run_post(channel, text)
+    final = "sent" if rc == 0 else ("unknown" if rc == EXIT_UNKNOWN else "not_sent")
+    if final == "unknown":
+        # 結果不明: 履歴で送信済みか確認。確認できなければ unknown のまま（再投稿しない）
+        found = ledger614.confirm_sent(channel, text)
+        if found is True:
+            final = "sent"
+        elif found is False:
+            final = "not_sent"
+            ledger614.record(k, "not_sent", run_id=run_id, note="timeout_then_history_none")
+            rc2 = _run_post(channel, text)  # 未送信を確認できた時だけ、最大1回
+            final = "sent" if rc2 == 0 else ("unknown" if rc2 == EXIT_UNKNOWN else "not_sent")
+            rc = rc2
+    ledger614.record(k, final, run_id=run_id)
+    if final == "sent":
         _remember_post(kind, text)
-    return int(proc.returncode)
+        if not _archive_append_result(path, "投稿結果: 送信済み"):
+            ledger614.record(k, "sent", run_id=run_id, note="result_append_failed")
+            ops614.emergency_log(f"Slack 控えへの結果追記に失敗（投稿は済み・再投稿しない） {kind} run={run_id}")
+        return 0
+    if final == "unknown":
+        _archive_append_result(path, "投稿結果: 結果不明（届いたか確認できず。再投稿していません）")
+        if not is_ops:
+            ops614.notify_ops(
+                system=kind, stage="n19 Slack 投稿", run_id=run_id,
+                cause="短報の投稿結果が不明（応答待ちで切れ、履歴でも確認できず）",
+                next_action="#report を見て届いているか確認。届いていなければ人の依頼で再投稿（自動では再投稿しません）",
+            )
+        else:
+            ops614.emergency_log(f"ops 通知の結果不明（再投稿しない） {kind} run={run_id}")
+        return EXIT_UNKNOWN
+    # 届いていない（確定）
+    _archive_append_result(path, "投稿結果: 送信失敗（届いていない）")
+    if is_ops:
+        ops614.enqueue_pending(text, nid=ledger614.fingerprint(text), system=kind, stage="slack", run_id=run_id)
+    return int(rc) or 1
 
 
 def main() -> int:
@@ -347,6 +486,8 @@ def main() -> int:
     ap.add_argument("--error", default="")
     ap.add_argument("--note", default="")
     ap.add_argument("--channel", default="report", choices=("report", "ops", "consult"))
+    ap.add_argument("--stage", default="", help="#ops 障害通知: 失敗した工程（例: n13 Olive 取込）")
+    ap.add_argument("--next", dest="next_action", default="", help="#ops 障害通知: 次の対応")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true", help="無効化 env を無視")
     args = ap.parse_args()
@@ -364,9 +505,16 @@ def main() -> int:
             print(f"⏭ {kind_env}=1 — Slack 投稿スキップ")
             return 0
 
+    _OPS_EXTRA.update({k: v[:160] for k, v in (("stage", args.stage), ("next", args.next_action)) if v})
     channel = args.channel
     if args.outcome == "failed" and args.channel == "report":
         channel = "ops"
+    if not args.dry_run:
+        # 保留中の #ops 通知を再送（全体停止中は何もしない）
+        try:
+            ops614.flush_pending()
+        except Exception as e:  # noqa: BLE001 — 再送の失敗で本線の短報を止めない
+            ops614.emergency_log(f"flush_pending 例外 {type(e).__name__}")
 
     if args.kind == "teiki":
         st = _load_json(TEIKI_STATE) if args.from_state else {}

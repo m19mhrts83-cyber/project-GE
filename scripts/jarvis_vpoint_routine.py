@@ -32,6 +32,9 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jarvis_614_display as display614  # noqa: E402
+import jarvis_614_ops as ops614  # noqa: E402
+import jarvis_614_runlog as runlog614  # noqa: E402
 import jarvis_614_verified_state as vs  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -300,7 +303,56 @@ def build_jarvis_asks(
     return out[:12]
 
 
+REC: runlog614.RunRecord | None = None
+SYS = "vpoint"
+
+
+def _stage(stage: str, status: str, detail: str = "", code: str | None = None, system: str = SYS) -> None:
+    if REC is not None:
+        REC.stage(system, stage, status, detail, code)
+
+
+def lock_path() -> Path:
+    return STATE_DIR / "vpoint_routine.lock"
+
+
 def main() -> int:
+    """run を集約記録（P1・工程31）し、同時起動を排他して本体を実行する。記録の失敗で本線は落とさない。"""
+    global REC
+    argv = sys.argv[1:]
+    dry = "--dry-run" in argv or "--apply" not in argv
+    REC = runlog614.RunRecord(
+        run_id=runlog614.new_run_id(SYS), dry_run=dry,
+        trigger="manual" if "--force-window-c" in argv else "auto", script="jarvis_vpoint_routine.py",
+    )
+    os.environ["JARVIS_614_RUN_ID"] = REC.run_id  # 子（Slack 短報）が同じ run_id を使う
+    if dry:
+        return _finish(_main())  # 取得・保存を伴わない確認は排他しない
+    try:
+        with vs.file_lock(lock_path()):  # launchd と朝の取りこぼし起動の同時実行を防ぐ
+            return _finish(_main())
+    except vs.LockBusy:
+        print("⏭ 別の Vポイント定例が実行中のためスキップ（排他）")
+        _stage("fetch", "skipped", "別の実行中（排他）")
+        return _finish(0)
+    except Exception as e:  # noqa: BLE001
+        _stage("run", "failed", f"想定外のエラー（{type(e).__name__}）", "unexpected_error")
+        ops614.notify_ops(
+            system=SYS, stage="Vポイント定例", run_id=REC.run_id,
+            cause=f"想定外のエラーで止まった（{type(e).__name__}）",
+            next_action="ログ（~/Library/Logs/jarvis_vpoint_routine/）を確認", dry_run=dry,
+        )
+        REC.finish()
+        raise
+
+
+def _finish(rc: int) -> int:
+    if REC is not None:
+        REC.finish()
+    return rc
+
+
+def _main() -> int:
     ap = argparse.ArgumentParser(description="Vポイント定例（自動＋Jarvis促し）")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--apply", action="store_true", help="state 更新・子スクリプト実行")
@@ -320,16 +372,23 @@ def main() -> int:
         "manual": {},
     }
 
-    if env.get("JARVIS_VPOINT_MONTHLY_DISABLE") == "1" or env.get(
+    if ops614.global_stop() or env.get("JARVIS_VPOINT_MONTHLY_DISABLE") == "1" or env.get(
         "JARVIS_VPOINT_ROUTINE_DISABLE"
     ) == "1":
-        report["skipped"] = "disabled"
+        report["skipped"] = "614 全体停止" if ops614.global_stop() else "disabled"
+        _stage("fetch", "skipped", report["skipped"])
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
+    if args.apply and not args.dry_run:
+        try:
+            ops614.flush_pending()  # 保留中の #ops 通知を再送（全体停止中は何もしない）
+        except Exception as e:  # noqa: BLE001
+            ops614.emergency_log(f"flush_pending 例外 {type(e).__name__}")
     monthly = load_json(MONTHLY_PATH)
     if monthly.get("disabled"):
         report["skipped"] = "vpoint_monthly disabled"
+        _stage("fetch", "skipped", "vpoint_monthly disabled")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
@@ -393,6 +452,20 @@ def main() -> int:
             else:
                 grant_run_failed = True
 
+    # run 記録（工程31）: 付与サマリ（窓C）の取得品質を『取得』工程として独立に残す
+    if not need_grant:
+        _stage("fetch", "skipped", "窓C外または今月は実施済み")
+    elif args.dry_run or not args.apply:
+        _stage("fetch", "not_applicable", "dry-run／--apply なし")
+    elif grant_run_failed or grant_quality == "failed":
+        _stage("fetch", "failed", grant_quality_reason or "付与サマリの生成に失敗", "grant_summary_failed")
+    elif grant_quality == "partial":
+        _stage("fetch", "partial", grant_quality_reason or "付与サマリが完全でない（履歴が古い等）", "grant_summary_partial")
+    elif grant_built:
+        _stage("fetch", "success", "付与サマリ生成（基準日が対象月末以降）")
+    else:
+        _stage("fetch", "unverified", "付与サマリの結果を確認できず")
+
     # --- Auto B: cadence (state-only, no browser) ---
     if not args.skip_cadence and not cadence.get("disabled"):
         if args.dry_run or not args.apply:
@@ -436,6 +509,8 @@ def main() -> int:
                     "ok": r.get("ok"),
                     "stderr_tail": r.get("stderr_tail"),
                 }
+                _stage("fetch", "success" if r.get("ok") else "failed", "テイチャン確認・抽選（Vpass）",
+                       None if r.get("ok") else "teiki_failed", system="teiki")
                 if not r.get("ok"):
                     report["auto"]["teiki"]["fallback"] = (
                         "ブラウザ失敗 → Jarvis促し（『テイチャン回して』）"
@@ -515,6 +590,14 @@ def main() -> int:
         }
         if not report["save_verify"]["ok"]:
             save_failed = True
+        _stage("save", "success" if final_save["ok"] else "failed", "tmp→置換で保存",
+               None if final_save["ok"] else "save_verify_mismatch")
+        _stage("save_verify", "success" if report["save_verify"]["ok"] else "failed",
+               "; ".join(save_errors)[:150] or "読み戻し照合 OK",
+               None if report["save_verify"]["ok"] else "save_verify_mismatch")
+        stamped_now = monthly.get("last_check_c") == month_key(now) and prev_check_c != month_key(now)
+        _stage("stamp", "success" if stamped_now else "skipped",
+               f"{month_key(now)} の月印" if stamped_now else "月印なし（成功でない／窓外／今月は済み）")
 
         # human-readable block for chat / logs
         lines = [
@@ -562,11 +645,24 @@ def main() -> int:
         if save_failed:
             # 保存を確認できない state を画面へ渡さない
             report["push"] = {"ok": False, "skipped": "save_verify_failed"}
+            _stage("push", "skipped", "保存を確認できないため画面へ渡さない")
+            _stage("display", "skipped", "保存を確認できないため画面へ渡さない")
         else:
-            report["push"] = run_py(
-                [str(REPO / "scripts" / "jarvis_dashboard_push.py"), "--watch-only"],
-                timeout=180,
-            )
+            # 保存済み state から push → 実表示（/vpoint の行）を読み戻して照合。不一致は最大1回再 push。
+            # 失敗しても取得・保存・月印は取り消さない
+            sync = display614.sync_and_verify(["vpoint"])
+            report["push"] = {"ok": sync["push"] == "success", **{k: sync[k] for k in ("display", "attempts", "error")}}
+            _stage("push", "success" if sync["push"] == "success" else "failed", f"{sync['attempts']}回目まで",
+                   None if sync["push"] == "success" else "push_failed")
+            disp = {"success": "success", "failed": "failed"}.get(sync["display"], "unverified")
+            _stage("display", disp, sync["error"] or "画面の行を読み戻して一致",
+                   None if disp == "success" else f"display_{sync['display']}")
+            if sync["push"] != "success" or sync["display"] == "failed":
+                ops614.notify_ops(
+                    system=SYS, stage="n17/18 画面反映", run_id=REC.run_id if REC else "-",
+                    cause=sync["error"] or "画面反映を確認できず（取得・保存は済み）",
+                    next_action="/vpoint を確認。保存済み state から再 push（dashboard_push.py --watch-only）",
+                )
         # 614 ポイント・還元ウォッチ係 → Slack #report（失敗しても本線は止めない）
         asks = (report.get("manual") or {}).get("jarvis_asks") or []
         if not isinstance(asks, list):
@@ -605,6 +701,17 @@ def main() -> int:
             " · ".join(note_bits)[:200],
         ]
         report["slack"] = run_py(slack_cmd, timeout=60)
+        src = report["slack"].get("returncode")
+        if report["slack"].get("ok"):
+            _stage("slack", "success", f"短報（結果語={slack_outcome}）")
+        elif src == 5:
+            _stage("slack", "skipped", "614 全体停止中のため送らず")
+        elif src == 4:
+            _stage("slack", "unverified", "投稿結果不明（再投稿していない）", "post_unknown")
+        elif src == 3:
+            _stage("slack", "failed", "控えを保存できず投稿を保留", "archive_failed")
+        else:
+            _stage("slack", "failed", f"exit {src}", "post_failed")
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 1 if save_failed else 0

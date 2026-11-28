@@ -30,6 +30,9 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import jarvis_614_display as display614  # noqa: E402
+import jarvis_614_ops as ops614  # noqa: E402
+import jarvis_614_runlog as runlog614  # noqa: E402
 import jarvis_614_verified_state as vs  # noqa: E402
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -402,8 +405,10 @@ def push_slack_report(
     reason: str = "",
     error: str = "",
     note: str = "",
+    stage: str = "",
+    next_action: str = "",
 ) -> dict[str, Any]:
-    """614 ポイント・還元ウォッチ係 → Slack #report。"""
+    """614 ポイント・還元ウォッチ係 → Slack #report。失敗は #ops へ（工程・次の対応つき）。"""
     script = REPO / "scripts" / "jarvis_points_rebate_slack_report.py"
     if not script.is_file():
         return {"ok": False, "error": "jarvis_points_rebate_slack_report.py missing"}
@@ -434,6 +439,10 @@ def push_slack_report(
         cmd.extend(["--error", error[:200]])
     if note:
         cmd.extend(["--note", note[:200]])
+    if stage:
+        cmd.extend(["--stage", stage[:160]])
+    if next_action:
+        cmd.extend(["--next", next_action[:160]])
     try:
         proc = subprocess.run(
             cmd,
@@ -451,7 +460,54 @@ def push_slack_report(
         return {"ok": False, "error": str(e)}
 
 
+REC: runlog614.RunRecord | None = None
+SYS = "etc"
+
+
+def _stage(stage: str, status: str, detail: str = "", code: str | None = None) -> None:
+    if REC is not None:
+        REC.stage(SYS, stage, status, detail, code)
+
+
+def _slack_stage(res: dict[str, Any] | None) -> None:
+    """短報の結果を工程に。結果不明(4)は成功に数えない。"""
+    if not res:
+        return
+    rc = res.get("returncode")
+    if res.get("ok"):
+        _stage("slack", "success", "短報を投稿済み（または重複・停止で送らず）")
+    elif rc == 5:
+        _stage("slack", "skipped", "614 全体停止中のため送らず")
+    elif rc == 4:
+        _stage("slack", "unverified", "投稿結果不明（再投稿していない）", "post_unknown")
+    elif rc == 3:
+        _stage("slack", "failed", "控えを保存できず投稿を保留", "archive_failed")
+    else:
+        _stage("slack", "failed", f"exit {rc}", "post_failed")
+
+
 def main() -> int:
+    """run を集約記録（P1・工程31）して本体を実行する。記録の失敗で本線は落とさない。"""
+    global REC
+    argv = sys.argv[1:]
+    dry = "--dry-run" in argv or "--apply" not in argv
+    REC = runlog614.RunRecord(
+        run_id=runlog614.new_run_id(SYS), dry_run=dry,
+        trigger="manual" if "--target-month" in argv or "--force" in argv else "auto",
+        script="jarvis_etc_rebate_fetch.py",
+    )
+    os.environ["JARVIS_614_RUN_ID"] = REC.run_id  # 子（Slack 短報）が同じ run_id を使う
+    try:
+        rc = _main()
+    except Exception as e:  # noqa: BLE001
+        _stage("run", "failed", f"想定外のエラー（{type(e).__name__}）", "unexpected_error")
+        REC.finish()
+        raise
+    REC.finish()
+    return rc
+
+
+def _main() -> int:
     ap = argparse.ArgumentParser(description="ETC 平日朝夕還元額の自動取得")
     ap.add_argument("--dry-run", action="store_true", help="取得のみ（state/push しない）")
     ap.add_argument("--apply", action="store_true", help="etc_monthly.json に反映")
@@ -476,8 +532,15 @@ def main() -> int:
     env = load_dotenv(PRIVATE_ENV)
     state = load_state()
 
+    if not (args.dry_run or not args.apply):
+        try:
+            ops614.flush_pending()  # 保留中の #ops 通知を再送（全体停止中は何もしない）
+        except Exception as e:  # noqa: BLE001
+            ops614.emergency_log(f"flush_pending 例外 {type(e).__name__}")
+    stopped_all = ops614.global_stop()
     disabled = (
         state.get("disabled")
+        or stopped_all
         or env.get("JARVIS_ETC_MONTHLY_DISABLE", "").strip().lower() in ("1", "true", "yes")
         or env.get("JARVIS_ETC_REBATE_AUTO_DISABLE", "").strip().lower() in ("1", "true", "yes")
     )
@@ -486,8 +549,9 @@ def main() -> int:
         "window_day": now.day in AUTO_WINDOW_DAYS,
         "disabled": bool(disabled),
     }
-    if disabled and not args.force:
-        report["skipped"] = "disabled"
+    if (disabled and not args.force) or stopped_all:  # 全体停止は --force でも解除しない
+        report["skipped"] = "614 全体停止" if stopped_all else "disabled"
+        _stage("fetch", "skipped", report["skipped"])
         if want_slack:
             report["slack"] = push_slack_report(outcome="disabled", reason="disabled")
         print(json.dumps(report, ensure_ascii=False, indent=2))
@@ -500,6 +564,7 @@ def main() -> int:
             "手動は --target-month YYYY-MM"
         )
         # 窓外の定例ポーリングでは Slack しない（ノイズ防止）
+        _stage("fetch", "skipped", "定例窓外")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
@@ -508,6 +573,7 @@ def main() -> int:
 
     if history_has(state, target) and not args.force:
         report["skipped"] = f"history already has {target}"
+        _stage("fetch", "skipped", f"{target} は履歴済み")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
@@ -521,6 +587,7 @@ def main() -> int:
         # 取得待ちは窓内の翌日に再確認する。同じ日に何度もサイトへ取りに行かない（手動・--force は別）
         report["skipped"] = "取得待ち: 今日は確認済み（翌日に再確認）"
         report["status"] = "waiting"
+        _stage("fetch", "skipped", "取得待ち: 今日は確認済み")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
@@ -529,12 +596,16 @@ def main() -> int:
     if not mid or not pw:
         report["ok"] = False
         report["error"] = "ETC_MILEAGE_ID / ETC_MILEAGE_WEB_PASSWORD 未設定"
+        _stage("fetch", "failed", "資格情報が未設定", "credentials_missing")
         if want_slack:
             report["slack"] = push_slack_report(
                 outcome="failed",
                 target_month=target,
                 error=str(report["error"]),
+                stage="n09 ETC 取得",
+                next_action=".env.jarvis_private の ETC 資格情報を確認",
             )
+            _slack_stage(report["slack"])
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 2
 
@@ -548,12 +619,16 @@ def main() -> int:
     except Exception as e:
         report["ok"] = False
         report["error"] = str(e)
+        _stage("fetch", "failed", f"取得中の例外（{type(e).__name__}）", "scrape_exception")
         if want_slack:
             report["slack"] = push_slack_report(
                 outcome="failed",
                 target_month=target,
                 error=str(e),
+                stage="n09 ETC 取得",
+                next_action="smile-etc のログイン・画面変更を確認（窓内は翌日に再試行）",
             )
+            _slack_stage(report["slack"])
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 1
 
@@ -563,6 +638,7 @@ def main() -> int:
         report["ok"] = None
         report["status"] = "waiting"
         report["waiting_reason"] = str(scraped.get("error") or "付与前")
+        _stage("fetch", "waiting", "付与前（取得待ち）", "not_granted_yet")
         last_day = max(AUTO_WINDOW_DAYS)
         window_over = now.day >= last_day and not (args.target_month or "").strip()
         attempts = 1
@@ -577,12 +653,19 @@ def main() -> int:
             }
             sv = save_state_verified(state)
             report["save_verify"] = {"ok": sv["ok"], "errors": sv["errors"]}
+            _stage("save", "success" if sv["ok"] else "failed", "取得待ちの記録（etc_wait）")
+            _stage("save_verify", "success" if sv["ok"] else "failed", "; ".join(sv["errors"])[:100])
+        else:
+            _stage("save", "not_applicable", "dry-run／--apply なし")
+        _stage("stamp", "skipped", "取得待ちのため月印なし")
         if want_slack:
             if window_over:
                 report["slack"] = push_slack_report(
                     outcome="failed",
                     target_month=target,
                     error=f"取得窓（20〜{last_day}日）の最終日まで未付与のまま。smile-etc の還元額明細を確認",
+                    stage="n09 ETC 取得（取得待ちが窓の最終日を超過）",
+                    next_action="smile-etc の還元額明細で付与を確認。付与後は --target-month で手動取得",
                 )
             elif attempts == 1:  # 毎日同じ『取得待ち』を出さない（最初の1回だけ）
                 report["slack"] = push_slack_report(
@@ -590,16 +673,26 @@ def main() -> int:
                     target_month=target,
                     reason="付与前。窓内は翌日に再確認",
                 )
+            if report.get("slack"):
+                _slack_stage(report["slack"])
+            else:
+                _stage("slack", "skipped", "取得待ちの2回目以降は短報を出さない")
+        else:
+            _stage("slack", "skipped", "短報なし")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
     if not scraped.get("ok"):
         report["ok"] = False
+        _stage("fetch", "failed", "取得に失敗", "scrape_failed")
         if want_slack:
             report["slack"] = push_slack_report(
                 outcome="failed",
                 target_month=target,
                 error=str(scraped.get("error") or scraped.get("note") or "scrape not ok"),
+                stage="n09 ETC 取得",
+                next_action="smile-etc の画面・ログインを確認（窓内は翌日に再試行）",
             )
+            _slack_stage(report["slack"])
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 1
     invalid = validate_scraped(scraped, target)
@@ -607,15 +700,23 @@ def main() -> int:
         # 対象月が違う・還元額が確認できない結果は完了扱いにしない
         report["ok"] = False
         report["error"] = invalid
+        _stage("fetch", "failed", "対象月・還元額の検証に失敗", "invalid_result")
         if want_slack:
-            report["slack"] = push_slack_report(outcome="failed", target_month=target, error=invalid)
+            report["slack"] = push_slack_report(
+                outcome="failed", target_month=target, error=invalid,
+                stage="n09 ETC 取得結果の検証", next_action="取得結果の対象月を確認（完了扱いにしていません）",
+            )
+            _slack_stage(report["slack"])
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 1
 
     report["ok"] = True
+    _stage("fetch", "success", f"{target} の還元額を取得（対象月・付与月・還元額を検証済み）")
     if args.dry_run or not args.apply:
         if not args.apply:
             report["note"] = "取得のみ（--apply で state 反映）"
+        for name in ("save", "save_verify", "stamp", "push", "display", "slack"):
+            _stage(name, "not_applicable", "dry-run／--apply なし")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
 
@@ -626,16 +727,42 @@ def main() -> int:
         # 保存を確認できない結果は成功として画面・短報へ渡さない（外部は取り直さず、取得済みは pending に保持）
         report["ok"] = False
         report["error"] = "state の保存を読み戻して確認できませんでした（取得済みデータは非公開側に一時保持）"
+        _stage("save", "failed", "保存の読み戻し不一致", "save_verify_mismatch")
+        _stage("save_verify", "failed", "; ".join(sv["errors"])[:100], "save_verify_mismatch")
         if want_slack:
             report["slack"] = push_slack_report(
-                outcome="failed", target_month=target, error=str(report["error"])
+                outcome="failed", target_month=target, error=str(report["error"]),
+                stage="n16 ETC 保存", next_action="state 領域の空き・権限を確認し --force で保存だけやり直す（取得済みは一時保持）",
             )
+            _slack_stage(report["slack"])
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 1
     report["applied"] = result
+    _stage("save", "success", "tmp→置換で保存")
+    _stage("save_verify", "success", "読み戻し照合 OK")
+    _stage(
+        "stamp", "success" if state.get("last_check_b") == month_key(now) else "skipped",
+        "今月の月印" if state.get("last_check_b") == month_key(now) else "古い月の取得のため今月の月印は付けない",
+    )
 
     if args.push:
-        report["push"] = push_dashboard()
+        # 保存済み state から push → 実表示を読み戻して照合（不一致は最大1回再 push）。失敗しても取得・保存は取り消さない
+        sync = display614.sync_and_verify(["etc_mileage"])
+        report["push"] = sync
+        _stage("push", "success" if sync["push"] == "success" else "failed", f"{sync['attempts']}回目まで",
+               None if sync["push"] == "success" else "push_failed")
+        disp = {"success": "success", "failed": "failed"}.get(sync["display"], "unverified")
+        _stage("display", disp, sync["error"] or "画面の行を読み戻して一致",
+               None if disp == "success" else f"display_{sync['display']}")
+        if sync["push"] != "success" or sync["display"] == "failed":
+            ops614.notify_ops(
+                system=SYS, stage="n17/18 画面反映", run_id=REC.run_id if REC else "-",
+                cause=sync["error"] or "画面反映を確認できず（取得・保存は済み）",
+                next_action="/etc を確認。保存済み state から再 push（dashboard_push.py --watch-only）",
+            )
+    else:
+        _stage("push", "not_applicable", "--push なし")
+        _stage("display", "not_applicable", "--push なし")
 
     if want_slack:
         report["slack"] = push_slack_report(
@@ -655,6 +782,9 @@ def main() -> int:
             else None,
             note=str(result.get("note") or "")[:200],
         )
+        _slack_stage(report["slack"])
+    else:
+        _stage("slack", "not_applicable", "短報なし")
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0
