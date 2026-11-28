@@ -1,4 +1,4 @@
-# 取捨判断ドラフト係
+# 【停止】取捨判断ドラフト係
 
 - **AIオートメーション（FlowForge）**: [flow_ke1371iDffRaTdOwDs6WJAtC](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_ke1371iDffRaTdOwDs6WJAtC)
 

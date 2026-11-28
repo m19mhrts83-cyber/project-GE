@@ -1,4 +1,4 @@
-# 二重起票・競合監視係
+# 【停止】二重起票・競合監視係
 
 - **AIオートメーション（FlowForge）**: [flow_bfH_iUwm7JmE7XLpfzGIRXL0](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_bfH_iUwm7JmE7XLpfzGIRXL0)
 

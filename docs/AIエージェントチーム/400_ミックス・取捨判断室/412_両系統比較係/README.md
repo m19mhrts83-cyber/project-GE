@@ -1,4 +1,4 @@
-# 両系統比較係
+# 【停止】両系統比較係
 
 - **AIオートメーション（FlowForge）**: [flow_-9F4-5weQBcdsima3vddp_BQ](https://flowforge-259747770348.asia-northeast1.run.app/flows/flow_-9F4-5weQBcdsima3vddp_BQ)
 
