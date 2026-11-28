@@ -9,6 +9,7 @@ on:
       - "215_kamiooya/C1_cursor/1c_神・大家さん倶楽部_AI推進/神・大家さん倶楽部情報Q&Aチャットボット/**"
       - "scripts/kamiooya_*.py"
       - "scripts/tests/openchat_attachment_sources.integration.mjs"
+      - "scripts/tests/qa_member_reads_revoke.integration.mjs"
       - ".github/workflows/pr-kamiooya-qa.yml"
   workflow_dispatch:
 
@@ -37,7 +38,7 @@ jobs:
       - name: Attachment source PostgreSQL integration (local WASM, no external database)
         run: |
           npm install --prefix "$RUNNER_TEMP/openchat-pg" --no-save --ignore-scripts @electric-sql/pglite@0.5.15
-          NODE_PATH="$RUNNER_TEMP/openchat-pg/node_modules" node --test scripts/tests/openchat_attachment_sources.integration.mjs
+          NODE_PATH="$RUNNER_TEMP/openchat-pg/node_modules" node --test scripts/tests/openchat_attachment_sources.integration.mjs scripts/tests/qa_member_reads_revoke.integration.mjs
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.5.6
