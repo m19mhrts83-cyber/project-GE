@@ -3,6 +3,8 @@
 # 回転が無ければ（~/.jarvis_state/ms_graph_new_refresh.env が無ければ）何もしない。
 # トークンの値はログに出さない（sync_refresh は長さと指紋だけを出力）。失敗時だけ #ops へ1行。
 set -uo pipefail
+# launchd の PATH には gh（~/bin/gh）が無いので足す
+export PATH="${HOME}/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="${HOME}/Library/Logs/jarvis_ms_graph_sync"
 mkdir -p "$LOG_DIR"
